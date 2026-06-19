@@ -1,0 +1,14 @@
+# Serena Project Configuration
+# プロジェクト固有の設定
+
+project_name: cfreact-template
+
+# セキュリティ: 初期は読み取り専用モードで起動
+# ファイル編集機能を使用する場合は false に変更してください
+read_only: true
+
+# オプション: このプロジェクト専用のシステムプロンプト
+# system_prompt: "このプロジェクトはCloudflare Workers向けのReactテンプレートです"
+
+# オプション: 無効化するツール
+# disabled_tools: []

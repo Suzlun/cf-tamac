@@ -1,0 +1,56 @@
+{
+  "name": "cfreact-template",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "hediet.vscode-drawio",
+        "ms-azuretools.vscode-docker",
+        "typespec.typespec-vscode",
+        "vitest.explorer",
+        "ms-playwright.playwright",
+        "usernamehw.errorlens",
+        "eamodio.gitlens",
+        "christian-kohler.path-intellisense",
+        "formulahendry.auto-rename-tag",
+        "wix.vscode-import-cost",
+        "dsznajder.es7-react-js-snippets",
+        "yoavbls.pretty-ts-errors",
+        "mikestead.dotenv",
+        "typespec.typespec-vscode",
+        "openai.chatgpt"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"]
+      }
+    }
+  },
+  "forwardPorts": [5173, 8787, 24282],
+  "portsAttributes": {
+    "5173": {
+      "label": "Vite Dev Server",
+      "onAutoForward": "notify"
+    },
+    "8787": {
+      "label": "Cloudflare Workers Dev",
+      "onAutoForward": "notify"
+    },
+    "24282": {
+      "label": "Serena Dashboard",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "corepack enable && pnpm install && pnpm exec playwright install",
+  "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
+  "remoteUser": "node"
+}

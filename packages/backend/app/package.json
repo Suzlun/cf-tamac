@@ -1,0 +1,25 @@
+{
+  "name": "@cfreact-template-backend/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cfreact-template-backend/domain": "workspace:*",
+    "@cfreact-template-backend/http": "workspace:*",
+    "@cfreact-template-backend/persistence": "workspace:*",
+    "@cfreact-template-backend/types": "workspace:*",
+    "@cfreact-template-backend/usecases": "workspace:*",
+    "hono": "^4.12.25"
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260613.1",
+    "typescript": "^5.9.3"
+  }
+}
