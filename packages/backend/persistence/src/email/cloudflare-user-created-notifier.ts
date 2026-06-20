@@ -1,7 +1,7 @@
 import { EmailMessage } from 'cloudflare:email';
 
-import type { User, UserCreatedNotifier } from '@cfreact-template-backend/domain';
-import type { Bindings } from '@cfreact-template-backend/types';
+import type { User, UserCreatedNotifier } from '@cf-tamac-backend/domain';
+import type { Bindings } from '@cf-tamac-backend/types';
 
 /** Configuration for Cloudflare user-created email notifications. */
 export interface CloudflareUserCreatedNotifierOptions {
@@ -32,7 +32,7 @@ export class CloudflareUserCreatedNotifier implements UserCreatedNotifier {
     return [
       `From: <${from}>`,
       `To: <${to}>`,
-      'Subject: New user created in cfreact-template',
+      'Subject: New user created in cf-tamac',
       'MIME-Version: 1.0',
       'Content-Type: text/plain; charset=utf-8',
       '',

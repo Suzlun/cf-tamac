@@ -1,5 +1,5 @@
 {
-  "name": "@cfreact-template-backend/persistence",
+  "name": "@cf-tamac-backend/persistence",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@cfreact-template-backend/domain": "workspace:*",
-    "@cfreact-template-backend/drizzle": "workspace:*",
-    "@cfreact-template-backend/types": "workspace:*",
-    "@cfreact-template-backend/usecases": "workspace:*",
+    "@cf-tamac-backend/domain": "workspace:*",
+    "@cf-tamac-backend/drizzle": "workspace:*",
+    "@cf-tamac-backend/types": "workspace:*",
+    "@cf-tamac-backend/usecases": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {

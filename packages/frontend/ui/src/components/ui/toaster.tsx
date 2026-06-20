@@ -1,4 +1,4 @@
-import { useToast } from '@cfreact-template-frontend/ui/hooks/use-toast';
+import { useToast } from '@cf-tamac-frontend/ui/hooks/use-toast';
 import {
   Toast,
   ToastClose,
@@ -6,7 +6,7 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
-} from '@cfreact-template-frontend/ui/components/ui/toast';
+} from '@cf-tamac-frontend/ui/components/ui/toast';
 
 export function Toaster() {
   const { toasts } = useToast();

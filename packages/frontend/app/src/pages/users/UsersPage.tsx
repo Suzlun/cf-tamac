@@ -1,5 +1,5 @@
-import type { UsersActions, UsersData } from '@cfreact-template-frontend/domain';
-import { useUsers } from '@cfreact-template-frontend/domain';
+import type { UsersActions, UsersData } from '@cf-tamac-frontend/domain';
+import { useUsers } from '@cf-tamac-frontend/domain';
 import {
   Alert,
   AlertTitle,
@@ -20,7 +20,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@cfreact-template-frontend/ui';
+} from '@cf-tamac-frontend/ui';
 
 function PageHeader() {
   return (

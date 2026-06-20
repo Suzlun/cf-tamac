@@ -52,10 +52,10 @@ description: Enforce this repository's real React, Hono, Drizzle, and TypeSpec r
 - Contract を変えるときは `packages/typespec/main.tsp` を直し、`pnpm gen:api-sdk` と `pnpm check:codegen` で整合を取る
 - `packages/typespec/openapi/openapi.json` と `packages/frontend/api/src/generated/client.ts` は手で直さない
 - Frontend app / domain で `fetch`, `globalThis.fetch`, `axios`, `cross-fetch` を直接使わない
-- Frontend app の pages / components から `@cfreact-template-frontend/api` を直 import しない。domain hook を経由する
+- Frontend app の pages / components から `@cf-tamac-frontend/api` を直 import しない。domain hook を経由する
 - React と TSX はこの repo の正規 frontend 実装であり、Svelte 用の制約へ読み替えない
 - `packages/frontend/domain/src/hooks/**` では `use*` export、`{ data, actions }` 戻り値、`*Data` / `*Actions` 型注釈を守る
-- 再利用したい見た目は `@cfreact-template-frontend/ui` に寄せ、画面固有の構成だけを `packages/frontend/app` に置く
+- 再利用したい見た目は `@cf-tamac-frontend/ui` に寄せ、画面固有の構成だけを `packages/frontend/app` に置く
 - Backend HTTP は `packages/backend/http`、配線は `packages/backend/app`、永続化は `packages/backend/persistence` / `packages/backend/drizzle` に置く
 - `packages/backend/http` から `packages/backend/persistence` を直 import しない。`c.env` も HTTP 層で直接読まない
 - `packages/backend/domain` と `packages/backend/usecases` では adapter import や framework 依存を持ち込まない
@@ -89,7 +89,7 @@ Changed-file 向けの軽量チェック:
 ## Common violations to prevent
 
 - generated file の手編集
-- `packages/frontend/app` から `@cfreact-template-frontend/api` の直 import
+- `packages/frontend/app` から `@cf-tamac-frontend/api` の直 import
 - frontend app / domain での `fetch` / `axios` / `cross-fetch`
 - hooks が `{ data, actions }` を返さない
 - export に必要な TSDoc がない

@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 
-import type { Bindings } from '@cfreact-template-backend/types';
+import type { Bindings } from '@cf-tamac-backend/types';
 
 /** Drizzle client type for D1 connections. */
 export type DrizzleClient = ReturnType<typeof drizzle>;

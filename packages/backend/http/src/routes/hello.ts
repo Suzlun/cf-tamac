@@ -1,8 +1,8 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 
-import type { AppVariables } from '@cfreact-template-backend/http/context';
-import { helloResponseSchema } from '@cfreact-template-backend/http/schemas';
-import type { Bindings } from '@cfreact-template-backend/types';
+import type { AppVariables } from '@cf-tamac-backend/http/context';
+import { helloResponseSchema } from '@cf-tamac-backend/http/schemas';
+import type { Bindings } from '@cf-tamac-backend/types';
 
 const helloRoute = createRoute({
   method: 'get',

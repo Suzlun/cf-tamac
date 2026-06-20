@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import '@cfreact-template-frontend/ui/styles.css';
+import '@cf-tamac-frontend/ui/styles.css';
 
 import { App } from './app';
 

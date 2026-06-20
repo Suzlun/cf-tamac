@@ -1,5 +1,5 @@
 {
-  "name": "@cfreact-template-backend/drizzle",
+  "name": "@cf-tamac-backend/drizzle",
   "version": "0.1.0",
   "private": true,
   "type": "module",

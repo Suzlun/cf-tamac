@@ -1,5 +1,5 @@
 {
-  "name": "@cfreact-template-frontend/domain",
+  "name": "@cf-tamac-frontend/domain",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@cfreact-template-frontend/api": "workspace:*"
+    "@cf-tamac-frontend/api": "workspace:*"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.101.0",

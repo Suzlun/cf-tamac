@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Drawer as DrawerPrimitive } from 'vaul';
 
-import { cn } from '@cfreact-template-frontend/ui/lib/utils';
+import { cn } from '@cf-tamac-frontend/ui/lib/utils';
 
 const Drawer = ({
   shouldScaleBackground = true,

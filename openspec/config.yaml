@@ -1,7 +1,7 @@
 schema: new-feature
 
 context: |
-  Repository: cfreact-template
+  Repository: cf-tamac
   Tech stack: TypeScript, React, Cloudflare Workers, Hono, Drizzle ORM
   Testing: Vitest (unit/integration), Playwright (e2e)
 

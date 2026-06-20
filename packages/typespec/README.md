@@ -4,7 +4,7 @@ This package is the single source of truth for the API contract.
 
 - Edit entrypoint: `packages/typespec/main.tsp`
 - API base path: `/api/v1` (template convention)
-- Generate OpenAPI: `pnpm --filter @cfreact-template/typespec gen:openapi`
+- Generate OpenAPI: `pnpm --filter @cf-tamac/typespec gen:openapi`
 - Output: `packages/typespec/openapi/openapi.json`
 
 File layout (recommended)

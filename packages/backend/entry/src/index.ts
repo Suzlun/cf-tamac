@@ -1,1 +1,1 @@
-export { server as default } from '@cfreact-template-backend/app';
+export { server as default } from '@cf-tamac-backend/app';

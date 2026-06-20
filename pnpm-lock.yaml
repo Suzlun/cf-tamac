@@ -129,19 +129,19 @@ importers:
 
   packages/backend/app:
     dependencies:
-      '@cfreact-template-backend/domain':
+      '@cf-tamac-backend/domain':
         specifier: workspace:*
         version: link:../domain
-      '@cfreact-template-backend/http':
+      '@cf-tamac-backend/http':
         specifier: workspace:*
         version: link:../http
-      '@cfreact-template-backend/persistence':
+      '@cf-tamac-backend/persistence':
         specifier: workspace:*
         version: link:../persistence
-      '@cfreact-template-backend/types':
+      '@cf-tamac-backend/types':
         specifier: workspace:*
         version: link:../types
-      '@cfreact-template-backend/usecases':
+      '@cf-tamac-backend/usecases':
         specifier: workspace:*
         version: link:../usecases
       hono:
@@ -157,7 +157,7 @@ importers:
 
   packages/backend/domain:
     dependencies:
-      '@cfreact-template-backend/types':
+      '@cf-tamac-backend/types':
         specifier: workspace:*
         version: link:../types
     devDependencies:
@@ -180,10 +180,10 @@ importers:
 
   packages/backend/entry:
     dependencies:
-      '@cfreact-template-backend/app':
+      '@cf-tamac-backend/app':
         specifier: workspace:*
         version: link:../app
-      '@cfreact-template-backend/types':
+      '@cf-tamac-backend/types':
         specifier: workspace:*
         version: link:../types
       wrangler:
@@ -199,16 +199,16 @@ importers:
 
   packages/backend/http:
     dependencies:
-      '@cfreact-template-backend/domain':
+      '@cf-tamac-backend/domain':
         specifier: workspace:*
         version: link:../domain
-      '@cfreact-template-backend/drizzle':
+      '@cf-tamac-backend/drizzle':
         specifier: workspace:*
         version: link:../drizzle
-      '@cfreact-template-backend/types':
+      '@cf-tamac-backend/types':
         specifier: workspace:*
         version: link:../types
-      '@cfreact-template-backend/usecases':
+      '@cf-tamac-backend/usecases':
         specifier: workspace:*
         version: link:../usecases
       '@hono/zod-openapi':
@@ -221,7 +221,7 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@cfreact-template-backend/persistence':
+      '@cf-tamac-backend/persistence':
         specifier: workspace:*
         version: link:../persistence
       '@cloudflare/vitest-pool-workers':
@@ -239,16 +239,16 @@ importers:
 
   packages/backend/persistence:
     dependencies:
-      '@cfreact-template-backend/domain':
+      '@cf-tamac-backend/domain':
         specifier: workspace:*
         version: link:../domain
-      '@cfreact-template-backend/drizzle':
+      '@cf-tamac-backend/drizzle':
         specifier: workspace:*
         version: link:../drizzle
-      '@cfreact-template-backend/types':
+      '@cf-tamac-backend/types':
         specifier: workspace:*
         version: link:../types
-      '@cfreact-template-backend/usecases':
+      '@cf-tamac-backend/usecases':
         specifier: workspace:*
         version: link:../usecases
       drizzle-orm:
@@ -273,10 +273,10 @@ importers:
 
   packages/backend/usecases:
     dependencies:
-      '@cfreact-template-backend/domain':
+      '@cf-tamac-backend/domain':
         specifier: workspace:*
         version: link:../domain
-      '@cfreact-template-backend/types':
+      '@cf-tamac-backend/types':
         specifier: workspace:*
         version: link:../types
     devDependencies:
@@ -298,13 +298,13 @@ importers:
 
   packages/frontend/app:
     dependencies:
-      '@cfreact-template-frontend/api':
+      '@cf-tamac-frontend/api':
         specifier: workspace:*
         version: link:../api
-      '@cfreact-template-frontend/domain':
+      '@cf-tamac-frontend/domain':
         specifier: workspace:*
         version: link:../domain
-      '@cfreact-template-frontend/ui':
+      '@cf-tamac-frontend/ui':
         specifier: workspace:*
         version: link:../ui
       '@tanstack/react-query':
@@ -371,7 +371,7 @@ importers:
 
   packages/frontend/domain:
     dependencies:
-      '@cfreact-template-frontend/api':
+      '@cf-tamac-frontend/api':
         specifier: workspace:*
         version: link:../api
       '@tanstack/react-query':

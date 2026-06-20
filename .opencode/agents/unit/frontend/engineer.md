@@ -71,7 +71,7 @@ If any are missing, do not start. Reply with Status BLOCKED and list missing inp
 - If the caller did not provide concrete UI/UX instructions, call `unit/frontend/designer` before implementing presentation-facing changes
 - Treat a designer-authored wireframe/specification under `openspec/changes/**` as the source of truth for UI placement, states, and copy
 - Keep frontend dependency direction: `app -> domain -> api` and `app -> ui`
-- Never import `@cfreact-template-frontend/api` directly from app pages or components
+- Never import `@cf-tamac-frontend/api` directly from app pages or components
 - Never use `fetch`, `axios`, or `cross-fetch` directly in `packages/frontend/app` or `packages/frontend/domain`
 - Treat React and TSX as the normal implementation model for this repository
 - When UI can be shared, request `unit/frontend/designer` to create or update the reusable component in `packages/frontend/ui`, then integrate it from `packages/frontend/app` exactly as specified

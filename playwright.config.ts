@@ -29,13 +29,13 @@ export default defineConfig({
   /* テスト前にサーバーを起動 */
   webServer: [
     {
-      command: 'pnpm --filter @cfreact-template-frontend/app dev',
+      command: 'pnpm --filter @cf-tamac-frontend/app dev',
       url: 'http://localhost:5173',
       reuseExistingServer: process.env.CI === undefined,
       timeout: 120 * 1000,
     },
     {
-      command: 'pnpm --filter @cfreact-template-backend/entry dev',
+      command: 'pnpm --filter @cf-tamac-backend/entry dev',
       url: 'http://localhost:8787/health',
       reuseExistingServer: process.env.CI === undefined,
       timeout: 120 * 1000,

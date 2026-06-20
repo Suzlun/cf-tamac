@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
 
-import '@cfreact-template-frontend/ui/styles.css';
+import '@cf-tamac-frontend/ui/styles.css';
 
 import type { ReactElement, ReactNode } from 'react';
 

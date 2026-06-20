@@ -1,11 +1,8 @@
 import * as React from 'react';
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 
-import { cn } from '@cfreact-template-frontend/ui/lib/utils';
-import {
-  buttonVariants,
-  type ButtonProps,
-} from '@cfreact-template-frontend/ui/components/ui/button';
+import { cn } from '@cf-tamac-frontend/ui/lib/utils';
+import { buttonVariants, type ButtonProps } from '@cf-tamac-frontend/ui/components/ui/button';
 
 const Pagination = ({ className, ...props }: React.ComponentProps<'nav'>) => (
   <nav

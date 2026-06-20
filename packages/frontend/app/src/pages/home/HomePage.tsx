@@ -1,7 +1,7 @@
 import { Link as RouterLink } from 'react-router';
 
-import type { HelloData } from '@cfreact-template-frontend/domain';
-import { useHello } from '@cfreact-template-frontend/domain';
+import type { HelloData } from '@cf-tamac-frontend/domain';
+import { useHello } from '@cf-tamac-frontend/domain';
 import {
   Alert,
   AlertTitle,
@@ -14,7 +14,7 @@ import {
   CardTitle,
   Skeleton,
   Spinner,
-} from '@cfreact-template-frontend/ui';
+} from '@cf-tamac-frontend/ui';
 
 const techStackItems = [
   'React 19',
@@ -35,9 +35,7 @@ function HeroSection({ onRefresh, isLoading }: { onRefresh: () => void; isLoadin
         <Badge variant="outline" className="w-fit">
           Cloudflare · React · Hono
         </Badge>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Welcome to cfreact-template
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Welcome to cf-tamac</h1>
         <p className="text-muted-foreground">
           フルスタックで Workers を動かすためのスターター。React + TanStack Query + Hono + Drizzle
           をすぐに試せます。

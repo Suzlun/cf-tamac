@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '@cfreact-template-frontend/ui/lib/utils';
-import { Label } from '@cfreact-template-frontend/ui/components/ui/label';
-import { Separator } from '@cfreact-template-frontend/ui/components/ui/separator';
+import { cn } from '@cf-tamac-frontend/ui/lib/utils';
+import { Label } from '@cf-tamac-frontend/ui/components/ui/label';
+import { Separator } from '@cf-tamac-frontend/ui/components/ui/separator';
 
 function FieldSet({ className, ...props }: React.ComponentProps<'fieldset'>) {
   return (

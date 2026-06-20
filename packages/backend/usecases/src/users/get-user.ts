@@ -1,4 +1,4 @@
-import type { User, UserRepository } from '@cfreact-template-backend/domain';
+import type { User, UserRepository } from '@cf-tamac-backend/domain';
 
 /** Use case to fetch a user by id. */
 export class GetUser {

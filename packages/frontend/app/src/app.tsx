@@ -1,6 +1,6 @@
 import { RouterProvider } from 'react-router';
 
-import { QueryProvider } from '@cfreact-template-frontend/domain';
+import { QueryProvider } from '@cf-tamac-frontend/domain';
 
 import { router } from './router';
 

@@ -1,4 +1,4 @@
-# cfreact-template
+# cf-tamac
 
 **Cloudflare Workers** 上で React、Hono、Drizzle ORM を使用した本番環境対応アプリケーションを構築するためのフルスタックテンプレート。
 
@@ -35,7 +35,7 @@
 ## プロジェクト構成
 
 ```
-cfreact-template/
+cf-tamac/
 ├── packages/
 │   ├── typespec/                  # TypeSpec (API 契約) - OpenAPI の正
 │   ├── client/
@@ -83,7 +83,7 @@ cfreact-template/
 
    ```bash
    git clone <your-repo-url>
-   cd cfreact-template
+   cd cf-tamac
    ```
 
 2. **VS Code で開く:**
@@ -103,13 +103,13 @@ cfreact-template/
 
    ```bash
    # D1 データベースを作成
-   wrangler d1 create cfreact-template-db
+   wrangler d1 create cf-tamac-db
 
    # KV 名前空間を作成
    wrangler kv:namespace create KV
 
    # R2 バケットを作成
-   wrangler r2 bucket create cfreact-template-bucket
+   wrangler r2 bucket create cf-tamac-bucket
    ```
 
 5. **wrangler.toml を更新:**
@@ -122,10 +122,10 @@ cfreact-template/
    pnpm migrate:generate
 
    # ローカルでマイグレーションを適用
-   wrangler d1 execute cfreact-template-db --local --file=./drizzle/migrations/<migration-file>.sql
+   wrangler d1 execute cf-tamac-db --local --file=./drizzle/migrations/<migration-file>.sql
 
    # 本番環境でマイグレーションを適用
-   wrangler d1 execute cfreact-template-db --remote --file=./drizzle/migrations/<migration-file>.sql
+   wrangler d1 execute cf-tamac-db --remote --file=./drizzle/migrations/<migration-file>.sql
    ```
 
 7. **開発サーバーを起動:**
@@ -135,8 +135,8 @@ cfreact-template/
    pnpm dev:all
 
    # または個別に起動:
-   pnpm dev:server  # バックエンド http://localhost:8787 （@cfreact-template-backend/entry）
-   pnpm dev:client  # フロントエンド http://localhost:5173 （@cfreact-template-frontend/app）
+   pnpm dev:server  # バックエンド http://localhost:8787 （@cf-tamac-backend/entry）
+   pnpm dev:client  # フロントエンド http://localhost:5173 （@cf-tamac-frontend/app）
    ```
 
 8. **アプリケーションにアクセス:**
@@ -158,7 +158,7 @@ pnpm gen:api-sdk
 
 ```bash
 pnpm gen:openapi
-pnpm --filter @cfreact-template-frontend/api gen
+pnpm --filter @cf-tamac-frontend/api gen
 ```
 
 ### 方法 2: 手動セットアップ
@@ -304,13 +304,13 @@ pnpm dev:all
 3. **ローカルでマイグレーションを適用:**
 
    ```bash
-   wrangler d1 execute cfreact-template-db --local --file=./drizzle/migrations/<file>.sql
+   wrangler d1 execute cf-tamac-db --local --file=./drizzle/migrations/<file>.sql
    ```
 
 4. **本番環境でマイグレーションを適用:**
 
    ```bash
-   wrangler d1 execute cfreact-template-db --remote --file=./drizzle/migrations/<file>.sql
+   wrangler d1 execute cf-tamac-db --remote --file=./drizzle/migrations/<file>.sql
    ```
 
 5. **Drizzle Studio でデータベースを表示:**

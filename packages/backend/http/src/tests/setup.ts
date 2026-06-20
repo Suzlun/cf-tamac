@@ -1,7 +1,7 @@
 import { env as testEnv } from 'cloudflare:workers';
 import { beforeAll, beforeEach } from 'vitest';
 
-import type { Bindings } from '@cfreact-template-backend/types';
+import type { Bindings } from '@cf-tamac-backend/types';
 
 const env = testEnv as unknown as Bindings;
 

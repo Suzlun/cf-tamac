@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getOpenApiDocument } from '@cfreact-template-backend/http';
+import { getOpenApiDocument } from '@cf-tamac-backend/http';
 
 import contractOpenApi from '../../../../typespec/openapi/openapi.json';
 
@@ -41,7 +41,7 @@ describe('OpenAPI contract', () => {
       getOpenApiDocument({
         openapi: '3.0.3',
         info: {
-          title: 'cfreact-template API',
+          title: 'cf-tamac API',
           version: '1.0.0',
         },
         servers: [{ url: '/', description: 'Default server' }],

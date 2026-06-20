@@ -2,8 +2,8 @@ import * as React from 'react';
 import useEmblaCarousel, { type UseEmblaCarouselType } from 'embla-carousel-react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 
-import { cn } from '@cfreact-template-frontend/ui/lib/utils';
-import { Button } from '@cfreact-template-frontend/ui/components/ui/button';
+import { cn } from '@cf-tamac-frontend/ui/lib/utils';
+import { Button } from '@cf-tamac-frontend/ui/components/ui/button';
 
 type CarouselApi = UseEmblaCarouselType[1];
 type UseCarouselParameters = Parameters<typeof useEmblaCarousel>;

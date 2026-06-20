@@ -256,22 +256,22 @@ export default tseslint.config(
           },
           pathGroups: [
             {
-              pattern: '@cfreact-template-backend/drizzle',
+              pattern: '@cf-tamac-backend/drizzle',
               group: 'internal',
               position: 'after',
             },
             {
-              pattern: '@cfreact-template-frontend/**',
+              pattern: '@cf-tamac-frontend/**',
               group: 'internal',
               position: 'after',
             },
             {
-              pattern: '@cfreact-template-frontend/ui/**',
+              pattern: '@cf-tamac-frontend/ui/**',
               group: 'internal',
               position: 'after',
             },
             {
-              pattern: '@cfreact-template-backend/**',
+              pattern: '@cf-tamac-backend/**',
               group: 'internal',
               position: 'after',
             },
@@ -500,14 +500,14 @@ export default tseslint.config(
         {
           paths: [
             {
-              name: '@cfreact-template-frontend/api',
+              name: '@cf-tamac-frontend/api',
               message:
                 'App 層では API パッケージを直接 import せず、domain hooks を経由してください。',
             },
           ],
           patterns: [
             {
-              group: ['@cfreact-template-frontend/api/**'],
+              group: ['@cf-tamac-frontend/api/**'],
               message:
                 'App 層では API パッケージを直接 import せず、domain hooks を経由してください。',
             },
@@ -867,7 +867,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['@cfreact-template-frontend/app/**', '../app/**'],
+              group: ['@cf-tamac-frontend/app/**', '../app/**'],
               message: 'hooks では UI 層（app/pages/components）の import を禁止します。',
             },
           ],
@@ -946,11 +946,11 @@ export default tseslint.config(
           paths: [
             {
               name: 'axios',
-              message: 'Use @cfreact-template-frontend/api instead of axios.',
+              message: 'Use @cf-tamac-frontend/api instead of axios.',
             },
             {
               name: 'cross-fetch',
-              message: 'Use @cfreact-template-frontend/api instead of performing manual fetches.',
+              message: 'Use @cf-tamac-frontend/api instead of performing manual fetches.',
             },
           ],
         },
@@ -1006,11 +1006,11 @@ export default tseslint.config(
           paths: [
             {
               name: 'axios',
-              message: 'Use @cfreact-template-frontend/api instead of axios.',
+              message: 'Use @cf-tamac-frontend/api instead of axios.',
             },
             {
               name: 'cross-fetch',
-              message: 'Use @cfreact-template-frontend/api instead of performing manual fetches.',
+              message: 'Use @cf-tamac-frontend/api instead of performing manual fetches.',
             },
             {
               name: 'react',
@@ -1040,7 +1040,7 @@ export default tseslint.config(
           ],
           patterns: [
             {
-              group: ['@cfreact-template-frontend/api/**'],
+              group: ['@cf-tamac-frontend/api/**'],
               message: 'App 層から API パッケージを直接 import しないでください（domain 経由）。',
             },
           ],
@@ -1127,17 +1127,17 @@ export default tseslint.config(
         {
           paths: [
             {
-              name: '@cfreact-template-frontend/api',
+              name: '@cf-tamac-frontend/api',
               message: 'Pages/Components は Hooks 経由でAPIを呼び出してください。',
             },
             {
-              name: '@cfreact-template-frontend/domain',
+              name: '@cf-tamac-frontend/domain',
               message: 'hooks は個別フックを指し示すパスで import してください。',
             },
           ],
           patterns: [
             {
-              group: ['@cfreact-template-frontend/app/src/components/**'],
+              group: ['@cf-tamac-frontend/app/src/components/**'],
               message: 'components 同士の循環参照を避け、必要なら hooks 経由にしてください。',
             },
           ],
@@ -1192,10 +1192,10 @@ export default tseslint.config(
             {
               group: ['../**'],
               message:
-                '@cfreact-template-backend/* エイリアスでパッケージ内の上位ディレクトリを参照してください。',
+                '@cf-tamac-backend/* エイリアスでパッケージ内の上位ディレクトリを参照してください。',
             },
             {
-              group: ['@cfreact-template-backend/app/**'],
+              group: ['@cf-tamac-backend/app/**'],
               message: 'App層の依存はappパッケージ内でのみ利用してください。',
             },
           ],
@@ -1213,7 +1213,7 @@ export default tseslint.config(
             {
               group: ['../**'],
               message:
-                '@cfreact-template-backend/* エイリアスでパッケージ内の上位ディレクトリを参照してください。',
+                '@cf-tamac-backend/* エイリアスでパッケージ内の上位ディレクトリを参照してください。',
             },
           ],
         },
@@ -1231,8 +1231,8 @@ export default tseslint.config(
           patterns: [
             {
               group: [
-                '@cfreact-template-backend/http/**',
-                '@cfreact-template-backend/persistence/**',
+                '@cf-tamac-backend/http/**',
+                '@cf-tamac-backend/persistence/**',
                 '../http/**',
                 '../persistence/**',
               ],
@@ -1272,8 +1272,8 @@ export default tseslint.config(
           patterns: [
             {
               group: [
-                '@cfreact-template-backend/http/**',
-                '@cfreact-template-backend/persistence/**',
+                '@cf-tamac-backend/http/**',
+                '@cf-tamac-backend/persistence/**',
                 '../http/**',
                 '../persistence/**',
               ],
@@ -1400,7 +1400,7 @@ export default tseslint.config(
         {
           paths: [
             {
-              name: '@cfreact-template-backend/app',
+              name: '@cf-tamac-backend/app',
               message:
                 'HTTPアダプタ層から App 層を参照しないでください。必要な型は usecases/types から参照してください。',
             },
@@ -1418,19 +1418,19 @@ export default tseslint.config(
             {
               group: ['../**'],
               message:
-                '@cfreact-template-backend/* エイリアスでパッケージ内の上位ディレクトリを参照してください。',
+                '@cf-tamac-backend/* エイリアスでパッケージ内の上位ディレクトリを参照してください。',
             },
             {
               group: [
                 '../persistence/**',
                 '../../persistence/**',
-                '@cfreact-template-backend/persistence/**',
+                '@cf-tamac-backend/persistence/**',
               ],
               message:
                 'HTTPアダプタ層から直接Persistence層を参照せず、UseCase経由でアクセスしてください。',
             },
             {
-              group: ['@cfreact-template-backend/app/**'],
+              group: ['@cf-tamac-backend/app/**'],
               message:
                 'HTTPアダプタ層から App 層を参照しないでください。必要な型は usecases/types から参照してください。',
             },
@@ -1480,7 +1480,7 @@ export default tseslint.config(
               group: [
                 '../persistence/**',
                 '../../persistence/**',
-                '@cfreact-template-backend/persistence/**',
+                '@cf-tamac-backend/persistence/**',
               ],
               message:
                 'HTTPアダプタ層から直接Persistence層を参照せず、UseCase経由でアクセスしてください。',
@@ -1511,7 +1511,7 @@ export default tseslint.config(
               group: [
                 '../persistence/**',
                 '../../persistence/**',
-                '@cfreact-template-backend/persistence/**',
+                '@cf-tamac-backend/persistence/**',
               ],
               message:
                 'HTTPアダプタ層から直接Persistence層を参照せず、UseCase経由でアクセスしてください。',
@@ -1587,9 +1587,9 @@ export default tseslint.config(
             {
               group: [
                 '**/src/**/!(*index)',
-                '@cfreact-template-frontend/**/!(*index)',
-                '@cfreact-template-backend/**/!(*index)',
-                '@cfreact-template/**/!(*index)',
+                '@cf-tamac-frontend/**/!(*index)',
+                '@cf-tamac-backend/**/!(*index)',
+                '@cf-tamac/**/!(*index)',
                 './**/!(*index)',
                 '../**/!(*index)',
               ],

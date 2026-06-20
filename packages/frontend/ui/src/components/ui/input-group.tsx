@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '@cfreact-template-frontend/ui/lib/utils';
-import { Button } from '@cfreact-template-frontend/ui/components/ui/button';
-import { Input } from '@cfreact-template-frontend/ui/components/ui/input';
-import { Textarea } from '@cfreact-template-frontend/ui/components/ui/textarea';
+import { cn } from '@cf-tamac-frontend/ui/lib/utils';
+import { Button } from '@cf-tamac-frontend/ui/components/ui/button';
+import { Input } from '@cf-tamac-frontend/ui/components/ui/input';
+import { Textarea } from '@cf-tamac-frontend/ui/components/ui/textarea';
 
 function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (

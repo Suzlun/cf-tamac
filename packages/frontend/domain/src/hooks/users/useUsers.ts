@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { usersApi } from '@cfreact-template-frontend/api';
-import type { CreateUserPayload, User } from '@cfreact-template-frontend/api/types';
+import { usersApi } from '@cf-tamac-frontend/api';
+import type { CreateUserPayload, User } from '@cf-tamac-frontend/api/types';
 
 /** Data exposed by the users domain hook. */
 interface UsersData {

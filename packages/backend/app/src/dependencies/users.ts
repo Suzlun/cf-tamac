@@ -2,14 +2,9 @@ import {
   CloudflareUserCreatedNotifier,
   createDrizzleClient,
   DrizzleUserRepository,
-} from '@cfreact-template-backend/persistence';
-import type { Bindings } from '@cfreact-template-backend/types';
-import {
-  CreateUser,
-  GetUser,
-  ListUsers,
-  type UsersUseCases,
-} from '@cfreact-template-backend/usecases';
+} from '@cf-tamac-backend/persistence';
+import type { Bindings } from '@cf-tamac-backend/types';
+import { CreateUser, GetUser, ListUsers, type UsersUseCases } from '@cf-tamac-backend/usecases';
 
 /** Build user use cases with persistence dependencies. */
 export const createUsersUseCases = (bindings: Bindings): UsersUseCases => {

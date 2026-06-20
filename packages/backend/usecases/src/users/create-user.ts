@@ -1,10 +1,10 @@
-import { normalizeCreateUserInput } from '@cfreact-template-backend/domain';
+import { normalizeCreateUserInput } from '@cf-tamac-backend/domain';
 import type {
   CreateUserInput,
   User,
   UserCreatedNotifier,
   UserRepository,
-} from '@cfreact-template-backend/domain';
+} from '@cf-tamac-backend/domain';
 
 /** Use case to create a new user. */
 export class CreateUser {

@@ -1,17 +1,17 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 
-import { InvalidCreateUserInputError } from '@cfreact-template-backend/domain';
-import type { User } from '@cfreact-template-backend/domain';
-import type { AppVariables } from '@cfreact-template-backend/http/context';
+import { InvalidCreateUserInputError } from '@cf-tamac-backend/domain';
+import type { User } from '@cf-tamac-backend/domain';
+import type { AppVariables } from '@cf-tamac-backend/http/context';
 import {
   createUserInputSchema,
   errorResponseSchema,
   userIdParamsSchema,
   userResponseSchema,
   usersListResponseSchema,
-} from '@cfreact-template-backend/http/schemas';
-import type { Bindings } from '@cfreact-template-backend/types';
-import type { UsersUseCases } from '@cfreact-template-backend/usecases';
+} from '@cf-tamac-backend/http/schemas';
+import type { Bindings } from '@cf-tamac-backend/types';
+import type { UsersUseCases } from '@cf-tamac-backend/usecases';
 
 const listUsersRoute = createRoute({
   method: 'get',

@@ -1,4 +1,4 @@
-name = "cfreact-template-server"
+name = "cf-tamac-server"
 main = "packages/backend/entry/src/index.ts"
 compatibility_date = "2025-11-13"
 compatibility_flags = ["nodejs_compat"]
@@ -9,7 +9,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "cfreact-template-db"
+database_name = "cf-tamac-db"
 database_id = "YOUR_DATABASE_ID_HERE"
 
 [[kv_namespaces]]
@@ -18,7 +18,7 @@ id = "YOUR_KV_NAMESPACE_ID_HERE"
 
 [[r2_buckets]]
 binding = "R2"
-bucket_name = "cfreact-template-bucket"
+bucket_name = "cf-tamac-bucket"
 
 [[send_email]]
 name = "EMAIL"
@@ -28,7 +28,7 @@ EMAIL_FROM = "noreply@example.com"
 EMAIL_TO = "recipient@example.com"
 
 [env.production]
-name = "cfreact-template-server-production"
+name = "cf-tamac-server-production"
 
 [env.production.vars]
 EMAIL_FROM = "noreply@example.com"
@@ -36,7 +36,7 @@ EMAIL_TO = "recipient@example.com"
 
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "cfreact-template-db-production"
+database_name = "cf-tamac-db-production"
 database_id = "YOUR_PRODUCTION_DATABASE_ID_HERE"
 
 [[env.production.kv_namespaces]]
@@ -45,7 +45,7 @@ id = "YOUR_PRODUCTION_KV_NAMESPACE_ID_HERE"
 
 [[env.production.r2_buckets]]
 binding = "R2"
-bucket_name = "cfreact-template-bucket-production"
+bucket_name = "cf-tamac-bucket-production"
 
 [[env.production.send_email]]
 name = "EMAIL"

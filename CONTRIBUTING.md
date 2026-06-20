@@ -25,8 +25,8 @@
    ```
 2. 開発サーバー
    ```bash
-   pnpm dev:server    # @cfreact-template-backend/entry (http://localhost:8787)
-   pnpm dev:client    # @cfreact-template-frontend/app  (http://localhost:5173)
+   pnpm dev:server    # @cf-tamac-backend/entry (http://localhost:8787)
+   pnpm dev:client    # @cf-tamac-frontend/app  (http://localhost:5173)
    # または
    pnpm dev:all
    ```
@@ -104,9 +104,9 @@ pnpm check
 
 ```bash
 pnpm test          # すべて（vitest workspace）
-pnpm test:client   # @cfreact-template-frontend/app
-pnpm test:server   # @cfreact-template-backend/http
-pnpm test:ui       # @cfreact-template-frontend/ui
+pnpm test:client   # @cf-tamac-frontend/app
+pnpm test:server   # @cf-tamac-backend/http
+pnpm test:ui       # @cf-tamac-frontend/ui
 pnpm test:e2e      # Playwright（変更が e2e に影響する場合）
 ```
 

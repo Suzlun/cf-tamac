@@ -1,5 +1,5 @@
 {
-  "name": "cfreact-template",
+  "name": "cf-tamac",
   "build": {
     "dockerfile": "Dockerfile"
   },
