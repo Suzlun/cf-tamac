@@ -1,4 +1,4 @@
-namespace CfreactTemplate;
+namespace CfTamac;
 
 model ErrorResponse {
   error: string;

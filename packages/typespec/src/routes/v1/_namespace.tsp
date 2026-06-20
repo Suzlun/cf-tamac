@@ -3,4 +3,4 @@ import "@typespec/http";
 using Http;
 
 @route("/api/v1")
-namespace CfreactTemplate.ApiV1;
+namespace CfTamac.ApiV1;

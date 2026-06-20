@@ -2,7 +2,7 @@ import "@typespec/openapi";
 
 using TypeSpec.OpenAPI;
 
-namespace CfreactTemplate;
+namespace CfTamac;
 
 model User {
   id: int64;

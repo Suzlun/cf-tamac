@@ -4,7 +4,7 @@ import "@typespec/openapi";
 using Http;
 using TypeSpec.OpenAPI;
 
-namespace CfreactTemplate.ApiV1;
+namespace CfTamac.ApiV1;
 
 @tag("hello")
 @summary("Returns greeting")
@@ -13,5 +13,5 @@ namespace CfreactTemplate.ApiV1;
 @route("/hello")
 op getHello(): {
   @statusCode statusCode: 200;
-  @body body: CfreactTemplate.HelloResponse;
+  @body body: CfTamac.HelloResponse;
 };

@@ -15,7 +15,7 @@ import "./src/routes/v1/users.tsp";
 using Http;
 using TypeSpec.OpenAPI;
 
-@service(#{ title: "cfreact-template API" })
+@service(#{ title: "cf-tamac API" })
 @info(#{ version: "1.0.0" })
 @server("/", "Default server")
-namespace CfreactTemplate;
+namespace CfTamac;

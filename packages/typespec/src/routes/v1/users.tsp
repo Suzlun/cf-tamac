@@ -4,7 +4,7 @@ import "@typespec/openapi";
 using Http;
 using TypeSpec.OpenAPI;
 
-namespace CfreactTemplate.ApiV1;
+namespace CfTamac.ApiV1;
 
 @tag("users")
 @summary("List all users")
@@ -13,7 +13,7 @@ namespace CfreactTemplate.ApiV1;
 @route("/users")
 op listUsers(): {
   @statusCode statusCode: 200;
-  @body body: CfreactTemplate.User[];
+  @body body: CfTamac.User[];
 };
 
 @tag("users")
@@ -21,14 +21,14 @@ op listUsers(): {
 @operationId("createUser")
 @post
 @route("/users")
-op createUser(@body body: CfreactTemplate.CreateUserInput):
+op createUser(@body body: CfTamac.CreateUserInput):
   | {
       @statusCode statusCode: 201;
-      @body body: CfreactTemplate.User;
+      @body body: CfTamac.User;
     }
   | {
       @statusCode statusCode: 400;
-      @body body: CfreactTemplate.ErrorResponse;
+      @body body: CfTamac.ErrorResponse;
     };
 
 @tag("users")
@@ -39,13 +39,13 @@ op createUser(@body body: CfreactTemplate.CreateUserInput):
 op getUser(@path id: int64):
   | {
       @statusCode statusCode: 200;
-      @body body: CfreactTemplate.User;
+      @body body: CfTamac.User;
     }
   | {
       @statusCode statusCode: 400;
-      @body body: CfreactTemplate.ErrorResponse;
+      @body body: CfTamac.ErrorResponse;
     }
   | {
       @statusCode statusCode: 404;
-      @body body: CfreactTemplate.ErrorResponse;
+      @body body: CfTamac.ErrorResponse;
     };
