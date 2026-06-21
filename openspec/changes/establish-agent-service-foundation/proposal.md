@@ -7,7 +7,7 @@
 ## What Changes
 
 - **BREAKING**: 公開 Agent API の正本契約は REST/OpenAPI/JSON DTO ではなく、TypeSpec から生成される proto3 service/message に統一される。初期必須 transport は Connect + binary Protobuf unary RPC とし、native gRPC 互換 gateway はこの foundation の実装範囲外だが、同一 proto 契約を使う任意互換 profile として禁止しない。
-- **BREAKING**: `hello` / `users` サンプル API、サンプル UI、サンプル TypeSpec route/model、OpenAPI artifact、Orval 生成 Agent client は公開機能から外れる。
+- **BREAKING**: `hello` / `users` サンプル API、サンプル UI、サンプル TypeSpec route/model、OpenAPI artifact、Orval 生成 client は公開機能から外れ、最終状態では旧 demo packages は active workspace から削除される。
 - Agent Service は `packages/agent` の独立デプロイ可能な Cloudflare Worker + Cloudflare Agents SDK + SQLite-backed Durable Object runtime として扱われる。
 - 管理 Client は `packages/client` の Next.js on Cloudflare Workers 管理 UI として扱われ、Client 専用 D1、管理対象 Agent 台帳、Agent RPC origin、credential reference、表示設定だけを所有する。
 - Agent API 契約の正本は `packages/agent/src/typespec` となり、OpenAPI ではなく proto3 と Protobuf-ES generated code を生成する。foundation は health-only ではなく、memo にある common/model/service TypeSpec stubs（pagination/security、Agent/Thread/Event/Run/State/Schedule/Tool/Extension/Adapter など）と lifecycle/event/thread/run/state/schedule/tool/extension/agent-adapter/health service files を含む。`packages/agent/src/typespec/src/services/agent-adapter.tsp` は `ExtensionIngressService` を定義し、`PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` を持つ。`AgentExtensionService` は Adapter Connection 管理の `CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` を所有する。
@@ -16,15 +16,16 @@
 - Agent-local Queue は Cloudflare Agents SDK の Agent-local wake/coalescing mechanism としてのみ使い、Cloudflare Queues product や Event source of truth として扱わない。
 - Client は Agent API proxy routes、`/api/client/*` Agent management APIs、Agent REST proxy routes を公開せず、Server Actions / Server Components を UI 内部の execution boundary として使う。
 - Agent Worker と Client Worker の binding、dependency direction、generated code の配置、lint/codegen drift check、OpenSpec scenario coverage guardrail が設計基準に合わせて更新される。
+- 旧 demo server に課していた依存方向の規律は `packages/agent` の Agent Worker / RPC facade / service modules / domain runtime / storage / generated RPC 境界へ移植される。旧 demo UI に課していた UI/API 分離の規律は、`packages/client` の Next.js App Router、Server Components、Server Actions、server-only modules、browser-visible bundles の境界へ移植される。
 - `.opencode` の coding-guardian、entrypoint reference、applier delegation、engineer/reviewer permission guidance は、実装委譲を開始する前の prerequisite として更新し、`packages/agent/**` と `packages/client/**` の restructure を実装 phase で正しく認識できるようにする。
 
 ## Spec Units
 
 ### New Spec Units
 
-- `agent-platform-be`: New。Agent Service の Protobuf RPC-only 契約、Connect facade、AIAgent Durable Object runtime、Agent-owned storage/binding/dependency 境界、サンプル機能を含まない公開 surface を定義する。
-- `management-client-fe`: New。Next.js 管理 UI の責務、Browser から Agent RPC を直接呼ばない server-side invocation、Client D1 所有範囲、Agent domain snapshot を保存しない表示境界を定義する。
-- `workspace-governance-be`: New。repo-level scripts、TypeSpec/proto generation、Buf/Protobuf-ES drift checks、OpenSpec/spec-test coverage、supply-chain policy、禁止 API surface の lint guardrail を定義する。
+- `agent-platform`: New。Agent Service の Protobuf RPC-only 契約、Connect facade、AIAgent Durable Object runtime、Agent-owned storage/binding/dependency 境界、サンプル機能を含まない公開 surface を定義する。
+- `management-client`: New。Next.js 管理 UI の責務、Browser から Agent RPC を直接呼ばない server-side invocation、Client D1 所有範囲、Agent domain snapshot を保存しない表示境界を定義する。
+- `workspace-governance`: New。repo-level scripts、TypeSpec/proto generation、Buf/Protobuf-ES drift checks、OpenSpec/spec-test coverage、supply-chain policy、禁止 API surface の lint guardrail を定義する。
 
 ### Modified Spec Units
 
@@ -32,14 +33,14 @@
 
 ## Naming
 
-- `agent-platform-be` の Scenario ID prefix は `AGENT-PLATFORM-BE` を使用する。
-- `management-client-fe` の Scenario ID prefix は `MANAGEMENT-CLIENT-FE` を使用する。
-- `workspace-governance-be` の Scenario ID prefix は `WORKSPACE-GOVERNANCE-BE` を使用する。
-- FE と BE は prefix に `FE` / `BE` を含めて分離し、同一 domain であっても `*-FE-S###` と `*-BE-S###` を混在させない。
+- `agent-platform` の Scenario ID prefix は `AGENT-PLATFORM` を使用する。
+- `management-client` の Scenario ID prefix は `MANAGEMENT-CLIENT` を使用する。
+- `workspace-governance` の Scenario ID prefix は `WORKSPACE-GOVERNANCE` を使用する。
+- Scenario ID prefix に presentation/implementation-layer suffix は含めない。旧 demo package の分類は、foundation 後の仕様単位名、Scenario ID、documented package boundary には残さない。
 
 ## Impact
 
-- Packages: `packages/backend/*`、`packages/frontend/*`、`packages/typespec`、`packages/agent`、`packages/client`、root scripts、workspace package patterns。
+- Packages: `packages/agent`、`packages/client`、root scripts、workspace package patterns。旧 demo packages は replacement verification 後に削除される graph としてのみ扱う。
 - APIs/contracts: Agent REST/OpenAPI surface、TypeSpec source layout、full proto3 model/service stub output、Protobuf-ES generated client/server descriptors、request-level `agent_id` / `idempotency_key` / 空文字ではなく 512 UTF-8 bytes 以下の `thread_key` invariants、Thread key identity invariant、Protobuf field stability guard、Agent-cross list/search absence、Connect method surface、optional native gRPC compatibility policy。
 - Runtime/Cloudflare: Agent Worker wrangler config、Client Worker/OpenNext config、Durable Object binding、R2 binding、Client D1 binding、Agent-local Queue wake coalescing、Cloudflare Queues 非採用の明示。
 - Persistence: Agent-owned DO SQLite schema の基礎、Client-owned D1 schema の基礎、Agent から Client D1 へアクセスしない境界。

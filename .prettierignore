@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+.open-next/
+.wrangler/
+.cache/
+coverage/
+playwright-report/
+test-results/
+
+# Command-owned generated API outputs
+packages/agent/proto/**
+packages/agent/src/generated/rpc/**
+packages/client/src/generated/agent-rpc/**
+
+# Reference memo is not an implementation artifact.
+docs/memo/**
+
+# Next.js generated type helper
+next-env.d.ts

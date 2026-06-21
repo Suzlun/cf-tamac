@@ -1,9 +1,10 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
-const SCENARIO_ID_PATTERN = /^[\dA-Z]+(?:-[\dA-Z]+)*-S\d{3,}$/;
-const SCENARIO_REF_PATTERN = /\[(?<id>[\dA-Z]+(?:-[\dA-Z]+)*-S\d{3,})]/g;
+export const SCENARIO_ID_PATTERN = /^[\dA-Z]+(?:-[\dA-Z]+)*-S\d{3,}$/;
+export const SCENARIO_REF_PATTERN = /\[(?<id>[\dA-Z]+(?:-[\dA-Z]+)*-S\d{3,})]/g;
 
 const REPO_ROOT = process.cwd();
 
@@ -12,7 +13,7 @@ const REPO_ROOT = process.cwd();
  * @param {(absPath: string) => boolean} includeFile
  * @param {(name: string) => boolean} ignoreDir
  */
-function collectFiles(absDir, includeFile, ignoreDir) {
+export function collectFiles(absDir, includeFile, ignoreDir) {
   /** @type {string[]} */
   const out = [];
 
@@ -70,7 +71,7 @@ function readText(absPath) {
  * @param {string} absPath
  * @returns {{ scenarios: Scenario[]; errors: string[] }}
  */
-function parseSpecFile(absPath) {
+export function parseSpecFile(absPath) {
   const relPath = path.relative(REPO_ROOT, absPath);
   const lines = readText(absPath).split(/\r?\n/);
 
@@ -172,7 +173,7 @@ const writeErr = (line) => {
   process.stderr.write(`${line}\n`);
 };
 
-function getSpecFiles() {
+export function getSpecFiles() {
   if (!ensureDirExists('openspec/specs')) return [];
   return collectFiles(
     path.join(REPO_ROOT, 'openspec/specs'),
@@ -181,10 +182,19 @@ function getSpecFiles() {
   );
 }
 
+export function getChangeSpecFiles() {
+  if (!ensureDirExists('openspec/changes')) return [];
+  return collectFiles(
+    path.join(REPO_ROOT, 'openspec/changes'),
+    (abs) => abs.endsWith('spec.md'),
+    (dirName) => dirName === '.git' || dirName === 'archive'
+  );
+}
+
 /**
  * @param {string[]} specFiles
  */
-function loadScenarios(specFiles) {
+export function loadScenarios(specFiles) {
   /** @type {Scenario[]} */
   const scenarios = [];
   /** @type {string[]} */
@@ -202,7 +212,7 @@ function loadScenarios(specFiles) {
 /**
  * @param {Scenario[]} scenarios
  */
-function indexScenariosById(scenarios) {
+export function indexScenariosById(scenarios) {
   /** @type {Map<string, Scenario[]>} */
   const byId = new Map();
   for (const s of scenarios) {
@@ -216,7 +226,7 @@ function indexScenariosById(scenarios) {
 /**
  * @param {Map<string, Scenario[]>} byId
  */
-function getDuplicateScenarioErrors(byId) {
+export function getDuplicateScenarioErrors(byId) {
   /** @type {string[]} */
   const duplicateErrors = [];
   for (const [id, list] of byId.entries()) {
@@ -230,10 +240,10 @@ function getDuplicateScenarioErrors(byId) {
   return duplicateErrors;
 }
 
-function getTestFiles() {
+export function getTestFiles() {
   /** @type {string[]} */
   const testFiles = [];
-  const testFileMatcher = (abs) => /\.(test|spec)\.(ts|tsx)$/.test(abs);
+  const testFileMatcher = (abs) => /\.(test|spec)\.(?:[cm]?js|tsx?)$/.test(abs);
   const ignoreDir = (name) =>
     name === 'node_modules' ||
     name === 'dist' ||
@@ -250,6 +260,9 @@ function getTestFiles() {
   if (ensureDirExists('tests')) {
     testFiles.push(...collectFiles(path.join(REPO_ROOT, 'tests'), testFileMatcher, ignoreDir));
   }
+  if (ensureDirExists('scripts')) {
+    testFiles.push(...collectFiles(path.join(REPO_ROOT, 'scripts'), testFileMatcher, ignoreDir));
+  }
 
   return testFiles;
 }
@@ -257,7 +270,7 @@ function getTestFiles() {
 /**
  * @param {string[]} testFiles
  */
-function collectTestScenarioReferences(testFiles) {
+export function collectTestScenarioReferences(testFiles) {
   /** @type {Map<string, Set<string>>} */
   const referencedIn = new Map();
   for (const f of testFiles) {
@@ -278,9 +291,10 @@ function collectTestScenarioReferences(testFiles) {
  * @param {Map<string, Scenario[]>} byId
  * @param {Scenario[]} scenarios
  * @param {Map<string, Set<string>>} referencedIn
+ * @param {Map<string, Scenario[]>} knownById
  */
-function computeCoverage(byId, scenarios, referencedIn) {
-  const specIdsAll = new Set(byId.keys());
+export function computeCoverage(byId, scenarios, referencedIn, knownById = byId) {
+  const specIdsAll = new Set(knownById.keys());
   const requiredIds = scenarios.filter((s) => !s.manual).map((s) => s.id);
   const missing = requiredIds.filter((id) => !referencedIn.has(id));
   const orphans = [...referencedIn.keys()].filter((id) => !specIdsAll.has(id));
@@ -297,7 +311,7 @@ function computeCoverage(byId, scenarios, referencedIn) {
  *  referencedIn: Map<string, Set<string>>;
  * }} result
  */
-function report(result) {
+export function report(result) {
   const { parseErrors, duplicateErrors, missing, orphans, byId, referencedIn } = result;
   const ok =
     parseErrors.length === 0 &&
@@ -345,16 +359,22 @@ function report(result) {
   process.exitCode = 1;
 }
 
-function main() {
+export function main() {
   const specFiles = getSpecFiles();
   const { scenarios, parseErrors } = loadScenarios(specFiles);
+  const { scenarios: knownChangeScenarios } = loadScenarios(getChangeSpecFiles());
   const byId = indexScenariosById(scenarios);
+  const knownById = indexScenariosById([...scenarios, ...knownChangeScenarios]);
   const duplicateErrors = getDuplicateScenarioErrors(byId);
   const testFiles = getTestFiles();
   const referencedIn = collectTestScenarioReferences(testFiles);
-  const { missing, orphans } = computeCoverage(byId, scenarios, referencedIn);
+  const { missing, orphans } = computeCoverage(byId, scenarios, referencedIn, knownById);
 
   report({ parseErrors, duplicateErrors, missing, orphans, byId, referencedIn });
 }
 
-main();
+const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectExecution) {
+  main();
+}

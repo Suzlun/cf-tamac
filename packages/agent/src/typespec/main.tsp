@@ -1,0 +1,36 @@
+import "@typespec/protobuf";
+
+import "./src/common/errors.tsp";
+import "./src/common/pagination.tsp";
+import "./src/common/security.tsp";
+import "./src/models/access-credential.tsp";
+import "./src/models/adapter.tsp";
+import "./src/models/agent.tsp";
+import "./src/models/compaction.tsp";
+import "./src/models/event.tsp";
+import "./src/models/extension.tsp";
+import "./src/models/history.tsp";
+import "./src/models/memory.tsp";
+import "./src/models/run.tsp";
+import "./src/models/schedule.tsp";
+import "./src/models/section.tsp";
+import "./src/models/state.tsp";
+import "./src/models/thread.tsp";
+import "./src/models/tool.tsp";
+import "./src/services/agent-adapter.tsp";
+import "./src/services/agent-event.tsp";
+import "./src/services/agent-extension.tsp";
+import "./src/services/agent-health.tsp";
+import "./src/services/agent-lifecycle.tsp";
+import "./src/services/agent-run.tsp";
+import "./src/services/agent-schedule.tsp";
+import "./src/services/agent-state.tsp";
+import "./src/services/agent-thread.tsp";
+import "./src/services/agent-tool.tsp";
+
+using Protobuf;
+
+@package({
+  name: "cftamac.agent.v1",
+})
+namespace CfTamac.Agent.V1;

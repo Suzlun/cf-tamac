@@ -25,10 +25,8 @@
    ```
 2. 開発サーバー
    ```bash
-   pnpm dev:server    # @cf-tamac-backend/entry (http://localhost:8787)
-   pnpm dev:client    # @cf-tamac-frontend/app  (http://localhost:5173)
-   # または
-   pnpm dev:all
+   pnpm dev:agent              # @cf-tamac/agent
+   pnpm dev:management-client  # @cf-tamac/client
    ```
 
 ## 依存関係とサプライチェーン対策
@@ -65,20 +63,33 @@ Husky によりコミット時に検証されます。
 - まず `CODING_STANDARDS.md` の意図（層の責務・依存方向）に沿って配置する
 - “例外” は最小にする（ESLint disable は説明必須。理由が妥当かレビュー対象）
 - 自動生成ファイルは手で直さない
-  - 例: `packages/frontend/api/src/generated/**`
+  - 例: `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**`
 - 仕様が変わる変更は spec とテストをセットで更新する
   - `openspec/specs/**` の `#### Scenario: ... (..-S001)` に対して、テストタイトルに `[...-S001]` を含める
   - 自動化できない Scenario は `Tags: manual` を明示する
 
 ## 自動生成
 
-### API
+### Agent API
 
-API 契約 (TypeSpec) を変更したら、OpenAPI と SDK を再生成してください。
+Agent API 契約 (TypeSpec) を変更したら、proto と Agent/Client RPC descriptors を再生成してください。生成物は手編集しません。
 
 ```bash
-pnpm gen:api-sdk
+pnpm gen:agent:proto
+pnpm gen:agent:rpc
 ```
+
+CI-style の drift check は次を使います。
+
+```bash
+pnpm check:codegen
+```
+
+Agent public API は Connect unary binary Protobuf だけを公開します。REST/OpenAPI/Orval、ad-hoc JSON DTO、Browser direct Agent RPC、Client Agent API proxy route は追加しないでください。
+
+### Removed legacy demo API
+
+Legacy demo OpenAPI/Orval workflow は active workspace から削除済みです。Agent API の契約、実装、レビュー基準には使いません。
 
 ### DB
 
@@ -104,10 +115,18 @@ pnpm check
 
 ```bash
 pnpm test          # すべて（vitest workspace）
-pnpm test:client   # @cf-tamac-frontend/app
-pnpm test:server   # @cf-tamac-backend/http
-pnpm test:ui       # @cf-tamac-frontend/ui
+pnpm test:agent    # @cf-tamac/agent
+pnpm test:management-client # @cf-tamac/client
+pnpm test:governance # governance scripts
 pnpm test:e2e      # Playwright（変更が e2e に影響する場合）
+```
+
+Foundation package を触った場合は、必要に応じて次も確認してください。
+
+```bash
+pnpm check:agent
+pnpm check:management-client
+pnpm build:foundation
 ```
 
 ## プルリクエストの流れ

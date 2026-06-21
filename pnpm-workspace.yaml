@@ -1,15 +1,18 @@
 packages:
-  - 'packages/*'
-  - 'packages/frontend/*'
-  - 'packages/backend/*'
+  - 'packages/agent'
+  - 'packages/client'
 
 # Wait 72 hours after npm publish before resolving new dependency versions.
 minimumReleaseAge: 4320
 
 allowBuilds:
+  '@bufbuild/buf': true
   '@fission-ai/openspec': true
+  '@mongodb-js/zstd': true
+  core-js-pure: true
   esbuild: true
   msw: true
+  node-liblzma: true
   sharp: true
   unrs-resolver: true
   workerd: true
@@ -26,4 +29,3 @@ overrides:
   ws: 8.21.0
   'eslint-plugin-sonarjs>minimatch': 10.2.5
   '@boundaries/elements>handlebars': 4.7.9
-  'concurrently>shell-quote': 1.8.4

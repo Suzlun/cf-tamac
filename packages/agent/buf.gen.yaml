@@ -1,0 +1,12 @@
+version: v2
+plugins:
+  - local: protoc-gen-es
+    out: src/generated/rpc
+    opt:
+      - target=ts
+      - import_extension=none
+  - local: protoc-gen-es
+    out: ../client/src/generated/agent-rpc
+    opt:
+      - target=ts
+      - import_extension=none

@@ -1,0 +1,16 @@
+name = "cf-tamac-client"
+main = ".open-next/worker.js"
+compatibility_date = "2026-06-20"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "CLIENT_DB"
+database_name = "cf-tamac-client-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[vars]
+AGENT_RPC_DEFAULT_ORIGIN = "http://localhost:8787"
+CLIENT_CREDENTIAL_SECRET_REF = "CLIENT_CREDENTIAL_ENCRYPTION_KEY"
+
+# Required Client credential secrets are provisioned with `wrangler secret put`.
+# - CLIENT_CREDENTIAL_ENCRYPTION_KEY

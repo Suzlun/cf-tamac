@@ -1,6 +1,6 @@
 ---
 name: coding-guardian
-description: Enforce this repository's real React, Hono, Drizzle, and TypeSpec rules while editing code, docs, or tooling.
+description: Enforce this repository's real Agent/Client foundation, TypeSpec-to-proto codegen, Next.js Client boundaries, and OpenSpec rules while editing code, docs, or tooling.
 ---
 
 # Coding Guardian
@@ -9,11 +9,10 @@ description: Enforce this repository's real React, Hono, Drizzle, and TypeSpec r
 
 - 返答言語: `AGENTS.md` に従う
 - 重要: まず `CODING_STANDARDS.md` と enforcement entrypoint を読む
-- 重要: API 契約の正は `packages/typespec/main.tsp`
-- 重要: 生成物は手編集しない
-- 重要: frontend は React + TSX + Vite + React Router であり、`packages/frontend/web` や SvelteKit 前提を持ち込まない
-- 重要: backend は TypeScript + Hono + Cloudflare Workers + Drizzle であり、Go / Gin / GORM 前提を持ち込まない
-- 重要: `pnpm lint` には OpenSpec validate と Scenario coverage check が含まれる
+- 重要: Agent API 契約の正は `packages/agent/src/typespec/main.tsp` で、OpenAPI ではなく proto3/RPC descriptors を生成する
+- 重要: 生成物は手編集しない。`packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**` は command-owned
+- 重要: Agent foundation では `packages/agent/**` が Cloudflare Agents SDK / Durable Object / Connect RPC Worker、`packages/client/**` が Next.js on Cloudflare Workers management Client
+- 重要: `pnpm lint` には OpenSpec validate、Scenario coverage check、supply-chain policy check が含まれる
 
 ## Workflow
 
@@ -29,36 +28,40 @@ description: Enforce this repository's real React, Hono, Drizzle, and TypeSpec r
 特に重要な enforcement entrypoint:
 
 - root flow: `package.json`, `.github/workflows/ci.yml`, `.husky/pre-commit`, `.husky/commit-msg`, `.lintstagedrc.json`, `commitlint.config.js`, `eslint.config.js`
-- TypeSpec / codegen: `packages/typespec/package.json`, `packages/typespec/tspconfig.yaml`, `packages/typespec/README.md`, `packages/frontend/api/orval.config.ts`
-- frontend: `packages/frontend/app/package.json`, `packages/frontend/domain/package.json`, `packages/frontend/ui/package.json`
-- backend: `packages/backend/entry/package.json`, `packages/backend/app/package.json`, `packages/backend/http/package.json`, `packages/backend/persistence/package.json`, `packages/backend/usecases/package.json`, `packages/backend/domain/package.json`, `packages/backend/types/package.json`, `packages/backend/drizzle/package.json`, `packages/backend/http/src/contracts/openapi-contract.test.ts`
+- Agent foundation: `packages/agent/package.json`, `packages/agent/wrangler.toml`, `packages/agent/src/index.ts`, `packages/agent/src/AIAgent.ts`, `packages/agent/src/rpc/**`, `packages/agent/src/storage/schema.ts`
+- Agent TypeSpec / proto / RPC codegen: `packages/agent/src/typespec/main.tsp`, `packages/agent/src/typespec/tspconfig.yaml`, `packages/agent/buf.yaml`, `packages/agent/buf.gen.yaml`, `scripts/codegen/check-agent-codegen-drift.mjs`
+- Client foundation: `packages/client/package.json`, `packages/client/wrangler.toml`, `packages/client/next.config.ts`, `packages/client/open-next.config.ts`, `packages/client/app/**`, `packages/client/src/server/**`
+- Governance: `scripts/governance/verify-agent-surface.mjs`, `scripts/governance/verify-package-boundaries.mjs`, `scripts/security/verify-pnpm-supply-chain.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`
+- Removed demo package graph: old demo contract/server/UI packages are no longer active implementation sources
 - OpenSpec: `scripts/openspec/verify-scenario-coverage.mjs`
 
 ### 2) Classify the change before editing
 
-- Contract / codegen: `packages/typespec/**`, `packages/frontend/api/**`
-- Frontend: `packages/frontend/app/**`, `packages/frontend/domain/**`, `packages/frontend/ui/**`
-- Backend: `packages/backend/**`
+- Agent contract / codegen: `packages/agent/src/typespec/**`, `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, `scripts/codegen/**`
+- Agent runtime: `packages/agent/src/**`, excluding generated RPC output
+- Management Client: `packages/client/app/**`, `packages/client/src/server/**`, `packages/client/src/tests/**`, excluding generated Agent RPC output
+- Workspace governance: `scripts/governance/**`, `scripts/security/**`, `scripts/openspec/**`, `.opencode/**`
 - Tooling / workflow: root config, scripts, hooks, CI, `.opencode/**`
 
 固定の依存方向:
 
-- Client: `packages/frontend/app -> packages/frontend/domain -> packages/frontend/api` and `packages/frontend/app -> packages/frontend/ui`
-- Server: `packages/backend/entry -> packages/backend/app -> (packages/backend/http | packages/backend/persistence | packages/backend/usecases) -> packages/backend/domain -> packages/backend/types`
-- Persistence schema: `packages/backend/persistence -> packages/backend/drizzle`
+- Agent: Worker entrypoint -> RPC adapter/router/interceptors -> service modules -> Agent domain/runtime modules -> Agent-owned storage/observability/types
+- Client: App Router/browser-visible modules -> Server Components/Server Actions -> server-only modules -> Client D1 repositories / generated Agent RPC client
+- Agent/Client foundation: `packages/agent/src` must not import `packages/client/src`; `packages/client/src` may import generated Agent RPC code from `packages/client/src/generated/agent-rpc/**` and Connect runtime packages, but must not import `packages/agent/src/**`
+- Agent codegen direction: `packages/agent/src/typespec -> packages/agent/proto -> packages/agent/src/generated/rpc` and `packages/client/src/generated/agent-rpc`
 
 ### 3) Implement without breaking enforced rules
 
-- Contract を変えるときは `packages/typespec/main.tsp` を直し、`pnpm gen:api-sdk` と `pnpm check:codegen` で整合を取る
-- `packages/typespec/openapi/openapi.json` と `packages/frontend/api/src/generated/client.ts` は手で直さない
-- Frontend app / domain で `fetch`, `globalThis.fetch`, `axios`, `cross-fetch` を直接使わない
-- Frontend app の pages / components から `@cf-tamac-frontend/api` を直 import しない。domain hook を経由する
-- React と TSX はこの repo の正規 frontend 実装であり、Svelte 用の制約へ読み替えない
-- `packages/frontend/domain/src/hooks/**` では `use*` export、`{ data, actions }` 戻り値、`*Data` / `*Actions` 型注釈を守る
-- 再利用したい見た目は `@cf-tamac-frontend/ui` に寄せ、画面固有の構成だけを `packages/frontend/app` に置く
-- Backend HTTP は `packages/backend/http`、配線は `packages/backend/app`、永続化は `packages/backend/persistence` / `packages/backend/drizzle` に置く
-- `packages/backend/http` から `packages/backend/persistence` を直 import しない。`c.env` も HTTP 層で直接読まない
-- `packages/backend/domain` と `packages/backend/usecases` では adapter import や framework 依存を持ち込まない
+- Agent contract を変えるときは `packages/agent/src/typespec/**` を直し、`pnpm gen:agent:proto`、`pnpm gen:agent:rpc`、`pnpm check:codegen` で整合を取る。`packages/agent/proto/**` と `packages/**/src/generated/**` は手で直さない
+- Agent public API は Protobuf RPC-only。Agent REST resource route、Agent OpenAPI artifact、Orval-generated Agent client、ad-hoc JSON DTO API、public Durable Object fetch API、browser-direct Agent RPC を追加しない
+- Agent Connect Worker は binary Protobuf unary profile を守る。production path では JSON encoding と HTTP GET を許可しない
+- Every public Agent RPC request body keeps `agent_id`; command requests keep `idempotency_key`; Event publish requests keep non-empty NFC-normalized `thread_key` of at most 512 UTF-8 bytes
+- `packages/agent/wrangler.toml` は `AI_AGENT` Durable Object binding と Agent-owned blob storage を持ち、D1、`CLIENT_DB`、Cloudflare Queues producer/consumer bindings を持たない
+- `packages/client/wrangler.toml` は `CLIENT_DB` と credential secret references を持ち、`AI_AGENT` と Agent-owned storage bindings を持たない
+- Client は `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding route を追加しない。Server Actions / Server Components は UI 内部境界として扱う
+- `packages/client` は Agent domain snapshots を Client D1 に保存しない。Client D1 は managed Agent records と credential references だけを所有する
+- `.opencode` guidance を更新するときは `packages/agent/**` と `packages/client/**` を implementation/review scope として認識させ、generated RPC output の hand edit permission を追加しない
+- Do not use the old demo package graph as an architecture or implementation source
 - `packages/**/src/**/*.{ts,tsx}` の export は、生成物とテストを除き TSDoc を付ける
 - OpenSpec を触るときは `openspec/specs/**/spec.md` の Scenario ID とテストタイトルの参照を崩さない
 
@@ -66,11 +69,12 @@ description: Enforce this repository's real React, Hono, Drizzle, and TypeSpec r
 
 変更内容に応じて、少なくとも次を実行する。
 
-- Contract / generated 変更: `pnpm gen:api-sdk` -> `pnpm check:codegen`
-- TypeSpec 変更: `pnpm format:check` -> `pnpm check`
+- Agent contract / generated 変更: `pnpm gen:agent:proto` -> `pnpm gen:agent:rpc` -> `pnpm check:codegen`
+- Agent/Client foundation 変更: relevant package checks/tests plus `pnpm lint`
+- Governance 変更: relevant script tests plus `pnpm lint`
 - JS / TS / TSX 変更: `pnpm lint` -> `pnpm test:run`
-- Frontend-focused 変更: `pnpm test:client`
-- Backend-focused 変更: `pnpm test:server`
+- Client-focused 変更: `pnpm test:management-client`
+- Agent-focused 変更: `pnpm test:agent`
 - Release-ready な変更や横断変更: `pnpm build`
 - Skill 変更: `python3 .opencode/skills/opencode-skills-devkit/scripts/validate_skills.py --root .`
 
@@ -89,10 +93,12 @@ Changed-file 向けの軽量チェック:
 ## Common violations to prevent
 
 - generated file の手編集
-- `packages/frontend/app` から `@cf-tamac-frontend/api` の直 import
-- frontend app / domain での `fetch` / `axios` / `cross-fetch`
-- hooks が `{ data, actions }` を返さない
+- Agent generated proto/RPC output の手編集
+- Agent REST/OpenAPI/Orval/JSON DTO surface の追加
+- Agent Worker への D1、`CLIENT_DB`、Cloudflare Queues binding 追加
+- Client Worker への `AI_AGENT` binding 追加
+- Client への Agent API proxy route、browser-direct Agent RPC、Agent credential exposure の追加
+- `packages/agent/src` と `packages/client/src` の runtime-source import coupling
+- `.opencode` guidance が古い demo template path だけを実装基準にすること
 - export に必要な TSDoc がない
-- `packages/backend/http` から `packages/backend/persistence` の直 import
-- HTTP 層での `c.env` 直接参照
 - OpenSpec の Scenario ID とテスト参照の不整合

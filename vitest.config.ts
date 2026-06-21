@@ -4,30 +4,30 @@ import { defineConfig } from 'vitest/config';
  * Vitest monorepo projects.
  *
  * Run all tests: `pnpm test:run`
- * Run a single project: `vitest run --project backend-http`
+ * Run a single project: `vitest run --project agent`
  */
 export default defineConfig({
   test: {
     projects: [
       {
-        extends: './packages/frontend/app/vitest.config.ts',
-        root: './packages/frontend/app',
+        extends: './packages/agent/vitest.config.ts',
+        root: './packages/agent',
         test: {
-          name: 'frontend-app',
+          name: 'agent',
         },
       },
       {
-        extends: './packages/backend/http/vitest.config.ts',
-        root: './packages/backend/http',
+        extends: './packages/client/vitest.config.ts',
+        root: './packages/client',
         test: {
-          name: 'backend-http',
+          name: 'management-client',
         },
       },
       {
-        extends: './packages/frontend/ui/vitest.config.ts',
-        root: './packages/frontend/ui',
         test: {
-          name: 'frontend-ui',
+          name: 'governance',
+          environment: 'node',
+          include: ['scripts/**/*.test.mjs'],
         },
       },
     ],

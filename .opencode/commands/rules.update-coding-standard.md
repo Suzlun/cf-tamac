@@ -1,5 +1,5 @@
 ---
-description: Update `CODING_STANDARDS.md` from this repo's actual lint, CI, git-hook, TypeSpec, and test rules with beginner-friendly examples.
+description: Update `CODING_STANDARDS.md` from this repo's actual Agent/Client foundation lint, CI, git-hook, TypeSpec-to-proto, and test rules with beginner-friendly examples.
 ---
 
 ## User Input
@@ -29,11 +29,12 @@ This document is lint-as-rules. Include only rules that are mechanically enforce
    - `pre-commit`: `pnpm lint-staged` then `pnpm check:codegen`
    - `commit-msg`: `pnpm commitlint --edit $1`
    - Break down what `.lintstagedrc.json` actually runs for TS, TSX, JS, JSX, JSON, and Markdown
-6. Use this repo's actual TypeSpec setup precisely:
-   - `packages/typespec/package.json` defines `format`, `format:check`, `gen:openapi`, and `check`
-   - OpenAPI output is configured by `packages/typespec/tspconfig.yaml`
+6. Use this repo's actual Agent TypeSpec-to-proto setup precisely:
+   - Agent API source of truth is `packages/agent/src/typespec/main.tsp`
+   - Generated outputs are `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, and `packages/client/src/generated/agent-rpc/**`
+   - Do not model Agent APIs with OpenAPI or Orval
 7. Mention OpenSpec exactly as implemented today through `pnpm lint:openspec` and `scripts/openspec/verify-scenario-coverage.mjs`.
-8. Use this repo's real file names and paths. Do not reference non-existent legacy paths such as `packages/frontend/web`, `packages/backend/internal/**`, `packages/backend/.golangci.yml`, `tools/scripts/*`, root `.spectral.yaml`, or `commitlint.config.cjs`.
+8. Use this repo's real file names and paths. Do not make old demo package categories the primary architecture or command model.
 
 ## Required Structure
 
@@ -41,15 +42,15 @@ This document is lint-as-rules. Include only rules that are mechanically enforce
 
 ## 0. 全体方針
 
-## 1. 契約と生成
+## 1. Agent API 契約と生成
 
-## 2. TypeSpec / OpenAPI
+## 2. Agent/Client package boundaries
 
-## 3. フロントエンド
+## 3. Management Client server/browser boundary
 
-## 4. バックエンド構造と依存
+## 4. Agent layer direction
 
-## 5. バックエンドの API / 認証 / 永続化
+## 5. Legacy demo deletion notes
 
 ## 6. CI 必須ステップ
 
@@ -76,17 +77,19 @@ If a section has no enforceable rules beyond a short scope note, keep it brief.
    - `.lintstagedrc.json`
    - `commitlint.config.js`
    - `eslint.config.js`
-   - `packages/typespec/package.json`
-   - `packages/typespec/tspconfig.yaml`
-   - `packages/typespec/README.md`
-   - `packages/frontend/api/orval.config.ts`
-   - `packages/backend/http/src/contracts/openapi-contract.test.ts`
+   - `packages/agent/src/typespec/main.tsp`
+   - `packages/agent/src/typespec/tspconfig.yaml`
+   - `packages/agent/buf.yaml`
+   - `packages/agent/buf.gen.yaml`
+   - `scripts/codegen/check-agent-codegen-drift.mjs`
+   - `scripts/governance/verify-agent-surface.mjs`
+   - `scripts/governance/verify-package-boundaries.mjs`
    - `scripts/openspec/verify-scenario-coverage.mjs`
 3. Extract only rules that actually fail in this repo, including repo-specific ones such as:
-   - TypeSpec is the source of truth; generated OpenAPI and frontend SDK are not hand-edited; codegen drift fails.
-   - Frontend boundaries such as `app -> domain -> api`, no direct API import from app, no direct `fetch` or `axios`, exported declarations require TSDoc, and hooks must return `{ data, actions }`.
-   - Backend guardrails such as layer boundaries across `entry/app/http/persistence/usecases/domain/types`, no HTTP-to-persistence direct import, and no direct `c.env` access in HTTP.
-   - Hono OpenAPI output must match the TypeSpec-generated OpenAPI contract.
+   - Agent TypeSpec is the source of truth; generated proto/RPC outputs are not hand-edited; codegen drift fails.
+   - Agent boundaries: Protobuf RPC-only, no REST/OpenAPI/Orval/ad-hoc JSON/public Durable Object fetch, Worker -> RPC -> service -> runtime -> storage direction.
+   - Client boundaries: Next.js App Router/browser-visible modules do not import server-only Agent RPC, credentials, generated RPC construction, or Connect runtime.
+   - Workspace governance: Agent/Client runtime coupling, binding separation, OpenSpec Scenario ID coverage, and supply-chain policy are enforced.
    - Exact CI step order and exact git hook behavior.
 4. Update `CODING_STANDARDS.md` following the constraints above.
 5. Before finishing, sanity-check that every cited rule maps to a real failing command, test, or hook in this repo and that every referenced file path exists.

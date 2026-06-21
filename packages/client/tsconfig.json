@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "jsx": "preserve",
+    "types": ["@cloudflare/workers-types", "node"]
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "next.config.ts",
+    "open-next.config.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["src/generated/**", ".next", ".open-next", "dist", "node_modules"]
+}

@@ -17,7 +17,7 @@ export default defineConfig({
   /* 共通設定 */
   use: {
     /* ベースURL */
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:3000',
     /* 失敗時のスクリーンショット */
     screenshot: 'only-on-failure',
     /* 失敗時のビデオ */
@@ -29,14 +29,8 @@ export default defineConfig({
   /* テスト前にサーバーを起動 */
   webServer: [
     {
-      command: 'pnpm --filter @cf-tamac-frontend/app dev',
-      url: 'http://localhost:5173',
-      reuseExistingServer: process.env.CI === undefined,
-      timeout: 120 * 1000,
-    },
-    {
-      command: 'pnpm --filter @cf-tamac-backend/entry dev',
-      url: 'http://localhost:8787/health',
+      command: 'pnpm dev:management-client',
+      url: 'http://localhost:3000',
       reuseExistingServer: process.env.CI === undefined,
       timeout: 120 * 1000,
     },

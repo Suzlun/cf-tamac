@@ -7,10 +7,13 @@ node_modules/
 # Build outputs
 dist/
 build/
+.next/
+.open-next/
 .wrangler/
 .cache/
 *.tsbuildinfo
 .vite/
+next-env.d.ts
 
 # Logs
 logs

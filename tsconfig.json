@@ -3,6 +3,13 @@
   "compilerOptions": {
     "rootDir": "."
   },
-  "include": ["drizzle.config.ts", "vitest.config.ts", "playwright.config.ts", "tests/**/*"],
+  "include": [
+    "commitlint.config.js",
+    "eslint.config.js",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "scripts/**/*.mjs",
+    "tests/**/*"
+  ],
   "exclude": ["node_modules", "dist", "build", ".wrangler", "packages"]
 }

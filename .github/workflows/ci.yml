@@ -35,8 +35,17 @@ jobs:
       - name: Type check
         run: pnpm check
 
+      - name: Agent and Client package checks
+        run: pnpm check:agent && pnpm check:management-client
+
       - name: Unit tests
         run: pnpm test:run
 
+      - name: Agent and Client package tests
+        run: pnpm test:agent && pnpm test:management-client
+
       - name: Codegen drift check
         run: pnpm check:codegen
+
+      - name: Agent codegen target smoke
+        run: pnpm gen:agent:proto && pnpm gen:agent:rpc
