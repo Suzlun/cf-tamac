@@ -7,8 +7,8 @@
 - Install: `corepack enable && pnpm install`
 - Dev (Agent Worker): `pnpm dev:agent`
 - Dev (Management Client): `pnpm dev:management-client`
-- Build foundation: `pnpm build:foundation`
-- Check foundation: `pnpm check:agent && pnpm check:management-client`
+- Build Agent/Client: `pnpm build:foundation`
+- Check Agent/Client: `pnpm check:agent && pnpm check:management-client`
 
 ## API Contract (TypeSpec)
 
@@ -18,7 +18,7 @@
 - Regenerate Agent proto + RPC SDK: `pnpm gen:agent:proto && pnpm gen:agent:rpc`
 - Regenerate all generated API outputs: `pnpm gen`
 - Codegen drift check (CI-style): `pnpm check:codegen`
-- Legacy demo OpenAPI/Orval workflow is removed from the active workspace; do not model Agent APIs with OpenAPI or Orval.
+- Do not model Agent APIs with OpenAPI or Orval.
 
 ## Testing
 
@@ -36,21 +36,23 @@
 
 ## Architecture Notes
 
+- Product shape: Cloudflare Workers 上で動作する自律駆動 AI Agent microservice と Management Client。
+- Aggregate boundary: `1 Agent ID = 1 AIAgent Durable Object instance = 1 AI Agent aggregate root`.
 - Agent dependency direction: Worker entrypoint -> RPC adapter/router/interceptors -> service modules -> Agent domain/runtime modules -> Agent-owned storage/observability/types.
 - Management Client direction: App Router/browser-visible modules -> Server Components/Server Actions -> server-only modules -> Client D1 repositories / generated Agent RPC client.
 - Agent API contract direction: implementation must follow `packages/agent/src/typespec`; do not model Agent APIs with OpenAPI or Orval.
 - Agent Worker (`packages/agent`) exposes Protobuf RPC-only via Connect unary binary Protobuf. Accept `POST` + `Content-Type: application/proto`; reject JSON/GET and fail closed for unmapped generated methods.
 - Agent Worker owns `AI_AGENT` Durable Object and Agent blob storage only. It must not use `CLIENT_DB`, Agent-cross D1, Cloudflare Queues bindings, public Durable Object fetch APIs, REST/OpenAPI/Orval Agent surfaces, or ad-hoc JSON DTO APIs.
-- Agent-local Queue is only a scheduler wake/coalescing boundary; accepted Events, pending Runs, Thread identity, replay/idempotency, audit, and rate-limit state stay in the `AIAgent` Durable Object SQLite foundation.
+- Agent-local Queue is only a scheduler wake/coalescing boundary; accepted Events, pending Runs, Thread identity, replay/idempotency, audit, and rate-limit state stay in `AIAgent` Durable Object SQLite storage.
 - Management Client (`packages/client`) owns `CLIENT_DB` and credential references only. It may call Agent RPC from server-only modules, but browser bundles must not contain Agent credentials, direct Agent RPC invocation logic, Agent runtime imports, or Agent API proxy routes.
 
 ## OpenSpec (Spec -> Test Contract)
 
-- Source of truth (current behavior): `openspec/specs/**/spec.md`
+- Product contract scenarios live in OpenSpec `spec.md` files.
 - Every `#### Scenario:` heading MUST end with a stable Scenario ID: `(...-S001)`
-  - Example: `#### Scenario: Create a user (USER-MGMT-S001)`
+  - Example: `#### Scenario: Initialize an Agent (AGENT-LIFECYCLE-BE-S001)`
 - Automated tests MUST reference Scenario IDs in the test title using brackets:
-  - Example: `it('[USER-MGMT-S001] Create a user', async () => { ... })`
+  - Example: `it('[AGENT-LIFECYCLE-BE-S001] Initialize an Agent', async () => { ... })`
 - To explicitly opt out of automation for a scenario, add `Tags: manual` under the scenario heading
 - Guardrails are enforced by `pnpm lint`:
   - `openspec validate --all --strict`

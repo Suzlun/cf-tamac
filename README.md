@@ -1,23 +1,68 @@
 # cf-tamac
 
-Cloudflare Workers 上に Agent Service Worker と Management Client Worker を分離して構築する foundation repository です。
+`cf-tamac` は、Cloudflare Workers 上で動作する自律駆動 AI Agent microservice と、その管理クライアントです。中心はチャット UI ではなく、外部 Event、時刻、Tool 結果、人間の入力、内部状態変化を受けて Agent が次の行動を決める server-side harness です。
 
-## 構成
+## Product Shape
 
-- `packages/agent`: Agent Service Worker。Cloudflare Agents SDK の `AIAgent` Durable Object、Agent-owned blob storage、Connect binary Protobuf RPC facade、Agent-local scheduler wake/coalescing seam を持ちます。
-- `packages/agent/src/typespec`: Agent public API の TypeSpec source of truth です。Agent API は REST/OpenAPI/Orval ではなく Protobuf RPC-only で定義します。
-- `packages/agent/proto/cftamac/agent/v1.proto`: command-owned generated proto です。手編集しません。
-- `packages/agent/src/generated/rpc/**`: Agent Worker 側の command-owned generated RPC descriptors です。手編集しません。
-- `packages/client`: Next.js on Cloudflare Workers の Management Client Worker。`CLIENT_DB` と credential references を所有します。
-- `packages/client/src/generated/agent-rpc/**`: Client server-side Agent RPC 呼び出し用の command-owned generated RPC descriptors です。手編集しません。
-- `scripts/codegen`: Agent proto/RPC drift、RPC Service Inventory、descriptor invariant、Protobuf field stability の guardrail です。
-- `scripts/governance`: Agent API surface と Agent/Client package boundary の guardrail です。
-- `scripts/openspec`: OpenSpec Scenario ID coverage guardrail です。
-- `scripts/security`: pnpm release-age と build-script approval policy の guardrail です。
+- `1 Agent ID = 1 AIAgent Durable Object instance = 1 AI Agent aggregate root` です。
+- `packages/agent` は Agent Service Worker です。Cloudflare Agents SDK、SQLite-backed Durable Objects、Agent-owned blob storage、Connect binary Protobuf RPC facade、Agent-local Queue を持ちます。
+- `packages/client` は Management Client Worker です。Next.js on Cloudflare Workers と Client 専用 D1 により、管理対象 Agent ID、Agent RPC origin、表示設定、credential reference を管理します。
+- Extension Provider は Agent Service の外側に置きます。Discord、Slack、Email、Webhook などの外部 protocol を Adapter/Tool/Delivery capability として Agent Event/RPC に接続します。
+- Browser は Agent RPC を直接呼びません。Management Client の Server Components / Server Actions / server-only modules が Agent RPC を呼びます。
 
-Legacy backend/frontend/OpenAPI demo packages は replacement verification が完了するまで残っていますが、Agent public API の基準にはしません。
+## Agent Service
 
-## Commands
+- Agent public API は Protobuf RPC-only です。
+- API contract の正本は `packages/agent/src/typespec/main.tsp` です。
+- Generated proto package/path は `cftamac.agent.v1` / `cftamac/agent/v1` です。
+- 初期必須 transport は Connect unary binary Protobuf です。
+- Worker facade は `POST` + `Content-Type: application/proto` だけを public success path とします。
+- REST resource API、OpenAPI Agent API、Orval Agent client、ad-hoc JSON DTO API、public Durable Object fetch API、browser direct Agent API は公開しません。
+
+## Agent Domain
+
+`AIAgent` Durable Object は AI Agent そのものとして次を所有します。
+
+- Thread / Section / AgentEvent
+- AgentRun / Run snapshot / scheduler wake state
+- ThreadCompaction / ThreadHistory / ThreadMemory / AgentMemory
+- AgentState / Schedule / Tool / ToolInvocation
+- Extension / Installation / Adapter Connection / DeliveryContext / AdapterDelivery
+- Principal、credential verifier、grant、approval、budget、idempotency、replay nonce、audit、rate-limit state
+
+外部 AgentEvent は `thread_key` を必須とします。同一 `agent_id` と同一 NFC-normalized `thread_key` は同一 Thread に解決され、異なる `agent_id` では同じ `thread_key` でも別 Thread です。
+
+## Storage Boundary
+
+- Agent state の正本は `AIAgent` Durable Object SQLite に置きます。
+- Agent-local Queue は scheduler wake/coalescing mechanism であり、Event や Run の正本ではありません。
+- 大きな Event payload、History body、Tool result blob、artifact、archive segment は Agent-owned blob storage に offload します。
+- Agent Worker は `CLIENT_DB`、Agent-cross D1、Cloudflare Queues producer/consumer binding を持ちません。
+- Management Client Worker は `CLIENT_DB` と credential references を持ちますが、Agent domain snapshot を Client D1 に複製しません。
+
+## Management Client
+
+- Agent registry、Agent detail、Thread/Event/Run/Compaction、Schedule、Tool approval、Extension install/uninstall、Agent settings を管理する UI です。
+- Agent credential material、Agent RPC client construction、Agent runtime imports は browser bundle に入りません。
+- `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding route は公開しません。
+- Server Actions と Server Components は UI 内部の execution boundary であり、Agent public API ではありません。
+
+## Code Generation
+
+```bash
+pnpm gen:agent:proto
+pnpm gen:agent:rpc
+pnpm gen
+pnpm check:codegen
+```
+
+Command-owned generated outputs は手編集しません。
+
+- `packages/agent/proto/**`
+- `packages/agent/src/generated/rpc/**`
+- `packages/client/src/generated/agent-rpc/**`
+
+## Development Commands
 
 ```bash
 corepack enable
@@ -25,15 +70,8 @@ pnpm install
 ```
 
 ```bash
-pnpm dev:agent              # Agent Worker
-pnpm dev:management-client  # Management Client Worker
-```
-
-```bash
-pnpm gen:agent:proto
-pnpm gen:agent:rpc
-pnpm gen                    # generated outputs, including Agent proto/RPC
-pnpm check:codegen
+pnpm dev:agent
+pnpm dev:management-client
 ```
 
 ```bash
@@ -44,41 +82,17 @@ pnpm build:foundation
 
 ```bash
 pnpm lint
-pnpm lint:governance
-pnpm lint:supply-chain
 pnpm test:agent
 pnpm test:management-client
 pnpm test:governance
 pnpm test:run
 ```
 
-## Agent API Contract
-
-- Source of truth は `packages/agent/src/typespec/main.tsp` です。
-- Generated proto package/path は `cftamac.agent.v1` / `cftamac/agent/v1` です。
-- Public Agent transport は Connect unary binary Protobuf です。
-- Worker facade は `POST` + `Content-Type: application/proto` のみを受け付けます。
-- JSON encoding、HTTP `GET`、unsupported content types、unmapped generated methods は fail closed します。
-- すべての public Agent RPC request は body field として `agent_id` を持ちます。
-- Command request は `idempotency_key` を持ちます。
-- Event publish request は `thread_key` を持ち、NFC 正規化後に空でなく 512 UTF-8 bytes 以下である必要があります。
-- Agent-cross list/search RPC は定義しません。
-
-## Runtime Boundaries
-
-- Agent Worker は `AI_AGENT` Durable Object と Agent-owned blob storage を所有します。
-- Agent Worker は `CLIENT_DB`、Agent-cross D1、Cloudflare Queues producer/consumer binding、public Durable Object fetch API を持ちません。
-- Accepted Events、pending Runs、Thread identity、replay/idempotency、audit、rate-limit state は `AIAgent` Durable Object SQLite foundation に保持します。
-- Agent-local Queue は scheduler wake/coalescing boundary であり、Event source of truth ではありません。
-- Management Client Worker は `CLIENT_DB` と credential references のみを所有します。
-- Management Client は Agent RPC を server-only modules から呼び出します。Browser bundles に Agent credentials、direct Agent RPC invocation logic、Agent runtime imports、Agent API proxy routes を含めません。
-
 ## OpenSpec
 
-- Current behavior の source of truth は `openspec/specs/**/spec.md` です。
-- Active change の delta specs は sync/archive 前の計画 artifact です。
-- Automated tests は Scenario ID を test title に bracketed notation で含めます。
-- Guardrails は `pnpm lint` から `openspec validate --all --strict` と `scripts/openspec/verify-scenario-coverage.mjs` で実行されます。
+- Product contract は OpenSpec の `spec.md` に Scenario ID 付きで記述します。
+- Automated tests は test title に `[SCENARIO-ID]` を含めます。
+- `pnpm lint` は `openspec validate --all --strict` と `scripts/openspec/verify-scenario-coverage.mjs` を実行します。
 
 ## Supply Chain
 

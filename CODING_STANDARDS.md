@@ -6,8 +6,8 @@
 
 ## 0. 全体方針
 
-**Rule: Active guidance は Agent/Client foundation を向く。**
-Summary: OpenCode guidance は `packages/agent/**` と `packages/client/**` を実装/review scope とし、removed backend/frontend unit agents を参照しません。
+**Rule: Active guidance は Agent/Client architecture を向く。**
+Summary: OpenCode guidance は `packages/agent/**` と `packages/client/**` を Cloudflare Workers 上の Agent Service / Management Client scope とし、removed backend/frontend unit agents を参照しません。
 Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; fixture coverage in `scripts/governance/verify-package-boundaries.test.mjs`.
 NG例: `.opencode/agents/openspec/applier.md` で `unit/backend/` や `unit/frontend/` を委譲先として残す。
 OK例: `.opencode/agents/unit/agent/engineer.md`、`.opencode/agents/unit/client/engineer.md`、`.opencode/agents/unit/build/builder.md` を現行 scope として使う。
@@ -201,10 +201,10 @@ NG例: 空 `agent_id` を Durable Object name にする、same `agent_id` で異
 OK例: empty `agent_id` は拒否し、same `agent_id` は same DO id/stub に解決する。
 
 **Rule: Agent-local Queue は scheduler wake/coalescing boundary であり、Event/Run の source of truth ではない。**
-Summary: accepted Events、pending Runs、scheduler wake state は `AIAgent` Durable Object SQLite foundation に保存します。
+Summary: accepted Events、pending Runs、scheduler wake state は `AIAgent` Durable Object SQLite storage に保存します。
 Enforcement point: `pnpm test:agent` via `packages/agent/src/tests/agent-local-queue-wake.test.ts`, `packages/agent/src/AIAgent.ts`, `packages/agent/src/storage/table-initializer.ts`, and `packages/agent/src/storage/schema.ts`.
 NG例: Cloudflare Queues producer/consumer API を Event source of truth として使う、wake ごとに unbounded item を作る。
-OK例: Event append -> pending Run creation -> scheduler wake/coalescing state の順に DO SQLite foundation へ保存する。
+OK例: Event append -> pending Run creation -> scheduler wake/coalescing state の順に DO SQLite storage へ保存する。
 
 ## 5. Legacy demo deletion notes
 
@@ -218,7 +218,7 @@ OK例: unsupported route または Connect-compatible error とし、Agent RPC s
 Summary: Agent package graph は old demo contract/runtime packages や demo domain files を import/export しません。
 Enforcement point: `pnpm test:agent` via `packages/agent/src/tests/agent-source-graph.test.ts`.
 NG例: `packages/agent/src/index.ts` から old demo package/domain を export する。
-OK例: `packages/agent/**` の entrypoints は Agent foundation modules と generated RPC policy だけを扱う。
+OK例: `packages/agent/**` の entrypoints は Agent Service modules と generated RPC policy だけを扱う。
 
 **Rule: Legacy demo API routes を supported product API として文書化しない。**
 Summary: README/AGENTS/CONTRIBUTING/CODING_STANDARDS は old demo API を product API として案内しません。
@@ -344,7 +344,7 @@ OK例: Scenario heading の下に `Tags: manual` を置く。
 Summary: duplicate Scenario ID、main/change specs にない orphan test reference、missing automated coverage は失敗します。
 Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-coverage.mjs`.
 NG例: 同じ Scenario ID を複数置く、spec にない ID を tests で参照する、manual でない Scenario の test reference を忘れる。
-OK例: `openspec/specs/**/spec.md` の current behavior と `packages/**`、`tests/**`、`scripts/**` の test titles を一致させる。
+OK例: OpenSpec `spec.md` の Scenario ID と `packages/**`、`tests/**`、`scripts/**` の test titles を一致させる。
 
 ## 9. 設定参照
 

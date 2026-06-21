@@ -6,8 +6,8 @@
 ## What Changes
 
 <!-- TODO: User/operator-facing changes. List additions/changes/removals. Mark breaking changes with **BREAKING**. -->
-<!-- Good: "The React frontend adds a users management screen and corresponding API interactions." -->
-<!-- Bad: "Replace packages/frontend/app router wiring and generated client files." -->
+<!-- Good: "The Management Client adds an Agent registry screen and server-side Agent RPC interactions." -->
+<!-- Bad: "Replace packages/client/app route wiring and generated Agent RPC files." -->
 
 ## Spec Units
 
@@ -30,7 +30,7 @@
 
 ## Naming
 
-<!-- TODO: Confirm the DOMAIN prefix for Scenario IDs (derived from <domain>) and that FE/BE prefixes differ (e.g., USER-MGMT-FE-S001 vs USER-MGMT-BE-S001). -->
+<!-- TODO: Confirm the DOMAIN prefix for Scenario IDs (derived from <domain>) and that FE/BE or platform prefixes differ when needed (e.g., AGENT-LIFECYCLE-BE-S001 vs CLIENT-MANAGEMENT-FE-S001). -->
 
 ## Impact
 

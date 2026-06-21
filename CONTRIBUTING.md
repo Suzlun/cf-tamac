@@ -6,9 +6,8 @@
 
 - コーディング規則（一次資料）: `CODING_STANDARDS.md`
   - `eslint.config.js` は規約の自動検査（実装）として追従させます
-- 仕様（契約）: `openspec/specs/**/spec.md`
+- 仕様（契約）: OpenSpec の `spec.md`
   - `pnpm lint` で `openspec validate --all --strict` と Scenario ID カバレッジ検査が走ります
-  - `openspec/changes/**` の delta spec は、`/opsx-sync` または `openspec archive` で main spec に反映してから検査対象になります
 
 ## 前提環境
 
@@ -48,14 +47,14 @@
 Husky によりコミット時に検証されます。
 
 - `commit-msg`: `pnpm commitlint --edit $1`
-- `pre-commit`: `pnpm lint-staged`
+- `pre-commit`: `pnpm lint-staged` then `pnpm check:codegen`
 
 コミットメッセージは Conventional Commits に従ってください（`commitlint.config.js`）。
 
 例:
 
-- `feat(client): add user profile page`
-- `fix(server): prevent null env injection`
+- `feat(client): add agent registry page`
+- `fix(agent): prevent invalid env injection`
 - `docs: update coding standards`
 
 ## 変更を入れるときの原則
@@ -65,7 +64,7 @@ Husky によりコミット時に検証されます。
 - 自動生成ファイルは手で直さない
   - 例: `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**`
 - 仕様が変わる変更は spec とテストをセットで更新する
-  - `openspec/specs/**` の `#### Scenario: ... (..-S001)` に対して、テストタイトルに `[...-S001]` を含める
+  - `#### Scenario: ... (..-S001)` に対して、テストタイトルに `[...-S001]` を含める
   - 自動化できない Scenario は `Tags: manual` を明示する
 
 ## 自動生成
@@ -87,19 +86,13 @@ pnpm check:codegen
 
 Agent public API は Connect unary binary Protobuf だけを公開します。REST/OpenAPI/Orval、ad-hoc JSON DTO、Browser direct Agent RPC、Client Agent API proxy route は追加しないでください。
 
-### Removed legacy demo API
-
-Legacy demo OpenAPI/Orval workflow は active workspace から削除済みです。Agent API の契約、実装、レビュー基準には使いません。
-
 ### DB
 
-スキーマを変更したらマイグレーションを生成してください。
+Agent Service は D1 を持ちません。Agent-owned state は `AIAgent` Durable Object SQLite と Agent-owned blob storage に置きます。
 
-```bash
-pnpm migrate:generate
-```
+Client D1 schema を変更する場合は、`packages/client/src/server/db/schema.ts` と `packages/client/src/server/db/migrations/**` を同時に更新してください。
 
-適用は `wrangler d1 execute ...`（README 参照）。
+適用は `wrangler d1 execute ... --config packages/client/wrangler.toml --file <migration.sql>` を使います。
 
 ## 実装時のチェック
 
@@ -121,7 +114,7 @@ pnpm test:governance # governance scripts
 pnpm test:e2e      # Playwright（変更が e2e に影響する場合）
 ```
 
-Foundation package を触った場合は、必要に応じて次も確認してください。
+Agent/Client package を触った場合は、必要に応じて次も確認してください。
 
 ```bash
 pnpm check:agent
