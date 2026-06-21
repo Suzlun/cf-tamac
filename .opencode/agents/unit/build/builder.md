@@ -2,7 +2,7 @@
 description: Build agent helper for Agent/Client generation, lint, tests, build, governance checks, and repository-wide execution support.
 mode: subagent
 hidden: false
-model: github-copilot/gpt-5.4
+model: openai/gpt-5.5
 reasoningEffort: 'high'
 permission:
   edit:
