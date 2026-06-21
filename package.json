@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Agent Service and Management Client foundation for Cloudflare Workers",
+  "license": "MPL-2.0",
   "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": ">=24.12.0"
