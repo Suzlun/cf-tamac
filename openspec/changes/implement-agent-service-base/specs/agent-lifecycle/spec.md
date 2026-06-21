@@ -15,14 +15,14 @@ Agent 管理者は、同じ Agent ID への操作が常に同じ自律主体へ�
 - AIAgent Durable Object は、Agent profile、ライフサイクル状態、config 版、credential generation、監査 pointer、予約済み system Thread identity を Agent-owned store 内に永続化 MUST。
 - Agent Service は、list-all または search-all Agent のような Agent 横断ライフサイクル RPC を公開して MUST NOT。
 
-#### Scenario: InitializeAgent が指定名の Agent aggregate を作成する (AGENT-LIFECYCLE-BE-S001)
+#### Scenario: InitializeAgent が指定名の Agent aggregate を作成する (AGENT-LIFECYCLE-S001)
 
 - **GIVEN** 有効な Client Service principal が `agent_id = agent-alpha` に対するライフサイクル scope を持っている
 - **WHEN** 必須 profile、config、idempotency key を指定して `InitializeAgent` を呼ぶ
 - **THEN** リクエストは `agent-alpha` という名前の AIAgent Durable Object に route される
 - **AND** Agent profile、有効なライフサイクル状態、初期 config 版、credential generation、予約済み system Thread、ライフサイクル監査 Event はその Agent のためだけに永続化される
 
-#### Scenario: GetAgent が Agent-local profile と config を返す (AGENT-LIFECYCLE-BE-S002)
+#### Scenario: GetAgent が Agent-local profile と config を返す (AGENT-LIFECYCLE-S002)
 
 - **GIVEN** `agent-alpha` が initialized である
 - **WHEN** 認可済み Client Service principal が `agent-alpha` に対して `GetAgent` を呼ぶ
@@ -44,7 +44,7 @@ Agent 管理者は、作成、停止、破棄、credential rotation のような
 - Lifecycle command は `agent_id + principal_id + idempotency_key` で冪等である MUST し、異なるリクエスト body digest を持つ同じ key を拒否 MUST。
 - Lifecycle command は予約済み system Thread に監査 Event を追加 MUST。
 
-#### Scenario: DestroyAgent が mutating Agent operations を無効化する (AGENT-LIFECYCLE-BE-S003)
+#### Scenario: DestroyAgent が mutating Agent operations を無効化する (AGENT-LIFECYCLE-S003)
 
 - **GIVEN** `agent-alpha` が有効で、Thread、Schedule、ToolInvocation、Extension Installation を持っている
 - **WHEN** 認可済み principal が有効な idempotency key で `DestroyAgent` を呼ぶ
@@ -52,7 +52,7 @@ Agent 管理者は、作成、停止、破棄、credential rotation のような
 - **AND** `agent-alpha` に対する以後の Event publish、Schedule creation、Tool 承認、Extension install command はライフサイクル事前条件エラーで失敗する
 - **AND** 既存の監査/History 記録は認可ポリシーに従って照会可能なままである
 
-#### Scenario: 重複ライフサイクル command が記録済み応答を replay する (AGENT-LIFECYCLE-BE-S004)
+#### Scenario: 重複ライフサイクル command が記録済み応答を replay する (AGENT-LIFECYCLE-S004)
 
 - **GIVEN** `InitializeAgent` または `DestroyAgent` が idempotency key `idem-1` で `agent-alpha` に対してすでに成功している
 - **WHEN** 同じ principal が同じ body digest と `idem-1` で同じ command を繰り返す
@@ -74,7 +74,7 @@ Client Service や管理者は、Agent への接続資格情報と Agent 設定�
 - Agent 構成更新は config 版を increment MUST し、その版は AgentRun スナップショットに capture MUST。
 - AIAgent Durable Object 内の final authorization は、状態を変更する前にライフサイクル状態、credential 状態、principal type、scope/grant、要求された operation を検証 MUST。
 
-#### Scenario: RotateAgentCredential が新しい有効 generation を作成する (AGENT-LIFECYCLE-BE-S005)
+#### Scenario: RotateAgentCredential が新しい有効 generation を作成する (AGENT-LIFECYCLE-S005)
 
 - **GIVEN** `agent-alpha` が credential generation `1` を持っている
 - **WHEN** 認可済み principal が generation `2` メタデータと overlap policy で `RotateAgentCredential` を呼ぶ
@@ -82,7 +82,7 @@ Client Service や管理者は、Agent への接続資格情報と Agent 設定�
 - **AND** generation `1` は構成済み overlap window の間だけ保持される
 - **AND** credential rotation は平文の秘密鍵 material を保存せずに system Thread 監査 Event に記録される
 
-#### Scenario: UpdateConfig が後続 Run に capture される版を変更する (AGENT-LIFECYCLE-BE-S006)
+#### Scenario: UpdateConfig が後続 Run に capture される版を変更する (AGENT-LIFECYCLE-S006)
 
 - **GIVEN** `agent-alpha` が config 版 `3` を持っている
 - **WHEN** 認可済み principal が model、予算、Memory、Tool、または scheduling 構成を更新する
@@ -105,7 +105,7 @@ Agent Service は Agent-local 状態と構成を安全なスナップショッ�
 - GetState と GetConfig は Agent-local final authorization を通り、秘密鍵、生 credential、Provider secret、Thread payload body、未 redaction の signature material を返す MUST NOT。
 - GetState と GetConfig は running Run のスナップショット config を変更 MUST NOT し、照会結果は変更を発生させない MUST。
 
-#### Scenario: GetState と GetConfig が Agent-local スナップショットを返す (AGENT-LIFECYCLE-BE-S007)
+#### Scenario: GetState と GetConfig が Agent-local スナップショットを返す (AGENT-LIFECYCLE-S007)
 
 - **GIVEN** `agent-alpha` が config 版 `4` で initialized され、別 Agent が異なる状態を持っている
 - **WHEN** 認可済み Client Service principal が `agent-alpha` に対して `GetState` と `GetConfig` を呼ぶ

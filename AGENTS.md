@@ -50,9 +50,9 @@
 
 - Product contract scenarios live in OpenSpec `spec.md` files.
 - Every `#### Scenario:` heading MUST end with a stable Scenario ID: `(...-S001)`
-  - Example: `#### Scenario: Initialize an Agent (AGENT-LIFECYCLE-BE-S001)`
+  - Example: `#### Scenario: Initialize an Agent (AGENT-LIFECYCLE-S001)`
 - Automated tests MUST reference Scenario IDs in the test title using brackets:
-  - Example: `it('[AGENT-LIFECYCLE-BE-S001] Initialize an Agent', async () => { ... })`
+  - Example: `it('[AGENT-LIFECYCLE-S001] Initialize an Agent', async () => { ... })`
 - To explicitly opt out of automation for a scenario, add `Tags: manual` under the scenario heading
 - Guardrails are enforced by `pnpm lint`:
   - `openspec validate --all --strict`

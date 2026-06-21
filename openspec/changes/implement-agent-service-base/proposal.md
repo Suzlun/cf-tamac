@@ -28,17 +28,17 @@
 
 ### New Spec Units
 
-- `agent-lifecycle-be`: New。Agent initialize/get/destroy、credential rotation、profile/config、Agent ID と Durable Object identity の一致を定義する。
-- `agent-eventing-be`: New。Thread、Section、AgentEvent、Mailbox、idempotency、sequence、thread_key 解決、system Thread を定義する。
-- `agent-runtime-be`: New。AgentRun、scheduler fairness、snapshot immutability、interrupt、harness decision、budget、Agent-local Queue wake を定義する。
-- `agent-memory-be`: New。Section boundary、Compaction、Handoff、ThreadHistory、ThreadMemory、AgentMemory、R2 history/archive、Memory rebase を定義する。
-- `agent-schedule-be`: New。Agent-owned Schedule、thread-scoped trigger Event、overlap policy、Extension uninstall 時の cancel を定義する。
-- `agent-tool-be`: New。ToolDefinition、ToolInvocation lifecycle、approval、signed Provider RPC、async operation reconcile、Tool result Event を定義する。
-- `agent-extension-be`: New。Extension manifest、Installation lifecycle、`AgentExtensionService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections` による Adapter Connection 管理、ExtensionIngressService、Delivery RPC、uninstall cleanup、Installation signature を定義する。
-- `agent-security-be`: New。Client Service JWT、Extension detached signature、raw body digest、nonce/idempotency replay protection、final Agent-local authorization、Connect error mapping、observability を定義する。
-- `agent-health-be`: New。REST `/health` ではなく `AgentHealthService.Check` RPC で Agent Service と AIAgent routing の health を確認する contract を定義する。
-- `client-registry-be`: New。Client 専用 D1 の管理対象 Agent 台帳、credential reference、server-side Agent RPC client、Agent domain snapshot を保存しない server-side data boundary を定義する。
-- `client-management-fe`: New。Next.js 管理 UI の Agent/Thread/Event/Run/Compaction/Schedule/Tool/Extension/Settings 画面、Browser credential 非公開、Agent proxy 非提供を定義する。
+- `agent-lifecycle`: New。Agent initialize/get/destroy、credential rotation、profile/config、Agent ID と Durable Object identity の一致を定義する。
+- `agent-eventing`: New。Thread、Section、AgentEvent、Mailbox、idempotency、sequence、thread_key 解決、system Thread を定義する。
+- `agent-runtime`: New。AgentRun、scheduler fairness、snapshot immutability、interrupt、harness decision、budget、Agent-local Queue wake を定義する。
+- `agent-memory`: New。Section boundary、Compaction、Handoff、ThreadHistory、ThreadMemory、AgentMemory、R2 history/archive、Memory rebase を定義する。
+- `agent-schedule`: New。Agent-owned Schedule、thread-scoped trigger Event、overlap policy、Extension uninstall 時の cancel を定義する。
+- `agent-tool`: New。ToolDefinition、ToolInvocation lifecycle、approval、signed Provider RPC、async operation reconcile、Tool result Event を定義する。
+- `agent-extension`: New。Extension manifest、Installation lifecycle、`AgentExtensionService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections` による Adapter Connection 管理、ExtensionIngressService、Delivery RPC、uninstall cleanup、Installation signature を定義する。
+- `agent-security`: New。Client Service JWT、Extension detached signature、raw body digest、nonce/idempotency replay protection、final Agent-local authorization、Connect error mapping、observability を定義する。
+- `agent-health`: New。REST `/health` ではなく `AgentHealthService.Check` RPC で Agent Service と AIAgent routing の health を確認する contract を定義する。
+- `client-registry`: New。Client 専用 D1 の管理対象 Agent 台帳、credential reference、server-side Agent RPC client、Agent domain snapshot を保存しない server-side data boundary を定義する。
+- `client-management`: New。Next.js 管理 UI の Agent/Thread/Event/Run/Compaction/Schedule/Tool/Extension/Settings 画面、Browser credential 非公開、Agent proxy 非提供を定義する。
 
 ### Modified Spec Units
 
@@ -46,10 +46,10 @@
 
 ## Naming
 
-- `agent-lifecycle-be` は `AGENT-LIFECYCLE-BE`、`agent-eventing-be` は `AGENT-EVENTING-BE`、`agent-runtime-be` は `AGENT-RUNTIME-BE`、`agent-memory-be` は `AGENT-MEMORY-BE` を Scenario ID prefix とする。
-- `agent-schedule-be` は `AGENT-SCHEDULE-BE`、`agent-tool-be` は `AGENT-TOOL-BE`、`agent-extension-be` は `AGENT-EXTENSION-BE`、`agent-security-be` は `AGENT-SECURITY-BE`、`agent-health-be` は `AGENT-HEALTH-BE` を Scenario ID prefix とする。
-- `client-registry-be` は `CLIENT-REGISTRY-BE`、`client-management-fe` は `CLIENT-MANAGEMENT-FE` を Scenario ID prefix とする。
-- FE と BE は prefix に `FE` / `BE` を含めて分離し、automated test title は `[SCENARIO_ID]` を含める。
+- `agent-lifecycle` は `AGENT-LIFECYCLE`、`agent-eventing` は `AGENT-EVENTING`、`agent-runtime` は `AGENT-RUNTIME`、`agent-memory` は `AGENT-MEMORY` を Scenario ID prefix とする。
+- `agent-schedule` は `AGENT-SCHEDULE`、`agent-tool` は `AGENT-TOOL`、`agent-extension` は `AGENT-EXTENSION`、`agent-security` は `AGENT-SECURITY`、`agent-health` は `AGENT-HEALTH` を Scenario ID prefix とする。
+- `client-registry` は `CLIENT-REGISTRY`、`client-management` は `CLIENT-MANAGEMENT` を Scenario ID prefix とする。
+- Automated test title は `[SCENARIO_ID]` を含める。
 
 ## Impact
 

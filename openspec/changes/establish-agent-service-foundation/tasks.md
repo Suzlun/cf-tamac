@@ -101,8 +101,8 @@
 
 ## 10. Final-scope correction before replacement verification
 
-- [x] 10.1 OpenSpec spec unit directories と Scenario IDs を suffix-less names に移行する。対象は `agent-platform` / `AGENT-PLATFORM-S###`、`management-client` / `MANAGEMENT-CLIENT-S###`、`workspace-governance` / `WORKSPACE-GOVERNANCE-S###` であり、`FE` / `BE` prefixes は新規 tests/specs/docs に残さない。
-- [x] 10.2 packages/agent と packages/client の既存 tests、E2E specs、governance tests、OpenSpec coverage references を 10.1 の Scenario IDs に合わせて rename し、旧 `*-BE-S###` / `*-FE-S###` references が残らないことを検査する。
+- [x] 10.1 OpenSpec spec unit directories と Scenario IDs を suffix-less names に移行する。対象は `agent-platform` / `AGENT-PLATFORM-S###`、`management-client` / `MANAGEMENT-CLIENT-S###`、`workspace-governance` / `WORKSPACE-GOVERNANCE-S###` であり、層 prefix は新規 tests/specs/docs に残さない。
+- [x] 10.2 packages/agent と packages/client の既存 tests、E2E specs、governance tests、OpenSpec coverage references を 10.1 の Scenario IDs に合わせて rename し、旧層付き Scenario ID references が残らないことを検査する。
 - [x] 10.3 `.opencode/agents/unit/backend/**` と `.opencode/agents/unit/frontend/**` を `.opencode/agents/unit/agent/**` と `.opencode/agents/unit/client/**` へ移行し、applier/delegation guidance、coding-guardian entrypoints、governance fixtures を更新する。
 - [x] 10.4 `eslint.config.js`、`CODING_STANDARDS.md`、`scripts/governance/verify-package-boundaries.mjs` に Agent layer direction と Next.js Client server/browser boundary を正式ルールとして追加し、旧 demo package boundary を primary rule として参照しない。
 - [x] 10.5 `AGENTS.md`、`README.md`、`CONTRIBUTING.md`、`CODING_STANDARDS.md` から旧 demo package categories を primary architecture/development commands として扱う文言を削除し、必要な場合は deletion/migration note に限定する。

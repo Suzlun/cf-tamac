@@ -15,21 +15,21 @@ Agent Service は、Agent-scoped `thread_key` 値を通じて外部 Event 文脈
 - 異なる Agent 内の同じ `thread_key` は異なる Thread に解決 MUST。
 - `thread_key` 比較は Unicode NFC normalization、大文字小文字を区別する比較、暗黙 prefix なし、最大 512 UTF-8 bytes を使用 MUST。
 
-#### Scenario: PublishEvent が欠落または空の `thread_key` を拒否する (AGENT-EVENTING-BE-S001)
+#### Scenario: PublishEvent が欠落または空の `thread_key` を拒否する (AGENT-EVENTING-S001)
 
 - **GIVEN** 有効な principal が `agent-alpha` に Event を publish できる
 - **WHEN** `thread_key` なし、または空の `thread_key` で `PublishEvent` を呼ぶ
 - **THEN** Agent Service はリクエストを `invalid_argument` として拒否する
 - **AND** Event、Thread、Section、pending Run、Queue wake は作成されない
 
-#### Scenario: 同じ Agent と同じ `thread_key` は同じ Thread に解決する (AGENT-EVENTING-BE-S002)
+#### Scenario: 同じ Agent と同じ `thread_key` は同じ Thread に解決する (AGENT-EVENTING-S002)
 
 - **GIVEN** `agent-alpha` に `project:agent-service` 用の Thread がない
 - **WHEN** `thread_key = project:agent-service` で二つの Event が `agent-alpha` に publish される
 - **THEN** 両方の Event は同じ internal `thread_id` を参照する
 - **AND** それらの `thread_sequence` 値はその Thread 内で連続している
 
-#### Scenario: 異なる Agent 間の同じ `thread_key` は分離されたままになる (AGENT-EVENTING-BE-S003)
+#### Scenario: 異なる Agent 間の同じ `thread_key` は分離されたままになる (AGENT-EVENTING-S003)
 
 - **GIVEN** `agent-alpha` と `agent-beta` がどちらも `thread_key = shared:ops` の Event を受け取っている
 - **WHEN** 各 Agent の Thread view が照会される
@@ -50,7 +50,7 @@ Lifecycle、credential rotation、Extension install/uninstall などの管理操
 - Lifecycle、credential、Extension installation、permission revocation、destructive management operation は監査 Event を system Thread に追加 MUST。
 - 公開 Event publish API は、caller が特権 system 監査 Event provenance を spoof することを許可して MUST NOT。
 
-#### Scenario: ライフサイクル監査 Event が system Thread に追加される (AGENT-EVENTING-BE-S004)
+#### Scenario: ライフサイクル監査 Event が system Thread に追加される (AGENT-EVENTING-S004)
 
 - **GIVEN** `agent-alpha` が initialized である
 - **WHEN** credential rotation または Extension uninstall が成功する
@@ -72,7 +72,7 @@ Agent は外部 Event を失わず、後続の自律判断で同じ履歴を再�
 - 受理済み Event は、`agent_sequence`、`thread_sequence`、`section_id`、`source`、`type`、`occurred_at`、idempotency key、payload 参照または inline payload、提供された場合の correlation ID と causation ID を含める MUST。
 - Agent-local Queue は Event authority ではなく、すでに永続化された Event と pending Run のための wake-up mechanism としてだけ使用 MUST。
 
-#### Scenario: 受理済み Event は scheduler wake 前に永続化される (AGENT-EVENTING-BE-S005)
+#### Scenario: 受理済み Event は scheduler wake 前に永続化される (AGENT-EVENTING-S005)
 
 - **GIVEN** 有効な Event が `agent-alpha` に publish されている
 - **WHEN** `PublishEvent` が成功を返す
@@ -80,7 +80,7 @@ Agent は外部 Event を失わず、後続の自律判断で同じ履歴を再�
 - **AND** その Thread には pending Run が存在するか coalesced される
 - **AND** Agent-local Queue には pending work 用の scheduler wake が最大一つ含まれる
 
-#### Scenario: 重複 Event publish が元の Event 結果を返す (AGENT-EVENTING-BE-S006)
+#### Scenario: 重複 Event publish が元の Event 結果を返す (AGENT-EVENTING-S006)
 
 - **GIVEN** principal が idempotency key `evt-1` で Event の publish に成功している
 - **WHEN** 同じ principal が同じ body digest と `evt-1` でリクエストを繰り返す
@@ -102,14 +102,14 @@ Agent Service は scoped Event 照会と検証済み payload 参照を公開 SHA
 - 構成済み inline 閾値より大きい payload は immutable R2 object として保存 MUST し、Event 記録では参照、サイズ、content type、digest で表現 MUST。
 - Event 照会応答は `agent_sequence` と `thread_sequence` による順序を保持 MUST。
 
-#### Scenario: ListEvents が requested Thread 内の ordered Events を返す (AGENT-EVENTING-BE-S007)
+#### Scenario: ListEvents が requested Thread 内の ordered Events を返す (AGENT-EVENTING-S007)
 
 - **GIVEN** Thread が一つ以上の Section にまたがる複数の Event を含んでいる
 - **WHEN** 認可済み principal がその `agent_id` と `thread_id` に対して `ListEvents` を呼ぶ
 - **THEN** 応答はその Thread 内の Event だけを `thread_sequence` 順に返す
 - **AND** ページング cursor は別 Agent または Thread への access を許さない
 
-#### Scenario: 大きな Event payload が digest メタデータ付きで offload される (AGENT-EVENTING-BE-S008)
+#### Scenario: 大きな Event payload が digest メタデータ付きで offload される (AGENT-EVENTING-S008)
 
 - **GIVEN** Event payload が inline payload threshold を超えている
 - **WHEN** Event が受理される
@@ -132,7 +132,7 @@ Agent Service は Thread と Section の公開照会を Agent scope 内に限定
 - `AgentThreadService.ListSections` は対象 Thread の Section を ordinal または sequence 範囲順に返し、Section 状態、Event 範囲、latest compaction 参照を含める MUST。
 - これらの照会は Agent-local final authorization を通り、not found、permission denied、pagination cursor scope error を安定した Connect code に変換 MUST。
 
-#### Scenario: ListThreads GetThread と ListSections が Agent scoped に留まる (AGENT-EVENTING-BE-S009)
+#### Scenario: ListThreads GetThread と ListSections が Agent scoped に留まる (AGENT-EVENTING-S009)
 
 - **GIVEN** `agent-alpha` と `agent-beta` がそれぞれ複数 Thread と Section を持っている
 - **WHEN** 認可済み principal が `agent-alpha` に対して `ListThreads`、`GetThread`、`ListSections` を呼ぶ

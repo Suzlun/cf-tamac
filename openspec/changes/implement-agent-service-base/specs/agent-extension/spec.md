@@ -15,21 +15,21 @@ Agent 管理者は、外部 Provider が提供する Adapter、Tool、Delivery c
 - Manifest は Provider により署名され、Installation が有効になる前に検証される MUST。
 - Installation 状態は `installing`、`pending_external_setup`、`active`、`disabled`、`uninstalling`、`uninstalled`、`failed` を支援 MUST。
 
-#### Scenario: InstallExtension が有効化前に署名済み manifest を検証する (AGENT-EXTENSION-BE-S001)
+#### Scenario: InstallExtension が有効化前に署名済み manifest を検証する (AGENT-EXTENSION-S001)
 
 - **GIVEN** 認可済み Client Service principal が manifest URL または manifest payload で Extension installation をリクエストしている
 - **WHEN** AIAgent Durable Object が manifest を fetch または受信する
 - **THEN** Provider signature、schema 版、Extension identity、key、要求 grant、対応 RPC profile を検証する
 - **AND** 検証が失敗した場合、有効 grant を永続化せず installation を拒否する
 
-#### Scenario: successful install が grant、Adapter、Tool、Delivery、trust key を永続化する (AGENT-EXTENSION-BE-S002)
+#### Scenario: successful install が grant、Adapter、Tool、Delivery、trust key を永続化する (AGENT-EXTENSION-S002)
 
 - **GIVEN** manifest が有効で、要求 grant が policy により approved されている
 - **WHEN** `InstallExtension` が成功する
 - **THEN** Agent は Installation 記録、Provider 公開鍵、grant、Adapter definition、Tool definition、Delivery definition、manifest digest、setup 状態を保存する
 - **AND** 監査 Event が system Thread に追加される
 
-#### Scenario: Installation が external setup を待機できる (AGENT-EXTENSION-BE-S003)
+#### Scenario: Installation が external setup を待機できる (AGENT-EXTENSION-S003)
 
 - **GIVEN** Extension が ingress 有効化前に Provider 側 connection setup を必要としている
 - **WHEN** `InstallExtension` が Agent 側永続化を完了するが外部 setup が incomplete である
@@ -54,7 +54,7 @@ Extension Provider は外部 platform protocol を AgentEvent に変換する in
 - ExtensionIngressService は有効な detached signature、時刻、nonce、idempotency、body digest、grant、Connection 所有関係を持つ有効な Extension Installation principal からのリクエストのみ受理 MUST。
 - Extension ingress Event は有効な `thread_key` を含むか導出 MUST し、ingress protocol が応答 delivery をサポートする場合は DeliveryContext を作成できる。
 
-#### Scenario: Adapter Connection ライフサイクルは Agent-local である (AGENT-EXTENSION-BE-S004)
+#### Scenario: Adapter Connection ライフサイクルは Agent-local である (AGENT-EXTENSION-S004)
 
 - **GIVEN** Installation `inst-1` が有効で Adapter definition を提供している
 - **WHEN** 認可済み principal が `AgentExtensionService.CreateAdapterConnection`、`ListAdapterConnections`、`DeleteAdapterConnection` を呼び、`inst-1` の Adapter Connection を作成、一覧取得、削除する
@@ -62,7 +62,7 @@ Extension Provider は外部 platform protocol を AgentEvent に変換する in
 - **AND** list 応答は他の Agent または Installation の Connection を露出しない
 - **AND** 削除後、その Connection からの future ingress は無効化される
 
-#### Scenario: 署名済み Extension ingress が Event と DeliveryContext を追加する (AGENT-EXTENSION-BE-S005)
+#### Scenario: 署名済み Extension ingress が Event と DeliveryContext を追加する (AGENT-EXTENSION-S005)
 
 - **GIVEN** 有効な Installation `inst-1` が ingress grant を持つ Connection `conn-1` を有している
 - **WHEN** Provider が有効な signature、nonce、body digest、idempotency key、`thread_key` で `ExtensionIngressService.PublishEvent` を呼ぶ
@@ -87,7 +87,7 @@ Adapter ingress に対する応答は、元の platform 文脈へ返る必要が
 - AIAgent Durable Object は Delivery 応答と能動的な外向き action を区別 MUST し、後者は ToolInvocation としてモデル化 MUST。
 - Delivery 結果 callback は Extension Installation principal として認証され、元の DeliveryContext に紐づく MUST。
 
-#### Scenario: Agent が Provider RPC 経由で Delivery 応答を送信する (AGENT-EXTENSION-BE-S006)
+#### Scenario: Agent が Provider RPC 経由で Delivery 応答を送信する (AGENT-EXTENSION-S006)
 
 - **GIVEN** Run が DeliveryContext `deliv-1` を持つ ingress Event への respond を決定している
 - **WHEN** AIAgent Durable Object が delivery を実行する
@@ -109,14 +109,14 @@ Extension を外すとき、ingress、Tool、Schedule、Delivery、trust key が
 - Uninstall は traceability のため Event、History、ToolInvocation 記録、Compaction、監査記録を保持 MUST。
 - Agent Service は汎用 Extension、Adapter、Tool、Delivery 相互運用性を定義 MUST し、Agent 側 Extension 振る舞いを満たすために Discord 固有 Provider 実装を要求して MUST NOT。
 
-#### Scenario: UninstallExtension が capabilities を disable し history を保持する (AGENT-EXTENSION-BE-S007)
+#### Scenario: UninstallExtension が capabilities を disable し history を保持する (AGENT-EXTENSION-S007)
 
 - **GIVEN** Installation `inst-1` が有効な Adapter Connection、Tool、Schedule、pending ToolInvocation、DeliveryContext を持っている
 - **WHEN** 認可済み principal が `UninstallExtension` を呼ぶ
 - **THEN** ingress は拒否され、Connection は `disabled` になり、Tool は `unavailable` になり、関連 Schedule は `cancelled` になり、pending ToolInvocation は `cancelled` または `outcome_unknown` として mark され、DeliveryContext は `revoked` され、trust key は `revoked` される
 - **AND** 既存の Event、History、ToolInvocation 記録、監査 Event は照会可能なままである
 
-#### Scenario: 汎用 Extension Provider が Discord 固有 code なしで動作する (AGENT-EXTENSION-BE-S008)
+#### Scenario: 汎用 Extension Provider が Discord 固有 code なしで動作する (AGENT-EXTENSION-S008)
 
 - **GIVEN** Provider が汎用 manifest、ingress、Tool、Delivery RPC 契約を実装している
 - **WHEN** Provider が Agent に install され、有効な Adapter Connection を通じて Event を publish する

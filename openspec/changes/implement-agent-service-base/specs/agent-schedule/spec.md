@@ -15,14 +15,14 @@ Agent は外部 Event がなくても、将来時刻や反復予定によって�
 - Schedule 管理 RPC は `agent_id`、認可、command 用 idempotency key、final Agent-local authorization を要求 MUST。
 - Schedule 記録の作成、更新、fire、取消は監査可能である MUST。
 
-#### Scenario: CreateSchedule が Thread context を要求する (AGENT-SCHEDULE-BE-S001)
+#### Scenario: CreateSchedule が Thread context を要求する (AGENT-SCHEDULE-S001)
 
 - **GIVEN** 認可済み Client Service principal が将来の Agent work を schedule したい
 - **WHEN** Thread ID または有効な `thread_key` なしで `CreateSchedule` を呼ぶ
 - **THEN** Agent Service はリクエストを `invalid_argument` として拒否する
 - **AND** Agent-local runtime schedule または Schedule 記録は作成されない
 
-#### Scenario: Schedule firing が `schedule.triggered` Event を append する (AGENT-SCHEDULE-BE-S002)
+#### Scenario: Schedule firing が `schedule.triggered` Event を append する (AGENT-SCHEDULE-S002)
 
 - **GIVEN** 有効な one-shot Schedule が Thread A に bind されている
 - **WHEN** schedule 済み時刻が到来する
@@ -44,7 +44,7 @@ Interval Schedule が長い処理と重なると、同じ目的の Run が重複
 - Schedule fire は Agent、Schedule、fire 時刻または tick identity、生成済み Event idempotency key により冪等である MUST。
 - AIAgent Durable Object は同じ Schedule tick に対して duplicate `schedule.triggered` Events を作成して MUST NOT。
 
-#### Scenario: overlap policy が duplicate interval work を防ぐ (AGENT-SCHEDULE-BE-S003)
+#### Scenario: overlap policy が duplicate interval work を防ぐ (AGENT-SCHEDULE-S003)
 
 - **GIVEN** 同じ Schedule の以前の work がまだ有効な間に repeating Schedule tick が発生している
 - **WHEN** runtime callback が実行される
@@ -65,7 +65,7 @@ Schedule 取消は後続 fire を防ぎ、Extension-owned Schedule を clean up 
 - Schedule 記録は取消理由、実行者、時刻、監査 link を保持 MUST。
 - Extension Installation が作成した Schedule は `installation_id` を保存 MUST し、その Installation がアンインストール済みまたは無効になったときに `cancelled` または `disabled` になる MUST。
 
-#### Scenario: CancelSchedule が future firing を防ぐ (AGENT-SCHEDULE-BE-S004)
+#### Scenario: CancelSchedule が future firing を防ぐ (AGENT-SCHEDULE-S004)
 
 - **GIVEN** Thread A に有効な Schedule が存在する
 - **WHEN** 認可済み principal が `CancelSchedule` を呼ぶ
@@ -73,7 +73,7 @@ Schedule 取消は後続 fire を防ぎ、Extension-owned Schedule を clean up 
 - **AND** Schedule 記録は監査メタデータ付きで cancelled になる
 - **AND** 同じ Schedule identity に対する後続 runtime callback は新しい Event を追加しない
 
-#### Scenario: Extension uninstall が有効 Schedule を cancel する (AGENT-SCHEDULE-BE-S005)
+#### Scenario: Extension uninstall が有効 Schedule を cancel する (AGENT-SCHEDULE-S005)
 
 - **GIVEN** Extension Installation `inst-1` が Agent 内に有効 Schedule を作成している
 - **WHEN** `inst-1` がアンインストール済みになる

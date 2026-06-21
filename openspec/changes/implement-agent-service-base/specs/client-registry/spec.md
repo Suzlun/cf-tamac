@@ -15,7 +15,7 @@ Client server は Client D1 内の管理対象 Agent 台帳メタデータを所
 - Agent Service は Client D1 を読み書き MUST NOT。
 - Client 台帳は authoritative Agent domain 状態として扱われて MUST NOT。
 
-#### Scenario: 管理対象 Agent 台帳が表示と並び順のメタデータを永続化する (CLIENT-REGISTRY-BE-S001)
+#### Scenario: 管理対象 Agent 台帳が表示と並び順のメタデータを永続化する (CLIENT-REGISTRY-S001)
 
 - **GIVEN** Client 運用者が Agent RPC origin と表示名を指定して `agent-alpha` を登録している
 - **WHEN** 運用者が Agent entry を pin、並べ替え、rename、または open する
@@ -36,7 +36,7 @@ Client は Agent RPC をサーバー側で呼ぶため credential 参照を管�
 - Client server はサーバー側実行内でのみ credential 参照を解決 MUST。
 - Browser 応答は Agent credential、生 JWT 署名鍵、Provider 秘密鍵、生 shared secret を含んで MUST NOT。
 
-#### Scenario: credential 参照は平文 secret を保存しない (CLIENT-REGISTRY-BE-S002)
+#### Scenario: credential 参照は平文 secret を保存しない (CLIENT-REGISTRY-S002)
 
 - **GIVEN** 運用者が `agent-alpha` の Client 側 credential 参照を保存または rotate している
 - **WHEN** Client server が credential メタデータを永続化する
@@ -58,7 +58,7 @@ Browser から Agent エンドポイントを直接呼ぶと CORS、credential �
 - Browser コードは Agent RPC origin を直接呼び出して MUST NOT し、生 Agent RPC リクエストを構築して MUST NOT。
 - Client server は Hono route または OpenAPI Agent 成果物から Agent RPC client を生成して MUST NOT。
 
-#### Scenario: Server Action が生成済み Connect client で Agent RPC を呼ぶ (CLIENT-REGISTRY-BE-S003)
+#### Scenario: Server Action が生成済み Connect client で Agent RPC を呼ぶ (CLIENT-REGISTRY-S003)
 
 - **GIVEN** user が Client UI で Agent 管理 action を実行している
 - **WHEN** 対応する Server Action が実行される
@@ -80,7 +80,7 @@ Client UI は Agent profile、Thread、Run、Schedule、Tool、Extension 情報�
 - Client server は authoritative にならず secret を含まない場合に限り、一時的な UI データを cache できる。
 - Client server は画面/action の必要に応じて Agent domain 状態を Agent RPC から取得 MUST。
 
-#### Scenario: Client が D1 スナップショットではなく Agent RPC から Agent domain 詳細を読む (CLIENT-REGISTRY-BE-S004)
+#### Scenario: Client が D1 スナップショットではなく Agent RPC から Agent domain 詳細を読む (CLIENT-REGISTRY-S004)
 
 - **GIVEN** Agent 詳細ページが profile、Thread、Run、Schedule、Tool、Extension を必要としている
 - **WHEN** Client server がページを描画する、または refresh を処理する
@@ -101,7 +101,7 @@ Client は管理 UI であり Agent API Provider ではない。Client が `/api
 - Next.js Server Actions と Server Components は UI 実行境界として動作できるが、公開 Agent domain API として文書化または扱われて MUST NOT。
 - Agent RPC origin と credential はサーバー側に留める MUST。
 
-#### Scenario: Client が公開 Agent proxy route を持たない (CLIENT-REGISTRY-BE-S005)
+#### Scenario: Client が公開 Agent proxy route を持たない (CLIENT-REGISTRY-S005)
 
 - **GIVEN** Client Worker が管理 UI route とともに deploy されている
 - **WHEN** Browser または外部 caller が `/api/client/agents`、`/api/client/extensions`、または別の Agent proxy route へアクセスを試みる

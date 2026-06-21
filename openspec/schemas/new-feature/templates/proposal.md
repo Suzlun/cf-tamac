@@ -13,24 +13,22 @@
 
 ### New Spec Units
 
-<!-- TODO: List new Spec Units (<domain>-fe / <domain>-be) and a 1-line scope summary for each. -->
+<!-- TODO: List new Spec Units (<capability>) and a 1-line scope summary for each. -->
 <!-- Spec Units MUST be lasting capability/responsibility names, not change names or task names. -->
-<!-- Bad: `setup-project-fe`, `migrate-backend-be`, `cleanup-ui-fe` -->
-<!-- Good: `architecture-fe`, `timeline-fe`, `account-be` -->
+<!-- Bad: `setup-project`, `migrate-template`, `cleanup-ui` -->
+<!-- Good: `agent-lifecycle`, `client-management`, `workspace-governance` -->
 
-- `<domain>-fe`: <!-- TODO: FE scope (screens, UX, client validation/state, error messages, etc.) -->
-- `<domain>-be`: <!-- TODO: BE scope (API, persistence, invariants, errors, notifications, non-functional concerns, etc.) -->
+- `<capability>`: <!-- TODO: Capability scope (screens, API, persistence, invariants, UX, security, errors, etc.) -->
 
 ### Modified Spec Units
 
 <!-- TODO: List existing Spec Units whose requirements change, and describe what changes (at requirement level) in 1-2 lines. -->
 
-- `<existing-domain>-fe`: <!-- TODO: Which requirements change and how (user-visible behavior). -->
-- `<existing-domain>-be`: <!-- TODO: Which requirements change and how (API/data/constraints/response differences). -->
+- `<existing-capability>`: <!-- TODO: Which requirements change and how (observable behavior, API/data/constraints, UX, errors, etc.). -->
 
 ## Naming
 
-<!-- TODO: Confirm the DOMAIN prefix for Scenario IDs (derived from <domain>) and that FE/BE or platform prefixes differ when needed (e.g., AGENT-LIFECYCLE-BE-S001 vs CLIENT-MANAGEMENT-FE-S001). -->
+<!-- TODO: Confirm the Scenario ID prefix derived from <capability> (e.g., AGENT-LIFECYCLE-S001, CLIENT-MANAGEMENT-S001). -->
 
 ## Impact
 

@@ -15,14 +15,14 @@ Agent API は Client Service、Extension Installation、Internal Service、Admin
 - Browser sessions は direct Agent principals として受理して MUST NOT。
 - 認証メタデータは decode 済みリクエストに bind MUST し、生 body digest とともに final authorization のため AIAgent Durable Object へ forward MUST。
 
-#### Scenario: 有効な Client Service JWT が Agent RPC を認証する (AGENT-SECURITY-BE-S001)
+#### Scenario: 有効な Client Service JWT が Agent RPC を認証する (AGENT-SECURITY-S001)
 
 - **GIVEN** Client Service が `agent-alpha` の有効 credential を保持している
 - **WHEN** 必須 claim と scope を含む有効な短命 JWT で許可済み Agent RPC を呼ぶ
 - **THEN** RPC facade は Client Service principal を認証する
 - **AND** principal、acting user、claim、生 body digest 文脈を AIAgent Durable Object に渡す
 
-#### Scenario: 不正な Client JWT は変更前に拒否される (AGENT-SECURITY-BE-S002)
+#### Scenario: 不正な Client JWT は変更前に拒否される (AGENT-SECURITY-S002)
 
 - **GIVEN** リクエストが期限切れ token、未有効 token、不正 audience、不正 `agent_id`、欠落 scope、または失効 key ID を持っている
 - **WHEN** mutating Agent RPC を呼ぶ
@@ -44,14 +44,14 @@ Extension Provider からの ingress、Tool 結果、Delivery 結果は外部 ne
 - Nonces は principal ごとに TTL 付きで保存 MUST し、replay 時には拒否 MUST。
 - 同じ body digest を持つ同じ idempotency key は記録済み結果を replay MUST し、異なる body digest を持つ同じ key は拒否 MUST。
 
-#### Scenario: 有効な Extension signature が grant 内の ingress を受理する (AGENT-SECURITY-BE-S003)
+#### Scenario: 有効な Extension signature が grant 内の ingress を受理する (AGENT-SECURITY-S003)
 
 - **GIVEN** 有効な Installation `inst-1` が Provider 公開鍵 `key-1` と Connection `conn-1` の ingress grant を持っている
 - **WHEN** Provider が有効な時刻、nonce、idempotency key、生 body digest、detached signature で ingress RPC を呼ぶ
 - **THEN** AIAgent Durable Object は signature と grant を検証する
 - **AND** command は RPC method に従って Event 受理または結果処理へ進む
 
-#### Scenario: body 改ざんと nonce replay が拒否される (AGENT-SECURITY-BE-S004)
+#### Scenario: body 改ざんと nonce replay が拒否される (AGENT-SECURITY-S004)
 
 - **GIVEN** Provider リクエストが特定の生 protobuf body と nonce に対して署名済みである
 - **WHEN** body bytes が変更される、または同じ nonce が再利用される
@@ -74,21 +74,21 @@ RPC facade の認証成功だけでは、Agent のライフサイクル、Instal
 - Extension Installation principal は Agent config、install/uninstall、credential rotation、Tool 承認 RPC を呼び出して MUST NOT。
 - Authorization denial は、許可された監査/security metrics を除き Agent-owned 状態を変更しないままにする MUST。
 
-#### Scenario: Extension grant 外の method は AIAgent により拒否される (AGENT-SECURITY-BE-S005)
+#### Scenario: Extension grant 外の method は AIAgent により拒否される (AGENT-SECURITY-S005)
 
 - **GIVEN** Extension Installation principal が ingress grant だけを持っている
 - **WHEN** Agent config、Extension install/uninstall、Schedule 管理、Thread 照会、または Tool 承認 RPC を呼ぶ
 - **THEN** AIAgent Durable Object はリクエストを permission denied で拒否する
 - **AND** その principal に対して config、installation、schedule、照会結果、承認状態は生成されない
 
-#### Scenario: idempotency replay が exactly-once command 結果を保持する (AGENT-SECURITY-BE-S006)
+#### Scenario: idempotency replay が exactly-once command 結果を保持する (AGENT-SECURITY-S006)
 
 - **GIVEN** mutating command が principal `p-1`、idempotency key `idem-1`、body digest `digest-a` で成功している
 - **WHEN** `p-1` が `idem-1` と `digest-a` で command を繰り返す
 - **THEN** 記録済み応答が重複変更なしで返される
 - **AND** `idem-1` と `digest-b` による反復は conflict として拒否される
 
-#### Scenario: Durable Object RPC は Connect facade の背後に留まる (AGENT-SECURITY-BE-S009)
+#### Scenario: Durable Object RPC は Connect facade の背後に留まる (AGENT-SECURITY-S009)
 
 - **GIVEN** AIAgent Durable Object がライフサイクル、Event、Run、Schedule、Tool、Extension、health operation 用の Worker-internal method を公開している
 - **WHEN** 外部 caller、Browser、または Provider が Agent Connect RPC facade なしでそれらの Durable Object method を呼び出そうとする
@@ -110,14 +110,14 @@ Client と Provider は、失敗を retry すべきか、入力を直すべき�
 - Secret、生 token、秘密鍵、機密値を含む完全な signature base、生 Provider credential は log して MUST NOT、Browser client に返して MUST NOT。
 - Rate limit と security 拒否 metrics は method と principal type ごとに観測可能である MUST。
 
-#### Scenario: Domain error が安定した Connect code に map される (AGENT-SECURITY-BE-S007)
+#### Scenario: Domain error が安定した Connect code に map される (AGENT-SECURITY-S007)
 
 - **GIVEN** Agent domain operation が検証、認証、認可、not-found、conflict、precondition、concurrency、rate limit、provider timeout、internal error を生成している
 - **WHEN** RPC facade が caller に error を返す
 - **THEN** 各 error は構成済み Connect code と安全なエラー詳細に map される
 - **AND** client は retry 可能 category と retry 不可 category を区別できる
 
-#### Scenario: Observability 文脈が secret material を除外する (AGENT-SECURITY-BE-S008)
+#### Scenario: Observability 文脈が secret material を除外する (AGENT-SECURITY-S008)
 
 - **GIVEN** Client Service または Extension Provider RPC が成功または失敗する
 - **WHEN** log、metrics、監査記録が emitted される

@@ -15,7 +15,7 @@ AIAgent Durable Object は Compaction ごとに正確に一つの frozen Section
 - Compaction は Agent-owned かつ Thread-scoped である MUST し、その Thread の新しい Event 受理を block して MUST NOT。
 - Compaction 記録は Event 範囲、Section ordinal、Compaction ordinal、`status`、provenance、digest、出力参照を含める MUST。
 
-#### Scenario: Compaction が一つの Section を freeze し次を open する (AGENT-MEMORY-BE-S001)
+#### Scenario: Compaction が一つの Section を freeze し次を open する (AGENT-MEMORY-S001)
 
 - **GIVEN** Thread A が Event sequence range `1..25` を持つ open Section を有している
 - **WHEN** Thread A の compaction が開始する
@@ -23,7 +23,7 @@ AIAgent Durable Object は Compaction ごとに正確に一つの frozen Section
 - **AND** Compaction 出力生成が続く前に Section `2` が open される
 - **AND** Compaction record は正確に Section `1` を参照する
 
-#### Scenario: Compaction 中に到着した Event は open Section に入る (AGENT-MEMORY-BE-S002)
+#### Scenario: Compaction 中に到着した Event は open Section に入る (AGENT-MEMORY-S002)
 
 - **GIVEN** Section `1` が frozen で、Compaction が running である
 - **WHEN** 同じ Thread の新しい Event が受理される
@@ -46,7 +46,7 @@ Agent の再開には短い引き継ぎだけでなく、検証可能な詳細�
 - ThreadHistory は時系列、実行者の意図、判断、検討選択肢、明示的理由、前提、未解決問題、Tool 活動、成果物、replay manifest を含める MUST。
 - ThreadMemoryDelta は provenance 付きの add、confirm、revise、supersede、invalidate operation を支援 MUST。
 
-#### Scenario: Compaction が Handoff History と MemoryDelta を作成する (AGENT-MEMORY-BE-S003)
+#### Scenario: Compaction が Handoff History と MemoryDelta を作成する (AGENT-MEMORY-S003)
 
 - **GIVEN** frozen Section に user Events、Tool activity、decisions、artifacts が含まれている
 - **WHEN** compaction が成功する
@@ -54,7 +54,7 @@ Agent の再開には短い引き継ぎだけでなく、検証可能な詳細�
 - **AND** digest/provenance を持つ詳細 ThreadHistory index が保存される
 - **AND** 新しい ThreadMemory 版を作成するため ThreadMemoryDelta operation が適用される
 
-#### Scenario: Context Builder が latest ready compaction と raw Events から再開する (AGENT-MEMORY-BE-S004)
+#### Scenario: Context Builder が latest ready compaction と raw Events から再開する (AGENT-MEMORY-S004)
 
 - **GIVEN** Thread A が Section `5` の latest ready Compaction と open Section `6` の raw Event を持っている
 - **WHEN** Thread A の新しい Run が開始する
@@ -75,7 +75,7 @@ Agent が長期間活動すると、事実、方針、判断、制約が変化�
 - Memory 更新は supersede/invalidate 関係を保持 MUST し、各 Run スナップショットが使用した有効版を公開 MUST。
 - 矛盾または stale な Memory item は silent overwrite ではなく、明示的な revise、supersede、invalidate operation により解決 MUST。
 
-#### Scenario: Memory update が provenance と版を保持する (AGENT-MEMORY-BE-S005)
+#### Scenario: Memory update が provenance と版を保持する (AGENT-MEMORY-S005)
 
 - **GIVEN** Compaction 出力が以前の制約を revise する MemoryDelta を提案している
 - **WHEN** MemoryDelta が適用される
@@ -98,7 +98,7 @@ Durable Object SQLite にはサイズ制約があるため、大きな History�
 - Storage 閾値は warning、Compaction/archive priority、large body offload、critical read/delete/compact/export 振る舞いを駆動 MUST。
 - 初期 storage 閾値は inline payload <= 64 KiB、70% warning、80% compaction/archive priority、90% force large body R2、read/delete/compact/export を優先する 95% critical mode を使用 MUST。
 
-#### Scenario: 大きな History body が index メタデータ付きで R2 に保存される (AGENT-MEMORY-BE-S006)
+#### Scenario: 大きな History body が index メタデータ付きで R2 に保存される (AGENT-MEMORY-S006)
 
 - **GIVEN** ThreadHistory body が 64 KiB inline storage threshold を超える、または storage usage が 90% large body offload threshold に到達している
 - **WHEN** compaction が History output を書き込む
@@ -120,7 +120,7 @@ Agent Service は Compaction、ThreadMemory、ThreadHistory 照会を Agent-owne
 - `AgentThreadService.SearchThreadHistory` は Agent/Thread-scoped History index を検索し、照会、時間範囲、Section 範囲、ページング、provenance 絞り込み条件を適用する MUST。
 - これらの照会は R2 body への raw access を直接公開せず、認可済み経路で digest と所有関係メタデータを検証できる参照を返す MUST。
 
-#### Scenario: Thread memory と history 照会が scoped 参照を返す (AGENT-MEMORY-BE-S008)
+#### Scenario: Thread memory と history 照会が scoped 参照を返す (AGENT-MEMORY-S008)
 
 - **GIVEN** Thread A が Memory と History index を持つ ready、running、failed の Compaction 記録を有している
 - **WHEN** 認可済み principal が Thread A に対して `GetLatestCompaction`、`GetThreadMemory`、`SearchThreadHistory` を呼ぶ
@@ -141,7 +141,7 @@ Memory rebase は lineage を失わずに long-running Thread memory を refresh
 - Rebase trigger policy は Compaction 数、Memory item 数、token 見積もり、矛盾数、明示 rebase リクエストなどの閾値を支援 MUST。
 - Rebase は provenance を保持 MUST し、以前の判断を説明するために必要な監査/History 記録を削除して MUST NOT。
 
-#### Scenario: Memory rebase が lineage を失わず long-term Memory を refresh する (AGENT-MEMORY-BE-S007)
+#### Scenario: Memory rebase が lineage を失わず long-term Memory を refresh する (AGENT-MEMORY-S007)
 
 - **GIVEN** Thread が configured compaction count または contradiction threshold を超えている
 - **WHEN** Memory rebase が実行される

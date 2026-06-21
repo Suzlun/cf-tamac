@@ -15,14 +15,14 @@ Agent Service は REST health エンドポイントではなく `AgentHealthServ
 - Check 応答は `serving` 状態、service 版、契約 package、確認対象 Agent identity、依存状態要約など、安全な運用メタデータ項目だけを公開 MUST。
 - Agent Service は REST `/health`、ad-hoc JSON health、Browser 直接 health API を Agent 公開 API として公開して MUST NOT。
 
-#### Scenario: Check が Protobuf RPC 経由で安全な serving 状態を返す (AGENT-HEALTH-BE-S001)
+#### Scenario: Check が Protobuf RPC 経由で安全な serving 状態を返す (AGENT-HEALTH-S001)
 
 - **GIVEN** Agent Service が deploy され、`agent-alpha` が対応する AIAgent Durable Object へ route できる
 - **WHEN** 認可済み smoke-test または Client Service principal が binary Protobuf を使い `agent_id = agent-alpha` で `AgentHealthService.Check` を呼ぶ
 - **THEN** 応答は安全な service と契約メタデータとともに `serving` または `degraded` 状態を報告する
 - **AND** Agent credential、秘密鍵、生 token、Provider secret、Thread payload、Memory body、domain スナップショットは返されない
 
-#### Scenario: REST health エンドポイントは Agent 公開 API ではない (AGENT-HEALTH-BE-S002)
+#### Scenario: REST health エンドポイントは Agent 公開 API ではない (AGENT-HEALTH-S002)
 
 - **GIVEN** Agent Service が Protobuf RPC facade を公開している
 - **WHEN** caller が REST `/health`、Connect JSON、HTTP GET unary、または Browser 直接 health リクエストを Agent origin に送信する
