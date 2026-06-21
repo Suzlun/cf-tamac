@@ -12,7 +12,7 @@ export interface AgentWorkerVars {
  */
 export const requiredAgentSecretNames = [
   'AGENT_CLIENT_JWT_PUBLIC_KEYS',
-  'AGENT_EXTENSION_SIGNATURE_KEYS',
+  'AGENT_INTEGRATION_SIGNATURE_KEYS',
   'AGENT_MODEL_PROVIDER_SECRET_REFS',
 ] as const;
 
@@ -48,8 +48,8 @@ export function getMissingAgentSecrets(env: Partial<AgentWorkerEnv>): RequiredAg
   if (isMissingSecret(env.AGENT_CLIENT_JWT_PUBLIC_KEYS)) {
     missingSecrets.push('AGENT_CLIENT_JWT_PUBLIC_KEYS');
   }
-  if (isMissingSecret(env.AGENT_EXTENSION_SIGNATURE_KEYS)) {
-    missingSecrets.push('AGENT_EXTENSION_SIGNATURE_KEYS');
+  if (isMissingSecret(env.AGENT_INTEGRATION_SIGNATURE_KEYS)) {
+    missingSecrets.push('AGENT_INTEGRATION_SIGNATURE_KEYS');
   }
   if (isMissingSecret(env.AGENT_MODEL_PROVIDER_SECRET_REFS)) {
     missingSecrets.push('AGENT_MODEL_PROVIDER_SECRET_REFS');

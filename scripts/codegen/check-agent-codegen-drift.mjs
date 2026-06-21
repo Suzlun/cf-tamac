@@ -33,10 +33,10 @@ export const rpcServiceInventory = new Map([
   ['AgentScheduleService', ['CreateSchedule', 'GetSchedule', 'ListSchedules', 'CancelSchedule']],
   ['AgentToolService', ['ListTools', 'GetInvocation', 'ListInvocations', 'ApproveInvocation', 'RejectInvocation']],
   [
-    'AgentExtensionService',
+    'AgentIntegrationService',
     [
-      'InstallExtension',
-      'UninstallExtension',
+      'InstallIntegration',
+      'UninstallIntegration',
       'GetInstallation',
       'ListInstallations',
       'CreateAdapterConnection',
@@ -44,7 +44,7 @@ export const rpcServiceInventory = new Map([
       'ListAdapterConnections',
     ],
   ],
-  ['ExtensionIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
+  ['IntegrationIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
   ['AgentHealthService', ['Check']],
 ]);
 
@@ -52,7 +52,7 @@ const forbiddenCrossAgentMethods = new Set([
   'ListAllAgents',
   'SearchAgents',
   'ListAllToolInvocations',
-  'ListAllExtensionInstallations',
+  'ListAllIntegrationInstallations',
 ]);
 
 const commandMethods = new Set([
@@ -66,18 +66,18 @@ const commandMethods = new Set([
   'AgentScheduleService.CancelSchedule',
   'AgentToolService.ApproveInvocation',
   'AgentToolService.RejectInvocation',
-  'AgentExtensionService.InstallExtension',
-  'AgentExtensionService.UninstallExtension',
-  'AgentExtensionService.CreateAdapterConnection',
-  'AgentExtensionService.DeleteAdapterConnection',
-  'ExtensionIngressService.PublishEvent',
-  'ExtensionIngressService.PublishToolResult',
-  'ExtensionIngressService.PublishDeliveryResult',
+  'AgentIntegrationService.InstallIntegration',
+  'AgentIntegrationService.UninstallIntegration',
+  'AgentIntegrationService.CreateAdapterConnection',
+  'AgentIntegrationService.DeleteAdapterConnection',
+  'IntegrationIngressService.PublishEvent',
+  'IntegrationIngressService.PublishToolResult',
+  'IntegrationIngressService.PublishDeliveryResult',
 ]);
 
 const eventPublishMethods = new Set([
   'AgentEventService.PublishEvent',
-  'ExtensionIngressService.PublishEvent',
+  'IntegrationIngressService.PublishEvent',
 ]);
 
 function listFiles(root, suffix) {

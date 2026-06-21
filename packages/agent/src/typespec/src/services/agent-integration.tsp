@@ -3,9 +3,9 @@ using Protobuf;
 namespace CfTamac.Agent.V1;
 
 @Protobuf.service
-interface AgentExtensionService {
-  InstallExtension(...InstallExtensionRequest): InstallExtensionResponse;
-  UninstallExtension(...UninstallExtensionRequest): UninstallExtensionResponse;
+interface AgentIntegrationService {
+  InstallIntegration(...InstallIntegrationRequest): InstallIntegrationResponse;
+  UninstallIntegration(...UninstallIntegrationRequest): UninstallIntegrationResponse;
   GetInstallation(...GetInstallationRequest): GetInstallationResponse;
   ListInstallations(...ListInstallationsRequest): ListInstallationsResponse;
   CreateAdapterConnection(...CreateAdapterConnectionRequest): CreateAdapterConnectionResponse;
@@ -14,28 +14,28 @@ interface AgentExtensionService {
 }
 
 @message
-model InstallExtensionRequest {
+model InstallIntegrationRequest {
   @field(1) agent_id: string;
   @field(2) idempotency_key: string;
-  @field(3) extension_id: string;
+  @field(3) integration_id: string;
   @field(4) manifest_ref: string;
 }
 
 @message
-model InstallExtensionResponse {
-  @field(1) installation: ExtensionInstallation;
+model InstallIntegrationResponse {
+  @field(1) installation: IntegrationInstallation;
 }
 
 @message
-model UninstallExtensionRequest {
+model UninstallIntegrationRequest {
   @field(1) agent_id: string;
   @field(2) idempotency_key: string;
   @field(3) installation_id: string;
 }
 
 @message
-model UninstallExtensionResponse {
-  @field(1) installation: ExtensionInstallation;
+model UninstallIntegrationResponse {
+  @field(1) installation: IntegrationInstallation;
 }
 
 @message
@@ -46,7 +46,7 @@ model GetInstallationRequest {
 
 @message
 model GetInstallationResponse {
-  @field(1) installation: ExtensionInstallation;
+  @field(1) installation: IntegrationInstallation;
 }
 
 @message
@@ -57,7 +57,7 @@ model ListInstallationsRequest {
 
 @message
 model ListInstallationsResponse {
-  @field(1) installations: ExtensionInstallation[];
+  @field(1) installations: IntegrationInstallation[];
   @field(2) page: PageResponse;
 }
 

@@ -356,7 +356,7 @@ function isAgentDomainRuntimePath(normalizedPath) {
     '/packages/agent/src/compactions/',
     '/packages/agent/src/schedules/',
     '/packages/agent/src/tools/',
-    '/packages/agent/src/extensions/',
+    '/packages/agent/src/integrations/',
     '/packages/agent/src/adapters/',
   ].some((prefix) => normalizedPath === prefix.slice(0, -1) || normalizedPath.startsWith(prefix));
 }

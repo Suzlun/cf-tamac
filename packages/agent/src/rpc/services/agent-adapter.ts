@@ -1,10 +1,10 @@
-import { type ExtensionIngressService } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
+import { type IntegrationIngressService } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
 import type { ServiceImpl } from '@connectrpc/connect';
 
 /**
- * Extension ingress service foundation; unimplemented methods fail closed by router default.
+ * Integration ingress service foundation; unimplemented methods fail closed by router default.
  */
-export const extensionIngressService = {} satisfies Partial<
-  ServiceImpl<typeof ExtensionIngressService>
+export const integrationIngressService = {} satisfies Partial<
+  ServiceImpl<typeof IntegrationIngressService>
 >;

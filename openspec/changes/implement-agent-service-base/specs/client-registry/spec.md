@@ -72,17 +72,17 @@ Client server は Agent domain スナップショットを Client-owned 状態�
 
 **利用者文脈**
 
-Client UI は Agent profile、Thread、Run、Schedule、Tool、Extension 情報を表示する必要がある。しかし、それらの domain スナップショットを Client D1 に複製すると古い projection と所有関係の曖昧さが生じる。Client は domain データが必要なときに Agent Service を問い合わせる必要がある。
+Client UI は Agent profile、Thread、Run、Schedule、Tool、Integration 情報を表示する必要がある。しかし、それらの domain スナップショットを Client D1 に複製すると古い projection と所有関係の曖昧さが生じる。Client は domain データが必要なときに Agent Service を問い合わせる必要がある。
 
 **要件**
 
-- Client D1 は Extension Installation、Adapter Connection、ToolInvocation、Schedule、AgentEvent、ThreadMemory、AgentState、AgentRun 状態の authoritative スナップショットを永続化して MUST NOT。
+- Client D1 は Integration Installation、Adapter Connection、ToolInvocation、Schedule、AgentEvent、ThreadMemory、AgentState、AgentRun 状態の authoritative スナップショットを永続化して MUST NOT。
 - Client server は authoritative にならず secret を含まない場合に限り、一時的な UI データを cache できる。
 - Client server は画面/action の必要に応じて Agent domain 状態を Agent RPC から取得 MUST。
 
 #### Scenario: Client が D1 スナップショットではなく Agent RPC から Agent domain 詳細を読む (CLIENT-REGISTRY-S004)
 
-- **GIVEN** Agent 詳細ページが profile、Thread、Run、Schedule、Tool、Extension を必要としている
+- **GIVEN** Agent 詳細ページが profile、Thread、Run、Schedule、Tool、Integration を必要としている
 - **WHEN** Client server がページを描画する、または refresh を処理する
 - **THEN** Client server は Agent-owned domain データを Agent RPC から問い合わせる
 - **AND** Client D1 は管理対象 Agent 台帳と credential 参照に限定される
@@ -104,6 +104,6 @@ Client は管理 UI であり Agent API Provider ではない。Client が `/api
 #### Scenario: Client が公開 Agent proxy route を持たない (CLIENT-REGISTRY-S005)
 
 - **GIVEN** Client Worker が管理 UI route とともに deploy されている
-- **WHEN** Browser または外部 caller が `/api/client/agents`、`/api/client/extensions`、または別の Agent proxy route へアクセスを試みる
+- **WHEN** Browser または外部 caller が `/api/client/agents`、`/api/client/integrations`、または別の Agent proxy route へアクセスを試みる
 - **THEN** Client は公開 Agent proxy エンドポイントを公開しない
 - **AND** Agent operation は認証済み UI Server Action または server-rendered flow 経由でのみ到達できる

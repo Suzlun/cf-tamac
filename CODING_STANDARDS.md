@@ -47,8 +47,8 @@ OK例: Agent contract は `packages/agent/src/typespec/main.tsp` から `package
 **Rule: RPC Service Inventory を維持する。**
 Summary: 必須 service/method が proto descriptors から消えると codegen/test が失敗します。
 Enforcement point: `pnpm check:codegen` via `scripts/codegen/check-agent-codegen-drift.mjs`; `pnpm test:agent` via `packages/agent/src/tests/contract-generation.test.ts`.
-NG例: `ExtensionIngressService` を削除する、`AgentExtensionService.CreateAdapterConnection` を別 service に移す。
-OK例: `AgentLifecycleService`、`AgentEventService`、`AgentThreadService`、`AgentRunService`、`AgentStateService`、`AgentScheduleService`、`AgentToolService`、`AgentExtensionService`、`ExtensionIngressService`、`AgentHealthService` と required methods を残す。
+NG例: `IntegrationIngressService` を削除する、`AgentIntegrationService.CreateAdapterConnection` を別 service に移す。
+OK例: `AgentLifecycleService`、`AgentEventService`、`AgentThreadService`、`AgentRunService`、`AgentStateService`、`AgentScheduleService`、`AgentToolService`、`AgentIntegrationService`、`IntegrationIngressService`、`AgentHealthService` と required methods を残す。
 
 **Rule: Public Agent RPC request は Agent-scoped body fields を持つ。**
 Summary: public request は `agent_id` を body に持ち、command は `idempotency_key`、Event publish は `thread_key` を持ちます。
@@ -59,7 +59,7 @@ OK例: request body の `agent_id` で scope し、command/Event publish invaria
 **Rule: Agent-cross list/search RPC を定義しない。**
 Summary: Agent を横断する list/search method 名は public RPC inventory で禁止されています。
 Enforcement point: `pnpm check:codegen` via `scripts/codegen/check-agent-codegen-drift.mjs`; `pnpm test:agent` via `packages/agent/src/tests/rpc-schema-invariants.test.ts`.
-NG例: `ListAllAgents`、`SearchAgents`、`ListAllToolInvocations`、`ListAllExtensionInstallations` を追加する。
+NG例: `ListAllAgents`、`SearchAgents`、`ListAllToolInvocations`、`ListAllIntegrationInstallations` を追加する。
 OK例: list/search は service 内で `agent_id` に scope された request として定義する。
 
 **Rule: Protobuf field stability を壊さない。**
@@ -71,7 +71,7 @@ OK例: すべての model field に `@field(n)` を置き、削除済み field �
 **Rule: Thread key identity と validation metadata を維持する。**
 Summary: `thread_key` は NFC 正規化後に非空、512 UTF-8 bytes 以下、case-sensitive、Agent-scoped です。
 Enforcement point: `pnpm check:codegen` via `scripts/codegen/check-agent-codegen-drift.mjs`; `pnpm test:agent` via `packages/agent/src/tests/thread-key-identity.test.ts` and `packages/agent/src/tests/command-event-invariants.test.ts`.
-NG例: 空文字や 512 UTF-8 bytes 超過を許す、Extension/Adapter/principal を暗黙 prefix にする、大文字小文字を同一視する。
+NG例: 空文字や 512 UTF-8 bytes 超過を許す、Integration/Adapter/principal を暗黙 prefix にする、大文字小文字を同一視する。
 OK例: same `agent_id` + same normalized `thread_key` は same Thread、different `agent_id` は別 Thread とする。
 
 **Rule: Agent public surface は Protobuf RPC-only に閉じる。**
@@ -148,7 +148,7 @@ OK例: `packages/client/app/agents/**/page.tsx` の route shells と Server Acti
 Summary: Client UI route graph は Agent registry/detail sections だけを公開し、demo/API route を足しません。
 Enforcement point: `pnpm test:management-client` via `packages/client/src/tests/client-api-proxy-absence.test.ts` and `packages/client/src/tests/management-navigation.test.tsx`.
 NG例: `packages/client/app/api/**` route handler、旧 demo route、Agent proxy route を追加する。
-OK例: `/`、`/agents`、`/agents/new`、`/agents/[agentId]`、`threads`、`events`、`schedules`、`tools`、`extensions`、`settings` の shell routes に留める。
+OK例: `/`、`/agents`、`/agents/new`、`/agents/[agentId]`、`threads`、`events`、`schedules`、`tools`、`integrations`、`settings` の shell routes に留める。
 
 **Rule: Client UI は Agent registry shell を表示し、旧 demo content を表示しない。**
 Summary: Management Client の UI は Agent 管理 shell であり、`hello` / `users` demo experience を表示しません。
@@ -159,7 +159,7 @@ OK例: `Agent registry`、`Register the first managed Agent.`、`New Agent recor
 **Rule: Client D1 は management ledger だけを保持し、Agent-domain snapshots を保存しない。**
 Summary: Client-owned D1 は managed Agent records と credential refs だけを持ちます。
 Enforcement point: `pnpm test:management-client` via `packages/client/src/tests/client-d1-schema.test.ts`, `packages/client/src/tests/client-repository-boundary.test.ts`, and `packages/client/src/server/db/schema.ts`.
-NG例: Client D1 に Agent events、thread memory、state snapshots、schedules、tool invocations、extension installations、adapter connections、compaction bodies を保存する table/API を追加する。
+NG例: Client D1 に Agent events、thread memory、state snapshots、schedules、tool invocations、integration installations、adapter connections、compaction bodies を保存する table/API を追加する。
 OK例: `client_managed_agents` と `client_agent_credential_refs` だけを Client-owned management data として扱う。
 
 ## 4. Agent layer direction

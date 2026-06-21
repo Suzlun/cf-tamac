@@ -56,7 +56,7 @@ export const forbiddenClientAgentSnapshotTables = [
   'agent_runs',
   'agent_schedules',
   'agent_tool_invocations',
-  'agent_extension_installations',
+  'agent_integration_installations',
   'agent_adapter_connections',
   'agent_compactions',
 ] as const;

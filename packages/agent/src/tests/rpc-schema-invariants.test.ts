@@ -8,7 +8,7 @@ const forbiddenCrossAgentMethods = new Set([
   'ListAllAgents',
   'SearchAgents',
   'ListAllToolInvocations',
-  'ListAllExtensionInstallations',
+  'ListAllIntegrationInstallations',
 ]);
 
 const rpcServiceInventory = new Map<string, string[]>([
@@ -36,10 +36,10 @@ const rpcServiceInventory = new Map<string, string[]>([
     ['ListTools', 'GetInvocation', 'ListInvocations', 'ApproveInvocation', 'RejectInvocation'],
   ],
   [
-    'AgentExtensionService',
+    'AgentIntegrationService',
     [
-      'InstallExtension',
-      'UninstallExtension',
+      'InstallIntegration',
+      'UninstallIntegration',
       'GetInstallation',
       'ListInstallations',
       'CreateAdapterConnection',
@@ -47,7 +47,7 @@ const rpcServiceInventory = new Map<string, string[]>([
       'ListAdapterConnections',
     ],
   ],
-  ['ExtensionIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
+  ['IntegrationIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
   ['AgentHealthService', ['Check']],
 ]);
 

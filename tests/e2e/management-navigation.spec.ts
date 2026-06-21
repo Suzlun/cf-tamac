@@ -10,7 +10,7 @@ test('[MANAGEMENT-CLIENT-S007] Management navigation excludes demo routes', asyn
   await expect(page.getByRole('link', { name: 'Events' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Schedules' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Tools' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Extensions' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Integrations' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
   await expect(page.getByText(/hello|users/i)).toHaveCount(0);
 });

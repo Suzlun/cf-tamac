@@ -2,7 +2,7 @@ import { createConnectRouter, type ConnectRouter } from '@connectrpc/connect';
 
 import {
   AgentEventService,
-  AgentExtensionService,
+  AgentIntegrationService,
   AgentHealthService,
   AgentLifecycleService,
   AgentRunService,
@@ -10,13 +10,13 @@ import {
   AgentStateService,
   AgentThreadService,
   AgentToolService,
-  ExtensionIngressService,
+  IntegrationIngressService,
 } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
-import { extensionIngressService } from './services/agent-adapter';
+import { integrationIngressService } from './services/agent-adapter';
 import { agentEventService } from './services/events';
-import { agentExtensionService } from './services/extensions';
 import { createAgentHealthService } from './services/health';
+import { agentIntegrationService } from './services/integrations';
 import { agentLifecycleService } from './services/lifecycle';
 import { agentRunService } from './services/runs';
 import { agentScheduleService } from './services/schedules';
@@ -33,9 +33,9 @@ export function registerAgentRpcServices(
   router: ConnectRouter,
   env: AgentWorkerEnv
 ): ConnectRouter {
-  router.service(ExtensionIngressService, extensionIngressService);
+  router.service(IntegrationIngressService, integrationIngressService);
   router.service(AgentEventService, agentEventService);
-  router.service(AgentExtensionService, agentExtensionService);
+  router.service(AgentIntegrationService, agentIntegrationService);
   router.service(AgentHealthService, createAgentHealthService(env));
   router.service(AgentLifecycleService, agentLifecycleService);
   router.service(AgentRunService, agentRunService);

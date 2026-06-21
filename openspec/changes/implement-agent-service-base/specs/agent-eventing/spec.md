@@ -6,7 +6,7 @@ Agent Service は、Agent-scoped `thread_key` 値を通じて外部 Event 文脈
 
 **利用者文脈**
 
-外部サービス、Client、Schedule、Tool、Extension は、Agent に Event を渡すときに「どの長期文脈へ入れるか」を明確に指定する必要がある。チャットルーム以外の文脈も扱うため、Thread は外部 platform 固有 ID ではなく opaque な `thread_key` で統合される必要がある。
+外部サービス、Client、Schedule、Tool、Integration は、Agent に Event を渡すときに「どの長期文脈へ入れるか」を明確に指定する必要がある。チャットルーム以外の文脈も扱うため、Thread は外部 platform 固有 ID ではなく opaque な `thread_key` で統合される必要がある。
 
 **要件**
 
@@ -42,18 +42,18 @@ AIAgent Durable Object は Agent management operations を reserved system Threa
 
 **利用者文脈**
 
-Lifecycle、credential rotation、Extension install/uninstall などの管理操作にも監査可能な Event History が必要だが、これらは通常の外部 Thread に属さない。監査 Event は Agent 内の予約済み system Thread に集約される必要がある。
+Lifecycle、credential rotation、Integration install/uninstall などの管理操作にも監査可能な Event History が必要だが、これらは通常の外部 Thread に属さない。監査 Event は Agent 内の予約済み system Thread に集約される必要がある。
 
 **要件**
 
 - AIAgent Durable Object は、Agent 管理監査 Event のため安定した internal `thread_key` を持つ予約済み system Thread を維持 MUST。
-- Lifecycle、credential、Extension installation、permission revocation、destructive management operation は監査 Event を system Thread に追加 MUST。
+- Lifecycle、credential、Integration installation、permission revocation、destructive management operation は監査 Event を system Thread に追加 MUST。
 - 公開 Event publish API は、caller が特権 system 監査 Event provenance を spoof することを許可して MUST NOT。
 
 #### Scenario: ライフサイクル監査 Event が system Thread に追加される (AGENT-EVENTING-S004)
 
 - **GIVEN** `agent-alpha` が initialized である
-- **WHEN** credential rotation または Extension uninstall が成功する
+- **WHEN** credential rotation または Integration uninstall が成功する
 - **THEN** 監査 AgentEvent が予約済み system Thread に追加される
 - **AND** Event には実行者、operation、時刻、correlation ID、結果としてのライフサイクルまたは capability 状態が含まれる
 

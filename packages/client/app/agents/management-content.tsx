@@ -29,9 +29,9 @@ const agentSections: readonly AgentSection[] = [
     summary: 'Tool approval surfaces remain server-side and credential-free in browser bundles.',
   },
   {
-    slug: 'extensions',
-    label: 'Extensions',
-    summary: 'Extension installation shells avoid storing Agent-owned installation snapshots.',
+    slug: 'integrations',
+    label: 'Integrations',
+    summary: 'Integration installation shells avoid storing Agent-owned installation snapshots.',
   },
   {
     slug: 'settings',

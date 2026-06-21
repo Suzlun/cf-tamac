@@ -24,7 +24,7 @@ Browser-delivered bundles は、Agent credential material または direct Agent
 
 Server Actions と Server Components は internal UI execution boundaries のみ SHALL であり、public Agent domain APIs として扱って MUST NOT。
 
-Client App Router は `/agents`、`/agents/new`、`/agents/[agentId]`、`/agents/[agentId]/threads`、`/agents/[agentId]/events`、`/agents/[agentId]/schedules`、`/agents/[agentId]/tools`、`/agents/[agentId]/extensions`、`/agents/[agentId]/settings` の shell routes を含む SHALL。
+Client App Router は `/agents`、`/agents/new`、`/agents/[agentId]`、`/agents/[agentId]/threads`、`/agents/[agentId]/events`、`/agents/[agentId]/schedules`、`/agents/[agentId]/tools`、`/agents/[agentId]/integrations`、`/agents/[agentId]/settings` の shell routes を含む SHALL。
 
 #### Scenario: Agent registry shell renders for a browser user (MANAGEMENT-CLIENT-S001)
 
@@ -72,7 +72,7 @@ Client Worker は Client-owned management ledger data のみを Client D1 に保
 
 **Customer Context**
 
-管理 Client は、どの Agent を管理対象として表示するか、どの RPC origin を使うか、どの credential reference を参照するかを保持する必要がある。ただし Agent の Thread、Event、Run、Schedule、ToolInvocation、Extension Installation などの正本データを複製すると、管理 UI と Agent Service の所有権が衝突する。
+管理 Client は、どの Agent を管理対象として表示するか、どの RPC origin を使うか、どの credential reference を参照するかを保持する必要がある。ただし Agent の Thread、Event、Run、Schedule、ToolInvocation、Integration Installation などの正本データを複製すると、管理 UI と Agent Service の所有権が衝突する。
 
 **Requirement**
 
@@ -82,7 +82,7 @@ Client D1 は `agent_id`、`agent_rpc_origin`、display metadata、ordering meta
 
 Client D1 は `agent_id`、`credential_ref`、key metadata、masked hints、status、timestamps を持つ Agent credential references を保存 SHALL。
 
-Client D1 は AgentEvent、ThreadMemory、AgentState、Schedule、ToolInvocation、Extension Installation、Adapter Connection、Compaction bodies などの Agent-domain snapshots を保存 MUST NOT。
+Client D1 は AgentEvent、ThreadMemory、AgentState、Schedule、ToolInvocation、Integration Installation、Adapter Connection、Compaction bodies などの Agent-domain snapshots を保存 MUST NOT。
 
 #### Scenario: Client D1 exposes only management tables (MANAGEMENT-CLIENT-S003)
 
@@ -144,7 +144,7 @@ Agent 管理者は Agent registry、Agent RPC origin、credential reference の�
 
 **Requirement**
 
-Client UI routes は Agent registry、registration、detail overview、threads、events、schedules、tools、extensions、settings foundations 用の Agent management shell routes を表示 SHALL。
+Client UI routes は Agent registry、registration、detail overview、threads、events、schedules、tools、integrations、settings foundations 用の Agent management shell routes を表示 SHALL。
 
 Client UI は `hello` または `users` demonstration pages、navigation items、mock handlers、tests を production management experiences として表示 MUST NOT。
 
@@ -156,6 +156,6 @@ Initial empty states は users に `agent_id`、Agent RPC origin、credential re
 
 - **GIVEN** Client route configuration と primary navigation を検査できる
 - **WHEN** available management routes を列挙する
-- **THEN** Agent registry、registration、detail overview、threads、events、schedules、tools、extensions、settings shell routes が存在する
+- **THEN** Agent registry、registration、detail overview、threads、events、schedules、tools、integrations、settings shell routes が存在する
 - **AND** `hello` と `users` demonstration routes は存在しない
 - **AND** Client route graph は demonstration UI package graph へ依存しない

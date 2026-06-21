@@ -47,7 +47,7 @@ Agent の判断は、どの Event、Memory、Config、Tool 集合を見て行わ
 **要件**
 
 - AgentRun は開始時に入力スナップショットを固定 MUST。
-- スナップショットは trigger Event 範囲、ThreadMemory 版、latest ready Compaction ID、未 Compaction Event 上限 sequence、Agent config 版、利用可能 Tool 集合版、Extension Installation 版を含める MUST。
+- スナップショットは trigger Event 範囲、ThreadMemory 版、latest ready Compaction ID、未 Compaction Event 上限 sequence、Agent config 版、利用可能 Tool 集合版、Integration Installation 版を含める MUST。
 - Run 中に到着した新しい Event は永続的に追加 MUST だが、running スナップショットを変更して MUST NOT。
 - Run 結果確定は、状態変更を適用する前に取消、generation、ライフサイクル、config、capability 版を検証 MUST。
 
@@ -73,18 +73,18 @@ AIAgent Durable Object は Run 確定前に interrupt と generation 確認を�
 
 **利用者文脈**
 
-ユーザー取消、権限剥奪、Extension uninstall のような interrupt は、実行中の model/Tool call を物理的に止められない場合でも、戻ってきた結果が誤って確定されないようにしなければならない。
+ユーザー取消、権限剥奪、Integration uninstall のような interrupt は、実行中の model/Tool call を物理的に止められない場合でも、戻ってきた結果が誤って確定されないようにしなければならない。
 
 **要件**
 
-- AIAgent Durable Object は、取消、human override、permission revocation、または Extension uninstall Event が要求する場合、有効 Run に interrupt flag を記録 MUST。
+- AIAgent Durable Object は、取消、human override、permission revocation、または Integration uninstall Event が要求する場合、有効 Run に interrupt flag を記録 MUST。
 - AgentRun 確定は、Agent 状態を変更する前にスナップショット generation と interrupt 状態を比較 MUST。
 - `interrupted` または `cancelled` の Run は観測可能な terminal 状態で終了 MUST し、interrupt を説明する監査詳細を追加または公開 MUST。
 
 #### Scenario: interrupt が stale Run result commit を防ぐ (AGENT-RUNTIME-S006)
 
 - **GIVEN** Run が外部 model または Tool 結果を待機している
-- **WHEN** その Run に `user.cancel`、`human.override`、permission revocation、または Extension uninstall interrupt が記録される
+- **WHEN** その Run に `user.cancel`、`human.override`、permission revocation、または Integration uninstall interrupt が記録される
 - **THEN** Run は policy に従って `interrupted` または `cancelled` として mark される
 - **AND** 外部 call から後で戻った stale result は generation 確認により破棄される
 - **AND** 監査 Event が interrupt 理由を記録する
@@ -95,12 +95,12 @@ Harness 実行は構成済み予算境界内で認可済み判断を確定 SHALL
 
 **利用者文脈**
 
-Agent は単に応答文を返すだけでなく、状態更新、記憶、Schedule、Tool、Delivery、人間承認など複数の action を判断する。無限 loop や過剰な外部呼び出しを避けるため、Run 単位と日次/Extension/Tool 単位の予算が必要である。
+Agent は単に応答文を返すだけでなく、状態更新、記憶、Schedule、Tool、Delivery、人間承認など複数の action を判断する。無限 loop や過剰な外部呼び出しを避けるため、Run 単位と日次/Integration/Tool 単位の予算が必要である。
 
 **要件**
 
 - Harness は `stop`、`update_state`、`write_memory`、`create_schedule`、`invoke_tool`、DeliveryContext を通じた `respond`、`request_human_approval`、`emit_event` の判断 type を支援 MUST。
-- Harness は model call、Tool call、token、loop、timeout、cooldown、日次予算、Extension 予算、Tool 予算の構成済み上限を強制 MUST。
+- Harness は model call、Tool call、token、loop、timeout、cooldown、日次予算、Integration 予算、Tool 予算の構成済み上限を強制 MUST。
 - 判断確定は Agent-owned 状態変更が関係する場合は transactional である MUST し、観測可能な Run 出力と監査詳細を生成 MUST。
 - 予算枯渇は、未認可 action を部分的に確定せず、分類済み理由とともに Run を stop または fail MUST。
 

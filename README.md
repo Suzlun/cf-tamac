@@ -7,7 +7,7 @@
 - `1 Agent ID = 1 AIAgent Durable Object instance = 1 AI Agent aggregate root` です。
 - `packages/agent` は Agent Service Worker です。Cloudflare Agents SDK、SQLite-backed Durable Objects、Agent-owned blob storage、Connect binary Protobuf RPC facade、Agent-local Queue を持ちます。
 - `packages/client` は Management Client Worker です。Next.js on Cloudflare Workers と Client 専用 D1 により、管理対象 Agent ID、Agent RPC origin、表示設定、credential reference を管理します。
-- Extension Provider は Agent Service の外側に置きます。Discord、Slack、Email、Webhook などの外部 protocol を Adapter/Tool/Delivery capability として Agent Event/RPC に接続します。
+- Integration Provider は Agent Service の外側に置きます。Discord、Slack、Email、Webhook などの外部 protocol を Adapter/Tool/Delivery capability として Agent Event/RPC に接続します。
 - Browser は Agent RPC を直接呼びません。Management Client の Server Components / Server Actions / server-only modules が Agent RPC を呼びます。
 
 ## Agent Service
@@ -27,7 +27,7 @@
 - AgentRun / Run snapshot / scheduler wake state
 - ThreadCompaction / ThreadHistory / ThreadMemory / AgentMemory
 - AgentState / Schedule / Tool / ToolInvocation
-- Extension / Installation / Adapter Connection / DeliveryContext / AdapterDelivery
+- Integration / Installation / Adapter Connection / DeliveryContext / AdapterDelivery
 - Principal、credential verifier、grant、approval、budget、idempotency、replay nonce、audit、rate-limit state
 
 外部 AgentEvent は `thread_key` を必須とします。同一 `agent_id` と同一 NFC-normalized `thread_key` は同一 Thread に解決され、異なる `agent_id` では同じ `thread_key` でも別 Thread です。
@@ -42,7 +42,7 @@
 
 ## Management Client
 
-- Agent registry、Agent detail、Thread/Event/Run/Compaction、Schedule、Tool approval、Extension install/uninstall、Agent settings を管理する UI です。
+- Agent registry、Agent detail、Thread/Event/Run/Compaction、Schedule、Tool approval、Integration install/uninstall、Agent settings を管理する UI です。
 - Agent credential material、Agent RPC client construction、Agent runtime imports は browser bundle に入りません。
 - `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding route は公開しません。
 - Server Actions と Server Components は UI 内部の execution boundary であり、Agent public API ではありません。

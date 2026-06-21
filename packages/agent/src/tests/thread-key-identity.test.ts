@@ -18,7 +18,7 @@ describe('Thread key identity', () => {
     expect(maxLength.normalizedThreadKey).toHaveLength(maxThreadKeyUtf8Bytes);
 
     expect(composed.normalizedThreadKey).toBe('caf\u00e9');
-    expect(composed.normalizedThreadKey).not.toContain('extension:');
+    expect(composed.normalizedThreadKey).not.toContain('integration:');
     expect(composed.normalizedThreadKey).not.toContain('adapter:');
     expect(composed.normalizedThreadKey).not.toContain('connection:');
     expect(composed.normalizedThreadKey).not.toContain('principal:');

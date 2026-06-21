@@ -31,7 +31,7 @@ function createTestEnv(): AgentWorkerEnv {
   return {
     AGENT_BLOBS: {} as R2Bucket,
     AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
-    AGENT_EXTENSION_SIGNATURE_KEYS: 'test-extension-key',
+    AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',
     AI_AGENT: durableObjectNamespace,

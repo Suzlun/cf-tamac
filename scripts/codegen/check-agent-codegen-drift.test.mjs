@@ -102,7 +102,7 @@ describe('Agent codegen governance', () => {
     ]);
 
     expect(secondHash).toBe(firstHash);
-    expect([...rpcServiceInventory.keys()]).toContain('ExtensionIngressService');
+    expect([...rpcServiceInventory.keys()]).toContain('IntegrationIngressService');
     expect(collectAgentCodegenIssues()).toEqual([]);
   }, 300_000);
 

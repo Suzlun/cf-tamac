@@ -51,19 +51,19 @@ Interval Schedule が長い処理と重なると、同じ目的の Run が重複
 - **THEN** AIAgent Durable Object は Schedule の overlap policy を適用する
 - **AND** 意図しない重複 Event を作成せず、skip、coalesce、queue-next 振る舞いが記録される
 
-### Requirement: Schedule 取消と Extension cleanup
+### Requirement: Schedule 取消と Integration cleanup
 
-Schedule 取消は後続 fire を防ぎ、Extension-owned Schedule を clean up SHALL。
+Schedule 取消は後続 fire を防ぎ、Integration-owned Schedule を clean up SHALL。
 
 **利用者文脈**
 
-管理者や Extension uninstall は、将来発火する予定を確実に止める必要がある。Extension が作成した Schedule は、その Extension が使えない状態で外部作用を起こしてはならない。
+管理者や Integration uninstall は、将来発火する予定を確実に止める必要がある。Integration が作成した Schedule は、その Integration が使えない状態で外部作用を起こしてはならない。
 
 **要件**
 
 - CancelSchedule は冪等である MUST し、cancelled Schedule の future `schedule.triggered` Event を防止 MUST。
 - Schedule 記録は取消理由、実行者、時刻、監査 link を保持 MUST。
-- Extension Installation が作成した Schedule は `installation_id` を保存 MUST し、その Installation がアンインストール済みまたは無効になったときに `cancelled` または `disabled` になる MUST。
+- Integration Installation が作成した Schedule は `installation_id` を保存 MUST し、その Installation がアンインストール済みまたは無効になったときに `cancelled` または `disabled` になる MUST。
 
 #### Scenario: CancelSchedule が future firing を防ぐ (AGENT-SCHEDULE-S004)
 
@@ -73,10 +73,10 @@ Schedule 取消は後続 fire を防ぎ、Extension-owned Schedule を clean up 
 - **AND** Schedule 記録は監査メタデータ付きで cancelled になる
 - **AND** 同じ Schedule identity に対する後続 runtime callback は新しい Event を追加しない
 
-#### Scenario: Extension uninstall が有効 Schedule を cancel する (AGENT-SCHEDULE-S005)
+#### Scenario: Integration uninstall が有効 Schedule を cancel する (AGENT-SCHEDULE-S005)
 
-- **GIVEN** Extension Installation `inst-1` が Agent 内に有効 Schedule を作成している
+- **GIVEN** Integration Installation `inst-1` が Agent 内に有効 Schedule を作成している
 - **WHEN** `inst-1` がアンインストール済みになる
 - **THEN** `inst-1` に関連するすべての有効 Schedule は `cancelled` または `disabled` になる
 - **AND** 取消監査 Event が system Thread に追加される
-- **AND** 後続 Schedule fire はアンインストール済み Extension の Tool または Delivery capability を使用しない
+- **AND** 後続 Schedule fire はアンインストール済み Integration の Tool または Delivery capability を使用しない

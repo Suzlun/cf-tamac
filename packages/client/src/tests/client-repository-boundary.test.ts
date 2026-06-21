@@ -22,7 +22,7 @@ const forbiddenRepositoryTerms = [
   'writeThreadMemory',
   'upsertScheduleSnapshot',
   'upsertToolInvocation',
-  'upsertExtensionInstallation',
+  'upsertIntegrationInstallation',
   'upsertAdapterConnection',
   'upsertCompaction',
 ];

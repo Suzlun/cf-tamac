@@ -108,10 +108,10 @@ message AgentEventInput {
   optional bytes payload = 5;
 }
 
-message ExtensionInstallation {
+message IntegrationInstallation {
   string installation_id = 1;
   string agent_id = 2;
-  string extension_id = 3;
+  string integration_id = 3;
   string status = 4;
 }
 
@@ -201,7 +201,7 @@ message ToolInvocation {
   string status = 5;
 }
 
-message PublishExtensionEventRequest {
+message PublishIntegrationEventRequest {
   string agent_id = 1;
   string idempotency_key = 2;
   string thread_key = 3;
@@ -210,7 +210,7 @@ message PublishExtensionEventRequest {
   AgentEventInput event = 6;
 }
 
-message PublishExtensionEventResponse {
+message PublishIntegrationEventResponse {
   AgentEvent event = 1;
   AgentThread thread = 2;
 }
@@ -272,25 +272,25 @@ message ListEventsResponse {
   PageResponse page = 2;
 }
 
-message InstallExtensionRequest {
+message InstallIntegrationRequest {
   string agent_id = 1;
   string idempotency_key = 2;
-  string extension_id = 3;
+  string integration_id = 3;
   string manifest_ref = 4;
 }
 
-message InstallExtensionResponse {
-  ExtensionInstallation installation = 1;
+message InstallIntegrationResponse {
+  IntegrationInstallation installation = 1;
 }
 
-message UninstallExtensionRequest {
+message UninstallIntegrationRequest {
   string agent_id = 1;
   string idempotency_key = 2;
   string installation_id = 3;
 }
 
-message UninstallExtensionResponse {
-  ExtensionInstallation installation = 1;
+message UninstallIntegrationResponse {
+  IntegrationInstallation installation = 1;
 }
 
 message GetInstallationRequest {
@@ -299,7 +299,7 @@ message GetInstallationRequest {
 }
 
 message GetInstallationResponse {
-  ExtensionInstallation installation = 1;
+  IntegrationInstallation installation = 1;
 }
 
 message ListInstallationsRequest {
@@ -308,7 +308,7 @@ message ListInstallationsRequest {
 }
 
 message ListInstallationsResponse {
-  repeated ExtensionInstallation installations = 1;
+  repeated IntegrationInstallation installations = 1;
   PageResponse page = 2;
 }
 
@@ -598,8 +598,8 @@ message RejectInvocationResponse {
   ToolInvocation invocation = 1;
 }
 
-service ExtensionIngressService {
-  rpc PublishEvent(PublishExtensionEventRequest) returns (PublishExtensionEventResponse);
+service IntegrationIngressService {
+  rpc PublishEvent(PublishIntegrationEventRequest) returns (PublishIntegrationEventResponse);
   rpc PublishToolResult(PublishToolResultRequest) returns (PublishToolResultResponse);
   rpc PublishDeliveryResult(PublishDeliveryResultRequest) returns (PublishDeliveryResultResponse);
 }
@@ -610,9 +610,9 @@ service AgentEventService {
   rpc ListEvents(ListEventsRequest) returns (ListEventsResponse);
 }
 
-service AgentExtensionService {
-  rpc InstallExtension(InstallExtensionRequest) returns (InstallExtensionResponse);
-  rpc UninstallExtension(UninstallExtensionRequest) returns (UninstallExtensionResponse);
+service AgentIntegrationService {
+  rpc InstallIntegration(InstallIntegrationRequest) returns (InstallIntegrationResponse);
+  rpc UninstallIntegration(UninstallIntegrationRequest) returns (UninstallIntegrationResponse);
   rpc GetInstallation(GetInstallationRequest) returns (GetInstallationResponse);
   rpc ListInstallations(ListInstallationsRequest) returns (ListInstallationsResponse);
   rpc CreateAdapterConnection(CreateAdapterConnectionRequest) returns (CreateAdapterConnectionResponse);

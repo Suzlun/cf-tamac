@@ -20,5 +20,5 @@ AGENT_RPC_AUDIENCE = "cf-tamac-agent"
 
 # Required secrets are provisioned with `wrangler secret put` and never committed.
 # - AGENT_CLIENT_JWT_PUBLIC_KEYS
-# - AGENT_EXTENSION_SIGNATURE_KEYS
+# - AGENT_INTEGRATION_SIGNATURE_KEYS
 # - AGENT_MODEL_PROVIDER_SECRET_REFS

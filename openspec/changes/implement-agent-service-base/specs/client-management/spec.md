@@ -106,25 +106,25 @@ Client UI はサーバー側 action を通じて Schedule と Tool 承認を管�
 - **THEN** approve と reject control は Tool、入力要約、risk/承認メタデータ、acting user context を表示する
 - **AND** 承認または却下は明示的な user confirmation の後にのみ送信される
 
-### Requirement: Extension 管理 UI の提供
+### Requirement: Integration 管理 UI の提供
 
-Client UI は汎用 Extension installation と cleanup flow を管理 SHALL。
+Client UI は汎用 Integration installation と cleanup flow を管理 SHALL。
 
 **利用者文脈**
 
-管理者は、Extension manifest を指定して install し、Adapter Connection、Tool、Delivery、setup 状態を確認し、不要になった Extension を安全に uninstall したい。
+管理者は、Integration manifest を指定して install し、Adapter Connection、Tool、Delivery、setup 状態を確認し、不要になった Integration を安全に uninstall したい。
 
 **要件**
 
-- Client UI は Installation 状態、manifest identity、Provider identity、grant、Adapter Connection、Tool、Delivery capability、setup 手順を表示する Extension 一覧/詳細画面を提供 MUST。
+- Client UI は Installation 状態、manifest identity、Provider identity、grant、Adapter Connection、Tool、Delivery capability、setup 手順を表示する Integration 一覧/詳細画面を提供 MUST。
 - Client UI はサーバー側 Agent RPC を通じて install/uninstall action を提供 MUST。
-- Client UI は Discord 固有 Provider 実装を前提にせず、汎用 Extension 情報を見えるようにする MUST。
+- Client UI は Discord 固有 Provider 実装を前提にせず、汎用 Integration 情報を見えるようにする MUST。
 
-#### Scenario: Extension 画面が汎用 Extension を install、list、uninstall する (CLIENT-MANAGEMENT-S008)
+#### Scenario: Integration 画面が汎用 Integration を install、list、uninstall する (CLIENT-MANAGEMENT-S008)
 
-- **GIVEN** 運用者が署名済み汎用 Extension manifest を持っている
-- **WHEN** 運用者が Extension 画面から Extension を install、inspect、uninstall する
-- **THEN** Client server は Agent Extension RPC を呼ぶ
+- **GIVEN** 運用者が署名済み汎用 Integration manifest を持っている
+- **WHEN** 運用者が Integration 画面から Integration を install、inspect、uninstall する
+- **THEN** Client server は Agent Integration RPC を呼ぶ
 - **AND** UI は Installation 状態、grant、Adapter Connection、Tool、Delivery capability、setup 手順、cleanup 結果を表示する
 
 ### Requirement: Browser credential と direct RPC protection
@@ -143,7 +143,7 @@ Client UI は Browser で動くため、Agent credential や署名 material が�
 
 #### Scenario: Browser が Agent credentials を受け取らず Agent RPC を直接呼ばない (CLIENT-MANAGEMENT-S009)
 
-- **GIVEN** 運用者が Agent list、overview、Thread、Schedule、Tool、Extension、Settings 画面を移動している
+- **GIVEN** 運用者が Agent list、overview、Thread、Schedule、Tool、Integration、Settings 画面を移動している
 - **WHEN** Browser network 応答、描画済み HTML、JavaScript bundle、storage が検査される
 - **THEN** Agent credential、秘密鍵、生 JWT 署名 material、Provider secret、直接 Agent RPC リクエストは存在しない
 - **AND** Agent RPC call は Client サーバー側実行からのみ発生する

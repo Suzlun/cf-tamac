@@ -16,26 +16,26 @@ Agent Service の利用者は、REST、OpenAPI、JSON DTO、Orval client が混�
 
 Agent API contract は `packages/agent/src/typespec` を正本 SHALL とし、`cftamac.agent.v1` package の proto3 file を `packages/agent/proto/cftamac/agent/v1.proto` へ emit SHALL。
 
-TypeSpec source tree は、errors、pagination、security metadata の common stubs、Agent、access credential、thread、section、event、run、compaction、history、memory、state、schedule、tool、extension、adapter の model stubs、および Agent lifecycle、event、thread、run、state、schedule、tool、extension、agent-adapter、health の service files を含む SHALL。
+TypeSpec source tree は、errors、pagination、security metadata の common stubs、Agent、access credential、thread、section、event、run、compaction、history、memory、state、schedule、tool、integration、adapter の model stubs、および Agent lifecycle、event、thread、run、state、schedule、tool、integration、agent-adapter、health の service files を含む SHALL。
 
 Foundation descriptors は、次の RPC Service Inventory を満たす SHALL。
 
-| Service                   | RPC methods                                                                                                                                                      |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AgentLifecycleService`   | `InitializeAgent`, `GetAgent`, `DestroyAgent`, `RotateAgentCredential`                                                                                           |
-| `AgentEventService`       | `PublishEvent`, `GetEvent`, `ListEvents`                                                                                                                         |
-| `AgentThreadService`      | `ListThreads`, `GetThread`, `ListSections`, `GetLatestCompaction`, `GetThreadMemory`, `SearchThreadHistory`                                                      |
-| `AgentRunService`         | `GetRun`, `ListRuns`, `CancelRun`                                                                                                                                |
-| `AgentStateService`       | `GetState`, `GetConfig`, `UpdateConfig`                                                                                                                          |
-| `AgentScheduleService`    | `CreateSchedule`, `GetSchedule`, `ListSchedules`, `CancelSchedule`                                                                                               |
-| `AgentToolService`        | `ListTools`, `GetInvocation`, `ListInvocations`, `ApproveInvocation`, `RejectInvocation`                                                                         |
-| `AgentExtensionService`   | `InstallExtension`, `UninstallExtension`, `GetInstallation`, `ListInstallations`, `CreateAdapterConnection`, `DeleteAdapterConnection`, `ListAdapterConnections` |
-| `ExtensionIngressService` | `PublishEvent`, `PublishToolResult`, `PublishDeliveryResult`                                                                                                     |
-| `AgentHealthService`      | `Check`                                                                                                                                                          |
+| Service                     | RPC methods                                                                                                                                                          |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentLifecycleService`     | `InitializeAgent`, `GetAgent`, `DestroyAgent`, `RotateAgentCredential`                                                                                               |
+| `AgentEventService`         | `PublishEvent`, `GetEvent`, `ListEvents`                                                                                                                             |
+| `AgentThreadService`        | `ListThreads`, `GetThread`, `ListSections`, `GetLatestCompaction`, `GetThreadMemory`, `SearchThreadHistory`                                                          |
+| `AgentRunService`           | `GetRun`, `ListRuns`, `CancelRun`                                                                                                                                    |
+| `AgentStateService`         | `GetState`, `GetConfig`, `UpdateConfig`                                                                                                                              |
+| `AgentScheduleService`      | `CreateSchedule`, `GetSchedule`, `ListSchedules`, `CancelSchedule`                                                                                                   |
+| `AgentToolService`          | `ListTools`, `GetInvocation`, `ListInvocations`, `ApproveInvocation`, `RejectInvocation`                                                                             |
+| `AgentIntegrationService`   | `InstallIntegration`, `UninstallIntegration`, `GetInstallation`, `ListInstallations`, `CreateAdapterConnection`, `DeleteAdapterConnection`, `ListAdapterConnections` |
+| `IntegrationIngressService` | `PublishEvent`, `PublishToolResult`, `PublishDeliveryResult`                                                                                                         |
+| `AgentHealthService`        | `Check`                                                                                                                                                              |
 
-`ExtensionIngressService` は `packages/agent/src/typespec/src/services/agent-adapter.tsp` で定義 SHALL し、`PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` を持つ SHALL。
+`IntegrationIngressService` は `packages/agent/src/typespec/src/services/agent-adapter.tsp` で定義 SHALL し、`PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` を持つ SHALL。
 
-`AgentExtensionService` は Adapter Connection management の `CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` を所有 SHALL。
+`AgentIntegrationService` は Adapter Connection management の `CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` を所有 SHALL。
 
 すべての Protobuf message field は、TypeSpec source 上の `@field(n)` または生成物で等価に検証できる明示 field number を持つ SHALL。削除済み field の number と name は再利用せず、TypeSpec source または generated proto で reserve SHALL。Codegen guard は、field number の再利用、明示 field number の欠落、同一 package 内の service 名重複、同一 service 内の method 名重複を検出して失敗 SHALL。
 
@@ -51,7 +51,7 @@ Production Agent RPC は、Connect JSON encoding、HTTP GET unary invocation、u
 
 - **GIVEN** Agent TypeSpec project が contract generation 用に compile される状態である
 - **WHEN** generation command が完了する
-- **THEN** `packages/agent/proto/cftamac/agent/v1.proto` に common types、すべての Agent foundation models、lifecycle/event/thread/run/state/schedule/tool/extension/agent-adapter/health service files 由来の proto3 service/message definitions が存在する
+- **THEN** `packages/agent/proto/cftamac/agent/v1.proto` に common types、すべての Agent foundation models、lifecycle/event/thread/run/state/schedule/tool/integration/agent-adapter/health service files 由来の proto3 service/message definitions が存在する
 - **AND** RPC Service Inventory の全 service/method が generated descriptors に存在する
 - **AND** public Agent OpenAPI artifact は Agent API contract として emit されない
 
@@ -85,21 +85,21 @@ Production Agent RPC は、Connect JSON encoding、HTTP GET unary invocation、u
 
 **Customer Context**
 
-Agent Service の利用者と運用者は、request body だけで対象 Agent、command の冪等性、Event の Thread 所属を監査・署名・再実行できる必要がある。Agent 横断の一覧・検索 RPC や metadata-only Agent scope が混入すると、Client の管理台帳、Agent aggregate、Extension 署名境界が崩れる。
+Agent Service の利用者と運用者は、request body だけで対象 Agent、command の冪等性、Event の Thread 所属を監査・署名・再実行できる必要がある。Agent 横断の一覧・検索 RPC や metadata-only Agent scope が混入すると、Client の管理台帳、Agent aggregate、Integration 署名境界が崩れる。
 
 **Requirement**
 
 すべての public Agent RPC request message は、request body field として `agent_id` を含む SHALL。`agent_id` は transport metadata のみで表現 MUST NOT。
 
-すべての command-style public Agent RPC request message は、request body field として `idempotency_key` を含む SHALL。Command-style requests には、Agent lifecycle changes、event publishing、schedule creation/cancellation、configuration updates、extension installation changes、adapter connection changes、tool approval/rejection、Extension ingress callbacks、その他 Agent-owned state を変更する操作を含める。
+すべての command-style public Agent RPC request message は、request body field として `idempotency_key` を含む SHALL。Command-style requests には、Agent lifecycle changes、event publishing、schedule creation/cancellation、configuration updates、integration installation changes、adapter connection changes、tool approval/rejection、Integration ingress callbacks、その他 Agent-owned state を変更する操作を含める。
 
-Public Event publish request messages は、`AgentEventService.PublishEvent` と `ExtensionIngressService.PublishEvent` を含め、空文字ではなく Unicode NFC 正規化後に最大 512 UTF-8 bytes の `thread_key` を要求 SHALL。外部 Thread context を持たない Agent lifecycle audit events は、Agent-local reserved system Thread へ内部的に割り当て SHALL し、Thread ownership のない public Event publish request を作成 SHALL NOT。
+Public Event publish request messages は、`AgentEventService.PublishEvent` と `IntegrationIngressService.PublishEvent` を含め、空文字ではなく Unicode NFC 正規化後に最大 512 UTF-8 bytes の `thread_key` を要求 SHALL。外部 Thread context を持たない Agent lifecycle audit events は、Agent-local reserved system Thread へ内部的に割り当て SHALL し、Thread ownership のない public Event publish request を作成 SHALL NOT。
 
-`thread_key` は Agent-local opaque string SHALL。Thread lookup と storage では、受信した `thread_key` を Unicode NFC に正規化した値を比較キーとして使用 SHALL。正規化後の `thread_key` は空文字であって MUST NOT、UTF-8 encoding で 512 bytes を超えて MUST NOT。比較は NFC 正規化後も case-sensitive SHALL。同一 `agent_id` と同一 normalized `thread_key` は同一 Thread に解決 SHALL。異なる `agent_id` は同一 normalized `thread_key` でも別 Thread に解決 SHALL。Extension、Adapter、Connection、principal などの識別子を `thread_key` へ暗黙 prefix 付与 MUST NOT。異なる Extension または Adapter が意図的に同じ normalized `thread_key` を指定した場合、その Event は同じ Agent 内の同じ Thread に統合 SHALL。
+`thread_key` は Agent-local opaque string SHALL。Thread lookup と storage では、受信した `thread_key` を Unicode NFC に正規化した値を比較キーとして使用 SHALL。正規化後の `thread_key` は空文字であって MUST NOT、UTF-8 encoding で 512 bytes を超えて MUST NOT。比較は NFC 正規化後も case-sensitive SHALL。同一 `agent_id` と同一 normalized `thread_key` は同一 Thread に解決 SHALL。異なる `agent_id` は同一 normalized `thread_key` でも別 Thread に解決 SHALL。Integration、Adapter、Connection、principal などの識別子を `thread_key` へ暗黙 prefix 付与 MUST NOT。異なる Integration または Adapter が意図的に同じ normalized `thread_key` を指定した場合、その Event は同じ Agent 内の同じ Thread に統合 SHALL。
 
 Generated proto と Protobuf-ES service descriptors は、RPC Service Inventory の service/method presence、`agent_id`、command `idempotency_key`、Event publish `thread_key` の未指定/空文字/512 UTF-8 bytes 超過 rejection、forbidden Agent-cross RPC methods を automated checks で検査 SHALL。
 
-Agent Service は public Agent-cross list/search RPCs を定義 MUST NOT。`ListAllAgents`、`SearchAgents`、`ListAllToolInvocations`、`ListAllExtensionInstallations` などの methods は存在 MUST NOT。Agent service groups 内に存在する list/search RPCs は、`agent_id` で scope されたまま SHALL。
+Agent Service は public Agent-cross list/search RPCs を定義 MUST NOT。`ListAllAgents`、`SearchAgents`、`ListAllToolInvocations`、`ListAllIntegrationInstallations` などの methods は存在 MUST NOT。Agent service groups 内に存在する list/search RPCs は、`agent_id` で scope されたまま SHALL。
 
 #### Scenario: Public RPC descriptors are agent-scoped and exclude cross-Agent list/search (AGENT-PLATFORM-S010)
 
@@ -107,23 +107,23 @@ Agent Service は public Agent-cross list/search RPCs を定義 MUST NOT。`List
 - **WHEN** descriptor invariant check が public request messages、service methods、RPC Service Inventory を列挙する
 - **THEN** すべての public request message は `agent_id` field を含む
 - **AND** RPC Service Inventory の required service/method はすべて存在する
-- **AND** `ListAllAgents`、`SearchAgents`、`ListAllToolInvocations`、`ListAllExtensionInstallations` などの Agent-cross list/search names を公開する service method は存在しない
+- **AND** `ListAllAgents`、`SearchAgents`、`ListAllToolInvocations`、`ListAllIntegrationInstallations` などの Agent-cross list/search names を公開する service method は存在しない
 
 #### Scenario: Command and Event publish descriptors require replay and Thread keys (AGENT-PLATFORM-S011)
 
 - **GIVEN** `cftamac.agent.v1` の generated proto と Protobuf-ES service descriptors が利用できる
 - **WHEN** descriptor invariant check が command request messages と Event publish request messages を分類する
 - **THEN** すべての command request message は `idempotency_key` field を含む
-- **AND** `AgentEventService.PublishEvent` と `ExtensionIngressService.PublishEvent` は validation で空文字ではなく Unicode NFC 正規化後に最大 512 UTF-8 bytes になる `thread_key` field を含む
+- **AND** `AgentEventService.PublishEvent` と `IntegrationIngressService.PublishEvent` は validation で空文字ではなく Unicode NFC 正規化後に最大 512 UTF-8 bytes になる `thread_key` field を含む
 - **AND** command `idempotency_key` または Event publish `thread_key` が未指定、空文字、または 512 UTF-8 bytes を超える validation fixtures は失敗する
 
 #### Scenario: Thread key identity is normalized and Agent-scoped (AGENT-PLATFORM-S013)
 
-- **GIVEN** `AgentEventService.PublishEvent` または `ExtensionIngressService.PublishEvent` が同じ `agent_id` と Unicode NFC 正規化後に同じ 512 UTF-8 bytes 以下の `thread_key` を二回受け取る
+- **GIVEN** `AgentEventService.PublishEvent` または `IntegrationIngressService.PublishEvent` が同じ `agent_id` と Unicode NFC 正規化後に同じ 512 UTF-8 bytes 以下の `thread_key` を二回受け取る
 - **WHEN** AIAgent Durable Object が Thread を解決する
 - **THEN** 二つの Event は同じ internal `thread_id` を持つ同一 Thread に所属する
 - **AND** `thread_key` 比較は NFC 正規化後も case-sensitive であり、大小文字だけが異なる値は別 Thread として扱われる
-- **AND** Extension、Adapter、Connection、principal 由来の暗黙 prefix は付与されず、異なる ingress source が同じ normalized `thread_key` を指定した場合は同じ Thread に統合される
+- **AND** Integration、Adapter、Connection、principal 由来の暗黙 prefix は付与されず、異なる ingress source が同じ normalized `thread_key` を指定した場合は同じ Thread に統合される
 - **AND** 異なる `agent_id` が同じ normalized `thread_key` を指定しても Thread は共有されず、別 `AIAgent` 内の別 Thread として解決される
 
 ### Requirement: Agent Worker aggregate runtime boundary
@@ -152,7 +152,7 @@ Agent-local Queue は、AgentEvent、Mailbox、pending AgentRun state の source
 
 Agent-local Queue wake foundation は、wake が pending または running の間に Event acceptance が繰り返されても、同じ `AIAgent` に対して unbounded wake items を enqueue しないよう scheduler wakes を coalesce SHALL。
 
-Agent runtime source layout は、domain、harness、threads、events、runs、compactions、schedules、tools、extensions、adapters、storage、observability responsibilities を分けた foundation modules を提供 SHALL。
+Agent runtime source layout は、domain、harness、threads、events、runs、compactions、schedules、tools、integrations、adapters、storage、observability responsibilities を分けた foundation modules を提供 SHALL。
 
 Agent Worker は、`CLIENT_DB` または Agent-cross D1 bindings を含む D1 binding を定義 MUST NOT。また、`packages/client` runtime source に依存 MUST NOT。
 
@@ -228,7 +228,7 @@ Agent platform は、implemented foundation handlers の外側で fail closed �
 
 Agent platform は generated Protobuf descriptors、Connect Worker adapter、RPC router、binary content enforcement、request validation hook、authentication hook、authorization hook、replay-protection hook、audit hook、rate-limit hook、Durable Object RPC dispatcher を compileable foundation modules として提供 SHALL。
 
-Generated Connect router は、generated descriptors から `AgentLifecycleService`、`AgentEventService`、`AgentThreadService`、`AgentRunService`、`AgentStateService`、`AgentScheduleService`、`AgentToolService`、`AgentExtensionService`、`ExtensionIngressService`、`AgentHealthService` を登録 SHALL。
+Generated Connect router は、generated descriptors から `AgentLifecycleService`、`AgentEventService`、`AgentThreadService`、`AgentRunService`、`AgentStateService`、`AgentScheduleService`、`AgentToolService`、`AgentIntegrationService`、`IntegrationIngressService`、`AgentHealthService` を登録 SHALL。
 
 Agent platform は `AgentHealthService.Check` を foundation health RPC として Connect binary Protobuf で公開 SHALL。
 
@@ -247,6 +247,6 @@ Foundation modules は Durable Object RPC methods を Worker-to-Durable-Object c
 
 #### Scenario: Foundation handlers fail closed for unmapped methods (AGENT-PLATFORM-S009)
 
-- **GIVEN** generated lifecycle/event/thread/run/state/schedule/tool/extension/`ExtensionIngressService` service methods が domain handlers なしで登録されている
+- **GIVEN** generated lifecycle/event/thread/run/state/schedule/tool/integration/`IntegrationIngressService` service methods が domain handlers なしで登録されている
 - **WHEN** caller がそれらの methods の一つを binary Connect で呼び出す
 - **THEN** Worker は ad-hoc JSON handling または public Durable Object fetch handling を呼び出さず Connect code `unimplemented` を返す

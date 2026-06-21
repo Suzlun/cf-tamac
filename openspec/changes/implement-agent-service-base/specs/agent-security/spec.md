@@ -6,12 +6,12 @@ Agent Service は各 RPC caller を対応済み principal type として認証 S
 
 **利用者文脈**
 
-Agent API は Client Service、Extension Installation、Internal Service、Admin Operator など複数の主体から呼ばれる。Browser user を直接 Agent principal にせず、サーバー側 service identity と acting user 情報で監査できる必要がある。
+Agent API は Client Service、Integration Installation、Internal Service、Admin Operator など複数の主体から呼ばれる。Browser user を直接 Agent principal にせず、サーバー側 service identity と acting user 情報で監査できる必要がある。
 
 **要件**
 
 - Agent Service は issuer、subject、JWT ID、audience、expiry、not-before、`agent_id`、scope、acting user identity を持つ短命 JWT または同等の application-level credential を使用して Client Service リクエストを認証 MUST。
-- Agent Service は、より狭い internal trust profile が明示的に構成されていない限り、detached signature を使用して Extension Provider リクエストを Extension Installation principal として認証 MUST。
+- Agent Service は、より狭い internal trust profile が明示的に構成されていない限り、detached signature を使用して Integration Provider リクエストを Integration Installation principal として認証 MUST。
 - Browser sessions は direct Agent principals として受理して MUST NOT。
 - 認証メタデータは decode 済みリクエストに bind MUST し、生 body digest とともに final authorization のため AIAgent Durable Object へ forward MUST。
 
@@ -29,22 +29,22 @@ Agent API は Client Service、Extension Installation、Internal Service、Admin
 - **THEN** Agent Service はエラー分類に従って unauthenticated または permission denied としてリクエストを拒否する
 - **AND** Agent-owned 状態は変更されない
 
-### Requirement: Extension detached signature と replay 防止
+### Requirement: Integration detached signature と replay 防止
 
-Extension リクエストは detached signature、nonce、idempotency 確認により保護 SHALL。
+Integration リクエストは detached signature、nonce、idempotency 確認により保護 SHALL。
 
 **利用者文脈**
 
-Extension Provider からの ingress、Tool 結果、Delivery 結果は外部 network 経由で届くため、body 改ざん、nonce replay、idempotency replay、key rotation の不整合を防ぐ必要がある。
+Integration Provider からの ingress、Tool 結果、Delivery 結果は外部 network 経由で届くため、body 改ざん、nonce replay、idempotency replay、key rotation の不整合を防ぐ必要がある。
 
 **要件**
 
-- Extension signature base は RPC service、RPC method、`agent_id`、`installation_id`、該当する場合の `connection_id`、時刻、nonce、idempotency key、生 protobuf リクエスト body の SHA-256 digest を含める MUST。
+- Integration signature base は RPC service、RPC method、`agent_id`、`installation_id`、該当する場合の `connection_id`、時刻、nonce、idempotency key、生 protobuf リクエスト body の SHA-256 digest を含める MUST。
 - AIAgent Durable Object は時刻 window、nonce 一意性、key 状態、Installation 状態、要求 RPC grant、idempotency key、body digest を検証 MUST。
 - Nonces は principal ごとに TTL 付きで保存 MUST し、replay 時には拒否 MUST。
 - 同じ body digest を持つ同じ idempotency key は記録済み結果を replay MUST し、異なる body digest を持つ同じ key は拒否 MUST。
 
-#### Scenario: 有効な Extension signature が grant 内の ingress を受理する (AGENT-SECURITY-S003)
+#### Scenario: 有効な Integration signature が grant 内の ingress を受理する (AGENT-SECURITY-S003)
 
 - **GIVEN** 有効な Installation `inst-1` が Provider 公開鍵 `key-1` と Connection `conn-1` の ingress grant を持っている
 - **WHEN** Provider が有効な時刻、nonce、idempotency key、生 body digest、detached signature で ingress RPC を呼ぶ
@@ -71,13 +71,13 @@ RPC facade の認証成功だけでは、Agent のライフサイクル、Instal
 - AIAgent Durable Object はすべての command と機密照会に対して final authorization を実行 MUST。
 - Final authorization は対象 Agent ID、ライフサイクル状態、credential 状態、principal type、scope/grant、Installation 状態、Connection 所有関係、Tool/Adapter capability、nonce/idempotency、要求 operation を確認 MUST。
 - Durable Object RPC method は Agent RPC facade から AIAgent Durable Object への Worker-internal call である MUST し、公開 fetch route、公開 REST エンドポイント、Browser-callable API として公開して MUST NOT。
-- Extension Installation principal は Agent config、install/uninstall、credential rotation、Tool 承認 RPC を呼び出して MUST NOT。
+- Integration Installation principal は Agent config、install/uninstall、credential rotation、Tool 承認 RPC を呼び出して MUST NOT。
 - Authorization denial は、許可された監査/security metrics を除き Agent-owned 状態を変更しないままにする MUST。
 
-#### Scenario: Extension grant 外の method は AIAgent により拒否される (AGENT-SECURITY-S005)
+#### Scenario: Integration grant 外の method は AIAgent により拒否される (AGENT-SECURITY-S005)
 
-- **GIVEN** Extension Installation principal が ingress grant だけを持っている
-- **WHEN** Agent config、Extension install/uninstall、Schedule 管理、Thread 照会、または Tool 承認 RPC を呼ぶ
+- **GIVEN** Integration Installation principal が ingress grant だけを持っている
+- **WHEN** Agent config、Integration install/uninstall、Schedule 管理、Thread 照会、または Tool 承認 RPC を呼ぶ
 - **THEN** AIAgent Durable Object はリクエストを permission denied で拒否する
 - **AND** その principal に対して config、installation、schedule、照会結果、承認状態は生成されない
 
@@ -90,7 +90,7 @@ RPC facade の認証成功だけでは、Agent のライフサイクル、Instal
 
 #### Scenario: Durable Object RPC は Connect facade の背後に留まる (AGENT-SECURITY-S009)
 
-- **GIVEN** AIAgent Durable Object がライフサイクル、Event、Run、Schedule、Tool、Extension、health operation 用の Worker-internal method を公開している
+- **GIVEN** AIAgent Durable Object がライフサイクル、Event、Run、Schedule、Tool、Integration、health operation 用の Worker-internal method を公開している
 - **WHEN** 外部 caller、Browser、または Provider が Agent Connect RPC facade なしでそれらの Durable Object method を呼び出そうとする
 - **THEN** Durable Object RPC method を直接公開する公開 route は存在しない
 - **AND** すべての外部 Agent operation は AIAgent 状態に到達する前に Connect binary Protobuf 認証、検証、replay 防止、final authorization を通過する
@@ -119,7 +119,7 @@ Client と Provider は、失敗を retry すべきか、入力を直すべき�
 
 #### Scenario: Observability 文脈が secret material を除外する (AGENT-SECURITY-S008)
 
-- **GIVEN** Client Service または Extension Provider RPC が成功または失敗する
+- **GIVEN** Client Service または Integration Provider RPC が成功または失敗する
 - **WHEN** log、metrics、監査記録が emitted される
 - **THEN** troubleshooting 用の安全な correlation field が含まれる
 - **AND** 生 token、秘密鍵、生 shared secret、完全な Provider credential、未 redaction の signature material は含まれない

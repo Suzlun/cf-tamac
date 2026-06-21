@@ -37,26 +37,26 @@
 
 ## RPC Service Inventory
 
-| Service                   | Methods                                                                                                                                                          |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AgentLifecycleService`   | `InitializeAgent`, `GetAgent`, `DestroyAgent`, `RotateAgentCredential`                                                                                           |
-| `AgentEventService`       | `PublishEvent`, `GetEvent`, `ListEvents`                                                                                                                         |
-| `AgentThreadService`      | `ListThreads`, `GetThread`, `ListSections`, `GetLatestCompaction`, `GetThreadMemory`, `SearchThreadHistory`                                                      |
-| `AgentRunService`         | `GetRun`, `ListRuns`, `CancelRun`                                                                                                                                |
-| `AgentStateService`       | `GetState`, `GetConfig`, `UpdateConfig`                                                                                                                          |
-| `AgentScheduleService`    | `CreateSchedule`, `GetSchedule`, `ListSchedules`, `CancelSchedule`                                                                                               |
-| `AgentToolService`        | `ListTools`, `GetInvocation`, `ListInvocations`, `ApproveInvocation`, `RejectInvocation`                                                                         |
-| `AgentExtensionService`   | `InstallExtension`, `UninstallExtension`, `GetInstallation`, `ListInstallations`, `CreateAdapterConnection`, `DeleteAdapterConnection`, `ListAdapterConnections` |
-| `ExtensionIngressService` | `PublishEvent`, `PublishToolResult`, `PublishDeliveryResult`                                                                                                     |
-| `AgentHealthService`      | `Check`                                                                                                                                                          |
+| Service                     | Methods                                                                                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentLifecycleService`     | `InitializeAgent`, `GetAgent`, `DestroyAgent`, `RotateAgentCredential`                                                                                               |
+| `AgentEventService`         | `PublishEvent`, `GetEvent`, `ListEvents`                                                                                                                             |
+| `AgentThreadService`        | `ListThreads`, `GetThread`, `ListSections`, `GetLatestCompaction`, `GetThreadMemory`, `SearchThreadHistory`                                                          |
+| `AgentRunService`           | `GetRun`, `ListRuns`, `CancelRun`                                                                                                                                    |
+| `AgentStateService`         | `GetState`, `GetConfig`, `UpdateConfig`                                                                                                                              |
+| `AgentScheduleService`      | `CreateSchedule`, `GetSchedule`, `ListSchedules`, `CancelSchedule`                                                                                                   |
+| `AgentToolService`          | `ListTools`, `GetInvocation`, `ListInvocations`, `ApproveInvocation`, `RejectInvocation`                                                                             |
+| `AgentIntegrationService`   | `InstallIntegration`, `UninstallIntegration`, `GetInstallation`, `ListInstallations`, `CreateAdapterConnection`, `DeleteAdapterConnection`, `ListAdapterConnections` |
+| `IntegrationIngressService` | `PublishEvent`, `PublishToolResult`, `PublishDeliveryResult`                                                                                                         |
+| `AgentHealthService`        | `Check`                                                                                                                                                              |
 
 ## Descriptor And Runtime Invariants
 
 - Every public Agent RPC request body includes `agent_id`; metadata-only Agent scope is not allowed.
 - Command requests include `idempotency_key`.
-- `AgentEventService.PublishEvent` and `ExtensionIngressService.PublishEvent` include required `thread_key`.
-- `thread_key` is Unicode NFC normalized, non-empty, maximum 512 UTF-8 bytes, case-sensitive, and scoped by `(agent_id, normalized_thread_key)` without implicit Extension/Adapter/Connection/principal prefixes.
-- Agent-cross list/search methods such as `ListAllAgents`, `SearchAgents`, `ListAllToolInvocations`, and `ListAllExtensionInstallations` are forbidden.
+- `AgentEventService.PublishEvent` and `IntegrationIngressService.PublishEvent` include required `thread_key`.
+- `thread_key` is Unicode NFC normalized, non-empty, maximum 512 UTF-8 bytes, case-sensitive, and scoped by `(agent_id, normalized_thread_key)` without implicit Integration/Adapter/Connection/principal prefixes.
+- Agent-cross list/search methods such as `ListAllAgents`, `SearchAgents`, `ListAllToolInvocations`, and `ListAllIntegrationInstallations` are forbidden.
 - All Protobuf fields have explicit `@field(n)` or generated equivalent. Deleted field numbers/names stay reserved. Field number reuse, service name duplicates, and duplicate method names inside a service fail governance checks.
 - Production Agent RPC accepts unary Connect binary Protobuf only: `POST` with `Content-Type: application/proto`. JSON encodings and `GET` map to `unimplemented`; invalid/missing binary content and malformed Protobuf map to `invalid_argument`.
 - All generated services register in the Connect router. `AgentHealthService.Check` reaches a foundation handler; unimplemented generated methods fail closed with Connect `unimplemented`.
@@ -71,7 +71,7 @@
 - `/agents/[agentId]/events`
 - `/agents/[agentId]/schedules`
 - `/agents/[agentId]/tools`
-- `/agents/[agentId]/extensions`
+- `/agents/[agentId]/integrations`
 - `/agents/[agentId]/settings`
 - Do not add `/api/client/*`, `/api/agent*`, Agent REST proxy routes, arbitrary RPC forwarding handlers, `hello`, or `users` management routes.
 

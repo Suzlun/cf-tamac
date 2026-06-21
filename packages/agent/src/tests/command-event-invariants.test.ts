@@ -18,18 +18,18 @@ const commandMethods = new Set([
   'AgentScheduleService.CancelSchedule',
   'AgentToolService.ApproveInvocation',
   'AgentToolService.RejectInvocation',
-  'AgentExtensionService.InstallExtension',
-  'AgentExtensionService.UninstallExtension',
-  'AgentExtensionService.CreateAdapterConnection',
-  'AgentExtensionService.DeleteAdapterConnection',
-  'ExtensionIngressService.PublishEvent',
-  'ExtensionIngressService.PublishToolResult',
-  'ExtensionIngressService.PublishDeliveryResult',
+  'AgentIntegrationService.InstallIntegration',
+  'AgentIntegrationService.UninstallIntegration',
+  'AgentIntegrationService.CreateAdapterConnection',
+  'AgentIntegrationService.DeleteAdapterConnection',
+  'IntegrationIngressService.PublishEvent',
+  'IntegrationIngressService.PublishToolResult',
+  'IntegrationIngressService.PublishDeliveryResult',
 ]);
 
 const eventPublishMethods = new Set([
   'AgentEventService.PublishEvent',
-  'ExtensionIngressService.PublishEvent',
+  'IntegrationIngressService.PublishEvent',
 ]);
 
 interface ProtoMethod {

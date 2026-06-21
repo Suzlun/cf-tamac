@@ -2,7 +2,7 @@
 
 現在のリポジトリは Cloudflare Workers + Hono + Drizzle + React の汎用テンプレート構成を前提としており、`hello` / `users` を中心にしたサンプル API、OpenAPI 生成、Orval 生成クライアント、Vite SPA が混在している。このままでは、チャットに依存しない自律駆動 AI Agent Service という設計基準に対して、公開 API、永続化所有者、Worker binding、Client の責務が一致せず、以後の Agent 機能実装で REST/OpenAPI やサンプル機能が再利用されるリスクが高い。
 
-この change は、`docs/memo/仕様設計・アーキテクチャ設定.md` を実装の設計基準として、最初にリポジトリ構造、API 契約、生成物、lint/codegen guardrail、Agent Worker と Client Worker の分離を確定する。これにより、後続の Agent/Thread/Event/Run/Compaction/Schedule/Tool/Extension/Client 実装が、Protobuf RPC-only、Connect + binary Protobuf、1 Agent ID = 1 AIAgent Durable Object instance、Client D1 分離という境界から逸脱しない状態で進められる。
+この change は、`docs/memo/仕様設計・アーキテクチャ設定.md` を実装の設計基準として、最初にリポジトリ構造、API 契約、生成物、lint/codegen guardrail、Agent Worker と Client Worker の分離を確定する。これにより、後続の Agent/Thread/Event/Run/Compaction/Schedule/Tool/Integration/Client 実装が、Protobuf RPC-only、Connect + binary Protobuf、1 Agent ID = 1 AIAgent Durable Object instance、Client D1 分離という境界から逸脱しない状態で進められる。
 
 ## What Changes
 
@@ -10,7 +10,7 @@
 - **BREAKING**: `hello` / `users` サンプル API、サンプル UI、サンプル TypeSpec route/model、OpenAPI artifact、Orval 生成 client は公開機能から外れ、最終状態では旧 demo packages は active workspace から削除される。
 - Agent Service は `packages/agent` の独立デプロイ可能な Cloudflare Worker + Cloudflare Agents SDK + SQLite-backed Durable Object runtime として扱われる。
 - 管理 Client は `packages/client` の Next.js on Cloudflare Workers 管理 UI として扱われ、Client 専用 D1、管理対象 Agent 台帳、Agent RPC origin、credential reference、表示設定だけを所有する。
-- Agent API 契約の正本は `packages/agent/src/typespec` となり、OpenAPI ではなく proto3 と Protobuf-ES generated code を生成する。foundation は health-only ではなく、memo にある common/model/service TypeSpec stubs（pagination/security、Agent/Thread/Event/Run/State/Schedule/Tool/Extension/Adapter など）と lifecycle/event/thread/run/state/schedule/tool/extension/agent-adapter/health service files を含む。`packages/agent/src/typespec/src/services/agent-adapter.tsp` は `ExtensionIngressService` を定義し、`PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` を持つ。`AgentExtensionService` は Adapter Connection 管理の `CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` を所有する。
+- Agent API 契約の正本は `packages/agent/src/typespec` となり、OpenAPI ではなく proto3 と Protobuf-ES generated code を生成する。foundation は health-only ではなく、memo にある common/model/service TypeSpec stubs（pagination/security、Agent/Thread/Event/Run/State/Schedule/Tool/Integration/Adapter など）と lifecycle/event/thread/run/state/schedule/tool/integration/agent-adapter/health service files を含む。`packages/agent/src/typespec/src/services/agent-adapter.tsp` は `IntegrationIngressService` を定義し、`PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` を持つ。`AgentIntegrationService` は Adapter Connection 管理の `CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` を所有する。
 - すべての public Agent RPC request は request body に `agent_id` を持ち、command request は `idempotency_key` を持ち、Event publish request は `thread_key` を必須検証する。`thread_key` は未指定と空文字を拒否し、Unicode NFC 正規化後に最大 512 UTF-8 bytes として case-sensitive で比較し、same `agent_id` + same normalized `thread_key` を同一 Thread、different `agent_id` を別 Thread とし、暗黙 prefix は付与しない。Agent 横断の list/search RPC は提供せず、generated proto/service descriptors、Protobuf field number/reserve/reuse、service/method uniqueness を codegen drift check で検査する。
 - Connect Worker facade は生成された全 Agent service を登録し、domain handler 未実装 method は Connect error で fail-closed する。binary content-type、JSON/GET rejection、authentication/authorization/replay/rate-limit hook seam、audit、validation、DO routing を foundation として固定する。
 - Agent-local Queue は Cloudflare Agents SDK の Agent-local wake/coalescing mechanism としてのみ使い、Cloudflare Queues product や Event source of truth として扱わない。
@@ -44,7 +44,7 @@
 - APIs/contracts: Agent REST/OpenAPI surface、TypeSpec source layout、full proto3 model/service stub output、Protobuf-ES generated client/server descriptors、request-level `agent_id` / `idempotency_key` / 空文字ではなく 512 UTF-8 bytes 以下の `thread_key` invariants、Thread key identity invariant、Protobuf field stability guard、Agent-cross list/search absence、Connect method surface、optional native gRPC compatibility policy。
 - Runtime/Cloudflare: Agent Worker wrangler config、Client Worker/OpenNext config、Durable Object binding、R2 binding、Client D1 binding、Agent-local Queue wake coalescing、Cloudflare Queues 非採用の明示。
 - Persistence: Agent-owned DO SQLite schema の基礎、Client-owned D1 schema の基礎、Agent から Client D1 へアクセスしない境界。
-- Security: Client Service JWT、Extension Installation signature、binary Protobuf content-type enforcement、JSON/GET rejection、Connect error mapping、nonce/idempotency/replay/audit/rate-limit guardrail の配置先。
+- Security: Client Service JWT、Integration Installation signature、binary Protobuf content-type enforcement、JSON/GET rejection、Connect error mapping、nonce/idempotency/replay/audit/rate-limit guardrail の配置先。
 - Testing/lint: TypeSpec compile/format、proto generation drift、Buf lint/breaking、REST/OpenAPI absence checks、OpenSpec strict validation、Scenario ID coverage、supply-chain policy。
 - Documentation: `AGENTS.md`、README/architecture docs、commands、testing docs、migration notes、禁止事項の明文化。
 - Workflow governance: `.opencode/skills/coding-guardian/**` と関連する agent/applier/engineer/reviewer permission/delegation files の計画更新。

@@ -5,7 +5,7 @@ import { createConnectTransport } from '@connectrpc/connect-web';
 
 import {
   AgentEventService,
-  AgentExtensionService,
+  AgentIntegrationService,
   AgentHealthService,
   AgentLifecycleService,
   AgentRunService,
@@ -13,7 +13,7 @@ import {
   AgentStateService,
   AgentThreadService,
   AgentToolService,
-  ExtensionIngressService,
+  IntegrationIngressService,
 } from '@cf-tamac/client-agent-rpc/cftamac/agent/v1_pb';
 
 import { createAgentRpcAuthInterceptor, type AgentRpcCredentialMetadata } from './authentication';
@@ -38,8 +38,8 @@ export interface ServerAgentRpcClients {
   readonly state: Client<typeof AgentStateService>;
   readonly schedules: Client<typeof AgentScheduleService>;
   readonly tools: Client<typeof AgentToolService>;
-  readonly extensions: Client<typeof AgentExtensionService>;
-  readonly extensionIngress: Client<typeof ExtensionIngressService>;
+  readonly integrations: Client<typeof AgentIntegrationService>;
+  readonly integrationIngress: Client<typeof IntegrationIngressService>;
   readonly health: Client<typeof AgentHealthService>;
 }
 
@@ -65,8 +65,8 @@ export function createServerAgentRpcClients(
     state: createClient(AgentStateService, transport),
     schedules: createClient(AgentScheduleService, transport),
     tools: createClient(AgentToolService, transport),
-    extensions: createClient(AgentExtensionService, transport),
-    extensionIngress: createClient(ExtensionIngressService, transport),
+    integrations: createClient(AgentIntegrationService, transport),
+    integrationIngress: createClient(IntegrationIngressService, transport),
     health: createClient(AgentHealthService, transport),
   };
 }

@@ -7,15 +7,15 @@
 - Stage 2: `1 Agent ID = 1 AIAgent Durable Object instance` を基準に、Agent lifecycle、credential/grant、Thread、Section、AgentEvent、Mailbox、idempotency/replay、Agent-local Queue wake を実装する。
 - Stage 3: AgentRun、run input snapshot、Context Builder、scheduler fairness、interrupt/generation check、budget、harness decision commit を実装する。
 - Stage 4: `1 Compaction = 1 Section`、Handoff、ThreadHistory、ThreadMemory、AgentMemory、R2 offload、Memory rebase を実装する。
-- Stage 5: Agent-owned Schedule、thread-scoped `schedule.triggered` Event、overlap policy、Extension uninstall 時の schedule cleanup を実装する。
+- Stage 5: Agent-owned Schedule、thread-scoped `schedule.triggered` Event、overlap policy、Integration uninstall 時の schedule cleanup を実装する。
 - Stage 6: ToolDefinition、ToolInvocation lifecycle、approval、signed Tool Provider RPC、async operation reconcile、Tool result Event を実装する。
-- Stage 7: Agent 側の Extension manifest 検証、Installation、`packages/agent/src/adapters/**/*.ts` による Adapter ingress 境界、`AgentExtensionService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections` による Adapter Connection 管理、`packages/agent/src/typespec/src/services/agent-adapter.tsp` で定義される ExtensionIngressService、Provider-facing `ExtensionDeliveryService.Deliver` client、uninstall cleanup、Installation signature/replay protection を実装する。
-- Stage 8: `packages/client` の Next.js 管理 UI、Client 専用 D1 registry、credential reference、server-side generated Connect client、Agent/Thread/Event/Run/Compaction/Schedule/Tool/Extension/Settings 画面を実装する。
-- 対象 Spec Unit は `agent-lifecycle`、`agent-eventing`、`agent-runtime`、`agent-memory`、`agent-schedule`、`agent-tool`、`agent-extension`、`agent-security`、`agent-health`、`client-registry`、`client-management` とする。
+- Stage 7: Agent 側の Integration manifest 検証、Installation、`packages/agent/src/adapters/**/*.ts` による Adapter ingress 境界、`AgentIntegrationService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections` による Adapter Connection 管理、`packages/agent/src/typespec/src/services/agent-adapter.tsp` で定義される IntegrationIngressService、Provider-facing `IntegrationDeliveryService.Deliver` client、uninstall cleanup、Installation signature/replay protection を実装する。
+- Stage 8: `packages/client` の Next.js 管理 UI、Client 専用 D1 registry、credential reference、server-side generated Connect client、Agent/Thread/Event/Run/Compaction/Schedule/Tool/Integration/Settings 画面を実装する。
+- 対象 Spec Unit は `agent-lifecycle`、`agent-eventing`、`agent-runtime`、`agent-memory`、`agent-schedule`、`agent-tool`、`agent-integration`、`agent-security`、`agent-health`、`client-registry`、`client-management` とする。
 
 ### Out of Scope
 
-- Stage 9 の Discord Extension Provider 実装、Discord Interaction endpoint、Discord Bot token 管理、Discord command registration。Agent 側の generic Extension/Tool/Delivery interop は Stage 1-8 の対象に残す。
+- Stage 9 の Discord Integration Provider 実装、Discord Interaction endpoint、Discord Bot token 管理、Discord command registration。Agent 側の generic Integration/Tool/Delivery interop は Stage 1-8 の対象に残す。
 - Agent の REST resource API、Agent OpenAPI artifact、Connect JSON production API、Browser からの Agent RPC 直接呼び出し、必須 native gRPC gateway、gRPC-Web。
 - Agent 横断の一覧/検索 RPC、Thread ごとの Durable Object 分割、Cloudflare Queues product を Agent mailbox 正本にする設計。
 - Agent から Client D1 を読み書きする projection、Client が Agent API を代理公開する public proxy route。
@@ -38,11 +38,11 @@
 
 ## Impacted Areas
 
-- API contract: foundation の `packages/agent/src/typespec/**`、`packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**` を詳細化し、`ExtensionToolService` / `ExtensionDeliveryService` 用の Provider-facing generated clients を追加する。
+- API contract: foundation の `packages/agent/src/typespec/**`、`packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**` を詳細化し、`IntegrationToolService` / `IntegrationDeliveryService` 用の Provider-facing generated clients を追加する。
 - Agent runtime: `packages/agent/src/index.ts`、`AIAgent.ts`、RPC facade、domain modules、`adapters` modules、DO SQLite schema/migrations、Agent-local Queue callbacks、R2 archive references、optional Workflow/Fiber integration points。
-- Security/operations: JWT verification、Extension detached signature、raw body digest、nonce/idempotency tables、grant/scope matrix、rate limiting、audit log、metrics、Connect error mapping、secret redaction。
+- Security/operations: JWT verification、Integration detached signature、raw body digest、nonce/idempotency tables、grant/scope matrix、rate limiting、audit log、metrics、Connect error mapping、secret redaction。
 - Client backend: Client D1 schema/migrations、managed agent registry、credential reference、server-side Agent RPC factory、Server Actions。
-- Client frontend: Agent registry、Agent detail、Threads/Events/Runs/Compactions、Schedules、Tools/Approvals、Extensions、Settings 用の Next.js App Router pages/components。
+- Client frontend: Agent registry、Agent detail、Threads/Events/Runs/Compactions、Schedules、Tools/Approvals、Integrations、Settings 用の Next.js App Router pages/components。
 - Tooling/docs: root/package scripts、workspace package entries、ESLint boundaries、Vitest/Playwright projects、OpenSpec scenario coverage tests、CI/codegen drift checks、AGENTS.md、CODING_STANDARDS.md、CONTRIBUTING.md、coding-guardian skill/reference。
 - Legacy surface: foundation で除去/非活性化された template `packages/typespec` OpenAPI emitter/output、`packages/frontend/api` Orval Agent SDK、`packages/backend/http` Hono zod-openapi Agent routes と OpenAPI contract tests が再導入されないことを検証する。
 
@@ -76,10 +76,10 @@ packages
 │     │        ├─ agent-state.tsp
 │     │        ├─ agent-schedule.tsp
 │     │        ├─ agent-tool.tsp
-│     │        ├─ agent-extension.tsp
+│     │        ├─ agent-integration.tsp
 │     │        ├─ agent-adapter.tsp
-│     │        ├─ extension-tool.tsp
-│     │        ├─ extension-delivery.tsp
+│     │        ├─ integration-tool.tsp
+│     │        ├─ integration-delivery.tsp
 │     │        └─ agent-health.tsp
 │     ├─ generated/rpc
 │     │  └─ cftamac/agent/v1/*_pb.ts
@@ -97,7 +97,7 @@ packages
 │     ├─ compactions
 │     ├─ schedules
 │     ├─ tools
-│     ├─ extensions
+│     ├─ integrations
 │     ├─ adapters
 │     ├─ storage
 │     ├─ observability
@@ -120,7 +120,7 @@ packages
 │  │        ├─ compactions/page.tsx
 │  │        ├─ schedules/page.tsx
 │  │        ├─ tools/page.tsx
-│  │        ├─ extensions/page.tsx
+│  │        ├─ integrations/page.tsx
 │  │        └─ settings/page.tsx
 │  └─ src
 │     ├─ server
@@ -153,83 +153,83 @@ foundationで不在確認: packages/typespec Agent OpenAPI, packages/frontend/ap
 
 ## New / Changed Files
 
-| Type       | File                                                               | Change                                                                                                                                                                                                      |
-| ---------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Update     | `packages/agent/package.json`                                      | foundation scripts を Stage 1〜8 の build/check/test/generation/local dev に拡張する。                                                                                                                      |
-| Update     | `packages/agent/wrangler.toml`                                     | Agent Worker、AIAgent Durable Object、R2、optional Workflow binding を機能実装の binding に合わせて確認/拡張する。                                                                                          |
-| Update     | `packages/agent/buf.yaml`                                          | proto lint/breaking の module 設定を Stage 1〜8 の proto に合わせる。                                                                                                                                       |
-| Update     | `packages/agent/buf.gen.yaml`                                      | Protobuf-ES と client/server descriptor 生成先を Agent/Client/Provider-facing RPC に合わせる。                                                                                                              |
-| Update     | `packages/agent/src/typespec/main.tsp`                             | `cftamac.agent.v1` の TypeSpec Protobuf entrypoint を全 Stage 1〜8 services/models へ接続する。                                                                                                             |
-| Update     | `packages/agent/src/typespec/tspconfig.yaml`                       | `@typespec/protobuf` 出力と Agent OpenAPI 非生成を確認する。                                                                                                                                                |
-| Update     | `packages/agent/src/typespec/src/common/*.tsp`                     | errors、pagination、security、idempotency、timestamp/nonce 共通型を詳細化する。                                                                                                                             |
-| Update     | `packages/agent/src/typespec/src/models/*.tsp`                     | Agent、Thread、Event、Run、Compaction、Memory、Schedule、Tool、Extension、Adapter model を詳細化する。                                                                                                      |
-| Update     | `packages/agent/src/typespec/src/services/agent-lifecycle.tsp`     | AgentLifecycleService の InitializeAgent/GetAgent/DestroyAgent/RotateAgentCredential を実装可能 contract にする。                                                                                           |
-| Update     | `packages/agent/src/typespec/src/services/agent-event.tsp`         | AgentEventService の PublishEvent/GetEvent/ListEvents を実装可能 contract にする。                                                                                                                          |
-| Update     | `packages/agent/src/typespec/src/services/agent-thread.tsp`        | AgentThreadService の Thread/Section/Compaction/Memory/History query を実装可能 contract にする。                                                                                                           |
-| Update     | `packages/agent/src/typespec/src/services/agent-run.tsp`           | AgentRunService の GetRun/ListRuns/CancelRun を実装可能 contract にする。                                                                                                                                   |
-| Update     | `packages/agent/src/typespec/src/services/agent-state.tsp`         | AgentStateService の GetState/GetConfig/UpdateConfig を実装可能 contract にする。                                                                                                                           |
-| Update     | `packages/agent/src/typespec/src/services/agent-schedule.tsp`      | AgentScheduleService の Create/Get/List/CancelSchedule を実装可能 contract にする。                                                                                                                         |
-| Update     | `packages/agent/src/typespec/src/services/agent-tool.tsp`          | AgentToolService の Tool catalog、Invocation query、approval/rejection を実装可能 contract にする。                                                                                                         |
-| Update     | `packages/agent/src/typespec/src/services/agent-extension.tsp`     | AgentExtensionService の install/uninstall/get/list Installation と CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections を実装可能 contract にする。                                     |
-| Update     | `packages/agent/src/typespec/src/services/agent-adapter.tsp`       | foundation で存在する service file を詳細化し、ExtensionIngressService の PublishEvent/PublishToolResult/PublishDeliveryResult だけを定義する。Adapter Connection 管理や個別取得用の追加 RPC は定義しない。 |
-| Add        | `packages/agent/src/typespec/src/services/extension-tool.tsp`      | Agent -> Provider の `ExtensionToolService.InvokeTool/GetOperation/CancelOperation` を定義する。                                                                                                            |
-| Add        | `packages/agent/src/typespec/src/services/extension-delivery.tsp`  | Agent -> Provider の `ExtensionDeliveryService.Deliver` を定義する。                                                                                                                                        |
-| Update     | `packages/agent/src/typespec/src/services/agent-health.tsp`        | AgentHealthService.Check を Stage 1〜8 の safe health contract に詳細化し REST `/health` を作らない。                                                                                                       |
-| Generated  | `packages/agent/proto/cftamac/agent/v1/*.proto`                    | TypeSpec から生成する proto3 artifact。手編集しない。                                                                                                                                                       |
-| Generated  | `packages/agent/src/generated/rpc/cftamac/agent/v1/*_pb.ts`        | Protobuf-ES generated server/client descriptor。手編集しない。                                                                                                                                              |
-| Update     | `packages/agent/src/index.ts`                                      | Connect Worker entrypoint と AIAgent Durable Object export を Stage 1〜8 handlers に接続する。                                                                                                              |
-| Update     | `packages/agent/src/AIAgent.ts`                                    | Cloudflare Agents SDK `Agent` subclass と Worker-internal DO RPC methods を機能実装へ拡張する。                                                                                                             |
-| Update     | `packages/agent/src/env.ts`                                        | Worker binding と secret reference 型を Stage 1〜8 に合わせる。                                                                                                                                             |
-| Update     | `packages/agent/src/rpc/router.ts`                                 | Generated services と Provider-facing client descriptor を登録/参照する。                                                                                                                                   |
-| Update     | `packages/agent/src/rpc/connect-worker-adapter.ts`                 | Cloudflare Workers fetch と Connect handler の binary-only adapter を実装/強化する。                                                                                                                        |
-| Update     | `packages/agent/src/rpc/do-router.ts`                              | `agent_id` から `getAgentByName` で AIAgent stub へ routing する Worker-internal 境界を維持する。                                                                                                           |
-| Update     | `packages/agent/src/rpc/interceptors/*.ts`                         | binary enforcement、authentication、authorization、replay、validation、audit、rate limit を具体化する。                                                                                                     |
-| Update     | `packages/agent/src/rpc/services/*.ts`                             | Protobuf RPC handlers から AIAgent DO RPC command/query へ変換する。                                                                                                                                        |
-| Add/Update | `packages/agent/src/domain/**/*.ts`                                | Agent aggregate、principal、grant、idempotency、domain error、state machine を実装する。                                                                                                                    |
-| Add/Update | `packages/agent/src/storage/**/*.ts`                               | DO SQLite tables、repository、transaction、R2 blob reference を実装する。                                                                                                                                   |
-| Add/Update | `packages/agent/src/events/**/*.ts`                                | Thread resolution、Event append、sequence、Mailbox integration を実装する。                                                                                                                                 |
-| Add/Update | `packages/agent/src/runs/**/*.ts`                                  | pending/running Run、snapshot、fairness scheduler、interrupt を実装する。                                                                                                                                   |
-| Add/Update | `packages/agent/src/harness/**/*.ts`                               | Context Builder、decision interpreter、budget enforcement を実装する。                                                                                                                                      |
-| Add/Update | `packages/agent/src/compactions/**/*.ts`                           | Section freeze、Handoff、History、MemoryDelta、rebase を実装する。                                                                                                                                          |
-| Add/Update | `packages/agent/src/schedules/**/*.ts`                             | Agent-owned Schedule と overlap policy を実装する。                                                                                                                                                         |
-| Add/Update | `packages/agent/src/tools/**/*.ts`                                 | Tool registry、ToolInvocation lifecycle、approval、provider RPC を実装する。                                                                                                                                |
-| Add/Update | `packages/agent/src/extensions/**/*.ts`                            | manifest verification、Installation、Adapter Connection、Delivery を実装する。                                                                                                                              |
-| Add/Update | `packages/agent/src/adapters/**/*.ts`                              | Adapter ingress normalization、Connection validation、DeliveryContext 作成境界を実装する。                                                                                                                  |
-| Add/Update | `packages/agent/src/observability/**/*.ts`                         | structured log、metrics、audit redaction を実装する。                                                                                                                                                       |
-| Add/Update | `packages/agent/src/tests/**/*.test.ts`                            | Agent contract/runtime/security/memory/schedule/tool/extension/health Scenario ID tests を追加する。                                                                                                        |
-| Add/Update | `packages/agent/README.md`                                         | Agent Service local dev、generation、deployment、Provider interop、secret handling を記載する。                                                                                                             |
-| Update     | `packages/client/package.json`                                     | Next.js/OpenNext Client scripts と Stage 8 tests/build を拡張する。                                                                                                                                         |
-| Update     | `packages/client/next.config.ts`                                   | Next.js App Router runtime 設定を Stage 8 UI に合わせる。                                                                                                                                                   |
-| Update     | `packages/client/open-next.config.ts`                              | Cloudflare OpenNext adapter 設定を Stage 8 UI に合わせる。                                                                                                                                                  |
-| Update     | `packages/client/wrangler.toml`                                    | Client Worker、CLIENT_DB、credential secret reference binding を確認/拡張する。                                                                                                                             |
-| Update     | `packages/client/src/server/db/schema.ts`                          | Client 専用 D1 の managed agents と credential refs schema を詳細化する。                                                                                                                                   |
-| Add/Update | `packages/client/src/server/db/migrations/*.sql`                   | Client D1 schema migration を追加/更新する。                                                                                                                                                                |
-| Add/Update | `packages/client/src/server/db/managed-agents.ts`                  | `client_managed_agents` の create/update/list/delete/pin/sort/last-opened repository を実装する。                                                                                                           |
-| Add/Update | `packages/client/src/server/db/access-credentials.ts`              | `client_agent_credential_refs` の secret-free credential reference repository を実装する。                                                                                                                  |
-| Add/Update | `packages/client/src/server/agent-rpc/*.ts`                        | server-side generated Connect client と JWT/signature metadata 生成を実装する。                                                                                                                             |
-| Add/Update | `packages/client/src/server/actions/*.ts`                          | Agent registry と Agent RPC 操作用 Server Actions を実装する。                                                                                                                                              |
-| Add/Update | `packages/client/app/agents/**/*.tsx`                              | Agent 管理 UI route と Server Component を実装する。                                                                                                                                                        |
-| Add/Update | `packages/client/src/components/**/*.tsx`                          | Client UI で再利用する表示/フォームコンポーネントを実装する。                                                                                                                                               |
-| Generated  | `packages/client/src/generated/agent-rpc/cftamac/agent/v1/*_pb.ts` | Agent RPC client descriptor。手編集しない。                                                                                                                                                                 |
-| Add/Update | `packages/client/src/tests/**/*.{test.ts,test.tsx}`                | Client registry/server/UI Scenario ID tests を追加する。                                                                                                                                                    |
-| Add/Update | `packages/client/README.md`                                        | Client local dev、D1 migration、server-side RPC、secret handling を記載する。                                                                                                                               |
-| Add/Update | `tests/e2e/**/*.spec.ts`                                           | Client management UI と Browser credential non-exposure の Playwright tests を追加する。                                                                                                                    |
-| Update     | `package.json`                                                     | agent/client build、check、test、generation、codegen drift scripts を拡張する。                                                                                                                             |
-| Update     | `pnpm-workspace.yaml`                                              | `packages/agent` と `packages/client` の workspace inclusion と supply-chain 設定を確認する。                                                                                                               |
-| Update     | `AGENTS.md`                                                        | Agent API contract source、Protobuf generation、Client/Agent commands、generated guardrails を更新する。                                                                                                    |
-| Update     | `CODING_STANDARDS.md`                                              | Enforced package boundaries、Agent Protobuf-only codegen、generated exclusions、OpenSpec checks を更新する。                                                                                                |
-| Update     | `CONTRIBUTING.md`                                                  | Agent/Client setup、generation、test/build、docs sync 手順を更新する。                                                                                                                                      |
-| Update     | `.opencode/skills/coding-guardian/SKILL.md`                        | coding-guardian の API contract、entrypoint、package boundary guidance を更新する。                                                                                                                         |
-| Update     | `.opencode/skills/coding-guardian/references/repo-entrypoints.md`  | Agent/Client/Protobuf/Provider interop entrypoints を追加し旧 entrypoints を整理する。                                                                                                                      |
-| Update     | `eslint.config.js`                                                 | `packages/agent` と `packages/client` の依存境界、generated 除外、TSDoc ルールを追加する。                                                                                                                  |
-| Update     | `vitest.config.ts`                                                 | Agent と Client server-side/unit test project を追加する。                                                                                                                                                  |
-| Update     | `playwright.config.ts`                                             | Client management UI e2e project を追加する。                                                                                                                                                               |
-| Update     | `scripts/governance/verify-agent-surface.mjs`                      | forbidden Agent REST/OpenAPI/Orval/JSON surface が Stage 1〜8 で再導入されないことを検査する。                                                                                                              |
-| Add/Update | `scripts/governance/verify-agent-surface.test.mjs`                 | legacy Agent surface absence と Stage 1〜8 guardrail fixture tests を追加する。                                                                                                                             |
-| Verify     | `packages/typespec/**`                                             | foundation 後、Agent OpenAPI 正本として active workspace graph に残らないことを確認する。                                                                                                                   |
-| Verify     | `packages/frontend/api/**`                                         | foundation 後、Orval Agent SDK として active workspace graph に残らないことを確認する。                                                                                                                     |
-| Verify     | `packages/backend/http/src/routes/**`                              | foundation 後、Hono zod-openapi Agent REST routes として到達不能であることを確認する。                                                                                                                      |
-| Verify     | `packages/backend/http/src/contracts/openapi-contract.test.ts`     | foundation 後、Agent OpenAPI contract test として到達不能であることを確認する。                                                                                                                             |
+| Type       | File                                                                | Change                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Update     | `packages/agent/package.json`                                       | foundation scripts を Stage 1〜8 の build/check/test/generation/local dev に拡張する。                                                                                                                        |
+| Update     | `packages/agent/wrangler.toml`                                      | Agent Worker、AIAgent Durable Object、R2、optional Workflow binding を機能実装の binding に合わせて確認/拡張する。                                                                                            |
+| Update     | `packages/agent/buf.yaml`                                           | proto lint/breaking の module 設定を Stage 1〜8 の proto に合わせる。                                                                                                                                         |
+| Update     | `packages/agent/buf.gen.yaml`                                       | Protobuf-ES と client/server descriptor 生成先を Agent/Client/Provider-facing RPC に合わせる。                                                                                                                |
+| Update     | `packages/agent/src/typespec/main.tsp`                              | `cftamac.agent.v1` の TypeSpec Protobuf entrypoint を全 Stage 1〜8 services/models へ接続する。                                                                                                               |
+| Update     | `packages/agent/src/typespec/tspconfig.yaml`                        | `@typespec/protobuf` 出力と Agent OpenAPI 非生成を確認する。                                                                                                                                                  |
+| Update     | `packages/agent/src/typespec/src/common/*.tsp`                      | errors、pagination、security、idempotency、timestamp/nonce 共通型を詳細化する。                                                                                                                               |
+| Update     | `packages/agent/src/typespec/src/models/*.tsp`                      | Agent、Thread、Event、Run、Compaction、Memory、Schedule、Tool、Integration、Adapter model を詳細化する。                                                                                                      |
+| Update     | `packages/agent/src/typespec/src/services/agent-lifecycle.tsp`      | AgentLifecycleService の InitializeAgent/GetAgent/DestroyAgent/RotateAgentCredential を実装可能 contract にする。                                                                                             |
+| Update     | `packages/agent/src/typespec/src/services/agent-event.tsp`          | AgentEventService の PublishEvent/GetEvent/ListEvents を実装可能 contract にする。                                                                                                                            |
+| Update     | `packages/agent/src/typespec/src/services/agent-thread.tsp`         | AgentThreadService の Thread/Section/Compaction/Memory/History query を実装可能 contract にする。                                                                                                             |
+| Update     | `packages/agent/src/typespec/src/services/agent-run.tsp`            | AgentRunService の GetRun/ListRuns/CancelRun を実装可能 contract にする。                                                                                                                                     |
+| Update     | `packages/agent/src/typespec/src/services/agent-state.tsp`          | AgentStateService の GetState/GetConfig/UpdateConfig を実装可能 contract にする。                                                                                                                             |
+| Update     | `packages/agent/src/typespec/src/services/agent-schedule.tsp`       | AgentScheduleService の Create/Get/List/CancelSchedule を実装可能 contract にする。                                                                                                                           |
+| Update     | `packages/agent/src/typespec/src/services/agent-tool.tsp`           | AgentToolService の Tool catalog、Invocation query、approval/rejection を実装可能 contract にする。                                                                                                           |
+| Update     | `packages/agent/src/typespec/src/services/agent-integration.tsp`    | AgentIntegrationService の install/uninstall/get/list Installation と CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections を実装可能 contract にする。                                     |
+| Update     | `packages/agent/src/typespec/src/services/agent-adapter.tsp`        | foundation で存在する service file を詳細化し、IntegrationIngressService の PublishEvent/PublishToolResult/PublishDeliveryResult だけを定義する。Adapter Connection 管理や個別取得用の追加 RPC は定義しない。 |
+| Add        | `packages/agent/src/typespec/src/services/integration-tool.tsp`     | Agent -> Provider の `IntegrationToolService.InvokeTool/GetOperation/CancelOperation` を定義する。                                                                                                            |
+| Add        | `packages/agent/src/typespec/src/services/integration-delivery.tsp` | Agent -> Provider の `IntegrationDeliveryService.Deliver` を定義する。                                                                                                                                        |
+| Update     | `packages/agent/src/typespec/src/services/agent-health.tsp`         | AgentHealthService.Check を Stage 1〜8 の safe health contract に詳細化し REST `/health` を作らない。                                                                                                         |
+| Generated  | `packages/agent/proto/cftamac/agent/v1/*.proto`                     | TypeSpec から生成する proto3 artifact。手編集しない。                                                                                                                                                         |
+| Generated  | `packages/agent/src/generated/rpc/cftamac/agent/v1/*_pb.ts`         | Protobuf-ES generated server/client descriptor。手編集しない。                                                                                                                                                |
+| Update     | `packages/agent/src/index.ts`                                       | Connect Worker entrypoint と AIAgent Durable Object export を Stage 1〜8 handlers に接続する。                                                                                                                |
+| Update     | `packages/agent/src/AIAgent.ts`                                     | Cloudflare Agents SDK `Agent` subclass と Worker-internal DO RPC methods を機能実装へ拡張する。                                                                                                               |
+| Update     | `packages/agent/src/env.ts`                                         | Worker binding と secret reference 型を Stage 1〜8 に合わせる。                                                                                                                                               |
+| Update     | `packages/agent/src/rpc/router.ts`                                  | Generated services と Provider-facing client descriptor を登録/参照する。                                                                                                                                     |
+| Update     | `packages/agent/src/rpc/connect-worker-adapter.ts`                  | Cloudflare Workers fetch と Connect handler の binary-only adapter を実装/強化する。                                                                                                                          |
+| Update     | `packages/agent/src/rpc/do-router.ts`                               | `agent_id` から `getAgentByName` で AIAgent stub へ routing する Worker-internal 境界を維持する。                                                                                                             |
+| Update     | `packages/agent/src/rpc/interceptors/*.ts`                          | binary enforcement、authentication、authorization、replay、validation、audit、rate limit を具体化する。                                                                                                       |
+| Update     | `packages/agent/src/rpc/services/*.ts`                              | Protobuf RPC handlers から AIAgent DO RPC command/query へ変換する。                                                                                                                                          |
+| Add/Update | `packages/agent/src/domain/**/*.ts`                                 | Agent aggregate、principal、grant、idempotency、domain error、state machine を実装する。                                                                                                                      |
+| Add/Update | `packages/agent/src/storage/**/*.ts`                                | DO SQLite tables、repository、transaction、R2 blob reference を実装する。                                                                                                                                     |
+| Add/Update | `packages/agent/src/events/**/*.ts`                                 | Thread resolution、Event append、sequence、Mailbox integration を実装する。                                                                                                                                   |
+| Add/Update | `packages/agent/src/runs/**/*.ts`                                   | pending/running Run、snapshot、fairness scheduler、interrupt を実装する。                                                                                                                                     |
+| Add/Update | `packages/agent/src/harness/**/*.ts`                                | Context Builder、decision interpreter、budget enforcement を実装する。                                                                                                                                        |
+| Add/Update | `packages/agent/src/compactions/**/*.ts`                            | Section freeze、Handoff、History、MemoryDelta、rebase を実装する。                                                                                                                                            |
+| Add/Update | `packages/agent/src/schedules/**/*.ts`                              | Agent-owned Schedule と overlap policy を実装する。                                                                                                                                                           |
+| Add/Update | `packages/agent/src/tools/**/*.ts`                                  | Tool registry、ToolInvocation lifecycle、approval、provider RPC を実装する。                                                                                                                                  |
+| Add/Update | `packages/agent/src/integrations/**/*.ts`                           | manifest verification、Installation、Adapter Connection、Delivery を実装する。                                                                                                                                |
+| Add/Update | `packages/agent/src/adapters/**/*.ts`                               | Adapter ingress normalization、Connection validation、DeliveryContext 作成境界を実装する。                                                                                                                    |
+| Add/Update | `packages/agent/src/observability/**/*.ts`                          | structured log、metrics、audit redaction を実装する。                                                                                                                                                         |
+| Add/Update | `packages/agent/src/tests/**/*.test.ts`                             | Agent contract/runtime/security/memory/schedule/tool/integration/health Scenario ID tests を追加する。                                                                                                        |
+| Add/Update | `packages/agent/README.md`                                          | Agent Service local dev、generation、deployment、Provider interop、secret handling を記載する。                                                                                                               |
+| Update     | `packages/client/package.json`                                      | Next.js/OpenNext Client scripts と Stage 8 tests/build を拡張する。                                                                                                                                           |
+| Update     | `packages/client/next.config.ts`                                    | Next.js App Router runtime 設定を Stage 8 UI に合わせる。                                                                                                                                                     |
+| Update     | `packages/client/open-next.config.ts`                               | Cloudflare OpenNext adapter 設定を Stage 8 UI に合わせる。                                                                                                                                                    |
+| Update     | `packages/client/wrangler.toml`                                     | Client Worker、CLIENT_DB、credential secret reference binding を確認/拡張する。                                                                                                                               |
+| Update     | `packages/client/src/server/db/schema.ts`                           | Client 専用 D1 の managed agents と credential refs schema を詳細化する。                                                                                                                                     |
+| Add/Update | `packages/client/src/server/db/migrations/*.sql`                    | Client D1 schema migration を追加/更新する。                                                                                                                                                                  |
+| Add/Update | `packages/client/src/server/db/managed-agents.ts`                   | `client_managed_agents` の create/update/list/delete/pin/sort/last-opened repository を実装する。                                                                                                             |
+| Add/Update | `packages/client/src/server/db/access-credentials.ts`               | `client_agent_credential_refs` の secret-free credential reference repository を実装する。                                                                                                                    |
+| Add/Update | `packages/client/src/server/agent-rpc/*.ts`                         | server-side generated Connect client と JWT/signature metadata 生成を実装する。                                                                                                                               |
+| Add/Update | `packages/client/src/server/actions/*.ts`                           | Agent registry と Agent RPC 操作用 Server Actions を実装する。                                                                                                                                                |
+| Add/Update | `packages/client/app/agents/**/*.tsx`                               | Agent 管理 UI route と Server Component を実装する。                                                                                                                                                          |
+| Add/Update | `packages/client/src/components/**/*.tsx`                           | Client UI で再利用する表示/フォームコンポーネントを実装する。                                                                                                                                                 |
+| Generated  | `packages/client/src/generated/agent-rpc/cftamac/agent/v1/*_pb.ts`  | Agent RPC client descriptor。手編集しない。                                                                                                                                                                   |
+| Add/Update | `packages/client/src/tests/**/*.{test.ts,test.tsx}`                 | Client registry/server/UI Scenario ID tests を追加する。                                                                                                                                                      |
+| Add/Update | `packages/client/README.md`                                         | Client local dev、D1 migration、server-side RPC、secret handling を記載する。                                                                                                                                 |
+| Add/Update | `tests/e2e/**/*.spec.ts`                                            | Client management UI と Browser credential non-exposure の Playwright tests を追加する。                                                                                                                      |
+| Update     | `package.json`                                                      | agent/client build、check、test、generation、codegen drift scripts を拡張する。                                                                                                                               |
+| Update     | `pnpm-workspace.yaml`                                               | `packages/agent` と `packages/client` の workspace inclusion と supply-chain 設定を確認する。                                                                                                                 |
+| Update     | `AGENTS.md`                                                         | Agent API contract source、Protobuf generation、Client/Agent commands、generated guardrails を更新する。                                                                                                      |
+| Update     | `CODING_STANDARDS.md`                                               | Enforced package boundaries、Agent Protobuf-only codegen、generated exclusions、OpenSpec checks を更新する。                                                                                                  |
+| Update     | `CONTRIBUTING.md`                                                   | Agent/Client setup、generation、test/build、docs sync 手順を更新する。                                                                                                                                        |
+| Update     | `.opencode/skills/coding-guardian/SKILL.md`                         | coding-guardian の API contract、entrypoint、package boundary guidance を更新する。                                                                                                                           |
+| Update     | `.opencode/skills/coding-guardian/references/repo-entrypoints.md`   | Agent/Client/Protobuf/Provider interop entrypoints を追加し旧 entrypoints を整理する。                                                                                                                        |
+| Update     | `eslint.config.js`                                                  | `packages/agent` と `packages/client` の依存境界、generated 除外、TSDoc ルールを追加する。                                                                                                                    |
+| Update     | `vitest.config.ts`                                                  | Agent と Client server-side/unit test project を追加する。                                                                                                                                                    |
+| Update     | `playwright.config.ts`                                              | Client management UI e2e project を追加する。                                                                                                                                                                 |
+| Update     | `scripts/governance/verify-agent-surface.mjs`                       | forbidden Agent REST/OpenAPI/Orval/JSON surface が Stage 1〜8 で再導入されないことを検査する。                                                                                                                |
+| Add/Update | `scripts/governance/verify-agent-surface.test.mjs`                  | legacy Agent surface absence と Stage 1〜8 guardrail fixture tests を追加する。                                                                                                                               |
+| Verify     | `packages/typespec/**`                                              | foundation 後、Agent OpenAPI 正本として active workspace graph に残らないことを確認する。                                                                                                                     |
+| Verify     | `packages/frontend/api/**`                                          | foundation 後、Orval Agent SDK として active workspace graph に残らないことを確認する。                                                                                                                       |
+| Verify     | `packages/backend/http/src/routes/**`                               | foundation 後、Hono zod-openapi Agent REST routes として到達不能であることを確認する。                                                                                                                        |
+| Verify     | `packages/backend/http/src/contracts/openapi-contract.test.ts`      | foundation 後、Agent OpenAPI contract test として到達不能であることを確認する。                                                                                                                               |
 
 ## Legacy OpenAPI / Orval / Hono Route Disposition
 
@@ -241,7 +241,7 @@ foundationで不在確認: packages/typespec Agent OpenAPI, packages/frontend/ap
 
 ## Public RPC Behavior Coverage Map
 
-foundation の RPC Service Inventory に存在する公開 query/get/cancel methods は、この change で domain behavior、authorization、pagination、snapshot metadata、error mapping、tests を具体化する。Adapter Connection 管理は `AgentExtensionService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections` に限定し、Adapter 専用 service や個別取得 RPC は導入しない。
+foundation の RPC Service Inventory に存在する公開 query/get/cancel methods は、この change で domain behavior、authorization、pagination、snapshot metadata、error mapping、tests を具体化する。Adapter Connection 管理は `AgentIntegrationService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections` に限定し、Adapter 専用 service や個別取得 RPC は導入しない。
 
 | Service method                           | Behavior owner           | Spec coverage          | Implementation/test tasks |
 | ---------------------------------------- | ------------------------ | ---------------------- | ------------------------- |
@@ -269,7 +269,7 @@ flowchart LR
   SQLite[(DO SQLite)]
   LocalQueue[Agent-local Queue]
   R2[(R2 blobs/history)]
-  Provider[Extension Provider]
+  Provider[Integration Provider]
   External[External Platform]
 
   Browser --> Client
@@ -280,8 +280,8 @@ flowchart LR
   AIAgent <--> LocalQueue
   AIAgent --> R2
   External --> Provider
-  Provider -->|signed ExtensionIngressService| AgentRPC
-  AIAgent -->|signed ExtensionToolService / ExtensionDeliveryService RPC| Provider
+  Provider -->|signed IntegrationIngressService| AgentRPC
+  AIAgent -->|signed IntegrationToolService / IntegrationDeliveryService RPC| Provider
 ```
 
 ## Package Diagram
@@ -312,7 +312,7 @@ flowchart TB
 
 ```mermaid
 sequenceDiagram
-  participant C as Client or Extension Provider
+  participant C as Client or Integration Provider
   participant R as Agent Connect RPC Facade
   participant A as AIAgent DO
   participant DB as DO SQLite
@@ -331,7 +331,7 @@ sequenceDiagram
   Q->>A: processPendingRuns
   A->>DB: build fixed Run snapshot and execute harness
   alt Tool or Delivery needed
-    A->>P: signed ExtensionToolService.InvokeTool/GetOperation/CancelOperation or ExtensionDeliveryService.Deliver RPC
+    A->>P: signed IntegrationToolService.InvokeTool/GetOperation/CancelOperation or IntegrationDeliveryService.Deliver RPC
     P-->>A: operation result or async acknowledgement
     A->>DB: append tool/delivery result Event in same Thread
   else Stop or internal decision
@@ -399,7 +399,7 @@ classDiagram
     +status: string
     +approvalStatus: string
   }
-  class ExtensionInstallation {
+  class IntegrationInstallation {
     +installationId: string
     +status: string
     +manifestDigest: string
@@ -423,8 +423,8 @@ classDiagram
   ThreadCompaction "1" --> "many" MemoryItem
   Thread "1" --> "many" Schedule
   AgentRun "1" --> "many" ToolInvocation
-  ExtensionInstallation "1" --> "many" AdapterConnection
-  ExtensionInstallation "1" --> "many" ToolInvocation
+  IntegrationInstallation "1" --> "many" AdapterConnection
+  IntegrationInstallation "1" --> "many" ToolInvocation
   AgentEvent "0..1" --> "0..1" DeliveryContext
 ```
 
@@ -447,9 +447,9 @@ erDiagram
   agent_profile ||--o{ agent_tool_definitions : exposes
   agent_runs ||--o{ agent_tool_invocations : creates
   agent_tool_invocations ||--o{ agent_approvals : requires
-  agent_profile ||--o{ agent_extension_installations : installs
-  agent_extension_installations ||--o{ agent_extension_adapters : provides
-  agent_extension_installations ||--o{ agent_adapter_connections : owns
+  agent_profile ||--o{ agent_integration_installations : installs
+  agent_integration_installations ||--o{ agent_integration_adapters : provides
+  agent_integration_installations ||--o{ agent_adapter_connections : owns
   agent_events ||--o{ agent_delivery_contexts : creates
   agent_delivery_contexts ||--o{ agent_adapter_deliveries : receives
   agent_principals ||--o{ agent_request_nonces : protects
@@ -470,16 +470,16 @@ erDiagram
 
 #### packages/agent
 
-- Purpose / Responsibility: Agent API contract、Connect RPC facade、AIAgent Durable Object、Thread/Event/Run/Memory/Schedule/Tool/Extension/Security の正本を所有する。Client D1 と Agent REST/OpenAPI contract は所有しない。
-- Public API: `AgentLifecycleService`、`AgentEventService`、`AgentThreadService`、`AgentRunService`、`AgentStateService`、`AgentScheduleService`、`AgentToolService`、`AgentExtensionService`（CreateAdapterConnection、DeleteAdapterConnection、ListAdapterConnections を含む）、`ExtensionIngressService`、`AgentHealthService` の unary RPC。Provider-facing contract として `ExtensionToolService` と `ExtensionDeliveryService` を同じ TypeSpec/proto package から生成し、Agent は client として呼ぶ。
-- Key Data Structures: `AgentScope`、`AgentEventInput`、`ThreadView`、`RunSnapshot`、`Handoff`、`ThreadHistoryIndex`、`MemoryItem`、`ScheduleView`、`ToolDefinition`、`ToolInvocationView`、`ProviderOperation`、`ExtensionManifest`、`InstallationView`、`AdapterConnectionView`、`DeliveryContext`、`HealthStatus`、`Principal`、`Grant`、`IdempotencyRecord`。
+- Purpose / Responsibility: Agent API contract、Connect RPC facade、AIAgent Durable Object、Thread/Event/Run/Memory/Schedule/Tool/Integration/Security の正本を所有する。Client D1 と Agent REST/OpenAPI contract は所有しない。
+- Public API: `AgentLifecycleService`、`AgentEventService`、`AgentThreadService`、`AgentRunService`、`AgentStateService`、`AgentScheduleService`、`AgentToolService`、`AgentIntegrationService`（CreateAdapterConnection、DeleteAdapterConnection、ListAdapterConnections を含む）、`IntegrationIngressService`、`AgentHealthService` の unary RPC。Provider-facing contract として `IntegrationToolService` と `IntegrationDeliveryService` を同じ TypeSpec/proto package から生成し、Agent は client として呼ぶ。
+- Key Data Structures: `AgentScope`、`AgentEventInput`、`ThreadView`、`RunSnapshot`、`Handoff`、`ThreadHistoryIndex`、`MemoryItem`、`ScheduleView`、`ToolDefinition`、`ToolInvocationView`、`ProviderOperation`、`IntegrationManifest`、`InstallationView`、`AdapterConnectionView`、`DeliveryContext`、`HealthStatus`、`Principal`、`Grant`、`IdempotencyRecord`。
 - Key Flows: RPC facade が binary Protobuf/auth/validation を処理し、AIAgent DO が final authorization、state transition、SQLite transaction、Queue wake、harness decision commit を行う。DO RPC は Worker-internal のみで外部公開しない。
 - Dependencies: Cloudflare Agents SDK は Agent-local Queue と Agent lifecycle、DO SQLite は Agent aggregate の正本、R2 は large body/history、Connect/Protobuf-ES は RPC transport と generated descriptor のために使う。
 - Error Handling: Domain error を Connect code に変換し、idempotency replay は同一 digest で記録済み response、異なる digest は conflict とする。外部 Provider timeout は `outcome_unknown` と reconcile task に落とす。
-- Testing Strategy: TypeSpec/proto/codegen conformance、Connect binary rejection、DO SQLite transaction、Run scheduler、Compaction、Schedule、Tool/Extension/Security の Vitest integration/unit test を Scenario ID 付きで実装する。
+- Testing Strategy: TypeSpec/proto/codegen conformance、Connect binary rejection、DO SQLite transaction、Run scheduler、Compaction、Schedule、Tool/Integration/Security の Vitest integration/unit test を Scenario ID 付きで実装する。
 - Non-Functional: structured log、metrics、audit event、request ID/correlation ID、rate limit、secret redaction、storage threshold を標準化する。
 - Performance: Event acceptance は model/tool call を待たず、Queue wake を coalesce し、large body/history は R2 offload で DO SQLite working set を守る。
-- Security: JWT/Extension signature、raw body digest、nonce/idempotency、scope/grant、Agent-local final authorization、private key/token 非ログ化を必須にする。
+- Security: JWT/Integration signature、raw body digest、nonce/idempotency、scope/grant、Agent-local final authorization、private key/token 非ログ化を必須にする。
 
 #### packages/client
 
@@ -534,8 +534,8 @@ flowchart TD
   S4 --> S6[6. Tool invocation と Provider RPC]
   S5 --> S6
   S6 --> SEC3[6b. Tool capability authorization 拡張]
-  SEC3 --> S7[7. Extension install / ingress / delivery]
-  S7 --> SEC4[7b. Extension と Delivery authorization 拡張]
+  SEC3 --> S7[7. Integration install / ingress / delivery]
+  S7 --> SEC4[7b. Integration と Delivery authorization 拡張]
   S1 --> C1[8a. Client D1 registry と generated RPC client]
   C1 --> C2[8b. Client management UI と Server Actions]
   SEC4 --> C2
@@ -552,16 +552,16 @@ flowchart TD
 
 ### User Acceptance Test (Manual)
 
-| UAT ID                        | Related Requirement                             | Spec Summary                                      | Customer Problem Summary                                   | Steps                                                                     | Expected Behavior                                                        |
-| ----------------------------- | ----------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| UAT-AGENT-LIFECYCLE-HAP-001   | AGENT-LIFECYCLE-R001 Agent identity             | Agent ID が Durable Object identity と一致する。  | 管理対象 Agent が別 Agent と混線しないことを確認したい。   | Client UI から Agent を登録し、初期化、取得、credential rotation を行う。 | 同一 Agent ID の profile/config/audit が一貫して表示される。             |
-| UAT-AGENT-EVENTING-HAP-001    | AGENT-EVENTING-R001 Thread/Event                | `thread_key` 付き Event が Thread に保存される。  | 外部 Event を長期文脈に安全に追加したい。                  | 同じ `thread_key` と別 `thread_key` の Event を送信し Thread 一覧を見る。 | 同じ key は同じ Thread、別 key は別 Thread へ分離される。                |
-| UAT-AGENT-RUNTIME-HAP-001     | AGENT-RUNTIME-R001 Run scheduler                | Event 受理後に Run が非同期処理される。           | Event 受理が model/tool 実行で遅延しないことを確認したい。 | Event を連続投入し、Run queue と status を見る。                          | Event は即時 accepted、Run は順序と fairness に従い進む。                |
-| UAT-AGENT-MEMORY-HAP-001      | AGENT-MEMORY-R001 Compaction                    | Section が Handoff/History/Memory に圧縮される。  | 長期 Thread を再開可能にしたい。                           | Thread に十分な Event を投入し compaction を実行する。                    | latest Handoff、History index、Memory item が表示される。                |
-| UAT-AGENT-SCHEDULE-HAP-001    | AGENT-SCHEDULE-R001 Schedule                    | Schedule 発火が同一 Thread の Event になる。      | 時刻で Agent が自律的に動いてほしい。                      | UI で Schedule を作成し、発火後の Event/Run を確認する。                  | `schedule.triggered` Event と対応 Run が同一 Thread に残る。             |
-| UAT-AGENT-TOOL-PERM-001       | AGENT-TOOL-R002 Tool approval                   | 承認必須 ToolInvocation を人間が承認/拒否できる。 | Agent の外部作用を監督したい。                             | 承認必須 Tool を発生させ、UI で承認/拒否する。                            | status transition と audit が正しく記録される。                          |
-| UAT-AGENT-EXTENSION-HAP-001   | AGENT-EXTENSION-R001 Extension interoperability | Provider manifest から Installation を作る。      | 外部 Provider を Agent に追加したい。                      | UI から signed manifest を指定し Extension を install/uninstall する。    | grants、adapter/tool/delivery、cleanup が一貫して反映される。            |
-| UAT-CLIENT-MANAGEMENT-HAP-001 | CLIENT-MANAGEMENT-R001 Management UI            | Agent 管理画面から主要操作を完結できる。          | CLI なしで Agent を管理したい。                            | Agent 一覧から各 detail tab を操作する。                                  | profile、threads、runs、memory、schedule、tool、extension が操作できる。 |
+| UAT ID                        | Related Requirement                                 | Spec Summary                                      | Customer Problem Summary                                   | Steps                                                                     | Expected Behavior                                                          |
+| ----------------------------- | --------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| UAT-AGENT-LIFECYCLE-HAP-001   | AGENT-LIFECYCLE-R001 Agent identity                 | Agent ID が Durable Object identity と一致する。  | 管理対象 Agent が別 Agent と混線しないことを確認したい。   | Client UI から Agent を登録し、初期化、取得、credential rotation を行う。 | 同一 Agent ID の profile/config/audit が一貫して表示される。               |
+| UAT-AGENT-EVENTING-HAP-001    | AGENT-EVENTING-R001 Thread/Event                    | `thread_key` 付き Event が Thread に保存される。  | 外部 Event を長期文脈に安全に追加したい。                  | 同じ `thread_key` と別 `thread_key` の Event を送信し Thread 一覧を見る。 | 同じ key は同じ Thread、別 key は別 Thread へ分離される。                  |
+| UAT-AGENT-RUNTIME-HAP-001     | AGENT-RUNTIME-R001 Run scheduler                    | Event 受理後に Run が非同期処理される。           | Event 受理が model/tool 実行で遅延しないことを確認したい。 | Event を連続投入し、Run queue と status を見る。                          | Event は即時 accepted、Run は順序と fairness に従い進む。                  |
+| UAT-AGENT-MEMORY-HAP-001      | AGENT-MEMORY-R001 Compaction                        | Section が Handoff/History/Memory に圧縮される。  | 長期 Thread を再開可能にしたい。                           | Thread に十分な Event を投入し compaction を実行する。                    | latest Handoff、History index、Memory item が表示される。                  |
+| UAT-AGENT-SCHEDULE-HAP-001    | AGENT-SCHEDULE-R001 Schedule                        | Schedule 発火が同一 Thread の Event になる。      | 時刻で Agent が自律的に動いてほしい。                      | UI で Schedule を作成し、発火後の Event/Run を確認する。                  | `schedule.triggered` Event と対応 Run が同一 Thread に残る。               |
+| UAT-AGENT-TOOL-PERM-001       | AGENT-TOOL-R002 Tool approval                       | 承認必須 ToolInvocation を人間が承認/拒否できる。 | Agent の外部作用を監督したい。                             | 承認必須 Tool を発生させ、UI で承認/拒否する。                            | status transition と audit が正しく記録される。                            |
+| UAT-AGENT-INTEGRATION-HAP-001 | AGENT-INTEGRATION-R001 Integration interoperability | Provider manifest から Installation を作る。      | 外部 Provider を Agent に追加したい。                      | UI から signed manifest を指定し Integration を install/uninstall する。  | grants、adapter/tool/delivery、cleanup が一貫して反映される。              |
+| UAT-CLIENT-MANAGEMENT-HAP-001 | CLIENT-MANAGEMENT-R001 Management UI                | Agent 管理画面から主要操作を完結できる。          | CLI なしで Agent を管理したい。                            | Agent 一覧から各 detail tab を操作する。                                  | profile、threads、runs、memory、schedule、tool、integration が操作できる。 |
 
 ### E2E Test (Playwright)
 
@@ -576,24 +576,24 @@ flowchart TD
 
 ### Integration Test (Endpoint)
 
-| IT ID                      | Test Name                                                                               | Genre | Category | Summary                               | Steps (Test)                                                                                           | Expected Behavior                                                                              |
-| -------------------------- | --------------------------------------------------------------------------------------- | ----- | -------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| IT-AGENT-LIFECYCLE-HAP-001 | `[AGENT-LIFECYCLE-S001] InitializeAgent creates profile in the named Durable Object`    | agent | HAP      | Agent lifecycle RPC を検証する。      | Connect request から DO RPC を通し、SQLite の保存内容を確認する。                                      | profile、system Thread、audit が作成される。                                                   |
-| IT-AGENT-EVENTING-HAP-001  | `[AGENT-EVENTING-S002] Same agent and thread_key resolve to the same Thread`            | agent | HAP      | Thread resolution を検証する。        | 同じ key の Event を二つ publish し、thread/events 一覧を確認する。                                    | 同一 thread_id と連続 sequence になる。                                                        |
-| IT-AGENT-RUNTIME-REG-001   | `[AGENT-RUNTIME-S004] New event does not mutate a running snapshot`                     | agent | REG      | Snapshot immutability を検証する。    | Run を開始し、model 待機中に Event を append して commit を確認する。                                  | 実行中 snapshot は変わらず次 Run が作成される。                                                |
-| IT-AGENT-MEMORY-HAP-001    | `[AGENT-MEMORY-S003] Compaction creates handoff history and memory delta`               | agent | HAP      | Compaction output を検証する。        | Section を freeze し、compaction を実行して records/R2 を確認する。                                    | Handoff/History/MemoryDelta が作られる。                                                       |
-| IT-AGENT-SCHEDULE-BND-001  | `[AGENT-SCHEDULE-S003] Overlap policy prevents duplicate interval runs`                 | agent | BND      | Schedule overlap を検証する。         | prior callback が active の間に interval を trigger する。                                             | policy に従い skip/coalesce/queue-next になる。                                                |
-| IT-AGENT-TOOL-PERM-001     | `[AGENT-TOOL-S004] Authorized approval transitions invocation state`                    | agent | PERM     | Approval RPC を検証する。             | pending approval を作成し、scope 付きで approve/reject する。                                          | state transition と audit が正しい。                                                           |
-| IT-AGENT-EXTENSION-SEC-001 | `[AGENT-EXTENSION-S005] Signed extension ingress appends an event and delivery context` | agent | SEC      | Extension ingress を検証する。        | signed PublishEvent を送り、nonce/digest と DB 保存を確認する。                                        | Event と DeliveryContext が保存される。                                                        |
-| IT-AGENT-SECURITY-SEC-001  | `[AGENT-SECURITY-S004] Tampered body digest and nonce replay are rejected`              | agent | SEC      | Signature/replay を検証する。         | tampered body と replay nonce を送信する。                                                             | `unauthenticated`/`permission_denied` 相当で拒否される。                                       |
-| IT-AGENT-SECURITY-SEC-002  | `[AGENT-SECURITY-S009] Durable Object RPC stays behind the Connect facade`              | agent | SEC      | DO RPC internal boundary を検証する。 | direct public DO/fetch route を試し、route 不在を確認して Connect 経由だけを通す。                     | 外部公開 route はなく Connect facade だけが AIAgent に到達する。                               |
-| IT-AGENT-HEALTH-SMK-001    | `[AGENT-HEALTH-S001] Check returns safe serving status through Protobuf RPC`            | agent | SMK      | Health RPC を検証する。               | binary Protobuf Check を送り、status/safe metadata を確認する。                                        | serving/degraded と safe metadata だけが返る。                                                 |
-| IT-CLIENT-REGISTRY-HAP-001 | `[CLIENT-REGISTRY-S001] Managed agent registry persists display and ordering metadata`  | agent | HAP      | Client D1 registry を検証する。       | D1 test DB に対して Server Action/repository を実行する。                                              | registry metadata が永続化される。                                                             |
-| IT-AGENT-EVENTING-HAP-002  | `[AGENT-EVENTING-S009] ListThreads GetThread and ListSections stay Agent scoped`        | agent | HAP      | Thread/Section query を検証する。     | 複数 Agent/Thread/Section を作成し、ListThreads/GetThread/ListSections を呼ぶ。                        | 対象 Agent の Thread と Section だけが順序付きで返る。                                         |
-| IT-AGENT-MEMORY-HAP-002    | `[AGENT-MEMORY-S008] Thread memory and history queries return scoped references`        | agent | HAP      | Memory/History query を検証する。     | Compaction/Memory/History を seed し、GetLatestCompaction/GetThreadMemory/SearchThreadHistory を呼ぶ。 | latest ready compaction、Memory version、History results が scope と provenance を保って返る。 |
-| IT-AGENT-RUNTIME-HAP-002   | `[AGENT-RUNTIME-S009] GetRun and ListRuns expose immutable snapshots`                   | agent | HAP      | Run query を検証する。                | 複数 Runs と snapshots を seed し、GetRun/ListRuns を呼ぶ。                                            | authorized scope の Run status、snapshot ref、causal links だけが返る。                        |
-| IT-AGENT-RUNTIME-BND-001   | `[AGENT-RUNTIME-S010] CancelRun interrupts pending or running work idempotently`        | agent | BND      | Run cancel を検証する。               | pending/running Run に CancelRun を同じ key で複数回実行する。                                         | terminal/cancelling status と replay response が一貫し、stale commit は拒否される。            |
-| IT-AGENT-LIFECYCLE-HAP-002 | `[AGENT-LIFECYCLE-S007] GetState and GetConfig return Agent-local snapshots`            | agent | HAP      | State/Config query を検証する。       | initialized Agent に GetState/GetConfig を実行し、別 Agent の state も用意する。                       | 対象 Agent の state/config version と safe metadata だけが返る。                               |
+| IT ID                        | Test Name                                                                                   | Genre | Category | Summary                               | Steps (Test)                                                                                           | Expected Behavior                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------- | ----- | -------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| IT-AGENT-LIFECYCLE-HAP-001   | `[AGENT-LIFECYCLE-S001] InitializeAgent creates profile in the named Durable Object`        | agent | HAP      | Agent lifecycle RPC を検証する。      | Connect request から DO RPC を通し、SQLite の保存内容を確認する。                                      | profile、system Thread、audit が作成される。                                                   |
+| IT-AGENT-EVENTING-HAP-001    | `[AGENT-EVENTING-S002] Same agent and thread_key resolve to the same Thread`                | agent | HAP      | Thread resolution を検証する。        | 同じ key の Event を二つ publish し、thread/events 一覧を確認する。                                    | 同一 thread_id と連続 sequence になる。                                                        |
+| IT-AGENT-RUNTIME-REG-001     | `[AGENT-RUNTIME-S004] New event does not mutate a running snapshot`                         | agent | REG      | Snapshot immutability を検証する。    | Run を開始し、model 待機中に Event を append して commit を確認する。                                  | 実行中 snapshot は変わらず次 Run が作成される。                                                |
+| IT-AGENT-MEMORY-HAP-001      | `[AGENT-MEMORY-S003] Compaction creates handoff history and memory delta`                   | agent | HAP      | Compaction output を検証する。        | Section を freeze し、compaction を実行して records/R2 を確認する。                                    | Handoff/History/MemoryDelta が作られる。                                                       |
+| IT-AGENT-SCHEDULE-BND-001    | `[AGENT-SCHEDULE-S003] Overlap policy prevents duplicate interval runs`                     | agent | BND      | Schedule overlap を検証する。         | prior callback が active の間に interval を trigger する。                                             | policy に従い skip/coalesce/queue-next になる。                                                |
+| IT-AGENT-TOOL-PERM-001       | `[AGENT-TOOL-S004] Authorized approval transitions invocation state`                        | agent | PERM     | Approval RPC を検証する。             | pending approval を作成し、scope 付きで approve/reject する。                                          | state transition と audit が正しい。                                                           |
+| IT-AGENT-INTEGRATION-SEC-001 | `[AGENT-INTEGRATION-S005] Signed integration ingress appends an event and delivery context` | agent | SEC      | Integration ingress を検証する。      | signed PublishEvent を送り、nonce/digest と DB 保存を確認する。                                        | Event と DeliveryContext が保存される。                                                        |
+| IT-AGENT-SECURITY-SEC-001    | `[AGENT-SECURITY-S004] Tampered body digest and nonce replay are rejected`                  | agent | SEC      | Signature/replay を検証する。         | tampered body と replay nonce を送信する。                                                             | `unauthenticated`/`permission_denied` 相当で拒否される。                                       |
+| IT-AGENT-SECURITY-SEC-002    | `[AGENT-SECURITY-S009] Durable Object RPC stays behind the Connect facade`                  | agent | SEC      | DO RPC internal boundary を検証する。 | direct public DO/fetch route を試し、route 不在を確認して Connect 経由だけを通す。                     | 外部公開 route はなく Connect facade だけが AIAgent に到達する。                               |
+| IT-AGENT-HEALTH-SMK-001      | `[AGENT-HEALTH-S001] Check returns safe serving status through Protobuf RPC`                | agent | SMK      | Health RPC を検証する。               | binary Protobuf Check を送り、status/safe metadata を確認する。                                        | serving/degraded と safe metadata だけが返る。                                                 |
+| IT-CLIENT-REGISTRY-HAP-001   | `[CLIENT-REGISTRY-S001] Managed agent registry persists display and ordering metadata`      | agent | HAP      | Client D1 registry を検証する。       | D1 test DB に対して Server Action/repository を実行する。                                              | registry metadata が永続化される。                                                             |
+| IT-AGENT-EVENTING-HAP-002    | `[AGENT-EVENTING-S009] ListThreads GetThread and ListSections stay Agent scoped`            | agent | HAP      | Thread/Section query を検証する。     | 複数 Agent/Thread/Section を作成し、ListThreads/GetThread/ListSections を呼ぶ。                        | 対象 Agent の Thread と Section だけが順序付きで返る。                                         |
+| IT-AGENT-MEMORY-HAP-002      | `[AGENT-MEMORY-S008] Thread memory and history queries return scoped references`            | agent | HAP      | Memory/History query を検証する。     | Compaction/Memory/History を seed し、GetLatestCompaction/GetThreadMemory/SearchThreadHistory を呼ぶ。 | latest ready compaction、Memory version、History results が scope と provenance を保って返る。 |
+| IT-AGENT-RUNTIME-HAP-002     | `[AGENT-RUNTIME-S009] GetRun and ListRuns expose immutable snapshots`                       | agent | HAP      | Run query を検証する。                | 複数 Runs と snapshots を seed し、GetRun/ListRuns を呼ぶ。                                            | authorized scope の Run status、snapshot ref、causal links だけが返る。                        |
+| IT-AGENT-RUNTIME-BND-001     | `[AGENT-RUNTIME-S010] CancelRun interrupts pending or running work idempotently`            | agent | BND      | Run cancel を検証する。               | pending/running Run に CancelRun を同じ key で複数回実行する。                                         | terminal/cancelling status と replay response が一貫し、stale commit は拒否される。            |
+| IT-AGENT-LIFECYCLE-HAP-002   | `[AGENT-LIFECYCLE-S007] GetState and GetConfig return Agent-local snapshots`                | agent | HAP      | State/Config query を検証する。       | initialized Agent に GetState/GetConfig を実行し、別 Agent の state も用意する。                       | 対象 Agent の state/config version と safe metadata だけが返る。                               |
 
 ### Unit/Component Test (UT)
 
@@ -619,7 +619,7 @@ flowchart TD
 - Agent schema rollback: 初期導入は additive table 作成を基本とする。問題時は Agent Worker traffic を止め、DO SQLite/R2 を export してから rollback Worker を deploy する。
 - Client D1 rollback: `client_managed_agents` と `client_agent_credential_refs` は Client 専用 schema とし、migration は forward/backward SQL を用意する。credential secret 本体は D1 に保存しないため、rollback 時も secret exposure は発生しない。
 - Generated files rollback: 手編集せず、TypeSpec/Buf source を戻して `pnpm gen:*` と `pnpm check:codegen` で再生成する。
-- Feature exposure rollback: Client UI route を deploy 側で閉じても Agent Service の正本データは保持する。Extension uninstall は履歴を消さず capability を disable/revoke する。
+- Feature exposure rollback: Client UI route を deploy 側で閉じても Agent Service の正本データは保持する。Integration uninstall は履歴を消さず capability を disable/revoke する。
 
 ## Release Procedure
 
@@ -627,7 +627,7 @@ flowchart TD
 - `corepack enable && pnpm install` を実行する。
 - `pnpm gen:agent:proto`、`pnpm gen:agent:rpc`、`pnpm check:codegen` を実行し、generated drift がないことを確認する。
 - `pnpm format:check`、`pnpm lint`、`pnpm check`、`pnpm test:run`、`pnpm build` を実行する。
-- Agent Worker を staging に deploy し、AgentHealthService、InitializeAgent、PublishEvent、Run scheduling、Compaction、Schedule、Tool、Extension ingress の smoke test を行う。
+- Agent Worker を staging に deploy し、AgentHealthService、InitializeAgent、PublishEvent、Run scheduling、Compaction、Schedule、Tool、Integration ingress の smoke test を行う。
 - Client Worker を staging に deploy し、Client D1 migration、Agent registry、server-side Agent RPC、UI navigation、Browser secret non-exposure を確認する。
 - Production deploy は Agent Service、Client の順に行い、RPC latency/error、auth failure、Run pending count、storage threshold、Client Server Action error を監視する。
 
@@ -636,10 +636,10 @@ flowchart TD
 - `openspec validate --type change implement-agent-service-base --strict --no-interactive` が PASS する。
 - 全 Scenario ID に対応する automated test title が `[SCENARIO_ID]` を含む。
 - Agent API は TypeSpec -> proto3 -> Protobuf-ES -> Connect RPC の生成/実装フローで整合し、Agent OpenAPI/Orval/Hono REST route が存在しない。
-- `AgentExtensionService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections`、`packages/agent/src/typespec/src/services/agent-adapter.tsp` で定義される `ExtensionIngressService.PublishEvent/PublishToolResult/PublishDeliveryResult`、`AgentHealthService.Check`、Provider-facing `ExtensionToolService.InvokeTool/GetOperation/CancelOperation`、`ExtensionDeliveryService.Deliver` が TypeSpec/proto/generated client/server descriptors と tests で追跡される。
+- `AgentIntegrationService.CreateAdapterConnection/DeleteAdapterConnection/ListAdapterConnections`、`packages/agent/src/typespec/src/services/agent-adapter.tsp` で定義される `IntegrationIngressService.PublishEvent/PublishToolResult/PublishDeliveryResult`、`AgentHealthService.Check`、Provider-facing `IntegrationToolService.InvokeTool/GetOperation/CancelOperation`、`IntegrationDeliveryService.Deliver` が TypeSpec/proto/generated client/server descriptors と tests で追跡される。
 - `AgentThreadService.ListThreads/GetThread/ListSections/GetLatestCompaction/GetThreadMemory/SearchThreadHistory`、`AgentRunService.GetRun/ListRuns/CancelRun`、`AgentStateService.GetState/GetConfig` の scope、authorization、pagination/snapshot、cancel behavior が Scenario ID 付き tests で追跡される。
 - AIAgent Durable Object RPC methods は Worker-internal routing のみから到達し、外部 public API として公開されない。
-- Event acceptance、Run scheduling、Compaction、Schedule、Tool、Extension、Security、Client registry/UI の代表 happy/error/boundary/security test が PASS する。
+- Event acceptance、Run scheduling、Compaction、Schedule、Tool、Integration、Security、Client registry/UI の代表 happy/error/boundary/security test が PASS する。
 - `pnpm format:check`、`pnpm lint`、`pnpm check`、`pnpm test:run`、`pnpm check:codegen`、`pnpm build` が PASS する。
 - Browser に Agent credential/private key/token が露出せず、Agent は Client D1 binding を持たない。
 

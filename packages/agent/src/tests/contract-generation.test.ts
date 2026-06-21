@@ -41,10 +41,10 @@ const rpcServiceInventory = new Map<string, string[]>([
     ['ListTools', 'GetInvocation', 'ListInvocations', 'ApproveInvocation', 'RejectInvocation'],
   ],
   [
-    'AgentExtensionService',
+    'AgentIntegrationService',
     [
-      'InstallExtension',
-      'UninstallExtension',
+      'InstallIntegration',
+      'UninstallIntegration',
       'GetInstallation',
       'ListInstallations',
       'CreateAdapterConnection',
@@ -52,7 +52,7 @@ const rpcServiceInventory = new Map<string, string[]>([
       'ListAdapterConnections',
     ],
   ],
-  ['ExtensionIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
+  ['IntegrationIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
   ['AgentHealthService', ['Check']],
 ]);
 
@@ -73,7 +73,7 @@ const expectedMessages = [
   'AgentStateSnapshot',
   'AgentSchedule',
   'AgentTool',
-  'ExtensionInstallation',
+  'IntegrationInstallation',
   'AdapterConnection',
 ];
 
@@ -124,8 +124,8 @@ describe('Agent contract generation', () => {
       }
     }
 
-    expect(agentAdapterTypeSpecText).toContain('interface ExtensionIngressService');
-    expect(agentAdapterTypeSpecText).toContain('PublishEvent(...PublishExtensionEventRequest)');
+    expect(agentAdapterTypeSpecText).toContain('interface IntegrationIngressService');
+    expect(agentAdapterTypeSpecText).toContain('PublishEvent(...PublishIntegrationEventRequest)');
     expect(agentAdapterTypeSpecText).toContain('PublishToolResult(...PublishToolResultRequest)');
     expect(agentAdapterTypeSpecText).toContain(
       'PublishDeliveryResult(...PublishDeliveryResultRequest)'

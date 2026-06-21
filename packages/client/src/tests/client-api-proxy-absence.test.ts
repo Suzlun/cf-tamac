@@ -61,7 +61,7 @@ describe('Management Client Agent API proxy absence', () => {
       '/agents',
       '/agents/:param',
       '/agents/:param/events',
-      '/agents/:param/extensions',
+      '/agents/:param/integrations',
       '/agents/:param/schedules',
       '/agents/:param/settings',
       '/agents/:param/threads',

@@ -9,7 +9,7 @@ export interface AuthenticatedAgentPrincipal {
   readonly principalId: string;
   readonly principalType:
     | 'CLIENT_SERVICE'
-    | 'EXTENSION_INSTALLATION'
+    | 'INTEGRATION_INSTALLATION'
     | 'INTERNAL_SERVICE'
     | 'ADMIN_OPERATOR';
   readonly scopes: readonly string[];

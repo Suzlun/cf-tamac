@@ -14,7 +14,7 @@ const expectedRouteFiles = [
   'agents/[agentId]/events/page.tsx',
   'agents/[agentId]/schedules/page.tsx',
   'agents/[agentId]/tools/page.tsx',
-  'agents/[agentId]/extensions/page.tsx',
+  'agents/[agentId]/integrations/page.tsx',
   'agents/[agentId]/settings/page.tsx',
 ];
 
@@ -26,7 +26,7 @@ const expectedNavigationLabels = [
   'Events',
   'Schedules',
   'Tools',
-  'Extensions',
+  'Integrations',
   'Settings',
 ];
 

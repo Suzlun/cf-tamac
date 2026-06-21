@@ -24,7 +24,7 @@ function createTestEnv(): AgentWorkerEnv {
   return {
     AGENT_BLOBS: {} as R2Bucket,
     AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
-    AGENT_EXTENSION_SIGNATURE_KEYS: 'test-extension-key',
+    AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',
     AI_AGENT: {
@@ -112,7 +112,7 @@ describe('Agent fail-closed routing', () => {
             installationId: 'installation-1',
           })
         ),
-        path: '/cftamac.agent.v1.AgentExtensionService/GetInstallation',
+        path: '/cftamac.agent.v1.AgentIntegrationService/GetInstallation',
       },
       {
         body: toBinary(
@@ -125,7 +125,7 @@ describe('Agent fail-closed routing', () => {
             status: 'succeeded',
           })
         ),
-        path: '/cftamac.agent.v1.ExtensionIngressService/PublishToolResult',
+        path: '/cftamac.agent.v1.IntegrationIngressService/PublishToolResult',
       },
     ] as const;
 

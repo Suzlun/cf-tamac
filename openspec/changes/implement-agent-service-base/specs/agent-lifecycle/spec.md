@@ -6,7 +6,7 @@ Agent Service は、各 Agent ID を単一の AIAgent Durable Object identity �
 
 **利用者文脈**
 
-Agent 管理者は、同じ Agent ID への操作が常に同じ自律主体へ届き、別 Agent の状態や履歴と混線しないことを必要としている。Agent が Thread、Event、Run、Memory、Schedule、Tool、Extension を長期的に所有するため、identity の揺れは復旧不能な文脈破壊につながる。
+Agent 管理者は、同じ Agent ID への操作が常に同じ自律主体へ届き、別 Agent の状態や履歴と混線しないことを必要としている。Agent が Thread、Event、Run、Memory、Schedule、Tool、Integration を長期的に所有するため、identity の揺れは復旧不能な文脈破壊につながる。
 
 **要件**
 
@@ -27,7 +27,7 @@ Agent 管理者は、同じ Agent ID への操作が常に同じ自律主体へ�
 - **GIVEN** `agent-alpha` が initialized である
 - **WHEN** 認可済み Client Service principal が `agent-alpha` に対して `GetAgent` を呼ぶ
 - **THEN** 応答には `agent-alpha` が所有する Agent profile、ライフサイクル状態、config 版、credential generation、capability 要約が含まれる
-- **AND** 別 Agent の Thread、Memory、Schedule、ToolInvocation、Extension 状態は含まれない
+- **AND** 別 Agent の Thread、Memory、Schedule、ToolInvocation、Integration 状態は含まれない
 
 ### Requirement: Agent ライフサイクル状態遷移の強制
 
@@ -35,7 +35,7 @@ AIAgent Durable Object は、各 Agent の監査可能なライフサイクル�
 
 **利用者文脈**
 
-Agent 管理者は、作成、停止、破棄、credential rotation のような管理操作が監査可能で、実行中の Event/Run/Tool/Extension と矛盾しないライフサイクル境界を必要としている。
+Agent 管理者は、作成、停止、破棄、credential rotation のような管理操作が監査可能で、実行中の Event/Run/Tool/Integration と矛盾しないライフサイクル境界を必要としている。
 
 **要件**
 
@@ -46,10 +46,10 @@ Agent 管理者は、作成、停止、破棄、credential rotation のような
 
 #### Scenario: DestroyAgent が mutating Agent operations を無効化する (AGENT-LIFECYCLE-S003)
 
-- **GIVEN** `agent-alpha` が有効で、Thread、Schedule、ToolInvocation、Extension Installation を持っている
+- **GIVEN** `agent-alpha` が有効で、Thread、Schedule、ToolInvocation、Integration Installation を持っている
 - **WHEN** 認可済み principal が有効な idempotency key で `DestroyAgent` を呼ぶ
 - **THEN** Agent ライフサイクル状態は `destroyed` になる
-- **AND** `agent-alpha` に対する以後の Event publish、Schedule creation、Tool 承認、Extension install command はライフサイクル事前条件エラーで失敗する
+- **AND** `agent-alpha` に対する以後の Event publish、Schedule creation、Tool 承認、Integration install command はライフサイクル事前条件エラーで失敗する
 - **AND** 既存の監査/History 記録は認可ポリシーに従って照会可能なままである
 
 #### Scenario: 重複ライフサイクル command が記録済み応答を replay する (AGENT-LIFECYCLE-S004)

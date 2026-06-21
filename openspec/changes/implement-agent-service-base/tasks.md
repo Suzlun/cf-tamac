@@ -2,7 +2,7 @@
 
 - [ ] 1.1 `establish-agent-service-foundation` の proposal/design/spec/tasks と適用済み差分を確認し、`packages/agent`、`packages/client`、TypeSpec-to-proto 生成、Connect facade、Client D1、guardrail が foundation の完了条件を満たすことを記録する。未適用または未同期なら、この change の実装を始めず foundation の apply/sync を先に完了する。
 - [ ] 1.2 foundation 後の package graph を棚卸しし、`packages/typespec` Agent OpenAPI、`packages/frontend/api` Orval Agent SDK、`packages/backend/**` Hono zod-openapi Agent route、旧 Vite demo graph が active Agent surface に残っていないことを確認する。残存があれば foundation 逸脱として扱い、この change で再削除作業を重複させず、foundation 差分へ戻して解消する。
-- [ ] 1.3 `proposal.md`、`design.md`、全 delta spec、`docs/memo/仕様設計・アーキテクチャ設定.md` を照合し、Stage 1〜8 の実装順序、Stage 9 Discord Provider の対象外境界、Provider-facing Extension/Tool/Delivery 相互運用の対象範囲を apply メモに残す。
+- [ ] 1.3 `proposal.md`、`design.md`、全 delta spec、`docs/memo/仕様設計・アーキテクチャ設定.md` を照合し、Stage 1〜8 の実装順序、Stage 9 Discord Provider の対象外境界、Provider-facing Integration/Tool/Delivery 相互運用の対象範囲を apply メモに残す。
 - [ ] 1.4 TypeSpec Protobuf、Buf/Protobuf-ES、Connect、Cloudflare Agents SDK、Next.js/OpenNext、関連 test utilities の依存追加計画を作り、install 前に 72 時間 supply-chain policy と `allowBuilds` の必要性を確認する。
 - [ ] 1.5 foundation が作成した `packages/agent` と `packages/client` の package scripts を拡張し、Stage 1〜8 の build/check/test/generation/dev scripts が `pnpm --filter` で解決できることを確認する。
 - [ ] 1.6 root scripts を Agent proto/RPC 生成、Client build/dev/test、codegen drift、aggregate validation 用に拡張し、既存 lint、OpenSpec、supply-chain checks を弱めていないことを確認する。
@@ -14,11 +14,11 @@
 - [ ] 2.1 foundation の `packages/agent/src/typespec/main.tsp`、`tspconfig.yaml`、common TypeSpec modules を詳細化し、errors、pagination、security metadata、idempotency、timestamp、nonce、byte payload reference を明示する。完了条件は import が明示され、Agent API 用 OpenAPI emitter が設定されていないこと。
 - [ ] 2.2 Agent profile、config、credential、principal、grant、audit、health の TypeSpec models を定義/詳細化する。完了条件は lifecycle/security/health services が [AGENT-LIFECYCLE-S001]、[AGENT-SECURITY-S001]、[AGENT-HEALTH-S001] 用の安定 message を共有できること。
 - [ ] 2.3 Thread、Section、Event、Run、State、Compaction、History、ThreadMemory、AgentMemory の TypeSpec models を定義/詳細化する。完了条件は Event/Run/Memory services が [AGENT-EVENTING-S002]、[AGENT-RUNTIME-S004]、[AGENT-MEMORY-S003] 用の Agent-scoped ID と snapshot ref を共有できること。
-- [ ] 2.4 Schedule、ToolDefinition、ToolInvocation、Approval、ProviderOperation、Extension、Installation、Adapter、AdapterConnection、DeliveryContext、AdapterDelivery の TypeSpec models を定義/詳細化する。完了条件は Tool/Extension/Delivery messages が installation、connection、operation identities を持ち、[AGENT-TOOL-S005]、[AGENT-EXTENSION-S004]、[AGENT-EXTENSION-S006] に対応すること。
-- [ ] 2.5 `agent-lifecycle.tsp`、`agent-event.tsp`、`agent-thread.tsp`、`agent-run.tsp`、`agent-state.tsp`、`agent-schedule.tsp`、`agent-tool.tsp`、`agent-extension.tsp`、`agent-adapter.tsp`、`agent-health.tsp` を Agent-facing service として詳細化する。完了条件は各 service が unary methods、request 内 `agent_id`、scenario-linked contract tests を持つこと。
-- [ ] 2.6 `packages/agent/src/typespec/src/services/agent-extension.tsp` に Adapter Connection 管理を `AgentExtensionService.CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` として定義する。foundation 既存の `agent-adapter.tsp` は `ExtensionIngressService.PublishEvent/PublishToolResult/PublishDeliveryResult` だけを定義し、Adapter Connection 管理や個別取得用の追加 RPC を追加しない。完了条件は Adapter Connection coverage が [AGENT-EXTENSION-S004] に対応すること。
-- [ ] 2.7 `packages/agent/src/typespec/src/services/extension-tool.tsp` に Provider-facing `ExtensionToolService.InvokeTool`、`GetOperation`、`CancelOperation` を定義する。完了条件は Agent-to-Provider generated client usage が [AGENT-TOOL-S005]、[AGENT-TOOL-S007]、[AGENT-TOOL-S008] を覆うこと。
-- [ ] 2.8 `packages/agent/src/typespec/src/services/extension-delivery.tsp` に Provider-facing `ExtensionDeliveryService.Deliver` を定義する。完了条件は Agent-to-Provider generated client usage が [AGENT-EXTENSION-S006] を覆うこと。
+- [ ] 2.4 Schedule、ToolDefinition、ToolInvocation、Approval、ProviderOperation、Integration、Installation、Adapter、AdapterConnection、DeliveryContext、AdapterDelivery の TypeSpec models を定義/詳細化する。完了条件は Tool/Integration/Delivery messages が installation、connection、operation identities を持ち、[AGENT-TOOL-S005]、[AGENT-INTEGRATION-S004]、[AGENT-INTEGRATION-S006] に対応すること。
+- [ ] 2.5 `agent-lifecycle.tsp`、`agent-event.tsp`、`agent-thread.tsp`、`agent-run.tsp`、`agent-state.tsp`、`agent-schedule.tsp`、`agent-tool.tsp`、`agent-integration.tsp`、`agent-adapter.tsp`、`agent-health.tsp` を Agent-facing service として詳細化する。完了条件は各 service が unary methods、request 内 `agent_id`、scenario-linked contract tests を持つこと。
+- [ ] 2.6 `packages/agent/src/typespec/src/services/agent-integration.tsp` に Adapter Connection 管理を `AgentIntegrationService.CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` として定義する。foundation 既存の `agent-adapter.tsp` は `IntegrationIngressService.PublishEvent/PublishToolResult/PublishDeliveryResult` だけを定義し、Adapter Connection 管理や個別取得用の追加 RPC を追加しない。完了条件は Adapter Connection coverage が [AGENT-INTEGRATION-S004] に対応すること。
+- [ ] 2.7 `packages/agent/src/typespec/src/services/integration-tool.tsp` に Provider-facing `IntegrationToolService.InvokeTool`、`GetOperation`、`CancelOperation` を定義する。完了条件は Agent-to-Provider generated client usage が [AGENT-TOOL-S005]、[AGENT-TOOL-S007]、[AGENT-TOOL-S008] を覆うこと。
+- [ ] 2.8 `packages/agent/src/typespec/src/services/integration-delivery.tsp` に Provider-facing `IntegrationDeliveryService.Deliver` を定義する。完了条件は Agent-to-Provider generated client usage が [AGENT-INTEGRATION-S006] を覆うこと。
 - [ ] 2.9 `@typespec/protobuf`、package `cftamac.agent.v1`、明示 field number、reserved-field policy、unary RPC shape、binary Connect production profile notes を設定/確認する。
 - [ ] 2.10 `buf.yaml` と `buf.gen.yaml` を Stage 1〜8 の proto に合わせて更新し、`tsp compile`、`buf lint`、`buf breaking`、Protobuf-ES generation を package scripts へ接続する。
 - [ ] 2.11 `packages/agent/proto/cftamac/agent/v1`、`packages/agent/src/generated/rpc`、`packages/client/src/generated/agent-rpc` を生成 scripts だけで更新する。完了条件は `proto/**` と `generated/**` に手編集がないこと。
@@ -29,13 +29,13 @@
 ## 3. Cross-Cutting Security / Observability / Error Handling Foundation
 
 - [ ] 3.1 Client Service JWT verifier を実装し、issuer、subject、JWT ID、audience、expiry、not-before、agent scope、scopes、acting user を検証/抽出する。
-- [ ] 3.2 Extension detached signature verifier を実装し、service/method、Agent、Installation、Connection、timestamp、nonce、idempotency key、raw protobuf body digest を canonical input として検証する。
+- [ ] 3.2 Integration detached signature verifier を実装し、service/method、Agent、Installation、Connection、timestamp、nonce、idempotency key、raw protobuf body digest を canonical input として検証する。
 - [ ] 3.3 nonce/idempotency repository interfaces、request digest utilities、replay result types、Agent modules が共有する typed command context を定義する。
 - [ ] 3.4 AIAgent final authorization policy interfaces と decision result types を定義し、lifecycle、credential、principal type、scopes/grants、capability ownership、requested operation を表現する。
 - [ ] 3.5 validation、authentication、authorization、not found、conflict、precondition、concurrency、rate limit、provider failure、timeout、internal 用の Connect error taxonomy と mapper を実装する。
 - [ ] 3.6 structured logs、metrics、audit records、rate-limit/security counters、correlation fields、secret/token/signature redaction を実装する。
-- [ ] 3.7 Client JWT verifier、Extension signature canonicalization/verifier、Connect error mapping、audit/logging interfaces、observability redaction の happy/error path tests を追加する。
-- [ ] 3.8 `ExtensionToolService` と `ExtensionDeliveryService` 用の Agent-to-Provider signature metadata builders を実装し、service/method、Agent、Installation、Connection/Tool/Invocation/DeliveryContext、timestamp、nonce、idempotency key、raw protobuf body digest を署名対象に含める。完了条件は Provider RPC client tests が [AGENT-TOOL-S005]、[AGENT-TOOL-S008]、[AGENT-EXTENSION-S006] を参照すること。
+- [ ] 3.7 Client JWT verifier、Integration signature canonicalization/verifier、Connect error mapping、audit/logging interfaces、observability redaction の happy/error path tests を追加する。
+- [ ] 3.8 `IntegrationToolService` と `IntegrationDeliveryService` 用の Agent-to-Provider signature metadata builders を実装し、service/method、Agent、Installation、Connection/Tool/Invocation/DeliveryContext、timestamp、nonce、idempotency key、raw protobuf body digest を署名対象に含める。完了条件は Provider RPC client tests が [AGENT-TOOL-S005]、[AGENT-TOOL-S008]、[AGENT-INTEGRATION-S006] を参照すること。
 
 ## 4. Stage 2 - AIAgent Lifecycle / Thread / Event Foundation
 
@@ -57,11 +57,11 @@
 
 - [ ] 5.1 pending、running、waiting、completed、failed、cancelled、interrupted を持つ AgentRun state machine と Agent ごとの one active Run slot を実装する。
 - [ ] 5.2 priority、last served time、pending time による scheduler selection、bounded batch processing、残件用 wake re-enqueue を実装する。
-- [ ] 5.3 Event range、ThreadMemory version、latest ready Compaction、uncompacted upper sequence、config version、Tool set version、Extension version を固定する immutable Run snapshot creation を実装する。
+- [ ] 5.3 Event range、ThreadMemory version、latest ready Compaction、uncompacted upper sequence、config version、Tool set version、Integration version を固定する immutable Run snapshot creation を実装する。
 - [ ] 5.4 identity/policy、ThreadMemory、Handoff、uncompacted Events、retrieved History、relevant Agent Memory、trigger Event の順序で Context Builder prompt assembly を実装する。
 - [ ] 5.5 interrupt flags、cancellation、generation checks、lifecycle/version/capability checks、Run commit 時の stale result discard を実装する。
 - [ ] 5.6 stop、state update、memory write、schedule create、Tool invoke、Delivery response、human approval request、Event emit を処理する harness decision interpreter を実装する。
-- [ ] 5.7 model calls、Tool calls、tokens、loops、timeout、cooldown、daily budget、Extension budget、Tool budget の Run-level と aggregate budget enforcement を実装する。
+- [ ] 5.7 model calls、Tool calls、tokens、loops、timeout、cooldown、daily budget、Integration budget、Tool budget の Run-level と aggregate budget enforcement を実装する。
 - [ ] 5.8 scheduler coalescing/fairness、snapshot immutability、same/different Thread Event arrival、interrupt、decision commit、budget exhaustion の runtime tests を追加する。
 - [ ] 5.9 `AgentRunService.GetRun` と `ListRuns` handlers を実装し、Run status、immutable snapshot reference、trigger Event range、causal links、safe error detail、Thread/status/time pagination filters を返す。完了条件は [AGENT-RUNTIME-S009] の tests が通ること。
 - [ ] 5.10 `AgentRunService.CancelRun` handler を実装し、pending/running/waiting Run の cancellation/interruption、idempotency replay、terminal/precondition handling、stale commit rejection を確認する。完了条件は [AGENT-RUNTIME-S010] の tests が通ること。
@@ -85,35 +85,35 @@
 - [ ] 7.2 security primitives、command idempotency、Thread resolution、lifecycle checks、final authorization hooks を使って Create/Get/List/Cancel の Schedule RPC handlers を実装する。
 - [ ] 7.3 Cloudflare Agents SDK schedule APIs を one-shot と interval callbacks に接続し、callbacks を `schedule.triggered` Event append transactions へ変換する。
 - [ ] 7.4 skip、coalesce、queue-next の overlap policies、duplicate tick protection、observable status updates を実装する。
-- [ ] 7.5 Extension disabled/uninstalled states に対する Schedule cleanup を実装し、audit Events と later callback side effects 防止を確認する。
-- [ ] 7.6 Thread requirement、trigger Event append、overlap behavior、idempotent cancellation、Extension cleanup の schedule tests を追加する。
+- [ ] 7.5 Integration disabled/uninstalled states に対する Schedule cleanup を実装し、audit Events と later callback side effects 防止を確認する。
+- [ ] 7.6 Thread requirement、trigger Event append、overlap behavior、idempotent cancellation、Integration cleanup の schedule tests を追加する。
 
 ## 8. Stage 6 - Tool / Invocation / Approval
 
 - [ ] 8.1 ToolDefinition、ToolInvocation、approval、Provider operation、outgoing request、result Event の schema/repository modules を追加する。
-- [ ] 8.2 built-in と active Extension definitions から versioned Tool set snapshots を作る Tool catalog assembly を実装する。
+- [ ] 8.2 built-in と active Integration definitions から versioned Tool set snapshots を作る Tool catalog assembly を実装する。
 - [ ] 8.3 proposed から terminal states までの ToolInvocation lifecycle を、Thread/Run ownership、idempotency、input/output refs、attempts、audit links とともに実装する。
 - [ ] 8.4 Client Service authorization primitives、明示 actor/rationale capture、status transition checks を使って approval/rejection RPCs を実装する。
 - [ ] 8.5 Tool catalog、ToolInvocation、approval/rejection、Provider operation、Tool capability access の final authorization policies を Tool schema/state に基づき拡張する。
-- [ ] 8.6 generated `ExtensionToolService.InvokeTool`、Connect + binary Protobuf、raw body digest、nonce、idempotency、Provider target metadata を使う signed Agent-to-Provider Tool RPC client を実装する。完了条件は [AGENT-TOOL-S005] が raw fetch/JSON calls なしで通ること。
+- [ ] 8.6 generated `IntegrationToolService.InvokeTool`、Connect + binary Protobuf、raw body digest、nonce、idempotency、Provider target metadata を使う signed Agent-to-Provider Tool RPC client を実装する。完了条件は [AGENT-TOOL-S005] が raw fetch/JSON calls なしで通ること。
 - [ ] 8.7 success/failure Events を同じ Thread に append し、結果処理用の Run work を coalesce する Tool result handling を実装する。
-- [ ] 8.8 timeout/outcome_unknown handling、`ExtensionToolService.GetOperation` status reconciliation、duplicate result suppression、Provider operation identity persistence を実装する。完了条件は [AGENT-TOOL-S007] が通ること。
-- [ ] 8.9 Provider operation identity があり cancellation 対応のとき、generated `ExtensionToolService.CancelOperation` で Tool cancellation propagation を実装する。完了条件は [AGENT-TOOL-S008] が通ること。
-- [ ] 8.10 catalog filtering、disabled Extension Tools、approval gating、signed Provider RPC metadata、result Event append、GetOperation reconciliation、CancelOperation propagation、Tool-specific authorization の Tool tests を追加する。
+- [ ] 8.8 timeout/outcome_unknown handling、`IntegrationToolService.GetOperation` status reconciliation、duplicate result suppression、Provider operation identity persistence を実装する。完了条件は [AGENT-TOOL-S007] が通ること。
+- [ ] 8.9 Provider operation identity があり cancellation 対応のとき、generated `IntegrationToolService.CancelOperation` で Tool cancellation propagation を実装する。完了条件は [AGENT-TOOL-S008] が通ること。
+- [ ] 8.10 catalog filtering、disabled Integration Tools、approval gating、signed Provider RPC metadata、result Event append、GetOperation reconciliation、CancelOperation propagation、Tool-specific authorization の Tool tests を追加する。
 
-## 9. Stage 7 - Extension / Adapter / Delivery
+## 9. Stage 7 - Integration / Adapter / Delivery
 
-- [ ] 9.1 Extension Installation、manifest、Provider key、grant、Adapter definition、Adapter Connection、DeliveryContext、AdapterDelivery、cleanup の schema/repository modules を追加する。完了条件は各 table/repository が dedicated file または明確な module 名を持ち、[AGENT-EXTENSION-S001]〜[AGENT-EXTENSION-S007] に対応すること。
+- [ ] 9.1 Integration Installation、manifest、Provider key、grant、Adapter definition、Adapter Connection、DeliveryContext、AdapterDelivery、cleanup の schema/repository modules を追加する。完了条件は各 table/repository が dedicated file または明確な module 名を持ち、[AGENT-INTEGRATION-S001]〜[AGENT-INTEGRATION-S007] に対応すること。
 - [ ] 9.2 signature verification primitives、schema version checks、requested grant evaluation、manifest digest storage、setup instructions を使って manifest fetch/parse/verify flow を実装する。
 - [ ] 9.3 installing、pending external setup、active、disabled、uninstalling、uninstalled、failed を持つ Installation lifecycle を実装する。
-- [ ] 9.4 `packages/agent/src/adapters/**/*.ts` に Adapter definition normalization、Adapter Connection validation、ingress metadata normalization、DeliveryContext creation boundary を実装する。完了条件は [AGENT-EXTENSION-S008] に Discord-specific parser が不要であること。
-- [ ] 9.5 Installation ownership、connection status、grant validation、Agent-local scoping を使って `AgentExtensionService.CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` handlers を実装する。完了条件は [AGENT-EXTENSION-S004] が通ること。
-- [ ] 9.6 Installation status、Adapter Connection ownership、ingress grants、DeliveryContext access、Tool/Adapter capability、uninstall cleanup の final authorization policies を Extension schema/state に基づき拡張する。
-- [ ] 9.7 detached signature、timestamp、nonce、idempotency、body digest、grant checks を使って ExtensionIngressService の Event publish、Tool result publish、Delivery result publish handlers を実装する。
-- [ ] 9.8 ingress metadata から DeliveryContext を作り、generated `ExtensionDeliveryService.Deliver` を使う signed Agent-to-Provider Delivery RPC client と AdapterDelivery result tracking を実装する。完了条件は [AGENT-EXTENSION-S006] が通ること。
-- [ ] 9.9 Agent-side Extension/Tool/Delivery behavior が Discord-specific code に依存しない generic Provider interop boundary を実装し、Stage 9 Discord Provider packages を対象外に保つ。
-- [ ] 9.10 ingress rejection、Connection disable、Tool disable、pending ToolInvocation cancellation/outcome_unknown、Schedule cancellation、Delivery revocation、trust key revocation、audit を含む UninstallExtension cleanup を実装する。
-- [ ] 9.11 signed manifest install、pending setup、grants/adapters/tools/delivery persistence、Adapter Connection lifecycle、ingress、delivery、uninstall cleanup、generic Provider behavior、Extension-specific authorization の Extension tests を追加する。
+- [ ] 9.4 `packages/agent/src/adapters/**/*.ts` に Adapter definition normalization、Adapter Connection validation、ingress metadata normalization、DeliveryContext creation boundary を実装する。完了条件は [AGENT-INTEGRATION-S008] に Discord-specific parser が不要であること。
+- [ ] 9.5 Installation ownership、connection status、grant validation、Agent-local scoping を使って `AgentIntegrationService.CreateAdapterConnection`、`DeleteAdapterConnection`、`ListAdapterConnections` handlers を実装する。完了条件は [AGENT-INTEGRATION-S004] が通ること。
+- [ ] 9.6 Installation status、Adapter Connection ownership、ingress grants、DeliveryContext access、Tool/Adapter capability、uninstall cleanup の final authorization policies を Integration schema/state に基づき拡張する。
+- [ ] 9.7 detached signature、timestamp、nonce、idempotency、body digest、grant checks を使って IntegrationIngressService の Event publish、Tool result publish、Delivery result publish handlers を実装する。
+- [ ] 9.8 ingress metadata から DeliveryContext を作り、generated `IntegrationDeliveryService.Deliver` を使う signed Agent-to-Provider Delivery RPC client と AdapterDelivery result tracking を実装する。完了条件は [AGENT-INTEGRATION-S006] が通ること。
+- [ ] 9.9 Agent-side Integration/Tool/Delivery behavior が Discord-specific code に依存しない generic Provider interop boundary を実装し、Stage 9 Discord Provider packages を対象外に保つ。
+- [ ] 9.10 ingress rejection、Connection disable、Tool disable、pending ToolInvocation cancellation/outcome_unknown、Schedule cancellation、Delivery revocation、trust key revocation、audit を含む UninstallIntegration cleanup を実装する。
+- [ ] 9.11 signed manifest install、pending setup、grants/adapters/tools/delivery persistence、Adapter Connection lifecycle、ingress、delivery、uninstall cleanup、generic Provider behavior、Integration-specific authorization の Integration tests を追加する。
 
 ## 10. Stage 8 - Client Registry / Server-Side Agent RPC
 
@@ -123,7 +123,7 @@
 - [ ] 10.4 `packages/client/src/server/db/access-credentials.ts` repository に credential references、key ID、masked hint、status、timestamps、secret-reference lookup boundaries を実装する。完了条件は [CLIENT-REGISTRY-S002] が通り plaintext secrets が存在しないこと。
 - [ ] 10.5 credential reference の Browser-safe serialization と server-side execution 限定の secret resolution を実装する。
 - [ ] 10.6 generated Protobuf descriptors、Connect transport、Client Service auth metadata、acting user context、RPC error normalization を使う server-side Agent RPC client factory を実装する。完了条件は [CLIENT-REGISTRY-S003] が OpenAPI/Orval generated clients なしで通ること。
-- [ ] 10.7 Agent registry、Agent overview/config/credential rotation、Thread/Event/Run/Compaction queries、Schedule operations、Tool approval、Extension install/uninstall 用の Server Actions を実装する。
+- [ ] 10.7 Agent registry、Agent overview/config/credential rotation、Thread/Event/Run/Compaction queries、Schedule operations、Tool approval、Integration install/uninstall 用の Server Actions を実装する。
 - [ ] 10.8 Client D1 が Agent domain snapshots を保存せず、Agent Service package が Client runtime source や Client D1 bindings を import/参照しないことを確認する。完了条件は [CLIENT-REGISTRY-S004] が通ること。
 - [ ] 10.9 public `/api` Agent proxy routes が導入されていないことを確認し、Agent operations を Server Actions/Server Components の背後に保つ。完了条件は [CLIENT-REGISTRY-S005] が通ること。
 - [ ] 10.10 registry persistence、credential reference safety、generated Connect client invocation、no domain snapshot persistence、no proxy route exposure の Client registry/server tests を追加する。
@@ -137,8 +137,8 @@
 - [ ] 11.5 scoped pagination、filters、sequence display、snapshot details、Handoff/History/Memory provenance、causal links を持つ Thread/Event/Run/Compaction/Memory views を構築する。
 - [ ] 11.6 Thread context、overlap policy、next fire time、status を扱う Schedule list/create/detail/cancel UI を構築する。
 - [ ] 11.7 explicit confirmation、risk/input summary、status、attempts、result links を持つ Tool catalog、ToolInvocation list/detail、approval/rejection UI を構築する。
-- [ ] 11.8 manifest identity、Provider identity、grants、Adapter Connections、Tools、Delivery capability、setup instructions、cleanup result を表示する Extension list/detail/install/uninstall UI を構築する。
-- [ ] 11.9 registry navigation、overview/settings、Thread/Event/Run/Compaction views、Schedule operations、Tool approvals、Extension install/uninstall、accessibility、Browser credential non-exposure の Playwright/component tests を追加する。
+- [ ] 11.8 manifest identity、Provider identity、grants、Adapter Connections、Tools、Delivery capability、setup instructions、cleanup result を表示する Integration list/detail/install/uninstall UI を構築する。
+- [ ] 11.9 registry navigation、overview/settings、Thread/Event/Run/Compaction views、Schedule operations、Tool approvals、Integration install/uninstall、accessibility、Browser credential non-exposure の Playwright/component tests を追加する。
 
 ## 12. Automated Scenario Test Tasks
 
@@ -175,27 +175,27 @@
 - [ ] 12.31 `[AGENT-SCHEDULE-S002] Schedule firing appends a schedule.triggered Event` を title に含む automated tests を追加する。
 - [ ] 12.32 `[AGENT-SCHEDULE-S003] Overlap policy prevents duplicate interval work` を title に含む automated tests を追加する。
 - [ ] 12.33 `[AGENT-SCHEDULE-S004] CancelSchedule prevents future firing` を title に含む automated tests を追加する。
-- [ ] 12.34 `[AGENT-SCHEDULE-S005] Extension uninstall cancels its active Schedules` を title に含む automated tests を追加する。
+- [ ] 12.34 `[AGENT-SCHEDULE-S005] Integration uninstall cancels its active Schedules` を title に含む automated tests を追加する。
 - [ ] 12.35 `[AGENT-TOOL-S001] ListTools returns the Agent-local available Tool catalog` を title に含む automated tests を追加する。
-- [ ] 12.36 `[AGENT-TOOL-S002] Disabled Extension Tool cannot be invoked by a new Run` を title に含む automated tests を追加する。
+- [ ] 12.36 `[AGENT-TOOL-S002] Disabled Integration Tool cannot be invoked by a new Run` を title に含む automated tests を追加する。
 - [ ] 12.37 `[AGENT-TOOL-S003] Approval-required ToolInvocation waits before execution` を title に含む automated tests を追加する。
 - [ ] 12.38 `[AGENT-TOOL-S004] Authorized approval transitions ToolInvocation state` を title に含む automated tests を追加する。
-- [ ] 12.39 `[AGENT-TOOL-S005] Agent invokes Extension Tool with signed binary Protobuf RPC` を title に含む automated tests を追加する。
+- [ ] 12.39 `[AGENT-TOOL-S005] Agent invokes Integration Tool with signed binary Protobuf RPC` を title に含む automated tests を追加する。
 - [ ] 12.40 `[AGENT-TOOL-S006] Tool result Event returns to the same Thread` を title に含む automated tests を追加する。
 - [ ] 12.41 `[AGENT-TOOL-S007] Unknown Tool outcome is reconciled by operation status` を title に含む automated tests を追加する。
-- [ ] 12.42 `[AGENT-EXTENSION-S001] InstallExtension verifies signed manifest before activation` を title に含む automated tests を追加する。
-- [ ] 12.43 `[AGENT-EXTENSION-S002] Successful install persists grants adapters tools delivery and trust keys` を title に含む automated tests を追加する。
-- [ ] 12.44 `[AGENT-EXTENSION-S003] Installation can wait for external setup` を title に含む automated tests を追加する。
-- [ ] 12.45 `[AGENT-EXTENSION-S004] Adapter Connection lifecycle is Agent-local` を title に含む automated tests を追加する。
-- [ ] 12.46 `[AGENT-EXTENSION-S005] Signed extension ingress appends Event and DeliveryContext` を title に含む automated tests を追加する。
-- [ ] 12.47 `[AGENT-EXTENSION-S006] Agent sends Delivery response through Provider RPC` を title に含む automated tests を追加する。
-- [ ] 12.48 `[AGENT-EXTENSION-S007] UninstallExtension disables capabilities and preserves history` を title に含む automated tests を追加する。
-- [ ] 12.49 `[AGENT-EXTENSION-S008] Generic Extension Provider works without Discord-specific code` を title に含む automated tests を追加する。
+- [ ] 12.42 `[AGENT-INTEGRATION-S001] InstallIntegration verifies signed manifest before activation` を title に含む automated tests を追加する。
+- [ ] 12.43 `[AGENT-INTEGRATION-S002] Successful install persists grants adapters tools delivery and trust keys` を title に含む automated tests を追加する。
+- [ ] 12.44 `[AGENT-INTEGRATION-S003] Installation can wait for external setup` を title に含む automated tests を追加する。
+- [ ] 12.45 `[AGENT-INTEGRATION-S004] Adapter Connection lifecycle is Agent-local` を title に含む automated tests を追加する。
+- [ ] 12.46 `[AGENT-INTEGRATION-S005] Signed integration ingress appends Event and DeliveryContext` を title に含む automated tests を追加する。
+- [ ] 12.47 `[AGENT-INTEGRATION-S006] Agent sends Delivery response through Provider RPC` を title に含む automated tests を追加する。
+- [ ] 12.48 `[AGENT-INTEGRATION-S007] UninstallIntegration disables capabilities and preserves history` を title に含む automated tests を追加する。
+- [ ] 12.49 `[AGENT-INTEGRATION-S008] Generic Integration Provider works without Discord-specific code` を title に含む automated tests を追加する。
 - [ ] 12.50 `[AGENT-SECURITY-S001] Valid Client Service JWT authenticates Agent RPC` を title に含む automated tests を追加する。
 - [ ] 12.51 `[AGENT-SECURITY-S002] Invalid Client JWT is rejected before mutation` を title に含む automated tests を追加する。
-- [ ] 12.52 `[AGENT-SECURITY-S003] Valid Extension signature accepts ingress within grant` を title に含む automated tests を追加する。
+- [ ] 12.52 `[AGENT-SECURITY-S003] Valid Integration signature accepts ingress within grant` を title に含む automated tests を追加する。
 - [ ] 12.53 `[AGENT-SECURITY-S004] Body tampering and nonce replay are rejected` を title に含む automated tests を追加する。
-- [ ] 12.54 `[AGENT-SECURITY-S005] Method outside Extension grant is denied by AIAgent` を title に含む automated tests を追加する。
+- [ ] 12.54 `[AGENT-SECURITY-S005] Method outside Integration grant is denied by AIAgent` を title に含む automated tests を追加する。
 - [ ] 12.55 `[AGENT-SECURITY-S006] Idempotency replay preserves exactly-once command result` を title に含む automated tests を追加する。
 - [ ] 12.56 `[AGENT-SECURITY-S007] Domain errors map to stable Connect codes` を title に含む automated tests を追加する。
 - [ ] 12.57 `[AGENT-SECURITY-S008] Observability context excludes secret material` を title に含む automated tests を追加する。
@@ -211,7 +211,7 @@
 - [ ] 12.67 `[CLIENT-MANAGEMENT-S005] Thread Event Run and Compaction tabs show Agent-owned history` を title に含む automated tests を追加する。
 - [ ] 12.68 `[CLIENT-MANAGEMENT-S006] Schedule tab creates and cancels schedules` を title に含む automated tests を追加する。
 - [ ] 12.69 `[CLIENT-MANAGEMENT-S007] Tool approval screen requires explicit action` を title に含む automated tests を追加する。
-- [ ] 12.70 `[CLIENT-MANAGEMENT-S008] Extension screen installs lists and uninstalls generic Extension` を title に含む automated tests を追加する。
+- [ ] 12.70 `[CLIENT-MANAGEMENT-S008] Integration screen installs lists and uninstalls generic Integration` を title に含む automated tests を追加する。
 - [ ] 12.71 `[CLIENT-MANAGEMENT-S009] Browser does not receive Agent credentials or call Agent RPC directly` を title に含む automated tests を追加する。
 - [ ] 12.72 `[AGENT-TOOL-S008] Tool cancellation propagates to Provider operation` を title に含む automated tests を追加する。
 - [ ] 12.73 `[AGENT-SECURITY-S009] Durable Object RPC stays behind the Connect facade` を title に含む automated tests を追加する。
@@ -229,7 +229,7 @@
 - [ ] 13.2 `CODING_STANDARDS.md` を更新し、`packages/agent` / `packages/client` boundaries、Protobuf generation drift、generated exclusions、Scenario ID coverage、Agent OpenAPI/Orval/Hono route 前提の削除を反映する。
 - [ ] 13.3 `CONTRIBUTING.md` を更新し、Agent/Client setup、dependency review、generation、D1 migration、validation、test/build commands を反映する。
 - [ ] 13.4 `.opencode/skills/coding-guardian/SKILL.md` と `.opencode/skills/coding-guardian/references/repo-entrypoints.md` を更新し、今後の agents が Agent Protobuf、Client、Provider interop、削除済み legacy entrypoints を正しく読むようにする。
-- [ ] 13.5 Agent Service local dev、generation、deployment、Client D1 migration、Extension Provider integration profile、安全な secret handling の package README/runbooks を更新する。
+- [ ] 13.5 Agent Service local dev、generation、deployment、Client D1 migration、Integration Provider integration profile、安全な secret handling の package README/runbooks を更新する。
 - [ ] 13.6 `scripts/governance/verify-agent-surface.mjs` を更新し、Stage 1〜8 の forbidden Agent surface、public DO RPC route、REST `/health`、old OpenAPI/Orval/Hono regression、Client public Agent proxy route を検出する。完了条件は [AGENT-SECURITY-S009]、[AGENT-HEALTH-S002]、[CLIENT-REGISTRY-S005] の guardrail 観点を script diagnostics で説明できること。
 - [ ] 13.7 `scripts/governance/verify-agent-surface.test.mjs` を更新し、`[AGENT-SECURITY-S009]`、`[AGENT-HEALTH-S002]`、`[CLIENT-REGISTRY-S005]` を title に含む fixture tests で forbidden surface と許可される Connect/Server Action 境界を検証する。
 - [ ] 13.8 `pnpm gen:agent:proto`、`pnpm gen:agent:rpc`、`pnpm check:codegen` を実行し、generated drift がなくなるまで source files を修正する。
@@ -238,7 +238,7 @@
 - [ ] 13.11 `pnpm check` を実行し、TypeScript/TypeSpec compile errors を解消する。
 - [ ] 13.12 `pnpm test:run`、focused Agent/Client package tests、Client management UI の Playwright E2E を実行する。
 - [ ] 13.13 `pnpm build` を実行し、Agent Worker と Client Worker の build outputs を確認する。
-- [ ] 13.14 staging smoke tests を実行し、AgentHealthService.Check、InitializeAgent、PublishEvent、ListThreads/GetThread/ListSections、GetLatestCompaction/GetThreadMemory/SearchThreadHistory、GetRun/ListRuns/CancelRun、GetState/GetConfig、Run scheduling、Compaction、storage threshold signals、Schedule、Tool Invoke/GetOperation/CancelOperation、Extension ingress/delivery、Client UI flows を確認する。
+- [ ] 13.14 staging smoke tests を実行し、AgentHealthService.Check、InitializeAgent、PublishEvent、ListThreads/GetThread/ListSections、GetLatestCompaction/GetThreadMemory/SearchThreadHistory、GetRun/ListRuns/CancelRun、GetState/GetConfig、Run scheduling、Compaction、storage threshold signals、Schedule、Tool Invoke/GetOperation/CancelOperation、Integration ingress/delivery、Client UI flows を確認する。
 - [ ] 13.15 foundation で除去/非活性化された旧 Agent OpenAPI/Orval/Hono surfaces が再導入されていないことを検証する。完了条件は Agent `@typespec/openapi3` emitter/output、Orval Agent SDK、Hono zod-openapi Agent route、OpenAPI contract test が workspace scripts から到達不能であること。
 - [ ] 13.16 implementation approval workflow 後に OpenSpec deltas を main specs へ sync/archive し、`openspec validate --all --strict` と scenario coverage を再実行する。
-- [ ] 13.17 Agent RPC profile、Client management setup、Extension Provider interoperability、operational metrics、rollback steps、Stage 9 Discord Provider 対象外を含む release notes を準備する。
+- [ ] 13.17 Agent RPC profile、Client management setup、Integration Provider interoperability、operational metrics、rollback steps、Stage 9 Discord Provider 対象外を含む release notes を準備する。

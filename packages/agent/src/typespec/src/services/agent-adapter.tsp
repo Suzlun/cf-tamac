@@ -3,14 +3,14 @@ using Protobuf;
 namespace CfTamac.Agent.V1;
 
 @Protobuf.service
-interface ExtensionIngressService {
-  PublishEvent(...PublishExtensionEventRequest): PublishExtensionEventResponse;
+interface IntegrationIngressService {
+  PublishEvent(...PublishIntegrationEventRequest): PublishIntegrationEventResponse;
   PublishToolResult(...PublishToolResultRequest): PublishToolResultResponse;
   PublishDeliveryResult(...PublishDeliveryResultRequest): PublishDeliveryResultResponse;
 }
 
 @message
-model PublishExtensionEventRequest {
+model PublishIntegrationEventRequest {
   @field(1) agent_id: string;
   @field(2) idempotency_key: string;
   @field(3) thread_key: string;
@@ -20,7 +20,7 @@ model PublishExtensionEventRequest {
 }
 
 @message
-model PublishExtensionEventResponse {
+model PublishIntegrationEventResponse {
   @field(1) event: AgentEvent;
   @field(2) thread: AgentThread;
 }
