@@ -2,112 +2,112 @@
 
 ### Requirement: Agent ID と Durable Object identity
 
-Agent Service SHALL bind each Agent ID to a single AIAgent Durable Object identity.
+Agent Service は、各 Agent ID を単一の AIAgent Durable Object identity に bind SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Agent 管理者は、同じ Agent ID への操作が常に同じ自律主体へ届き、別 Agent の状態や履歴と混線しないことを必要としている。Agent が Thread、Event、Run、Memory、Schedule、Tool、Extension を長期的に所有するため、identity の揺れは復旧不能な文脈破壊につながる。
 
-**Requirement**
+**要件**
 
-- Agent Service MUST treat one `agent_id` as exactly one AIAgent Durable Object instance and one Agent aggregate root.
-- Agent Service MUST route every public RPC request by the `agent_id` contained in the request message, not only by metadata.
-- AIAgent Durable Object MUST persist Agent profile, lifecycle status, config version, credential generation, audit pointer, and reserved system Thread identity inside the Agent-owned store.
-- Agent Service MUST NOT expose Agent-crossing lifecycle RPCs such as list-all or search-all Agents.
+- Agent Service は、一つの `agent_id` を厳密に一つの AIAgent Durable Object instance かつ一つの Agent aggregate root として扱う MUST。
+- Agent Service は、すべての公開 RPC リクエストをメタデータだけでなくリクエスト message に含まれる `agent_id` で route MUST。
+- AIAgent Durable Object は、Agent profile、ライフサイクル状態、config 版、credential generation、監査 pointer、予約済み system Thread identity を Agent-owned store 内に永続化 MUST。
+- Agent Service は、list-all または search-all Agent のような Agent 横断ライフサイクル RPC を公開して MUST NOT。
 
-#### Scenario: InitializeAgent creates the named Agent aggregate (AGENT-LIFECYCLE-BE-S001)
+#### Scenario: InitializeAgent が指定名の Agent aggregate を作成する (AGENT-LIFECYCLE-BE-S001)
 
-- **GIVEN** a valid Client Service principal has lifecycle scope for `agent_id = agent-alpha`
-- **WHEN** it calls `InitializeAgent` with required profile, config, and idempotency key
-- **THEN** the request is routed to the AIAgent Durable Object named `agent-alpha`
-- **AND** an Agent profile, active lifecycle status, initial config version, credential generation, reserved system Thread, and lifecycle audit Event are persisted for that Agent only
+- **GIVEN** 有効な Client Service principal が `agent_id = agent-alpha` に対するライフサイクル scope を持っている
+- **WHEN** 必須 profile、config、idempotency key を指定して `InitializeAgent` を呼ぶ
+- **THEN** リクエストは `agent-alpha` という名前の AIAgent Durable Object に route される
+- **AND** Agent profile、有効なライフサイクル状態、初期 config 版、credential generation、予約済み system Thread、ライフサイクル監査 Event はその Agent のためだけに永続化される
 
-#### Scenario: GetAgent returns the Agent-local profile and config (AGENT-LIFECYCLE-BE-S002)
+#### Scenario: GetAgent が Agent-local profile と config を返す (AGENT-LIFECYCLE-BE-S002)
 
-- **GIVEN** `agent-alpha` is initialized
-- **WHEN** an authorized Client Service principal calls `GetAgent` for `agent-alpha`
-- **THEN** the response contains the Agent profile, lifecycle status, config version, credential generation, and capability summary owned by `agent-alpha`
-- **AND** no Thread, Memory, Schedule, ToolInvocation, or Extension state from another Agent is present
+- **GIVEN** `agent-alpha` が initialized である
+- **WHEN** 認可済み Client Service principal が `agent-alpha` に対して `GetAgent` を呼ぶ
+- **THEN** 応答には `agent-alpha` が所有する Agent profile、ライフサイクル状態、config 版、credential generation、capability 要約が含まれる
+- **AND** 別 Agent の Thread、Memory、Schedule、ToolInvocation、Extension 状態は含まれない
 
-### Requirement: Agent lifecycle state transitions
+### Requirement: Agent ライフサイクル状態遷移の強制
 
-AIAgent Durable Object SHALL enforce auditable lifecycle transitions for each Agent.
+AIAgent Durable Object は、各 Agent の監査可能なライフサイクル遷移を強制 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-Agent 管理者は、作成、停止、破棄、credential rotation のような管理操作が監査可能で、実行中の Event/Run/Tool/Extension と矛盾しない lifecycle boundary を必要としている。
+Agent 管理者は、作成、停止、破棄、credential rotation のような管理操作が監査可能で、実行中の Event/Run/Tool/Extension と矛盾しないライフサイクル境界を必要としている。
 
-**Requirement**
+**要件**
 
-- AIAgent Durable Object MUST enforce lifecycle state transitions for initialize, active operation, disabled operation, and destroyed operation.
-- Destroyed Agents MUST reject mutating public RPCs except explicitly allowed audit/query operations.
-- Lifecycle commands MUST be idempotent by `agent_id + principal_id + idempotency_key` and MUST reject the same key with a different request body digest.
-- Lifecycle commands MUST append audit Events to the reserved system Thread.
+- AIAgent Durable Object は initialize、有効 operation、無効 operation、destroyed operation のライフサイクル状態遷移を強制 MUST。
+- Destroyed Agent は、明示的に許可された監査/照会 operation を除き、変更系公開 RPC を拒否 MUST。
+- Lifecycle command は `agent_id + principal_id + idempotency_key` で冪等である MUST し、異なるリクエスト body digest を持つ同じ key を拒否 MUST。
+- Lifecycle command は予約済み system Thread に監査 Event を追加 MUST。
 
-#### Scenario: DestroyAgent disables mutating Agent operations (AGENT-LIFECYCLE-BE-S003)
+#### Scenario: DestroyAgent が mutating Agent operations を無効化する (AGENT-LIFECYCLE-BE-S003)
 
-- **GIVEN** `agent-alpha` is active and has Threads, Schedules, ToolInvocations, and Extension Installations
-- **WHEN** an authorized principal calls `DestroyAgent` with a valid idempotency key
-- **THEN** the Agent lifecycle status becomes destroyed
-- **AND** future Event publish, Schedule creation, Tool approval, and Extension install commands for `agent-alpha` fail with a lifecycle precondition error
-- **AND** existing audit/history records remain queryable according to authorization policy
+- **GIVEN** `agent-alpha` が有効で、Thread、Schedule、ToolInvocation、Extension Installation を持っている
+- **WHEN** 認可済み principal が有効な idempotency key で `DestroyAgent` を呼ぶ
+- **THEN** Agent ライフサイクル状態は `destroyed` になる
+- **AND** `agent-alpha` に対する以後の Event publish、Schedule creation、Tool 承認、Extension install command はライフサイクル事前条件エラーで失敗する
+- **AND** 既存の監査/History 記録は認可ポリシーに従って照会可能なままである
 
-#### Scenario: Duplicate lifecycle command replays the recorded response (AGENT-LIFECYCLE-BE-S004)
+#### Scenario: 重複ライフサイクル command が記録済み応答を replay する (AGENT-LIFECYCLE-BE-S004)
 
-- **GIVEN** `InitializeAgent` or `DestroyAgent` already succeeded for `agent-alpha` with idempotency key `idem-1`
-- **WHEN** the same principal repeats the same command with the same body digest and `idem-1`
-- **THEN** Agent Service returns the recorded successful response without creating duplicate profile, audit, Thread, or lifecycle records
-- **AND** a repeated command with `idem-1` and a different body digest is rejected as an idempotency conflict
+- **GIVEN** `InitializeAgent` または `DestroyAgent` が idempotency key `idem-1` で `agent-alpha` に対してすでに成功している
+- **WHEN** 同じ principal が同じ body digest と `idem-1` で同じ command を繰り返す
+- **THEN** Agent Service は重複する profile、監査、Thread、ライフサイクル記録を作成せず、記録済み成功応答を返す
+- **AND** `idem-1` と異なる body digest を持つ反復 command は idempotency conflict として拒否される
 
-### Requirement: Credential and configuration management
+### Requirement: credential と構成管理
 
-Agent Service SHALL manage credentials and configuration with versioned, Agent-local authorization.
+Agent Service は、版管理された Agent-local 認可により credential と構成を管理 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-Client Service や管理者は、Agent への接続資格情報と Agent 設定を安全に更新し、rotation 中も一貫した authorization と監査を維持したい。credential が失効している Agent への操作は、誤動作や不正アクセスを避けるために拒否される必要がある。
+Client Service や管理者は、Agent への接続資格情報と Agent 設定を安全に更新し、rotation 中も一貫した認可と監査を維持したい。credential が失効している Agent への操作は、誤動作や不正アクセスを避けるために拒否される必要がある。
 
-**Requirement**
+**要件**
 
-- Agent Service MUST support credential rotation with explicit key identifier, active/overlap/revoked status, generation number, and audit Event.
-- Agent Service MUST store only verifier material, public fingerprint, or secret references required for verification; private keys and raw shared secrets MUST NOT be stored in plaintext Agent records.
-- Agent configuration updates MUST increment a config version and the version MUST be captured in AgentRun snapshots.
-- Final authorization inside AIAgent Durable Object MUST verify lifecycle status, credential status, principal type, scopes/grants, and requested operation before mutating state.
+- Agent Service は明示 key identifier、有効/重複期間/revoked 状態、generation number、監査 Event を持つ credential rotation を支援 MUST。
+- Agent Service は検証に必要な verifier material、公開 fingerprint、または secret 参照だけを保存 MUST。秘密鍵と生 shared secret は平文 Agent 記録に保存して MUST NOT。
+- Agent 構成更新は config 版を increment MUST し、その版は AgentRun スナップショットに capture MUST。
+- AIAgent Durable Object 内の final authorization は、状態を変更する前にライフサイクル状態、credential 状態、principal type、scope/grant、要求された operation を検証 MUST。
 
-#### Scenario: RotateAgentCredential creates a new active generation (AGENT-LIFECYCLE-BE-S005)
+#### Scenario: RotateAgentCredential が新しい有効 generation を作成する (AGENT-LIFECYCLE-BE-S005)
 
-- **GIVEN** `agent-alpha` has credential generation `1`
-- **WHEN** an authorized principal calls `RotateAgentCredential` with generation `2` metadata and overlap policy
-- **THEN** generation `2` becomes active or overlapping according to policy
-- **AND** generation `1` is retained only for the configured overlap window
-- **AND** credential rotation is recorded in the system Thread audit Event without storing plaintext private key material
+- **GIVEN** `agent-alpha` が credential generation `1` を持っている
+- **WHEN** 認可済み principal が generation `2` メタデータと overlap policy で `RotateAgentCredential` を呼ぶ
+- **THEN** generation `2` は policy に従って有効または overlap 中になる
+- **AND** generation `1` は構成済み overlap window の間だけ保持される
+- **AND** credential rotation は平文の秘密鍵 material を保存せずに system Thread 監査 Event に記録される
 
-#### Scenario: UpdateConfig changes the version captured by later Runs (AGENT-LIFECYCLE-BE-S006)
+#### Scenario: UpdateConfig が後続 Run に capture される版を変更する (AGENT-LIFECYCLE-BE-S006)
 
-- **GIVEN** `agent-alpha` has config version `3`
-- **WHEN** an authorized principal updates model, budget, memory, tool, or scheduling configuration
-- **THEN** the Agent config version increments to `4`
-- **AND** later AgentRun snapshots reference config version `4`
-- **AND** already running AgentRun snapshots retain the config version captured at their start
+- **GIVEN** `agent-alpha` が config 版 `3` を持っている
+- **WHEN** 認可済み principal が model、予算、Memory、Tool、または scheduling 構成を更新する
+- **THEN** Agent config 版は `4` に increment する
+- **AND** 後続の AgentRun スナップショットは config 版 `4` を参照する
+- **AND** すでに running の AgentRun スナップショットは開始時に capture した config 版を保持する
 
-### Requirement: Agent state and configuration queries
+### Requirement: Agent 状態と構成照会
 
-Agent Service は Agent-local state と configuration を安全な snapshot として公開 MUST。
+Agent Service は Agent-local 状態と構成を安全なスナップショットとして公開 MUST。
 
-**Customer Context**
+**利用者文脈**
 
-管理 UI と運用者は、Agent の現在状態、lifecycle、config version、budget、model、memory、tool、schedule 設定を確認したい。query が secret や別 Agent state を返すと、運用判断と権限境界が崩れる。
+管理 UI と運用者は、Agent の現在状態、ライフサイクル、config 版、予算、model、Memory、Tool、Schedule 設定を確認したい。照会が secret や別 Agent 状態を返すと、運用判断と権限境界が崩れる。
 
-**Requirement**
+**要件**
 
-- `AgentStateService.GetState` は対象 Agent の lifecycle status、current active Run summary、scheduler/wake summary、storage threshold state、capability summary、safe operational metadata を返す MUST。
-- `AgentStateService.GetConfig` は対象 Agent の current config version、model/budget/memory/tool/schedule policy、updated actor/timestamp metadata を返す MUST。
-- GetState と GetConfig は Agent-local final authorization を通り、private key、raw credential、Provider secret、Thread payload body、unredacted signature material を返す MUST NOT。
-- GetState と GetConfig は running Run の snapshot config を変更 MUST NOT し、query result は mutation を発生させない MUST。
+- `AgentStateService.GetState` は対象 Agent のライフサイクル状態、現在の有効 Run 要約、scheduler/wake 要約、storage 閾値状態、capability 要約、安全な運用メタデータを返す MUST。
+- `AgentStateService.GetConfig` は対象 Agent の現在 config 版、model/予算/Memory/Tool/Schedule policy、更新実行者/時刻メタデータを返す MUST。
+- GetState と GetConfig は Agent-local final authorization を通り、秘密鍵、生 credential、Provider secret、Thread payload body、未 redaction の signature material を返す MUST NOT。
+- GetState と GetConfig は running Run のスナップショット config を変更 MUST NOT し、照会結果は変更を発生させない MUST。
 
-#### Scenario: GetState and GetConfig return Agent-local snapshots (AGENT-LIFECYCLE-BE-S007)
+#### Scenario: GetState と GetConfig が Agent-local スナップショットを返す (AGENT-LIFECYCLE-BE-S007)
 
-- **GIVEN** `agent-alpha` is initialized with config version `4` and another Agent has different state
-- **WHEN** an authorized Client Service principal calls `GetState` and `GetConfig` for `agent-alpha`
-- **THEN** responses include only `agent-alpha` state summary, current config version, safe policy metadata, and operational status
-- **AND** no secret material, Thread payload body, or other Agent state is returned
+- **GIVEN** `agent-alpha` が config 版 `4` で initialized され、別 Agent が異なる状態を持っている
+- **WHEN** 認可済み Client Service principal が `agent-alpha` に対して `GetState` と `GetConfig` を呼ぶ
+- **THEN** 応答には `agent-alpha` の状態要約、現在 config 版、安全な policy メタデータ、運用状態だけが含まれる
+- **AND** secret material、Thread payload body、その他の Agent 状態は返されない

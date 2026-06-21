@@ -1,125 +1,125 @@
 ## ADDED Requirements
 
-### Requirement: Tool definitions and availability
+### Requirement: Tool 定義と可用性
 
-AIAgent Durable Object SHALL maintain a versioned Agent-local Tool catalog.
+AIAgent Durable Object は、版管理された Agent-local Tool カタログを維持 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-Agent は外界へ作用するために Tool を呼ぶが、どの Tool が使えるか、どの入力/出力 schema を持つか、承認が必要かを実行時に説明できなければならない。Extension が Tool を追加しても Agent の所有境界と authorization が崩れてはならない。
+Agent は外界へ作用するために Tool を呼ぶが、どの Tool が使えるか、どの入力/出力スキーマを持つか、承認が必要かを実行時に説明できなければならない。Extension が Tool を追加しても Agent の所有境界と認可が崩れてはならない。
 
-**Requirement**
+**要件**
 
-- AIAgent Durable Object MUST own the enabled ToolDefinition catalog for each Agent.
-- ToolDefinition MUST include stable ID, version, display name, description, input schema, output schema, approval default, optional `installation_id`, and RPC target.
-- Tool availability MUST be versioned so AgentRun snapshots can record the Tool set used during decision making.
-- Disabled, revoked, or uninstalled Extension Tools MUST NOT be invokable by new Runs.
+- AIAgent Durable Object は、各 Agent の有効な ToolDefinition カタログを所有 MUST。
+- ToolDefinition は安定 ID、版、表示名、説明、入力スキーマ、出力スキーマ、既定の承認要否、任意の `installation_id`、RPC 対象を含める MUST。
+- Tool の利用可否は版管理され、AgentRun スナップショットが判断時に使用した Tool 集合を記録できるようにする MUST。
+- 無効、revoked、またはアンインストール済み状態の Extension Tool は、新しい Run から呼び出し可能であって MUST NOT。
 
-#### Scenario: ListTools returns the Agent-local available Tool catalog (AGENT-TOOL-BE-S001)
+#### Scenario: ListTools が Agent-local の利用可能な Tool カタログを返す (AGENT-TOOL-BE-S001)
 
-- **GIVEN** an Agent has built-in Tools and active Extension-provided Tools
-- **WHEN** an authorized Client Service principal calls `ListTools`
-- **THEN** the response returns Tool definitions available to that Agent with version, approval policy, installation ownership, and target metadata
-- **AND** Tools from disabled or uninstalled Installations are excluded or explicitly marked unavailable according to query options
+- **GIVEN** ある Agent に組み込み Tool と有効な Extension 提供 Tool がある
+- **WHEN** 認可済み Client Service principal が `ListTools` を呼ぶ
+- **THEN** 応答は、その Agent で利用可能な Tool definition を版、承認ポリシー、Installation 所有関係、対象メタデータとともに返す
+- **AND** 無効またはアンインストール済み状態の Installation 由来の Tool は、照会条件に従って除外されるか、明示的に利用不可として示される
 
-#### Scenario: Disabled Extension Tool cannot be invoked by a new Run (AGENT-TOOL-BE-S002)
+#### Scenario: 無効状態の Extension Tool は新しい Run から呼び出せない (AGENT-TOOL-BE-S002)
 
-- **GIVEN** Tool `calendar.create_event` belongs to Extension Installation `inst-1`
-- **WHEN** `inst-1` is disabled or uninstalled before a new Run starts
-- **THEN** the Tool is absent from the Run's available Tool set snapshot
-- **AND** any attempt to invoke it is rejected with a capability precondition error
+- **GIVEN** Tool `calendar.create_event` が Extension Installation `inst-1` に属している
+- **WHEN** 新しい Run が開始する前に `inst-1` が無効またはアンインストール済みになる
+- **THEN** その Tool は Run の利用可能 Tool 集合スナップショットに含まれない
+- **AND** 呼び出しを試みた場合は capability 事前条件エラーとして拒否される
 
-### Requirement: ToolInvocation lifecycle and approval
+### Requirement: ToolInvocation ライフサイクルと承認
 
-ToolInvocation SHALL track lifecycle, ownership, approval, and audit state.
+ToolInvocation はライフサイクル、所有関係、承認、監査状態を追跡 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Tool は外部 system に作用するため、実行状態、承認、入力/出力、再試行、失敗理由を追跡できる必要がある。人間の承認が必要な Tool は、明示的な承認なしに実行されてはならない。
 
-**Requirement**
+**要件**
 
-- ToolInvocation MUST belong to one Agent, Thread, and Run.
-- ToolInvocation MUST track lifecycle states proposed, pending_approval, approved, running, succeeded, failed, outcome_unknown, and cancelled.
-- ToolInvocation MUST include Tool ID, installation ID when applicable, idempotency key, input/output reference, status, approval record, attempt count, timestamps, and causal Event/Run links.
-- Approval and rejection commands MUST require authorized Client Service scope and MUST be recorded as audit Events.
+- ToolInvocation は一つの Agent、Thread、Run に所属 MUST。
+- ToolInvocation はライフサイクル状態として `proposed`、`pending_approval`、`approved`、`running`、`succeeded`、`failed`、`outcome_unknown`、`cancelled` を追跡 MUST。
+- ToolInvocation は Tool ID、該当する場合の Installation ID、idempotency key、入力/出力参照、`status`、承認記録、試行回数、時刻、因果 Event/Run link を含める MUST。
+- 承認と却下の command は、認可済み Client Service scope を要求 MUST し、監査 Event として記録 MUST。
 
-#### Scenario: Approval-required ToolInvocation waits before execution (AGENT-TOOL-BE-S003)
+#### Scenario: 承認が必要な ToolInvocation は実行前に待機する (AGENT-TOOL-BE-S003)
 
-- **GIVEN** a Run decides to invoke a Tool whose definition requires approval by default
-- **WHEN** the ToolInvocation is created
-- **THEN** its status becomes `pending_approval`
-- **AND** no Provider RPC is sent until an authorized approval is recorded
-- **AND** the pending approval is visible through ToolInvocation query RPCs
+- **GIVEN** Run が、definition で既定の承認を要求する Tool の呼び出しを決定している
+- **WHEN** ToolInvocation が作成される
+- **THEN** その `status` は `pending_approval` になる
+- **AND** 認可済み承認が記録されるまで Provider RPC は送信されない
+- **AND** 承認待ちは ToolInvocation 照会 RPC から確認できる
 
-#### Scenario: Authorized approval transitions ToolInvocation state (AGENT-TOOL-BE-S004)
+#### Scenario: 認可済み承認が ToolInvocation 状態を遷移させる (AGENT-TOOL-BE-S004)
 
-- **GIVEN** a ToolInvocation is `pending_approval`
-- **WHEN** an authorized Client Service principal calls `ApproveInvocation`
-- **THEN** the approval record captures actor, timestamp, decision, and optional rationale
-- **AND** the ToolInvocation transitions to `approved` and becomes eligible for execution
-- **AND** unauthorized approval or rejection attempts are denied without changing state
+- **GIVEN** ToolInvocation が `pending_approval` である
+- **WHEN** 認可済み Client Service principal が `ApproveInvocation` を呼ぶ
+- **THEN** 承認記録は実行者、時刻、判断、任意の理由を記録する
+- **AND** ToolInvocation は `approved` に遷移し、実行対象になれる
+- **AND** 認可されていない承認または却下の試行は、状態を変えずに拒否される
 
-### Requirement: Signed Tool Provider RPC
+### Requirement: 署名付き Tool Provider RPC
 
-Agent-to-Provider Tool calls SHALL use signed Protobuf RPC metadata.
+Agent-to-Provider Tool 呼び出しは、署名付き Protobuf RPC メタデータを使用 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Extension Provider が Tool を実装する場合、Agent から Provider への呼び出しも改ざん・なりすまし・replay を防ぐ必要がある。Provider は Agent が発行した正当な ToolInvocation であることを検証できなければならない。
 
-**Requirement**
+**要件**
 
-- Agent-to-Provider Tool requests MUST use Protobuf RPC with Connect + binary Protobuf as the mandatory profile.
-- Agent API TypeSpec MUST define the Provider-facing `ExtensionToolService` in `packages/agent/src/typespec/src/services/extension-tool.tsp` or an equivalent service module, with unary `InvokeTool`, `GetOperation`, and `CancelOperation` methods.
-- AIAgent Durable Object MUST call Extension Tool Providers through generated Protobuf client descriptors, not through raw ad-hoc JSON or REST requests.
-- Tool Provider RPC requests MUST be signed by Agent-controlled signing material and MUST include service, method, `agent_id`, `installation_id`, `tool_id`, `invocation_id`, timestamp, nonce, idempotency key, and raw protobuf body digest in the signature base.
-- AIAgent Durable Object MUST store outgoing request digest, nonce, attempt, Provider operation ID when present, and timeout/retry policy.
-- Tool Provider responses MUST be validated against expected invocation identity before committing result state.
+- Agent-to-Provider Tool リクエストは、必須 profile として Connect + binary Protobuf を用いる Protobuf RPC を使用 MUST。
+- Agent API TypeSpec は、unary `InvokeTool`、`GetOperation`、`CancelOperation` method を持つ Provider-facing `ExtensionToolService` を `packages/agent/src/typespec/src/services/extension-tool.tsp` または同等の service module で定義 MUST。
+- AIAgent Durable Object は、生 ad-hoc JSON や REST リクエストではなく、生成済み Protobuf client descriptor を通じて Extension Tool Provider を呼び出す MUST。
+- Tool Provider RPC リクエストは Agent-controlled 署名 material により署名 MUST し、signature base に service、method、`agent_id`、`installation_id`、`tool_id`、`invocation_id`、時刻、nonce、idempotency key、生 protobuf body digest を含める MUST。
+- AIAgent Durable Object は送信リクエスト digest、nonce、試行、存在する場合の Provider operation ID、timeout/retry policy を保存 MUST。
+- Tool Provider 応答は、結果状態を確定する前に想定 invocation identity と照合して検証 MUST。
 
-#### Scenario: Agent invokes Extension Tool with signed binary Protobuf RPC (AGENT-TOOL-BE-S005)
+#### Scenario: Agent が署名付き binary Protobuf RPC で Extension Tool を呼び出す (AGENT-TOOL-BE-S005)
 
-- **GIVEN** an approved ToolInvocation targets an Extension Provider Tool endpoint
-- **WHEN** AIAgent Durable Object executes the invocation
-- **THEN** it sends `ExtensionToolService.InvokeTool` as a Connect unary RPC encoded as binary Protobuf through the generated Provider client
-- **AND** the request includes signature metadata covering invocation identity and raw body digest
-- **AND** the outgoing attempt is recorded with digest, nonce, and Provider target
+- **GIVEN** `approved` 状態の ToolInvocation が Extension Provider Tool エンドポイントを対象にしている
+- **WHEN** AIAgent Durable Object が invocation を実行する
+- **THEN** 生成済み Provider client を通じて、binary Protobuf でエンコードされた Connect unary RPC として `ExtensionToolService.InvokeTool` を送信する
+- **AND** リクエストには invocation identity と生 body digest を対象に含む signature メタデータが含まれる
+- **AND** 送信試行は digest、nonce、Provider 対象とともに記録される
 
-### Requirement: Tool results and reconciliation
+### Requirement: Tool 結果と照合
 
-Tool results SHALL return to the originating Thread and support reconciliation.
+Tool 結果は発生元 Thread に戻り、照合を支援 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Tool の結果は Agent の次の判断に入る Event でなければならない。外部 timeout で結果が不明な場合も、同一 invocation identity で後から照会・収束できる必要がある。
 
-**Requirement**
+**要件**
 
-- Tool success or failure MUST append a `tool.invocation.succeeded` or `tool.invocation.failed` AgentEvent to the same Thread as the ToolInvocation.
-- Tool result payloads MUST be stored inline or by immutable R2 reference with digest metadata according to size threshold.
-- If external execution outcome is unknown after timeout or ambiguous failure, ToolInvocation MUST enter `outcome_unknown` and MUST support Provider operation reconciliation through `ExtensionToolService.GetOperation`.
-- Cancellation of a running or unknown Provider operation MUST call `ExtensionToolService.CancelOperation` when the Provider operation identity is known and the Tool definition permits cancellation.
-- Reconciliation MUST NOT create duplicate success/failure Events for the same invocation outcome.
+- Tool の成功または失敗は、ToolInvocation と同じ Thread に `tool.invocation.succeeded` または `tool.invocation.failed` AgentEvent を追加 MUST。
+- Tool 結果 payload は、サイズ閾値に従って inline または digest メタデータ付き immutable R2 参照として保存 MUST。
+- timeout または曖昧な失敗の後で外部実行結果が不明な場合、ToolInvocation は `outcome_unknown` に入り、`ExtensionToolService.GetOperation` を通じた Provider operation 照合を支援 MUST。
+- `running` または不明な Provider operation の取消は、Provider operation identity が既知で Tool definition が取消を許可する場合に `ExtensionToolService.CancelOperation` を呼び出す MUST。
+- 照合は、同じ invocation 結果に対して重複する成功/失敗 Event を作成して MUST NOT。
 
-#### Scenario: Tool result Event returns to the same Thread (AGENT-TOOL-BE-S006)
+#### Scenario: Tool result Event が同じ Thread に戻る (AGENT-TOOL-BE-S006)
 
-- **GIVEN** ToolInvocation `inv-1` belongs to Thread A and Run `run-1`
-- **WHEN** the Provider returns a successful result
-- **THEN** ToolInvocation `inv-1` becomes `succeeded`
-- **AND** a `tool.invocation.succeeded` AgentEvent is appended to Thread A with causal link to `run-1` and `inv-1`
-- **AND** pending Run work is created or coalesced for the result Event
+- **GIVEN** ToolInvocation `inv-1` が Thread A と Run `run-1` に属している
+- **WHEN** Provider が成功結果を返す
+- **THEN** ToolInvocation `inv-1` は `succeeded` になる
+- **AND** `run-1` と `inv-1` への因果 link を持つ `tool.invocation.succeeded` AgentEvent が Thread A に追加される
+- **AND** 結果 Event のための pending Run work が作成または coalesce される
 
-#### Scenario: Unknown Tool outcome is reconciled by operation status (AGENT-TOOL-BE-S007)
+#### Scenario: 不明な Tool 結果が operation 状態で照合される (AGENT-TOOL-BE-S007)
 
-- **GIVEN** a Tool Provider RPC times out after the Provider may have accepted the operation
-- **WHEN** AIAgent Durable Object cannot determine the outcome from the RPC response
-- **THEN** the ToolInvocation becomes `outcome_unknown`
-- **AND** reconciliation calls `ExtensionToolService.GetOperation` using the same invocation identity and Provider operation ID when present
-- **AND** the final succeeded, failed, or cancelled status is committed once without duplicate result Events
+- **GIVEN** Provider が operation を受理した可能性がある後に Tool Provider RPC が timeout する
+- **WHEN** AIAgent Durable Object が RPC 応答から結果を判定できない
+- **THEN** ToolInvocation は `outcome_unknown` になる
+- **AND** 照合は、同じ invocation identity と、存在する場合は Provider operation ID を使って `ExtensionToolService.GetOperation` を呼ぶ
+- **AND** 最終的な `succeeded`、`failed`、または `cancelled` 状態は、重複する結果 Event なしで一度だけ確定される
 
-#### Scenario: Tool cancellation propagates to Provider operation (AGENT-TOOL-BE-S008)
+#### Scenario: Tool 取消が Provider operation に伝播する (AGENT-TOOL-BE-S008)
 
-- **GIVEN** ToolInvocation `inv-2` has a running Provider operation that supports cancellation
-- **WHEN** an authorized cancellation or interrupt policy cancels `inv-2`
-- **THEN** AIAgent Durable Object calls `ExtensionToolService.CancelOperation` through the generated Provider client with signed binary Protobuf metadata
-- **AND** the ToolInvocation records the cancellation attempt, Provider operation identity, and final cancelled or outcome_unknown status without appending duplicate result Events
+- **GIVEN** ToolInvocation `inv-2` が取消をサポートする `running` Provider operation を持っている
+- **WHEN** 認可済み取消または interrupt policy が `inv-2` を cancel する
+- **THEN** AIAgent Durable Object は、署名済み binary Protobuf メタデータ付きで生成済み Provider client を通じて `ExtensionToolService.CancelOperation` を呼ぶ
+- **AND** ToolInvocation は重複する結果 Event を追加せず、取消試行、Provider operation identity、最終的な `cancelled` または `outcome_unknown` 状態を記録する

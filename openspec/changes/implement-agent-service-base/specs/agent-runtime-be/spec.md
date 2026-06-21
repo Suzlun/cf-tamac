@@ -1,149 +1,149 @@
 ## ADDED Requirements
 
-### Requirement: Agent-local Run scheduler
+### Requirement: Agent-local Run scheduler による実行制御
 
-AIAgent Durable Object SHALL schedule AgentRun work through coalesced Agent-local Queue wakes.
+AIAgent Durable Object は、coalesce 済み Agent-local Queue wake を通じて AgentRun work を schedule SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Agent は Event を受け取ったあと、外部 queue consumer を必要とせず自分自身の SQLite-backed runtime 上で順次処理したい。Event 受理は高速に返しつつ、Run は Agent ごとの一貫した順序と公平性で進む必要がある。
 
-**Requirement**
+**要件**
 
-- AIAgent Durable Object MUST create or coalesce pending AgentRun work when an Event is accepted.
-- Agent-local Queue MUST enqueue coalesced scheduler wake callbacks instead of one queue item per Event.
-- AIAgent Durable Object MUST allow at most one active AgentRun per Agent at a time.
-- Scheduler selection MUST use priority descending, `last_served_at` ascending, and `pending_since` ascending as the minimum fairness rule.
+- AIAgent Durable Object は、Event が受理されたときに pending AgentRun work を作成または coalesce MUST。
+- Agent-local Queue は、Event ごとに一つの queue item を入れるのではなく、coalesce 済み scheduler wake callback を enqueue MUST。
+- AIAgent Durable Object は、同時に Agent ごと最大一つの有効 AgentRun だけを許可 MUST。
+- Scheduler 選択は、最小限の公平性規則として priority descending、`last_served_at` ascending、`pending_since` ascending を使用 MUST。
 
-#### Scenario: Event acceptance coalesces scheduler wake (AGENT-RUNTIME-BE-S001)
+#### Scenario: Event acceptance が scheduler wake を coalesce する (AGENT-RUNTIME-BE-S001)
 
-- **GIVEN** multiple Events are accepted for one or more Threads while a scheduler wake is already pending
-- **WHEN** AIAgent Durable Object records those Events
-- **THEN** it creates or updates pending Run records for affected Threads
-- **AND** it does not enqueue duplicate wake callbacks beyond the coalesced scheduler wake
+- **GIVEN** scheduler wake がすでに pending の間に、一つ以上の Thread に対して複数の Event が受理されている
+- **WHEN** AIAgent Durable Object がそれらの Event を記録する
+- **THEN** 影響を受ける Thread の pending Run 記録を作成または更新する
+- **AND** coalesce 済み scheduler wake を超える重複 wake callback は enqueue しない
 
-#### Scenario: Only one AgentRun is active per Agent (AGENT-RUNTIME-BE-S002)
+#### Scenario: Agent ごとに一つの AgentRun だけが有効になる (AGENT-RUNTIME-BE-S002)
 
-- **GIVEN** Thread A has a running AgentRun and Thread B has pending Events
-- **WHEN** the scheduler wake executes
-- **THEN** Thread B remains pending until Thread A reaches a terminal or waiting state that releases the active Run slot
-- **AND** no second active Run executes concurrently in the same AIAgent Durable Object
+- **GIVEN** Thread A に running AgentRun があり、Thread B に pending Events がある
+- **WHEN** scheduler wake が実行される
+- **THEN** Thread B は、Thread A が有効 Run slot を解放する terminal または waiting 状態に到達するまで pending のままである
+- **AND** 同じ AIAgent Durable Object 内で二つ目の有効 Run は同時実行されない
 
-#### Scenario: Scheduler selects pending Thread fairly (AGENT-RUNTIME-BE-S003)
+#### Scenario: Scheduler が pending Thread を公平に選択する (AGENT-RUNTIME-BE-S003)
 
-- **GIVEN** several Threads have pending Runs with different priority, `last_served_at`, and `pending_since`
-- **WHEN** no AgentRun is active
-- **THEN** the scheduler selects the highest priority pending Run
-- **AND** ties are resolved by older `last_served_at` and then older `pending_since`
+- **GIVEN** 複数の Thread が、それぞれ異なる priority、`last_served_at`、`pending_since` を持つ pending Run を持っている
+- **WHEN** 有効な AgentRun がない
+- **THEN** scheduler は最も priority が高い pending Run を選択する
+- **AND** 同順位は古い `last_served_at`、次に古い `pending_since` で解決される
 
-### Requirement: Immutable Run input snapshot
+### Requirement: immutable Run 入力スナップショットの固定
 
-AgentRun SHALL execute from an immutable input snapshot.
+AgentRun は immutable 入力スナップショットから実行 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-Agent の判断は、どの Event、Memory、Config、Tool set を見て行われたか説明可能でなければならない。実行中に新しい Event が到着しても、その Run の入力が途中で変わると監査や再実行が不可能になる。
+Agent の判断は、どの Event、Memory、Config、Tool 集合を見て行われたか説明可能でなければならない。実行中に新しい Event が到着しても、その Run の入力が途中で変わると監査や再実行が不可能になる。
 
-**Requirement**
+**要件**
 
-- AgentRun MUST freeze an input snapshot at start.
-- The snapshot MUST include trigger Event range, ThreadMemory version, latest ready Compaction ID, uncompacted Event upper sequence, Agent config version, available Tool set version, and Extension Installation version.
-- New Events arriving during a Run MUST be appended durably but MUST NOT mutate the running snapshot.
-- Run result commit MUST verify cancellation, generation, lifecycle, config, and capability versions before applying state changes.
+- AgentRun は開始時に入力スナップショットを固定 MUST。
+- スナップショットは trigger Event 範囲、ThreadMemory 版、latest ready Compaction ID、未 Compaction Event 上限 sequence、Agent config 版、利用可能 Tool 集合版、Extension Installation 版を含める MUST。
+- Run 中に到着した新しい Event は永続的に追加 MUST だが、running スナップショットを変更して MUST NOT。
+- Run 結果確定は、状態変更を適用する前に取消、generation、ライフサイクル、config、capability 版を検証 MUST。
 
-#### Scenario: Same Thread Event arriving during a Run creates later work (AGENT-RUNTIME-BE-S004)
+#### Scenario: Run 中に到着した同じ Thread の Event が後続 work を作る (AGENT-RUNTIME-BE-S004)
 
-- **GIVEN** a Run is executing for Thread A from snapshot `snap-1`
-- **WHEN** a new Event is accepted for Thread A while the Run awaits model or Tool output
-- **THEN** the new Event is appended to Thread A after the snapshot upper sequence
-- **AND** the running Run continues using `snap-1`
-- **AND** a later pending Run is created or updated to process the new Event
+- **GIVEN** Run がスナップショット `snap-1` から Thread A に対して実行されている
+- **WHEN** Run が model または Tool 出力を待機している間に、Thread A の新しい Event が受理される
+- **THEN** 新しい Event はスナップショット上限 sequence の後に Thread A へ追加される
+- **AND** running Run は `snap-1` の使用を続ける
+- **AND** 新しい Event を処理するため、後続の pending Run が作成または更新される
 
-#### Scenario: Different Thread Event waits without contaminating active context (AGENT-RUNTIME-BE-S005)
+#### Scenario: 別 Thread の Event は有効文脈を混ぜずに待機する (AGENT-RUNTIME-BE-S005)
 
-- **GIVEN** a Run is executing for Thread A
-- **WHEN** an Event is accepted for Thread B
-- **THEN** the Thread B Event is appended immediately and creates pending work for Thread B
-- **AND** Thread A's prompt/context does not include Thread B's Event
-- **AND** Thread B is scheduled according to fairness after the active Run releases the slot
+- **GIVEN** Run が Thread A に対して実行されている
+- **WHEN** Thread B の Event が受理される
+- **THEN** Thread B Event はすぐに追加され、Thread B の pending work を作成する
+- **AND** Thread A の prompt/文脈には Thread B の Event は含まれない
+- **AND** 有効 Run が slot を解放した後、Thread B は公平性に従って schedule される
 
-### Requirement: Interrupt and generation checks
+### Requirement: interrupt と generation 確認
 
-AIAgent Durable Object SHALL enforce interrupts and generation checks before Run commit.
+AIAgent Durable Object は Run 確定前に interrupt と generation 確認を強制 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-ユーザー取消、権限剥奪、Extension uninstall のような interrupt は、実行中の model/tool call を物理的に止められない場合でも、戻ってきた結果が誤って commit されないようにしなければならない。
+ユーザー取消、権限剥奪、Extension uninstall のような interrupt は、実行中の model/Tool call を物理的に止められない場合でも、戻ってきた結果が誤って確定されないようにしなければならない。
 
-**Requirement**
+**要件**
 
-- AIAgent Durable Object MUST record interrupt flags for active Runs when cancellation, human override, permission revocation, or Extension uninstall Events require it.
-- AgentRun commit MUST compare snapshot generation and interrupt status before mutating Agent state.
-- Interrupted or cancelled Runs MUST end in an observable terminal status and MUST append or expose audit details explaining the interruption.
+- AIAgent Durable Object は、取消、human override、permission revocation、または Extension uninstall Event が要求する場合、有効 Run に interrupt flag を記録 MUST。
+- AgentRun 確定は、Agent 状態を変更する前にスナップショット generation と interrupt 状態を比較 MUST。
+- `interrupted` または `cancelled` の Run は観測可能な terminal 状態で終了 MUST し、interrupt を説明する監査詳細を追加または公開 MUST。
 
-#### Scenario: Interrupt prevents stale Run result commit (AGENT-RUNTIME-BE-S006)
+#### Scenario: interrupt が stale Run result commit を防ぐ (AGENT-RUNTIME-BE-S006)
 
-- **GIVEN** a Run is awaiting an external model or Tool result
-- **WHEN** a `user.cancel`, `human.override`, permission revocation, or Extension uninstall interrupt is recorded for that Run
-- **THEN** the Run is marked interrupted or cancelled according to policy
-- **AND** any later stale result from the external call is discarded by generation check
-- **AND** an audit Event records the interrupt reason
+- **GIVEN** Run が外部 model または Tool 結果を待機している
+- **WHEN** その Run に `user.cancel`、`human.override`、permission revocation、または Extension uninstall interrupt が記録される
+- **THEN** Run は policy に従って `interrupted` または `cancelled` として mark される
+- **AND** 外部 call から後で戻った stale result は generation 確認により破棄される
+- **AND** 監査 Event が interrupt 理由を記録する
 
-### Requirement: Harness decision execution and budget
+### Requirement: Harness 判断実行と予算
 
-Harness execution SHALL commit authorized decisions within configured budget boundaries.
+Harness 実行は構成済み予算境界内で認可済み判断を確定 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-Agent は単に応答文を返すだけでなく、状態更新、記憶、Schedule、Tool、Delivery、人間承認など複数の action を判断する。無限 loop や過剰な外部呼び出しを避けるため、Run 単位と日次/Extension/Tool 単位の budget が必要である。
+Agent は単に応答文を返すだけでなく、状態更新、記憶、Schedule、Tool、Delivery、人間承認など複数の action を判断する。無限 loop や過剰な外部呼び出しを避けるため、Run 単位と日次/Extension/Tool 単位の予算が必要である。
 
-**Requirement**
+**要件**
 
-- Harness MUST support decision types for stop, update state, write memory, create schedule, invoke tool, respond through delivery context, request human approval, and emit Event.
-- Harness MUST enforce configured limits for model calls, Tool calls, tokens, loops, timeout, cooldown, daily budget, Extension budget, and Tool budget.
-- Decision commit MUST be transactional where Agent-owned state changes are involved and MUST produce observable Run output and audit details.
-- Budget exhaustion MUST stop or fail the Run with a classified reason without partially committing unauthorized actions.
+- Harness は `stop`、`update_state`、`write_memory`、`create_schedule`、`invoke_tool`、DeliveryContext を通じた `respond`、`request_human_approval`、`emit_event` の判断 type を支援 MUST。
+- Harness は model call、Tool call、token、loop、timeout、cooldown、日次予算、Extension 予算、Tool 予算の構成済み上限を強制 MUST。
+- 判断確定は Agent-owned 状態変更が関係する場合は transactional である MUST し、観測可能な Run 出力と監査詳細を生成 MUST。
+- 予算枯渇は、未認可 action を部分的に確定せず、分類済み理由とともに Run を stop または fail MUST。
 
-#### Scenario: Harness decision commits Agent-owned actions (AGENT-RUNTIME-BE-S007)
+#### Scenario: Harness 判断が Agent-owned action を確定する (AGENT-RUNTIME-BE-S007)
 
-- **GIVEN** a Run snapshot is executing and the model returns decisions to update state, write memory, create a Schedule, invoke a Tool, and respond through a DeliveryContext
-- **WHEN** the decisions pass validation, authorization, and budget checks
-- **THEN** Agent-owned state changes are committed with causal links to the Run
-- **AND** ToolInvocation, Schedule, Memory, and response/delivery records reference the same Run and Thread
+- **GIVEN** Run スナップショットが実行中で、model が `update_state`、`write_memory`、Schedule 作成、Tool 呼び出し、DeliveryContext を通じた `respond` の判断を返している
+- **WHEN** 判断が検証、認可、予算確認を通過する
+- **THEN** Agent-owned 状態変更は Run への因果 link とともに確定される
+- **AND** ToolInvocation、Schedule、Memory、応答/Delivery 記録は同じ Run と Thread を参照する
 
-#### Scenario: Budget exhaustion stops the Run safely (AGENT-RUNTIME-BE-S008)
+#### Scenario: 予算枯渇が Run を安全に停止する (AGENT-RUNTIME-BE-S008)
 
-- **GIVEN** a Run reaches a configured model call, Tool call, token, loop, timeout, or budget limit
-- **WHEN** the harness attempts another decision step
-- **THEN** the Run stops or fails with a budget-specific reason
-- **AND** no further Tool, Schedule, Delivery, or state mutation is committed after the limit is reached
-- **AND** metrics and audit details include the exceeded budget dimension
+- **GIVEN** Run が構成済み model call、Tool call、token、loop、timeout、または予算上限に到達している
+- **WHEN** harness が次の判断手順を試みる
+- **THEN** Run は予算固有の理由とともに stop または fail する
+- **AND** 上限到達後は、それ以上の Tool、Schedule、Delivery、状態変更は確定されない
+- **AND** metrics と監査詳細には超過した予算次元が含まれる
 
-### Requirement: Run query and cancellation operations
+### Requirement: Run 照会と取消 operation
 
-Agent Service は Run の参照と取消を Agent scope、snapshot、idempotency に従って処理 MUST。
+Agent Service は Run の参照と取消を Agent scope、スナップショット、idempotency に従って処理 MUST。
 
-**Customer Context**
+**利用者文脈**
 
-管理 UI と運用者は、実行中または過去の Run がどの snapshot で動いたかを確認し、必要に応じて安全に取消したい。Run query が別 Thread を混ぜたり、取消が stale result commit を許すと、Agent の説明可能性と安全性が失われる。
+管理 UI と運用者は、実行中または過去の Run がどのスナップショットで動いたかを確認し、必要に応じて安全に取り消したい。Run 照会が別 Thread を混ぜたり、取消が stale result 確定を許すと、Agent の説明可能性と安全性が失われる。
 
-**Requirement**
+**要件**
 
-- `AgentRunService.GetRun` は対象 Agent 内の Run status、Thread、snapshot reference、trigger Event range、decision summary、interrupt/cancel metadata、safe error detail を返す MUST。
-- `AgentRunService.ListRuns` は Agent、Thread、status、time range、pagination filters を適用し、別 Agent の Run を返す MUST NOT。
-- `AgentRunService.CancelRun` は idempotency key を使い、pending/running/waiting Run を cancelled または interrupted policy に遷移させ、terminal Run への重複取消は記録済み結果または stable precondition result に収束 MUST。
-- CancelRun 後の Run commit は generation/interrupt check により stale result を破棄 MUST。
+- `AgentRunService.GetRun` は対象 Agent 内の Run 状態、Thread、スナップショット参照、trigger Event 範囲、判断要約、interrupt/cancel メタデータ、安全なエラー詳細を返す MUST。
+- `AgentRunService.ListRuns` は Agent、Thread、状態、時間範囲、ページング絞り込み条件を適用し、別 Agent の Run を返す MUST NOT。
+- `AgentRunService.CancelRun` は idempotency key を使い、pending/running/waiting Run を cancelled または interrupted policy に遷移させ、terminal Run への重複取消は記録済み結果または安定した事前条件結果に収束 MUST。
+- CancelRun 後の Run 確定は generation/interrupt 確認により stale result を破棄 MUST。
 
-#### Scenario: GetRun and ListRuns expose immutable snapshots (AGENT-RUNTIME-BE-S009)
+#### Scenario: GetRun と ListRuns が immutable スナップショットを公開する (AGENT-RUNTIME-BE-S009)
 
-- **GIVEN** `agent-alpha` has Runs across multiple Threads and statuses
-- **WHEN** an authorized principal calls `GetRun` and `ListRuns` with Thread and status filters
-- **THEN** responses include only `agent-alpha` Runs with status, immutable snapshot reference, trigger range, causal links, and safe error metadata
-- **AND** pagination cursors or Run IDs cannot expose Runs from another Agent
+- **GIVEN** `agent-alpha` に複数の Thread と状態にまたがる Run がある
+- **WHEN** 認可済み principal が Thread と状態絞り込み条件を指定して `GetRun` と `ListRuns` を呼ぶ
+- **THEN** 応答には、状態、immutable スナップショット参照、trigger 範囲、因果 link、安全なエラーメタデータを持つ `agent-alpha` の Run だけが含まれる
+- **AND** ページング cursor または Run ID は別 Agent の Run を露出できない
 
-#### Scenario: CancelRun interrupts pending or running work idempotently (AGENT-RUNTIME-BE-S010)
+#### Scenario: CancelRun が pending または running work を冪等に interrupt する (AGENT-RUNTIME-BE-S010)
 
-- **GIVEN** a pending or running Run exists for Thread A
-- **WHEN** an authorized principal calls `CancelRun` with idempotency key `cancel-1`
-- **THEN** the Run records cancellation or interruption metadata and blocks later stale commit
-- **AND** repeating `CancelRun` with the same body digest and key returns the same result without duplicate audit Events
+- **GIVEN** Thread A に pending または running Run が存在する
+- **WHEN** 認可済み principal が idempotency key `cancel-1` で `CancelRun` を呼ぶ
+- **THEN** Run は取消または interrupt メタデータを記録し、後続の stale commit を block する
+- **AND** 同じ body digest と key で `CancelRun` を繰り返すと、重複する監査 Event なしで同じ結果を返す

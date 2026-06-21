@@ -1,82 +1,82 @@
 ## ADDED Requirements
 
-### Requirement: Agent-owned thread-scoped Schedule
+### Requirement: Agent-owned Thread-scoped Schedule の所有
 
-AIAgent Durable Object SHALL own Schedules that fire into a specific Thread.
+AIAgent Durable Object は特定の Thread に fire する Schedule を所有 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Agent は外部 Event がなくても、将来時刻や反復予定によって自律的に行動する必要がある。Schedule は外部 Calendar ではなく Agent 内で Event を発生させる能力であり、必ず文脈となる Thread に紐づく必要がある。
 
-**Requirement**
+**要件**
 
-- Schedule MUST be owned by AIAgent Durable Object and MUST be scoped to one Agent.
-- Schedule MUST reference a Thread or resolvable `thread_key` and MUST fire into the same Thread as a `schedule.triggered` AgentEvent.
-- Schedule management RPCs MUST require `agent_id`, authorization, idempotency key for commands, and final Agent-local authorization.
-- Creating, updating, firing, and cancelling Schedule records MUST be auditable.
+- Schedule は AIAgent Durable Object に所有される MUST し、一つの Agent に scoped される MUST。
+- Schedule は Thread または解決可能な `thread_key` を参照 MUST し、`schedule.triggered` AgentEvent として同じ Thread に fire MUST。
+- Schedule 管理 RPC は `agent_id`、認可、command 用 idempotency key、final Agent-local authorization を要求 MUST。
+- Schedule 記録の作成、更新、fire、取消は監査可能である MUST。
 
-#### Scenario: CreateSchedule requires a Thread context (AGENT-SCHEDULE-BE-S001)
+#### Scenario: CreateSchedule が Thread context を要求する (AGENT-SCHEDULE-BE-S001)
 
-- **GIVEN** an authorized Client Service principal wants to schedule future Agent work
-- **WHEN** it calls `CreateSchedule` without a Thread ID or valid `thread_key`
-- **THEN** Agent Service rejects the request with invalid argument
-- **AND** no Agent-local runtime schedule or Schedule record is created
+- **GIVEN** 認可済み Client Service principal が将来の Agent work を schedule したい
+- **WHEN** Thread ID または有効な `thread_key` なしで `CreateSchedule` を呼ぶ
+- **THEN** Agent Service はリクエストを `invalid_argument` として拒否する
+- **AND** Agent-local runtime schedule または Schedule 記録は作成されない
 
-#### Scenario: Schedule firing appends a `schedule.triggered` Event (AGENT-SCHEDULE-BE-S002)
+#### Scenario: Schedule firing が `schedule.triggered` Event を append する (AGENT-SCHEDULE-BE-S002)
 
-- **GIVEN** an active one-shot Schedule is bound to Thread A
-- **WHEN** its scheduled time arrives
-- **THEN** AIAgent Durable Object appends a `schedule.triggered` AgentEvent to Thread A
-- **AND** pending Run work is created or coalesced for Thread A
-- **AND** the Schedule record reflects the firing timestamp and outcome
+- **GIVEN** 有効な one-shot Schedule が Thread A に bind されている
+- **WHEN** schedule 済み時刻が到来する
+- **THEN** AIAgent Durable Object は Thread A に `schedule.triggered` AgentEvent を append する
+- **AND** Thread A の pending Run work が作成または coalesced される
+- **AND** Schedule 記録は fire 時刻と結果を反映する
 
-### Requirement: Schedule overlap and idempotency
+### Requirement: Schedule overlap と idempotency
 
-Schedule execution SHALL apply overlap policy and idempotency controls.
+Schedule execution は overlap policy と idempotency controls を適用 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Interval Schedule が長い処理と重なると、同じ目的の Run が重複して外部作用を起こす可能性がある。Schedule ごとに重複時の扱いを明示し、発火処理も冪等にする必要がある。
 
-**Requirement**
+**要件**
 
-- Repeating Schedules MUST define an overlap policy of skip, coalesce, or queue-next.
-- Schedule firing MUST be idempotent by Agent, Schedule, fire time or tick identity, and generated Event idempotency key.
-- AIAgent Durable Object MUST NOT create duplicate `schedule.triggered` Events for the same Schedule tick.
+- Repeating Schedule は skip、coalesce、queue-next の overlap policy を定義 MUST。
+- Schedule fire は Agent、Schedule、fire 時刻または tick identity、生成済み Event idempotency key により冪等である MUST。
+- AIAgent Durable Object は同じ Schedule tick に対して duplicate `schedule.triggered` Events を作成して MUST NOT。
 
-#### Scenario: Overlap policy prevents duplicate interval work (AGENT-SCHEDULE-BE-S003)
+#### Scenario: overlap policy が duplicate interval work を防ぐ (AGENT-SCHEDULE-BE-S003)
 
-- **GIVEN** a repeating Schedule tick occurs while prior work for the same Schedule is still active
-- **WHEN** the runtime callback executes
-- **THEN** AIAgent Durable Object applies the Schedule's overlap policy
-- **AND** skip, coalesce, or queue-next behavior is recorded without creating unintended duplicate Events
+- **GIVEN** 同じ Schedule の以前の work がまだ有効な間に repeating Schedule tick が発生している
+- **WHEN** runtime callback が実行される
+- **THEN** AIAgent Durable Object は Schedule の overlap policy を適用する
+- **AND** 意図しない重複 Event を作成せず、skip、coalesce、queue-next 振る舞いが記録される
 
-### Requirement: Schedule cancellation and Extension cleanup
+### Requirement: Schedule 取消と Extension cleanup
 
-Schedule cancellation SHALL prevent later firing and clean up Extension-owned schedules.
+Schedule 取消は後続 fire を防ぎ、Extension-owned Schedule を clean up SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 管理者や Extension uninstall は、将来発火する予定を確実に止める必要がある。Extension が作成した Schedule は、その Extension が使えない状態で外部作用を起こしてはならない。
 
-**Requirement**
+**要件**
 
-- CancelSchedule MUST be idempotent and MUST prevent future `schedule.triggered` Events for the cancelled Schedule.
-- Schedule records MUST retain cancellation reason, actor, timestamp, and audit link.
-- Schedules created by an Extension Installation MUST store `installation_id` and MUST be cancelled or disabled when that Installation is uninstalled or disabled.
+- CancelSchedule は冪等である MUST し、cancelled Schedule の future `schedule.triggered` Event を防止 MUST。
+- Schedule 記録は取消理由、実行者、時刻、監査 link を保持 MUST。
+- Extension Installation が作成した Schedule は `installation_id` を保存 MUST し、その Installation がアンインストール済みまたは無効になったときに `cancelled` または `disabled` になる MUST。
 
-#### Scenario: CancelSchedule prevents future firing (AGENT-SCHEDULE-BE-S004)
+#### Scenario: CancelSchedule が future firing を防ぐ (AGENT-SCHEDULE-BE-S004)
 
-- **GIVEN** an active Schedule exists for Thread A
-- **WHEN** an authorized principal calls `CancelSchedule`
-- **THEN** the Agent-local runtime schedule is cancelled
-- **AND** the Schedule record becomes cancelled with audit metadata
-- **AND** later runtime callbacks for the same Schedule identity do not append new Events
+- **GIVEN** Thread A に有効な Schedule が存在する
+- **WHEN** 認可済み principal が `CancelSchedule` を呼ぶ
+- **THEN** Agent-local runtime schedule は cancelled になる
+- **AND** Schedule 記録は監査メタデータ付きで cancelled になる
+- **AND** 同じ Schedule identity に対する後続 runtime callback は新しい Event を追加しない
 
-#### Scenario: Extension uninstall cancels its active Schedules (AGENT-SCHEDULE-BE-S005)
+#### Scenario: Extension uninstall が有効 Schedule を cancel する (AGENT-SCHEDULE-BE-S005)
 
-- **GIVEN** Extension Installation `inst-1` created active Schedules in an Agent
-- **WHEN** `inst-1` is uninstalled
-- **THEN** all active Schedules associated with `inst-1` are cancelled or disabled
-- **AND** cancellation audit Events are appended to the system Thread
-- **AND** no later Schedule firing uses the uninstalled Extension's Tool or Delivery capability
+- **GIVEN** Extension Installation `inst-1` が Agent 内に有効 Schedule を作成している
+- **WHEN** `inst-1` がアンインストール済みになる
+- **THEN** `inst-1` に関連するすべての有効 Schedule は `cancelled` または `disabled` になる
+- **AND** 取消監査 Event が system Thread に追加される
+- **AND** 後続 Schedule fire はアンインストール済み Extension の Tool または Delivery capability を使用しない

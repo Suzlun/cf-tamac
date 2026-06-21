@@ -1,149 +1,149 @@
 ## ADDED Requirements
 
-### Requirement: Managed Agent list and registration UI
+### Requirement: 管理対象 Agent list と registration UI
 
-Client UI SHALL provide managed Agent listing and registration flows.
+Client UI は管理対象 Agent 一覧と登録 flow を提供 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Agent 管理者は、登録済み Agent を一覧し、表示名、pin、並び順、最終閲覧を確認し、新しい Agent 接続を追加できる UI を必要としている。CLI や直接 RPC を知らなくても管理を開始できる必要がある。
 
-**Requirement**
+**要件**
 
-- Client UI MUST provide a managed Agent list screen showing display name, Agent ID, RPC origin, pinned status, sort order, last opened time, and connection/credential status.
-- Client UI MUST provide an add/edit Agent registration form that validates Agent ID, RPC origin, display name, and credential reference input.
-- Client UI MUST use Server Actions or Server Components for registry mutation and MUST NOT expose Agent credentials to client-side JavaScript.
+- Client UI は表示名、Agent ID、RPC origin、pin 状態、並び順、最終閲覧時刻、connection/credential 状態を表示する管理対象 Agent 一覧画面を提供 MUST。
+- Client UI は Agent ID、RPC origin、表示名、credential 参照入力を検証する Agent 登録の追加/編集フォームを提供 MUST。
+- Client UI は台帳変更に Server Actions または Server Components を使用 MUST し、Agent credential を Client 側 JavaScript に露出して MUST NOT。
 
-#### Scenario: Agent list supports registry display and ordering (CLIENT-MANAGEMENT-FE-S001)
+#### Scenario: Agent list が registry 表示と並び順を支援する (CLIENT-MANAGEMENT-FE-S001)
 
-- **GIVEN** Client D1 contains multiple managed Agents with pin and sort metadata
-- **WHEN** an operator opens the Agent list screen
-- **THEN** pinned Agents and sort order are reflected in the list
-- **AND** selecting an Agent updates last opened metadata through server-side action
+- **GIVEN** Client D1 に pin と並び順メタデータを持つ複数の管理対象 Agent が含まれている
+- **WHEN** 運用者が Agent 一覧画面を開く
+- **THEN** pinned Agent と並び順が一覧に反映される
+- **AND** Agent を選択すると、サーバー側 action を通じて最終閲覧メタデータが更新される
 
-#### Scenario: Add Agent form validates connection metadata accessibly (CLIENT-MANAGEMENT-FE-S002)
+#### Scenario: Add Agent フォームが connection メタデータをアクセシブルに検証する (CLIENT-MANAGEMENT-FE-S002)
 
-- **GIVEN** an operator opens the add Agent screen
-- **WHEN** required fields are missing or RPC origin is invalid
-- **THEN** the form displays accessible validation errors linked to the relevant inputs
-- **AND** no registry record is created until validation passes server-side
+- **GIVEN** 運用者が Add Agent 画面を開いている
+- **WHEN** 必須 field が不足している、または RPC origin が不正である
+- **THEN** フォームは対応する入力項目に関連付けられた accessible な検証エラーを表示する
+- **AND** 検証がサーバー側で通過するまで台帳記録は作成されない
 
-### Requirement: Agent overview and configuration UI
+### Requirement: Agent overview と構成 UI
 
-Client UI SHALL render Agent overview and settings through server-side Agent RPC.
+Client UI はサーバー側 Agent RPC を通じて Agent overview と settings を描画 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-管理者は、Agent の profile、lifecycle、config、credential generation、capability summary を一画面で確認し、設定や credential rotation を安全に操作したい。
+管理者は、Agent の profile、ライフサイクル、config、credential generation、capability 要約を一画面で確認し、設定や credential rotation を安全に操作したい。
 
-**Requirement**
+**要件**
 
-- Client UI MUST provide an Agent overview screen that renders Agent profile, lifecycle status, config version, credential generation/status, and capability summary from Agent RPC.
-- Client UI MUST provide settings actions for configuration update and credential rotation through server-side Agent RPC calls.
-- Client UI MUST show Agent RPC errors with actionable messages without exposing secrets or raw internal stack traces.
+- Client UI は Agent RPC から Agent profile、ライフサイクル状態、config 版、credential generation/状態、capability 要約を描画する Agent overview 画面を提供 MUST。
+- Client UI はサーバー側 Agent RPC call を通じて構成更新と credential rotation の settings action を提供 MUST。
+- Client UI は secret または生 internal stack trace を露出せず、対処可能な message 付きで Agent RPC error を表示 MUST。
 
-#### Scenario: Agent overview renders server-side profile and config (CLIENT-MANAGEMENT-FE-S003)
+#### Scenario: Agent overview がサーバー側 profile と config を描画する (CLIENT-MANAGEMENT-FE-S003)
 
-- **GIVEN** an operator opens a registered Agent detail page
-- **WHEN** Client server queries `GetAgent` and related config RPCs
-- **THEN** the overview displays profile, lifecycle, config version, credential generation, and capability summary
-- **AND** Browser payload does not include credential secret material
+- **GIVEN** 運用者が登録済み Agent 詳細ページを開いている
+- **WHEN** Client server が `GetAgent` と関連 config RPC を照会する
+- **THEN** overview は profile、ライフサイクル、config 版、credential generation、capability 要約を表示する
+- **AND** Browser payload は credential secret material を含まない
 
-#### Scenario: Settings screen updates config and rotates credential through Agent RPC (CLIENT-MANAGEMENT-FE-S004)
+#### Scenario: Settings 画面が Agent RPC 経由で config 更新と credential rotation を行う (CLIENT-MANAGEMENT-FE-S004)
 
-- **GIVEN** an operator has permission to manage Agent settings
-- **WHEN** the operator submits config update or credential rotation from the settings screen
-- **THEN** Client server calls the corresponding Agent RPC with acting user context
-- **AND** the UI reflects updated config version or credential generation after success
+- **GIVEN** 運用者が Agent settings を管理する permission を持っている
+- **WHEN** 運用者が settings 画面から config update または credential rotation を送信する
+- **THEN** Client server は acting user context 付きで対応する Agent RPC を呼ぶ
+- **AND** UI は成功後に更新済み config 版または credential generation を反映する
 
-### Requirement: Thread Event Run and Compaction exploration UI
+### Requirement: Thread Event Run と Compaction exploration UI
 
-Client UI SHALL expose Thread, Event, Run, Compaction, and Memory exploration views.
+Client UI は Thread、Event、Run、Compaction、Memory の exploration view を公開 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 Agent の自律判断を運用するには、Thread、Event、Run、Compaction、Handoff、History、Memory をたどって「何が起きたか」「なぜそう判断したか」を確認できる画面が必要である。
 
-**Requirement**
+**要件**
 
-- Client UI MUST provide Thread list/detail screens with Thread key, status, Section, latest Event, latest Run, and Memory/Compaction summary.
-- Client UI MUST provide Event and Run views with sequence, type, source, status, snapshot, decision output, and causal links.
-- Client UI MUST provide Compaction and Memory views exposing latest Handoff, History reference, Memory version, provenance, and rebase status.
-- All data in these screens MUST be fetched from Agent RPC server-side and rendered without storing Agent domain snapshots in Client D1.
+- Client UI は Thread key、状態、Section、latest Event、latest Run、Memory/Compaction 要約を持つ Thread 一覧/詳細画面を提供 MUST。
+- Client UI は sequence、type、source、状態、スナップショット、判断出力、因果 link を持つ Event と Run の view を提供 MUST。
+- Client UI は latest Handoff、History 参照、Memory 版、provenance、rebase 状態を公開する Compaction と Memory の view を提供 MUST。
+- これらの画面のすべてのデータは Agent RPC からサーバー側で取得 MUST し、Agent domain スナップショットを Client D1 に保存せずに描画 MUST。
 
-#### Scenario: Thread Event Run and Compaction tabs show Agent-owned history (CLIENT-MANAGEMENT-FE-S005)
+#### Scenario: Thread Event Run と Compaction tabs が Agent-owned history を表示する (CLIENT-MANAGEMENT-FE-S005)
 
-- **GIVEN** an Agent has Threads with Events, Runs, Compactions, and Memory
-- **WHEN** an operator navigates across Threads, Events, Runs, and Compactions tabs
-- **THEN** each tab shows ordered Agent-owned records with sequence, status, causal links, and provenance
-- **AND** pagination and filters preserve Agent/Thread scope
+- **GIVEN** Agent が Event、Run、Compaction、Memory を持つ Thread を有している
+- **WHEN** 運用者が Thread、Event、Run、Compaction タブを移動する
+- **THEN** 各タブは sequence、状態、因果 link、provenance を持つ順序付き Agent-owned 記録を表示する
+- **AND** ページングと絞り込み条件は Agent/Thread scope を維持する
 
-### Requirement: Schedule and Tool management UI
+### Requirement: Schedule と Tool 管理 UI
 
-Client UI SHALL manage Schedules and Tool approvals through server-side actions.
+Client UI はサーバー側 action を通じて Schedule と Tool 承認を管理 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
 管理者は Agent の将来動作と外部作用を監督する必要がある。Schedule の作成/取消、Tool catalog の確認、ToolInvocation の承認/拒否を UI から安全に行える必要がある。
 
-**Requirement**
+**要件**
 
-- Client UI MUST provide Schedule management screens for listing, creating, inspecting, and cancelling Agent-owned Schedules.
-- Client UI MUST provide Tool catalog and ToolInvocation screens showing Tool definition, installation ownership, invocation status, approval status, attempts, and result Events.
-- Client UI MUST require explicit user action for Tool approval/rejection and MUST call Agent RPC server-side with acting user context.
+- Client UI は Agent-owned Schedule の一覧取得、作成、確認、取消を行う Schedule 管理画面を提供 MUST。
+- Client UI は Tool definition、Installation 所有関係、invocation 状態、承認状態、試行、結果 Event を表示する Tool catalog と ToolInvocation 画面を提供 MUST。
+- Client UI は Tool 承認/却下に明示的な user action を要求 MUST し、acting user context 付きで Agent RPC をサーバー側から呼ぶ MUST。
 
-#### Scenario: Schedule tab creates and cancels schedules (CLIENT-MANAGEMENT-FE-S006)
+#### Scenario: Schedule tab が schedules を作成し cancel する (CLIENT-MANAGEMENT-FE-S006)
 
-- **GIVEN** an operator opens the Schedule tab for a registered Agent
-- **WHEN** the operator creates a Schedule with Thread context and later cancels it
-- **THEN** Client server calls `CreateSchedule` and `CancelSchedule`
-- **AND** the UI shows schedule status, next fire time, overlap policy, and cancellation result from Agent RPC
+- **GIVEN** 運用者が登録済み Agent の Schedule タブを開いている
+- **WHEN** 運用者が Thread 文脈付きで Schedule を作成し、後で cancel する
+- **THEN** Client server は `CreateSchedule` と `CancelSchedule` を呼ぶ
+- **AND** UI は Agent RPC から取得した Schedule 状態、次回 fire 時刻、overlap policy、取消結果を表示する
 
-#### Scenario: Tool approval screen requires explicit action (CLIENT-MANAGEMENT-FE-S007)
+#### Scenario: Tool 承認画面が明示 action を要求する (CLIENT-MANAGEMENT-FE-S007)
 
-- **GIVEN** an Agent has a ToolInvocation in `pending_approval`
-- **WHEN** an operator opens the Tool approval screen
-- **THEN** approve and reject controls show Tool, input summary, risk/approval metadata, and acting user context
-- **AND** approval or rejection is sent only after explicit user confirmation
+- **GIVEN** Agent が `pending_approval` の ToolInvocation を持っている
+- **WHEN** 運用者が Tool 承認画面を開く
+- **THEN** approve と reject control は Tool、入力要約、risk/承認メタデータ、acting user context を表示する
+- **AND** 承認または却下は明示的な user confirmation の後にのみ送信される
 
-### Requirement: Extension management UI
+### Requirement: Extension 管理 UI の提供
 
-Client UI SHALL manage generic Extension installation and cleanup flows.
+Client UI は汎用 Extension installation と cleanup flow を管理 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-管理者は、Extension manifest を指定して Install し、Adapter Connection、Tool、Delivery、setup status を確認し、不要になった Extension を安全に Uninstall したい。
+管理者は、Extension manifest を指定して install し、Adapter Connection、Tool、Delivery、setup 状態を確認し、不要になった Extension を安全に uninstall したい。
 
-**Requirement**
+**要件**
 
-- Client UI MUST provide Extension list/detail screens showing Installation status, manifest identity, Provider identity, grants, Adapter Connections, Tools, Delivery capabilities, and setup instructions.
-- Client UI MUST provide install/uninstall actions through server-side Agent RPC.
-- Client UI MUST make generic Extension information visible without assuming Discord-specific Provider implementation.
+- Client UI は Installation 状態、manifest identity、Provider identity、grant、Adapter Connection、Tool、Delivery capability、setup 手順を表示する Extension 一覧/詳細画面を提供 MUST。
+- Client UI はサーバー側 Agent RPC を通じて install/uninstall action を提供 MUST。
+- Client UI は Discord 固有 Provider 実装を前提にせず、汎用 Extension 情報を見えるようにする MUST。
 
-#### Scenario: Extension screen installs lists and uninstalls generic Extension (CLIENT-MANAGEMENT-FE-S008)
+#### Scenario: Extension 画面が汎用 Extension を install、list、uninstall する (CLIENT-MANAGEMENT-FE-S008)
 
-- **GIVEN** an operator has a signed generic Extension manifest
-- **WHEN** the operator installs, inspects, and uninstalls the Extension from the Extension screen
-- **THEN** Client server calls Agent Extension RPCs
-- **AND** the UI shows Installation status, grants, Adapter Connections, Tools, Delivery capability, setup instructions, and cleanup result
+- **GIVEN** 運用者が署名済み汎用 Extension manifest を持っている
+- **WHEN** 運用者が Extension 画面から Extension を install、inspect、uninstall する
+- **THEN** Client server は Agent Extension RPC を呼ぶ
+- **AND** UI は Installation 状態、grant、Adapter Connection、Tool、Delivery capability、setup 手順、cleanup 結果を表示する
 
-### Requirement: Browser credential and direct RPC protection
+### Requirement: Browser credential と direct RPC protection
 
-Client UI SHALL keep Agent credentials and direct RPC calls out of Browser execution.
+Client UI は Agent credential と直接 RPC call を Browser 実行から除外 SHALL。
 
-**Customer Context**
+**利用者文脈**
 
-Client UI は Browser で動くため、Agent credential や signing material が一度でも Browser に渡ると漏えいリスクになる。すべての Agent RPC は server-side に閉じる必要がある。
+Client UI は Browser で動くため、Agent credential や署名 material が一度でも Browser に渡ると漏えいリスクになる。すべての Agent RPC はサーバー側に閉じる必要がある。
 
-**Requirement**
+**要件**
 
-- Client UI MUST NOT embed Agent RPC credentials, private keys, raw tokens, or Provider secrets in HTML, JavaScript bundles, local storage, session storage, or network responses to Browser.
-- Client UI MUST NOT call Agent RPC origin directly from Browser-side code.
-- Error and loading states MUST be displayed without leaking secret metadata or raw internal error stacks.
+- Client UI は HTML、JavaScript bundle、local storage、session storage、Browser への network 応答に Agent RPC credential、秘密鍵、生 token、Provider secret を embed して MUST NOT。
+- Client UI は Browser 側コードから Agent RPC origin を直接呼び出して MUST NOT。
+- Error と loading 状態は secret メタデータまたは生 internal error stack を漏えいせずに表示 MUST。
 
-#### Scenario: Browser does not receive Agent credentials or call Agent RPC directly (CLIENT-MANAGEMENT-FE-S009)
+#### Scenario: Browser が Agent credentials を受け取らず Agent RPC を直接呼ばない (CLIENT-MANAGEMENT-FE-S009)
 
-- **GIVEN** an operator navigates across Agent list, overview, Threads, Schedules, Tools, Extensions, and Settings screens
-- **WHEN** Browser network responses, rendered HTML, JavaScript bundles, and storage are inspected
-- **THEN** no Agent credential, private key, raw JWT signing material, Provider secret, or direct Agent RPC request is present
-- **AND** Agent RPC calls originate only from Client server-side execution
+- **GIVEN** 運用者が Agent list、overview、Thread、Schedule、Tool、Extension、Settings 画面を移動している
+- **WHEN** Browser network 応答、描画済み HTML、JavaScript bundle、storage が検査される
+- **THEN** Agent credential、秘密鍵、生 JWT 署名 material、Provider secret、直接 Agent RPC リクエストは存在しない
+- **AND** Agent RPC call は Client サーバー側実行からのみ発生する
