@@ -105,6 +105,14 @@ export const inverted = eventStorageStatuses;
       );
       writeFixture(
         fixtureRoot,
+        'packages/agent/src/storage/drizzle.ts',
+        `import { eq } from 'drizzle-orm';
+
+export const allowedStoragePersistence = eq;
+`
+      );
+      writeFixture(
+        fixtureRoot,
         'packages/agent/src/rpc/services/inverted.ts',
         `import { createAgentRpcRouter } from '../router';
 

@@ -1,0 +1,479 @@
+import { createThreadKeyIdentity } from '../threads';
+
+import {
+  agentSystemThreadKey,
+  assertAgentContext,
+  authorizeAgentOperation,
+  checkAgentIdempotency,
+  createEmptyCapabilitySummary,
+  mapAgentConfigRow,
+  mapAgentCredentialRow,
+  mapAgentProfileRow,
+  recordAgentIdempotency,
+  reserveAgentNonce,
+} from './agent-operation-utils';
+import { createAgentDomainError } from './errors';
+import { recordLifecycleAudit } from './lifecycle-audit';
+
+import type {
+  AgentConfigCommandInput,
+  AgentConfigView,
+  AgentCoreRequestContext,
+  AgentCredentialCommandInput,
+  AgentCredentialView,
+  AgentScopedQuery,
+  DestroyAgentCommand,
+  DestroyAgentResult,
+  GetAgentResult,
+  InitializeAgentCommand,
+  InitializeAgentResult,
+  RotateAgentCredentialCommand,
+  RotateAgentCredentialResult,
+  UpdateAgentConfigCommand,
+  UpdateAgentConfigResult,
+} from './agent-core';
+import type { AgentProfileRow, AgentStorageRepositories } from '../storage';
+
+/**
+ * Run InitializeAgent against Agent-owned storage.
+ */
+export function initializeAgentInStore(input: {
+  readonly agentId: string;
+  readonly command: InitializeAgentCommand;
+  readonly repositories: AgentStorageRepositories;
+}): InitializeAgentResult {
+  assertAgentContext(input.agentId, input.command.context);
+  const replay = checkAgentIdempotency<InitializeAgentResult>({
+    context: input.command.context,
+    operationName: 'AgentLifecycleService.InitializeAgent',
+    repositories: input.repositories,
+  });
+  if (replay.status === 'replay') return { ...replay.response, replayed: true };
+  reserveAgentNonce(input.repositories, input.command.context);
+  authorizeAgentOperation({
+    action: 'agent.initialize',
+    allowMissingProfile: true,
+    context: input.command.context,
+    method: 'InitializeAgent',
+    repositories: input.repositories,
+    requiredPrincipalTypes: ['CLIENT_SERVICE', 'ADMIN_OPERATOR', 'INTERNAL_SERVICE'],
+    requiredScopes: ['agent.rpc', 'agent.lifecycle'],
+    service: 'cftamac.agent.v1.AgentLifecycleService',
+  });
+  if (input.repositories.profile.getProfile() !== undefined) {
+    throw createAgentDomainError({ kind: 'conflict', message: 'Agent is already initialized.' });
+  }
+  const result = createInitializedAgent(input);
+  recordAgentIdempotency({
+    context: input.command.context,
+    operationName: 'AgentLifecycleService.InitializeAgent',
+    repositories: input.repositories,
+    response: result,
+  });
+  return result;
+}
+
+/**
+ * Run GetAgent against Agent-owned storage.
+ */
+export function getAgentFromStore(input: {
+  readonly agentId: string;
+  readonly query: AgentScopedQuery;
+  readonly repositories: AgentStorageRepositories;
+}): GetAgentResult {
+  assertAgentContext(input.agentId, input.query.context);
+  const profile = authorizeAgentOperation({
+    action: 'agent.get',
+    context: input.query.context,
+    method: 'GetAgent',
+    repositories: input.repositories,
+    requiredPrincipalTypes: ['CLIENT_SERVICE', 'ADMIN_OPERATOR', 'INTERNAL_SERVICE'],
+    requiredScopes: ['agent.rpc', 'agent.read'],
+    service: 'cftamac.agent.v1.AgentLifecycleService',
+  });
+  if (profile === undefined)
+    throw createAgentDomainError({ kind: 'not_found', message: 'Agent not found.' });
+  return {
+    activeCredential: mapOptionalCredential(input.agentId, input.repositories, input.query.context),
+    agent: mapAgentProfileRow(profile),
+    capabilitySummary: createEmptyCapabilitySummary(input.agentId),
+    config: getLatestConfigView(input.agentId, input.repositories),
+  };
+}
+
+/**
+ * Run DestroyAgent against Agent-owned storage.
+ */
+export function destroyAgentInStore(input: {
+  readonly agentId: string;
+  readonly command: DestroyAgentCommand;
+  readonly repositories: AgentStorageRepositories;
+}): DestroyAgentResult {
+  assertAgentContext(input.agentId, input.command.context);
+  const replay = checkAgentIdempotency<DestroyAgentResult>({
+    context: input.command.context,
+    operationName: 'AgentLifecycleService.DestroyAgent',
+    repositories: input.repositories,
+  });
+  if (replay.status === 'replay') return { ...replay.response, replayed: true };
+  reserveAgentNonce(input.repositories, input.command.context);
+  const profile = authorizeAgentOperation({
+    action: 'agent.destroy',
+    context: input.command.context,
+    method: 'DestroyAgent',
+    repositories: input.repositories,
+    requiredPrincipalTypes: ['CLIENT_SERVICE', 'ADMIN_OPERATOR'],
+    requiredScopes: ['agent.rpc', 'agent.lifecycle'],
+    service: 'cftamac.agent.v1.AgentLifecycleService',
+  });
+  if (profile === undefined)
+    throw createAgentDomainError({ kind: 'not_found', message: 'Agent not found.' });
+  const now = input.command.context.requestedAtMs;
+  input.repositories.profile.upsertProfile({
+    configVersion: profile.configVersion,
+    credentialGeneration: profile.credentialGeneration,
+    displayName: profile.displayName ?? undefined,
+    lifecycleStatus: 'destroyed',
+    nowMs: now,
+    systemThreadId: profile.systemThreadId ?? undefined,
+  });
+  const updated = requireProfile(input.repositories);
+  const audit = recordLifecycleAudit(input, 'agent.lifecycle.destroyed', 'destroyed');
+  const result = {
+    agent: mapAgentProfileRow(updated),
+    audit,
+    outcome: 'destroyed',
+    replayed: false,
+  };
+  recordAgentIdempotency({
+    context: input.command.context,
+    operationName: 'AgentLifecycleService.DestroyAgent',
+    repositories: input.repositories,
+    response: result,
+  });
+  return result;
+}
+
+/**
+ * Run RotateAgentCredential against Agent-owned storage.
+ */
+export function rotateAgentCredentialInStore(input: {
+  readonly agentId: string;
+  readonly command: RotateAgentCredentialCommand;
+  readonly repositories: AgentStorageRepositories;
+}): RotateAgentCredentialResult {
+  assertAgentContext(input.agentId, input.command.context);
+  const replay = checkAgentIdempotency<RotateAgentCredentialResult>({
+    context: input.command.context,
+    operationName: 'AgentLifecycleService.RotateAgentCredential',
+    repositories: input.repositories,
+  });
+  if (replay.status === 'replay') return { ...replay.response, replayed: true };
+  reserveAgentNonce(input.repositories, input.command.context);
+  const profile = authorizeLifecycleMutation(input, 'credential.rotate', 'RotateAgentCredential');
+  const previous = input.repositories.credentials.findCredentialByGeneration(
+    profile.credentialGeneration
+  );
+  const credential = insertRotatedCredential(
+    input.repositories,
+    input.command.context,
+    input.command.credential
+  );
+  updatePreviousCredential(
+    input.repositories,
+    previous,
+    input.command.context,
+    input.command.credential
+  );
+  input.repositories.profile.upsertProfile({
+    configVersion: profile.configVersion,
+    credentialGeneration: input.command.credential.generation,
+    displayName: profile.displayName ?? undefined,
+    lifecycleStatus: profile.lifecycleStatus,
+    nowMs: input.command.context.requestedAtMs,
+    systemThreadId: profile.systemThreadId ?? undefined,
+  });
+  const audit = recordLifecycleAudit(input, 'agent.credential.rotated', 'succeeded');
+  const result = {
+    audit,
+    credential: mapAgentCredentialRow(input.agentId, credential),
+    previousCredential:
+      previous === undefined ? undefined : mapAgentCredentialRow(input.agentId, previous),
+    replayed: false,
+  };
+  recordAgentIdempotency({
+    context: input.command.context,
+    operationName: 'AgentLifecycleService.RotateAgentCredential',
+    repositories: input.repositories,
+    response: result,
+  });
+  return result;
+}
+
+/**
+ * Run UpdateConfig against Agent-owned storage.
+ */
+export function updateAgentConfigInStore(input: {
+  readonly agentId: string;
+  readonly command: UpdateAgentConfigCommand;
+  readonly repositories: AgentStorageRepositories;
+}): UpdateAgentConfigResult {
+  assertAgentContext(input.agentId, input.command.context);
+  const replay = checkAgentIdempotency<UpdateAgentConfigResult>({
+    context: input.command.context,
+    operationName: 'AgentStateService.UpdateConfig',
+    repositories: input.repositories,
+  });
+  if (replay.status === 'replay') return { ...replay.response, replayed: true };
+  reserveAgentNonce(input.repositories, input.command.context);
+  const profile = authorizeLifecycleMutation(input, 'config.update', 'UpdateConfig');
+  const nextConfig = insertConfig(
+    input.repositories,
+    input.command.context,
+    profile.configVersion + 1,
+    input.command.config
+  );
+  input.repositories.profile.upsertProfile({
+    configVersion: nextConfig.configVersion,
+    credentialGeneration: profile.credentialGeneration,
+    displayName: nextConfig.displayName ?? profile.displayName ?? undefined,
+    lifecycleStatus: profile.lifecycleStatus,
+    nowMs: input.command.context.requestedAtMs,
+    systemThreadId: profile.systemThreadId ?? undefined,
+  });
+  const result = {
+    audit: recordLifecycleAudit(input, 'agent.config.updated', 'succeeded'),
+    config: mapAgentConfigRow(input.agentId, nextConfig),
+    replayed: false,
+  };
+  recordAgentIdempotency({
+    context: input.command.context,
+    operationName: 'AgentStateService.UpdateConfig',
+    repositories: input.repositories,
+    response: result,
+  });
+  return result;
+}
+
+/**
+ * Run GetConfig against Agent-owned storage.
+ */
+export function getAgentConfigFromStore(input: {
+  readonly agentId: string;
+  readonly query: AgentScopedQuery;
+  readonly repositories: AgentStorageRepositories;
+}): AgentConfigView {
+  assertAgentContext(input.agentId, input.query.context);
+  authorizeAgentOperation({
+    action: 'config.get',
+    context: input.query.context,
+    method: 'GetConfig',
+    repositories: input.repositories,
+    requiredPrincipalTypes: ['CLIENT_SERVICE', 'ADMIN_OPERATOR', 'INTERNAL_SERVICE'],
+    requiredScopes: ['agent.rpc', 'agent.read'],
+    service: 'cftamac.agent.v1.AgentStateService',
+  });
+  return getLatestConfigView(input.agentId, input.repositories);
+}
+
+function createInitializedAgent(input: {
+  readonly agentId: string;
+  readonly command: InitializeAgentCommand;
+  readonly repositories: AgentStorageRepositories;
+}): InitializeAgentResult {
+  const now = input.command.context.requestedAtMs;
+  const systemThreadId = createSystemThread(input.repositories, input.agentId, now);
+  const config = insertConfig(
+    input.repositories,
+    input.command.context,
+    1,
+    input.command.initialConfig
+  );
+  const credential = insertRotatedCredential(
+    input.repositories,
+    input.command.context,
+    input.command.credential
+  );
+  seedPrincipal(input.repositories, input.command.context);
+  input.repositories.profile.upsertProfile({
+    configVersion: 1,
+    credentialGeneration: credential.generation,
+    displayName: input.command.displayName,
+    lifecycleStatus: 'active',
+    nowMs: now,
+    systemThreadId,
+  });
+  const audit = recordLifecycleAudit(input, 'agent.lifecycle.initialized', 'succeeded');
+  const agent = mapAgentProfileRow(requireProfile(input.repositories));
+  const threadKeyRule = {
+    normalizedThreadKey: agentSystemThreadKey,
+    threadKey: agentSystemThreadKey,
+  };
+  return {
+    agent,
+    audit,
+    config: mapAgentConfigRow(input.agentId, config),
+    credential: mapAgentCredentialRow(input.agentId, credential),
+    replayed: false,
+    threadKeyRule,
+  };
+}
+
+function authorizeLifecycleMutation(
+  input: {
+    readonly command: { readonly context: AgentCoreRequestContext };
+    readonly repositories: AgentStorageRepositories;
+  },
+  action: string,
+  method: string
+) {
+  const profile = authorizeAgentOperation({
+    action,
+    context: input.command.context,
+    method,
+    repositories: input.repositories,
+    requiredPrincipalTypes: ['CLIENT_SERVICE', 'ADMIN_OPERATOR'],
+    requiredScopes: ['agent.rpc', 'agent.lifecycle'],
+    service: 'cftamac.agent.v1.AgentLifecycleService',
+  });
+  if (profile === undefined)
+    throw createAgentDomainError({ kind: 'not_found', message: 'Agent not found.' });
+  return profile;
+}
+
+function createSystemThread(
+  repositories: AgentStorageRepositories,
+  agentId: string,
+  now: number
+): string {
+  const identity = createThreadKeyIdentity(agentId, agentSystemThreadKey);
+  const existing = repositories.threads.findByNormalizedThreadKey(identity.normalizedThreadKey);
+  if (existing !== undefined) return existing.threadId;
+  const threadId = crypto.randomUUID();
+  repositories.threads.insertThread({
+    threadId,
+    threadKey: identity.threadKey,
+    normalizedThreadKey: identity.normalizedThreadKey,
+    nowMs: now,
+  });
+  const sectionId = crypto.randomUUID();
+  repositories.sections.insertSection({
+    createdAtMs: now,
+    sectionId,
+    sequence: 1,
+    startThreadSequence: 1,
+    status: 'active',
+    threadId,
+  });
+  repositories.threads.updateCurrentSection({ currentSectionId: sectionId, nowMs: now, threadId });
+  return threadId;
+}
+
+function insertConfig(
+  repositories: AgentStorageRepositories,
+  context: AgentCoreRequestContext,
+  configVersion: number,
+  config: AgentConfigCommandInput
+) {
+  repositories.config.insertConfigVersion({
+    ...config,
+    configVersion,
+    updatedAtMs: context.requestedAtMs,
+    updatedByPrincipalId: context.principal.principalId,
+  });
+  const row = repositories.config.findConfigVersion(configVersion);
+  if (row === undefined)
+    throw createAgentDomainError({ kind: 'internal', message: 'Config write failed.' });
+  return row;
+}
+
+function insertRotatedCredential(
+  repositories: AgentStorageRepositories,
+  context: AgentCoreRequestContext,
+  credential: AgentCredentialCommandInput
+) {
+  repositories.credentials.insertCredential({
+    credentialId: credential.credentialId,
+    generation: credential.generation,
+    notBeforeMs: context.requestedAtMs,
+    nowMs: context.requestedAtMs,
+    publicFingerprint: credential.publicFingerprint,
+    status: 'active',
+    verifierRef: credential.verifierMaterialRef,
+  });
+  const row = repositories.credentials.findCredential(credential.credentialId);
+  if (row === undefined)
+    throw createAgentDomainError({ kind: 'internal', message: 'Credential write failed.' });
+  return row;
+}
+
+function updatePreviousCredential(
+  repositories: AgentStorageRepositories,
+  previous: { readonly credentialId: string } | undefined,
+  context: AgentCoreRequestContext,
+  credential: AgentCredentialCommandInput
+): void {
+  if (previous === undefined) return;
+  if (credential.revokePrevious === true || credential.overlapSeconds === 0) {
+    repositories.credentials.updateCredentialStatus({
+      credentialId: previous.credentialId,
+      nowMs: context.requestedAtMs,
+      revokedAtMs: context.requestedAtMs,
+      status: 'revoked',
+    });
+    return;
+  }
+  repositories.credentials.updateCredentialStatus({
+    credentialId: previous.credentialId,
+    expiresAtMs: context.requestedAtMs + (credential.overlapSeconds ?? 300) * 1000,
+    nowMs: context.requestedAtMs,
+    status: 'overlap',
+  });
+}
+
+function seedPrincipal(
+  repositories: AgentStorageRepositories,
+  context: AgentCoreRequestContext
+): void {
+  repositories.principals.upsertPrincipal({
+    nowMs: context.requestedAtMs,
+    principalId: context.principal.principalId,
+    principalType: context.principal.principalType,
+    status: 'active',
+  });
+  for (const scope of context.principal.scopes) {
+    repositories.grants.upsertGrant({
+      capability: scope,
+      grantId: `${context.principal.principalId}:${scope}`,
+      nowMs: context.requestedAtMs,
+      principalId: context.principal.principalId,
+      status: 'active',
+    });
+  }
+}
+
+function getLatestConfigView(
+  agentId: string,
+  repositories: AgentStorageRepositories
+): AgentConfigView {
+  const config = repositories.config.getLatestConfig();
+  if (config === undefined)
+    throw createAgentDomainError({ kind: 'not_found', message: 'Agent config not found.' });
+  return mapAgentConfigRow(agentId, config);
+}
+
+function mapOptionalCredential(
+  agentId: string,
+  repositories: AgentStorageRepositories,
+  context: AgentCoreRequestContext
+): AgentCredentialView | undefined {
+  const credential = repositories.credentials.findActiveCredential(context.requestedAtMs);
+  return credential === undefined ? undefined : mapAgentCredentialRow(agentId, credential);
+}
+
+function requireProfile(repositories: AgentStorageRepositories): AgentProfileRow {
+  const profile = repositories.profile.getProfile();
+  if (profile === undefined)
+    throw createAgentDomainError({ kind: 'not_found', message: 'Agent not found.' });
+  return profile;
+}

@@ -14,25 +14,35 @@ import type { AgentWorkerEnv } from '../env';
 const baseUrl = 'https://agent.example.test';
 const healthRpcPath = '/cftamac.agent.v1.AgentHealthService/Check';
 
-function createTestEnv(): AgentWorkerEnv {
+function createTestEnv(): {
+  readonly env: AgentWorkerEnv;
+  readonly routedNames: readonly string[];
+} {
+  const routedNames: string[] = [];
   return {
-    AGENT_BLOBS: {} as R2Bucket,
-    AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
-    AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
-    AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
-    AGENT_RPC_AUDIENCE: 'test-audience',
-    AI_AGENT: {
-      get: () =>
-        ({
-          checkHealth: () => ({
-            agentId: 'agent-health',
-            queue: 'agent_local',
-            status: 'active',
-            storage: 'sqlite',
-          }),
-        }) as unknown as DurableObjectStub<AIAgent>,
-      idFromName: (name: string) => ({ name }) as unknown as DurableObjectId,
-    } as unknown as DurableObjectNamespace<AIAgent>,
+    env: {
+      AGENT_BLOBS: {} as R2Bucket,
+      AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+      AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
+      AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
+      AGENT_RPC_AUDIENCE: 'test-audience',
+      AI_AGENT: {
+        get: (id: DurableObjectId) =>
+          ({
+            checkHealth: () => ({
+              agentId: (id as { readonly name: string }).name,
+              queue: 'agent_local',
+              status: 'active',
+              storage: 'sqlite',
+            }),
+          }) as unknown as DurableObjectStub<AIAgent>,
+        idFromName: (name: string) => {
+          routedNames.push(name);
+          return { name } as unknown as DurableObjectId;
+        },
+      } as unknown as DurableObjectNamespace<AIAgent>,
+    },
+    routedNames,
   };
 }
 
@@ -55,11 +65,11 @@ async function readErrorCode(response: Response): Promise<string> {
 }
 
 describe('Agent health RPC', () => {
-  it('[AGENT-PLATFORM-S008] Health RPC reaches the Connect Worker facade', async () => {
-    const env = createTestEnv();
+  it('[AGENT-PLATFORM-S008] [AGENT-HEALTH-S001] [AGENT-HEALTH-S002] Health RPC reaches the Connect Worker facade and safe AIAgent routing', async () => {
+    const { env, routedNames } = createTestEnv();
     const requestBytes = toBinary(
       CheckHealthRequestSchema,
-      create(CheckHealthRequestSchema, { agentId: 'agent-health' })
+      create(CheckHealthRequestSchema, { agentId: 'agent-health', includeDependencies: true })
     );
 
     const response = await handleAgentConnectRequest(
@@ -68,13 +78,38 @@ describe('Agent health RPC', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(
-      fromBinary(CheckHealthResponseSchema, new Uint8Array(await response.arrayBuffer()))
-    ).toMatchObject({
+    const responseBody = fromBinary(
+      CheckHealthResponseSchema,
+      new Uint8Array(await response.arrayBuffer())
+    );
+    expect(responseBody).toMatchObject({
       agentId: 'agent-health',
+      contractPackage: 'cftamac.agent.v1',
+      dependencyStatusRef: 'storage:sqlite;queue:agent_local',
       serviceVersion: '0.1.0',
-      status: 'active',
+      status: 'serving',
     });
+    expect(responseBody.checkedAtUnixMs > 0n).toBe(true);
+    expect(responseBody.health).toMatchObject({
+      agentId: 'agent-health',
+      contractPackage: 'cftamac.agent.v1',
+      dependencyStatusRef: 'storage:sqlite;queue:agent_local',
+      serviceVersion: '0.1.0',
+      servingStatus: 'serving',
+    });
+    expect(routedNames).toEqual(['agent-health']);
+    expect(stringifyHealthResponse(responseBody)).not.toMatch(
+      /credential|secret|token|thread|memory|payload/i
+    );
+
+    const missingAgentId = await handleAgentConnectRequest(
+      createHealthRequest(
+        healthRpcPath,
+        toBinary(CheckHealthRequestSchema, create(CheckHealthRequestSchema, { agentId: '' }))
+      ),
+      env
+    );
+    expect(await readErrorCode(missingAgentId)).toBe('invalid_argument');
 
     const restHealth = await handleAgentConnectRequest(
       createHealthRequest('/health', new Uint8Array()),
@@ -83,3 +118,9 @@ describe('Agent health RPC', () => {
     expect(await readErrorCode(restHealth)).toBe('unimplemented');
   });
 });
+
+function stringifyHealthResponse(response: unknown): string {
+  return JSON.stringify(response, (_key, value: unknown) =>
+    typeof value === 'bigint' ? value.toString() : value
+  );
+}

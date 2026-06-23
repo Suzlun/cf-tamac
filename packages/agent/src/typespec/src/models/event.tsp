@@ -10,6 +10,18 @@ model AgentEvent {
   @field(4) section_id: string;
   @field(5) event_type: string;
   @field(6) payload_ref?: string;
+  @field(7) thread_key: string;
+  @field(8) normalized_thread_key: string;
+  @field(9) source: string;
+  @field(10) agent_sequence: int64;
+  @field(11) thread_sequence: int64;
+  @field(12) occurred_at_unix_ms: int64;
+  @field(13) idempotency_key?: string;
+  @field(14) payload_metadata?: BytePayloadReference;
+  @field(15) correlation_id?: string;
+  @field(16) causation_id?: string;
+  @field(17) run_id?: string;
+  @field(18) delivery_context_id?: string;
 }
 
 @message
@@ -19,4 +31,9 @@ model AgentEventInput {
   @field(3) source: string;
   @field(4) payload_content_type?: string;
   @field(5) payload?: bytes;
+  @field(6) payload_reference?: BytePayloadReference;
+  @field(7) occurred_at_unix_ms?: int64;
+  @field(8) correlation_id?: string;
+  @field(9) causation_id?: string;
+  @field(10) delivery_context?: DeliveryContext;
 }

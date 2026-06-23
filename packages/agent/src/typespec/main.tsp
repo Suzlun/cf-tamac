@@ -27,9 +27,16 @@ import "./src/services/agent-schedule.tsp";
 import "./src/services/agent-state.tsp";
 import "./src/services/agent-thread.tsp";
 import "./src/services/agent-tool.tsp";
+import "./src/services/integration-delivery.tsp";
+import "./src/services/integration-tool.tsp";
 
 using Protobuf;
 
+// Agent public API source of truth is this TypeSpec tree.
+// Emit Protobuf only; do not configure alternate Agent HTTP schema emitters here.
+// Production transport profile is unary Connect with binary Protobuf.
+// Field-number policy: every message field MUST keep an explicit @field(n).
+// If a field is removed, reserve the old number/name before reusing nothing.
 @package({
   name: "cftamac.agent.v1",
 })

@@ -118,7 +118,7 @@ Client UI は汎用 Integration installation と cleanup flow を管理 SHALL。
 
 - Client UI は Installation 状態、manifest identity、Provider identity、grant、Adapter Connection、Tool、Delivery capability、setup 手順を表示する Integration 一覧/詳細画面を提供 MUST。
 - Client UI はサーバー側 Agent RPC を通じて install/uninstall action を提供 MUST。
-- Client UI は Discord 固有 Provider 実装を前提にせず、汎用 Integration 情報を見えるようにする MUST。
+- Client UI は Integration/Installation/Adapter/Tool/Delivery の状態、grant、setup 手順、cleanup 結果を見えるようにする MUST。
 
 #### Scenario: Integration 画面が汎用 Integration を install、list、uninstall する (CLIENT-MANAGEMENT-S008)
 

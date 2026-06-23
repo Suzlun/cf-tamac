@@ -18,6 +18,8 @@ model GetRunRequest {
 @message
 model GetRunResponse {
   @field(1) run: AgentRun;
+  @field(2) input?: AgentRunInput;
+  @field(3) snapshot?: RunSnapshotReference;
 }
 
 @message
@@ -25,6 +27,8 @@ model ListRunsRequest {
   @field(1) agent_id: string;
   @field(2) thread_id?: string;
   @field(3) page?: PageRequest;
+  @field(4) status?: string;
+  @field(5) time_range?: TimeRange;
 }
 
 @message
@@ -38,9 +42,13 @@ model CancelRunRequest {
   @field(1) agent_id: string;
   @field(2) idempotency_key: string;
   @field(3) run_id: string;
+  @field(4) reason?: string;
+  @field(5) security?: SecurityMetadata;
 }
 
 @message
 model CancelRunResponse {
   @field(1) run: AgentRun;
+  @field(2) audit?: AgentAuditRecord;
+  @field(3) replayed: boolean;
 }

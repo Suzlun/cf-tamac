@@ -8,6 +8,7 @@
   --signal: #ffb000;
   --cyan: #79e2cf;
   --muted: rgba(239, 231, 208, 0.68);
+  --error: #d96b6b;
 }
 
 * {
@@ -26,7 +27,7 @@ body {
     radial-gradient(circle at 84% 12%, rgba(255, 176, 0, 0.16), transparent 28rem),
     linear-gradient(135deg, #07090c 0%, #101820 48%, #1b140b 100%);
   color: var(--paper);
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, serif;
 }
 
 a {
@@ -54,7 +55,7 @@ a {
   gap: 1rem;
   padding: 1rem clamp(1rem, 3vw, 2rem);
   border-bottom: 1px solid var(--line);
-  font-family: "IBM Plex Mono", "Courier New", monospace;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
@@ -72,7 +73,7 @@ a {
   border-radius: 999px;
   background: var(--signal);
   box-shadow: 0 0 18px var(--signal);
-  content: "";
+  content: '';
 }
 
 .hero-grid {
@@ -85,7 +86,7 @@ a {
 .kicker,
 .eyebrow {
   margin: 0 0 0.75rem;
-  font-family: "IBM Plex Mono", "Courier New", monospace;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
   font-size: 0.78rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -130,7 +131,7 @@ h2 {
   border-radius: 999px;
   padding: 0.8rem 1rem;
   background: rgba(0, 0, 0, 0.18);
-  font-family: "IBM Plex Mono", "Courier New", monospace;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -159,7 +160,7 @@ h2 {
 .route-card strong {
   display: block;
   margin-bottom: 0.45rem;
-  font-family: "IBM Plex Mono", "Courier New", monospace;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
   color: var(--signal);
   font-size: 0.82rem;
   letter-spacing: 0.1em;
@@ -189,8 +190,111 @@ h2 {
   border: 1px dashed rgba(121, 226, 207, 0.65);
   border-radius: 999px;
   padding: 0.55rem 0.85rem;
-  font-family: "IBM Plex Mono", "Courier New", monospace;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
   color: var(--cyan);
+}
+
+.state-loading {
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.state-error {
+  color: var(--error);
+}
+
+.state-success {
+  color: var(--cyan);
+}
+
+.state-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.state-pending {
+  color: var(--signal);
+}
+
+.storage-meter {
+  height: 0.65rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.storage-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--signal));
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-size: 0.82rem;
+}
+
+.data-table th {
+  color: var(--signal);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.data-table td {
+  color: var(--paper);
+}
+
+.data-table tbody tr:hover {
+  background: rgba(239, 231, 208, 0.05);
+}
+
+/* shadcn-style DataTable mobile stacking (wireframe §4.4). */
+.data-table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table-wrapper th,
+.data-table-wrapper td {
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-size: 0.82rem;
+}
+
+.data-table-wrapper th {
+  color: var(--signal);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.data-table-wrapper td {
+  color: var(--paper);
+}
+
+.data-table-wrapper tbody tr:hover {
+  background: rgba(239, 231, 208, 0.05);
 }
 
 @media (max-width: 820px) {
@@ -203,4 +307,111 @@ h2 {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .section-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .data-table thead,
+  .data-table-wrapper thead {
+    display: none;
+  }
+
+  .data-table tr,
+  .data-table-wrapper tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.75rem;
+  }
+
+  .data-table td,
+  .data-table-wrapper td {
+    display: block;
+    border-bottom: none;
+    padding: 0.35rem 0;
+  }
+
+  .data-table td::before,
+  .data-table-wrapper td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+}
+
+.form-field {
+  margin-bottom: 1.25rem;
+}
+
+.form-field label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--paper);
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.form-control:focus {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.form-helper {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.detail-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 50;
+}
+
+.detail-drawer {
+  width: min(40rem, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-loading {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* shadcn-style SignalBadge dot glyph (wireframe §5.1). */
+.signal-badge-dot::before {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 18px currentColor;
+  content: '';
 }

@@ -97,7 +97,7 @@ function collectAgentFoundationLayerImportIssues(normalizedPath, imports, conten
         `${normalizedPath}: Agent runtime/domain/storage layer must not import RPC, Worker, or generated descriptor layers`
       );
     }
-    if (isForbiddenAgentLowerLayerExternal(importedPath)) {
+    if (isForbiddenAgentLowerLayerExternal(normalizedPath, importedPath)) {
       issues.push(
         `${normalizedPath}: Agent runtime/domain/storage layer must not import framework, transport, persistence, or platform runtime packages`
       );
@@ -392,7 +392,13 @@ function isAgentWorkerEntrypointPath(normalizedPath) {
   ].includes(normalizedPath);
 }
 
-function isForbiddenAgentLowerLayerExternal(importedPath) {
+function isForbiddenAgentLowerLayerExternal(normalizedPath, importedPath) {
+  if (
+    normalizedPath.startsWith('/packages/agent/src/storage/') &&
+    (importedPath === 'drizzle-orm' || importedPath.startsWith('drizzle-orm/'))
+  ) {
+    return false;
+  }
   return (
     [
       'hono',

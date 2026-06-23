@@ -13,16 +13,16 @@ import {
   IntegrationIngressService,
 } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
-import { integrationIngressService } from './services/agent-adapter';
-import { agentEventService } from './services/events';
+import { createIntegrationIngressService } from './services/agent-adapter';
+import { createAgentEventService } from './services/events';
 import { createAgentHealthService } from './services/health';
-import { agentIntegrationService } from './services/integrations';
-import { agentLifecycleService } from './services/lifecycle';
-import { agentRunService } from './services/runs';
-import { agentScheduleService } from './services/schedules';
-import { agentStateService } from './services/state';
-import { agentThreadService } from './services/threads';
-import { agentToolService } from './services/tools';
+import { createAgentIntegrationService } from './services/integrations';
+import { createAgentLifecycleService } from './services/lifecycle';
+import { createAgentRunService } from './services/runs';
+import { createAgentScheduleService } from './services/schedules';
+import { createAgentStateService } from './services/state';
+import { createAgentThreadService } from './services/threads';
+import { createAgentToolService } from './services/tools';
 
 import type { AgentWorkerEnv } from '../env';
 
@@ -33,16 +33,16 @@ export function registerAgentRpcServices(
   router: ConnectRouter,
   env: AgentWorkerEnv
 ): ConnectRouter {
-  router.service(IntegrationIngressService, integrationIngressService);
-  router.service(AgentEventService, agentEventService);
-  router.service(AgentIntegrationService, agentIntegrationService);
+  router.service(IntegrationIngressService, createIntegrationIngressService(env));
+  router.service(AgentEventService, createAgentEventService(env));
+  router.service(AgentIntegrationService, createAgentIntegrationService(env));
   router.service(AgentHealthService, createAgentHealthService(env));
-  router.service(AgentLifecycleService, agentLifecycleService);
-  router.service(AgentRunService, agentRunService);
-  router.service(AgentScheduleService, agentScheduleService);
-  router.service(AgentStateService, agentStateService);
-  router.service(AgentThreadService, agentThreadService);
-  router.service(AgentToolService, agentToolService);
+  router.service(AgentLifecycleService, createAgentLifecycleService(env));
+  router.service(AgentRunService, createAgentRunService(env));
+  router.service(AgentScheduleService, createAgentScheduleService(env));
+  router.service(AgentStateService, createAgentStateService(env));
+  router.service(AgentThreadService, createAgentThreadService(env));
+  router.service(AgentToolService, createAgentToolService(env));
   return router;
 }
 

@@ -177,10 +177,10 @@ NG例: `packages/agent/src/storage/schema.ts` から `../events`、`../AIAgent`�
 OK例: storage module は schema/table constants と lower-level persistence helpers に閉じる。
 
 **Rule: Agent lower layers は framework/runtime imports と Worker network globals を使わない。**
-Summary: Agent domain/runtime/storage/observability lower layers は transport/framework/platform runtime から独立します。
+Summary: Agent domain/runtime/observability lower layers は transport/framework/platform runtime から独立します。storage persistence layer だけは Agent-owned Durable Object SQLite への Drizzle ORM access を持てます。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`.
-NG例: `packages/agent/src/domain/**`、`events/**`、`storage/**` などから `hono`、`@connectrpc/connect`、`next`、`react`、`drizzle-orm`、`@cloudflare/**`、`fetch`、`Request`、`Response`、`console` を使う。
-OK例: lower layers は pure domain/runtime/storage seam に閉じ、transport/platform access は Worker/RPC/DO wiring layer へ置く。
+NG例: `packages/agent/src/domain/**`、`events/**`、`runs/**`、`rpc/**` などの storage persistence layer 以外から `hono`、`@connectrpc/connect`、`next`、`react`、`drizzle-orm`、`@cloudflare/**`、`fetch`、`Request`、`Response`、`console` を使う。
+OK例: domain/runtime lower layers は pure seam に閉じ、transport/platform access は Worker/RPC/DO wiring layer へ置く。Agent storage persistence layer は `drizzle-orm/durable-sqlite`（または現行 Drizzle の Durable Object SQLite adapter）に閉じる。
 
 **Rule: Agent RPC service modules は router、adapter、interceptors を import しない。**
 Summary: RPC service modules は generated descriptors と domain/runtime seam を接続し、outer wiring へ逆依存しません。

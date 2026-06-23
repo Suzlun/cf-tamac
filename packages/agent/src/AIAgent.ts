@@ -1,127 +1,173 @@
 import { Agent, type AgentContext } from 'agents';
 
-import { type AgentIdentity, type AgentLifecycleStatus } from './domain';
-import { type EventStorageStatus } from './events';
-import { ensureAgentFoundationTables } from './storage';
-import { createThreadKeyIdentity, type ThreadKeyIdentity } from './threads';
+import { readDurableObjectSqlDatabaseSizeBytes } from './agent-foundation-state';
+import { acceptFoundationEventInStore } from './AIAgent.foundation-events';
+import {
+  agentIntegrationHandlers,
+  type AIAgentIntegrationHandlerContext,
+} from './AIAgent.integration-handlers';
+import {
+  type AgentConfigView,
+  type AgentEventView,
+  type AgentIdentity,
+  type AgentLifecycleStatus,
+  type AgentScopedQuery,
+  type GetAgentStateResult,
+  type DestroyAgentCommand,
+  type DestroyAgentResult,
+  type GetAgentEventQuery,
+  type GetAgentResult,
+  type GetAgentThreadQuery,
+  type GetAgentThreadResult,
+  type GetAgentThreadMemoryQuery,
+  type GetAgentThreadMemoryResult,
+  type InitializeAgentCommand,
+  type InitializeAgentResult,
+  type GetLatestAgentThreadCompactionQuery,
+  type GetLatestAgentThreadCompactionResult,
+  type ListAgentEventsQuery,
+  type ListAgentEventsResult,
+  type ListAgentSectionsQuery,
+  type ListAgentSectionsResult,
+  type ListAgentThreadsQuery,
+  type ListAgentThreadsResult,
+  type PublishAgentEventCommand,
+  type PublishAgentEventResult,
+  type RotateAgentCredentialCommand,
+  type RotateAgentCredentialResult,
+  type SearchAgentThreadHistoryQuery,
+  type SearchAgentThreadHistoryResult,
+  type UpdateAgentConfigCommand,
+  type UpdateAgentConfigResult,
+} from './domain';
+import {
+  getAgentConfigFromStore,
+  getAgentFromStore,
+  initializeAgentInStore,
+  destroyAgentInStore,
+  rotateAgentCredentialInStore,
+  updateAgentConfigInStore,
+} from './domain/lifecycle-operations';
+import { getAgentStateFromStore } from './domain/state-operations';
+import { getEventFromStore, listEventsFromStore, publishEventInStore } from './events';
+import {
+  cancelRunInStore,
+  getRunFromStore,
+  listRunsFromStore,
+  processAgentRunSchedulerBatch,
+  type CancelAgentRunCommand,
+  type CancelAgentRunResult,
+  type GetAgentRunQuery,
+  type GetAgentRunResult,
+  type ListAgentRunsQuery,
+  type ListAgentRunsResult,
+} from './runs';
+import {
+  cancelScheduleInStore,
+  cleanupInstallationSchedulesInStore,
+  createAndRegisterAgentSchedule,
+  fireScheduleInStore,
+  getScheduleFromStore,
+  listSchedulesFromStore,
+  type AgentScheduleCallbackPayload,
+  type CancelAgentScheduleCommand,
+  type CancelAgentScheduleResult,
+  type CleanupInstallationSchedulesCommand,
+  type CleanupInstallationSchedulesResult,
+  type CreateAgentScheduleCommand,
+  type CreateAgentScheduleResult,
+  type FireAgentScheduleResult,
+  type GetAgentScheduleQuery,
+  type GetAgentScheduleResult,
+  type ListAgentSchedulesQuery,
+  type ListAgentSchedulesResult,
+} from './schedules';
+import {
+  createAgentStorageRepositories,
+  createAgentStorageThresholdSnapshot,
+  type AgentStorageRepositories,
+} from './storage';
+import {
+  createThreadKeyIdentity,
+  getLatestCompactionFromStore,
+  getThreadFromStore,
+  getThreadMemoryFromStore,
+  listSectionsFromStore,
+  listThreadsFromStore,
+  searchThreadHistoryFromStore,
+  type ThreadKeyIdentity,
+} from './threads';
+import {
+  approveToolInvocationInStore,
+  cancelToolInvocationInStore,
+  createToolInvocationInStore,
+  executeToolInvocationWithProvider,
+  getToolInvocationFromStore,
+  listToolInvocationsFromStore,
+  listToolsFromStore,
+  reconcileToolInvocationInStore,
+  recordToolResultInStore,
+  rejectToolInvocationInStore,
+  type CancelToolInvocationCommand,
+  type CreateToolInvocationCommand,
+  type DecideToolInvocationCommand,
+  type ExecuteToolInvocationCommand,
+  type GetToolInvocationQuery,
+  type GetToolInvocationResult,
+  type ListAgentToolsQuery,
+  type ListAgentToolsResult,
+  type ListToolInvocationsQuery,
+  type ListToolInvocationsResult,
+  type ReconcileToolInvocationCommand,
+  type RecordToolResultCommand,
+  type ToolInvocationMutationResult,
+} from './tools';
 
+import type {
+  AgentFoundationEventAcceptance,
+  AgentFoundationEventInput,
+  AgentFoundationHealth,
+  AgentLocalQueueProcessPayload,
+  AgentLocalQueueProcessResult,
+  AgentLocalQueueWakePayload,
+  AgentSchedulerWakeRecord,
+  AIAgentState,
+} from './AIAgent.types';
 import type { AgentWorkerEnv } from './env';
-
-/**
- * Foundation health state exposed by the AIAgent Durable Object.
- */
-export interface AgentFoundationHealth {
-  readonly agentId: string;
-  readonly status: AgentLifecycleStatus;
-  readonly storage: 'sqlite';
-  readonly queue: 'agent_local';
-}
-
-/**
- * Persisted state shape for the AIAgent foundation.
- */
-export interface AIAgentState {
-  readonly lifecycleStatus: AgentLifecycleStatus;
-}
-
-/**
- * Internal event acceptance input used before generated RPC handlers are wired.
- */
-export interface AgentFoundationEventInput {
-  readonly threadKey: string;
-  readonly idempotencyKey: string;
-  readonly eventType: string;
-  readonly payloadRef?: string;
-}
-
-/**
- * Internal event acceptance result for foundation seams.
- */
-export interface AgentFoundationEventAcceptance {
-  readonly identity: ThreadKeyIdentity;
-  readonly idempotencyKey: string;
-  readonly eventType: string;
-  readonly payloadRef?: string;
-  readonly storageStatus: EventStorageStatus;
-  readonly threadId: string;
-  readonly sectionId: string;
-  readonly eventId: string;
-  readonly runId: string;
-  readonly wake: AgentSchedulerWakeRecord;
-}
-
-/**
- * Scheduler wake state recorded after event and pending run persistence.
- */
-export interface AgentSchedulerWakeRecord {
-  readonly wakeStatus: 'pending' | 'running';
-  readonly coalesced: boolean;
-  readonly pendingCount: number;
-}
-
-interface ThreadRow {
-  readonly threadId: string;
-}
-
-interface SectionRow {
-  readonly sectionId: string;
-}
-
-interface SequenceRow {
-  readonly nextSequence: number;
-}
-
-interface ExistingEventRow {
-  readonly eventId: string;
-  readonly threadId: string;
-  readonly sectionId: string;
-  readonly eventType: string;
-  readonly payloadRef: string | null;
-}
-
-interface ExistingRunRow {
-  readonly runId: string;
-}
-
-interface WakeStateRow {
-  readonly wakeStatus: 'pending' | 'running' | 'idle';
-  readonly pendingCount: number;
-}
-
-/**
- * Return the Durable Object name for an Agent ID.
- */
-export function getAIAgentDurableObjectName(agentId: string): string {
-  if (agentId === '') {
-    throw new TypeError('agent_id must not be empty.');
-  }
-  return agentId;
-}
-
-/**
- * Resolve the Durable Object ID for an Agent ID.
- */
-export function getAIAgentDurableObjectId(env: AgentWorkerEnv, agentId: string): DurableObjectId {
-  return env.AI_AGENT.idFromName(getAIAgentDurableObjectName(agentId));
-}
-
-/**
- * Resolve the Durable Object stub for an Agent ID.
- */
-export function getAIAgentDurableObjectStub(
-  env: AgentWorkerEnv,
-  agentId: string
-): DurableObjectStub<AIAgent> {
-  return env.AI_AGENT.get(getAIAgentDurableObjectId(env, agentId));
-}
+import type {
+  AdapterConnectionMutationResult,
+  CreateAdapterConnectionCommand,
+  DeleteAdapterConnectionCommand,
+  DeliverToIntegrationProviderCommand,
+  DeliverToIntegrationProviderResult,
+  GetIntegrationInstallationQuery,
+  GetIntegrationInstallationResult,
+  InstallIntegrationCommand,
+  InstallIntegrationResult,
+  ListAdapterConnectionsQuery,
+  ListAdapterConnectionsResult,
+  ListIntegrationInstallationsQuery,
+  ListIntegrationInstallationsResult,
+  PublishIntegrationDeliveryResult,
+  PublishIntegrationDeliveryResultCommand,
+  PublishIntegrationEventCommand,
+  PublishIntegrationEventResult,
+  PublishIntegrationToolResultCommand,
+  UninstallIntegrationCommand,
+  UninstallIntegrationResult,
+} from './integrations';
 
 /**
  * Cloudflare Agents SDK Durable Object foundation for one Agent aggregate.
  */
 export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
+  private readonly repositories: AgentStorageRepositories;
+  private readonly durableObjectStorage: DurableObjectStorage;
+
   constructor(ctx: AgentContext, env: AgentWorkerEnv) {
     super(ctx, env);
-    ensureAgentFoundationTables((strings, ...values) => this.sql(strings, ...values));
+    this.durableObjectStorage = ctx.storage;
+    this.repositories = createAgentStorageRepositories(this.name, ctx.storage);
   }
 
   /**
@@ -148,35 +194,716 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
   }
 
   /**
+   * Initialize the Agent aggregate profile, config, credential, system Thread, and audit Event.
+   */
+  initializeAgent(command: InitializeAgentCommand): InitializeAgentResult {
+    return initializeAgentInStore({ agentId: this.name, command, repositories: this.repositories });
+  }
+
+  /**
+   * Return the Agent aggregate profile and current safe configuration snapshot.
+   */
+  getAgent(query: AgentScopedQuery): GetAgentResult {
+    return getAgentFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Destroy the Agent aggregate for future mutating operations.
+   */
+  destroyAgent(command: DestroyAgentCommand): DestroyAgentResult {
+    return destroyAgentInStore({ agentId: this.name, command, repositories: this.repositories });
+  }
+
+  /**
+   * Rotate Agent credential verifier metadata without storing plaintext secrets.
+   */
+  rotateAgentCredential(command: RotateAgentCredentialCommand): RotateAgentCredentialResult {
+    return rotateAgentCredentialInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Update the Agent configuration and increment the Agent-local config version.
+   */
+  updateConfig(command: UpdateAgentConfigCommand): UpdateAgentConfigResult {
+    return updateAgentConfigInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Return the current safe Agent configuration snapshot.
+   */
+  getConfig(query: AgentScopedQuery): AgentConfigView {
+    return getAgentConfigFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Publish an external Event into the Agent-owned mailbox and Event Log.
+   */
+  async publishEvent(command: PublishAgentEventCommand): Promise<PublishAgentEventResult> {
+    const result = await publishEventInStore({
+      agentId: this.name,
+      blobWriter: async (blob) => {
+        await this.env.AGENT_BLOBS.put(blob.key, blob.body, {
+          customMetadata: { sha256: blob.sha256 },
+          httpMetadata: { contentType: blob.contentType },
+        });
+        return {
+          byteSize: blob.body.byteLength,
+          contentType: blob.contentType,
+          key: blob.key,
+          sha256: blob.sha256,
+        };
+      },
+      command,
+      repositories: this.repositories,
+      storageUsagePercent: createAgentStorageThresholdSnapshot({
+        currentBytes: readDurableObjectSqlDatabaseSizeBytes(this.durableObjectStorage),
+      }).currentPercent,
+    });
+    if (!result.replayed) {
+      this.requestSchedulerWake({
+        reason: 'event_accepted',
+        requestedAtMs: command.context.requestedAtMs,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Return one Agent Event after Agent-local authorization.
+   */
+  getEvent(query: GetAgentEventQuery): AgentEventView {
+    return getEventFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Return ordered Agent Events with scoped cursor pagination.
+   */
+  listEvents(query: ListAgentEventsQuery): ListAgentEventsResult {
+    return listEventsFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Return Agent-scoped Thread summaries with cursor-scoped pagination.
+   */
+  listThreads(query: ListAgentThreadsQuery): ListAgentThreadsResult {
+    return listThreadsFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Return one Agent-scoped Thread with safe latest Event and Run summaries.
+   */
+  getThread(query: GetAgentThreadQuery): GetAgentThreadResult {
+    return getThreadFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Return Agent-scoped Section summaries ordered by Section ordinal.
+   */
+  listSections(query: ListAgentSectionsQuery): ListAgentSectionsResult {
+    return listSectionsFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * 対象 Thread の latest ready Compaction と digest 付き snapshot 参照を返します。
+   */
+  getLatestCompaction(
+    query: GetLatestAgentThreadCompactionQuery
+  ): GetLatestAgentThreadCompactionResult {
+    return getLatestCompactionFromStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * 対象 Thread の active ThreadMemory version と lineage 付き items を返します。
+   */
+  getThreadMemory(query: GetAgentThreadMemoryQuery): GetAgentThreadMemoryResult {
+    return getThreadMemoryFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * ready Compaction 由来の ThreadHistory index を filter/cursor 付きで検索します。
+   */
+  searchThreadHistory(query: SearchAgentThreadHistoryQuery): SearchAgentThreadHistoryResult {
+    return searchThreadHistoryFromStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Return the current Agent-local state and storage threshold snapshot.
+   */
+  getState(query: AgentScopedQuery): GetAgentStateResult {
+    return getAgentStateFromStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+      storageUsageCurrentBytes: readDurableObjectSqlDatabaseSizeBytes(this.durableObjectStorage),
+    });
+  }
+
+  /**
+   * Return one Agent-scoped Run with immutable snapshot metadata.
+   */
+  getRun(query: GetAgentRunQuery): Promise<GetAgentRunResult> {
+    return getRunFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Return Agent-scoped Runs with Thread, status, time, and cursor filters.
+   */
+  listRuns(query: ListAgentRunsQuery): ListAgentRunsResult {
+    return listRunsFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Cancel or interrupt unfinished AgentRun work idempotently.
+   */
+  cancelRun(command: CancelAgentRunCommand): CancelAgentRunResult {
+    return cancelRunInStore({ agentId: this.name, command, repositories: this.repositories });
+  }
+
+  /**
+   * Agent-owned Tool catalog を AgentToolService.ListTools 用に返します。
+   *
+   * @param query 認証済み principal、Agent scope、installation filter、page size を含む query です。
+   * @returns built-in Tool と Provider-backed Tool を統合した catalog view です。
+   * @throws Agent identity の不一致、final authorization 不足、storage 読み取り失敗時に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = await agent.listTools({ context, pageSize: 50 });
+   * ```
+   */
+  listTools(query: ListAgentToolsQuery): Promise<ListAgentToolsResult> {
+    return listToolsFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Agent-owned ToolInvocation を一件取得します。
+   *
+   * @param query 認証済み principal、Agent scope、invocation ID、payload 参照表示条件を含む query です。
+   * @returns ToolInvocation、approval、Provider operation の安全な view です。
+   * @throws Agent identity の不一致、final authorization 不足、対象 invocation 不在時に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = agent.getToolInvocation({ context, invocationId });
+   * ```
+   */
+  getToolInvocation(query: GetToolInvocationQuery): GetToolInvocationResult {
+    return getToolInvocationFromStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Agent scope 内の ToolInvocation を filter と cursor で一覧します。
+   *
+   * @param query 認証済み principal、Thread/Run/status/installation filter、page 条件を含む query です。
+   * @returns ToolInvocation 一覧と次 page token を含む page 情報です。
+   * @throws cursor scope が要求 filter と一致しない場合、または final authorization 不足時に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = agent.listToolInvocations({ context, threadId, pageSize: 25 });
+   * ```
+   */
+  listToolInvocations(query: ListToolInvocationsQuery): ListToolInvocationsResult {
+    return listToolInvocationsFromStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * AgentRun harness から ToolInvocation を作成します。
+   *
+   * @param command Run/Thread/Tool/input 参照と idempotency context を含む command です。
+   * @returns 作成済み、または replay された ToolInvocation mutation 結果です。
+   * @throws ToolDefinition が存在しない、利用不可、final authorization 不足、idempotency 不正の場合に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = await agent.createToolInvocation(command);
+   * ```
+   */
+  createToolInvocation(
+    command: CreateToolInvocationCommand
+  ): Promise<ToolInvocationMutationResult> {
+    return createToolInvocationInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * pending approval の ToolInvocation を承認します。
+   *
+   * @param command invocation ID、理由、idempotency context、承認 principal を含む command です。
+   * @returns approval record と audit record を含む mutation 結果です。
+   * @throws 対象が pending approval ではない、権限不足、idempotency conflict の場合に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = agent.approveToolInvocation(command);
+   * ```
+   */
+  approveToolInvocation(command: DecideToolInvocationCommand): ToolInvocationMutationResult {
+    return approveToolInvocationInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * pending approval の ToolInvocation を却下し、実行されない状態へ遷移させます。
+   *
+   * @param command invocation ID、理由、idempotency context、却下 principal を含む command です。
+   * @returns rejection approval record と audit record を含む mutation 結果です。
+   * @throws 対象が pending approval ではない、権限不足、idempotency conflict の場合に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = agent.rejectToolInvocation(command);
+   * ```
+   */
+  rejectToolInvocation(command: DecideToolInvocationCommand): ToolInvocationMutationResult {
+    return rejectToolInvocationInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * 承認済み ToolInvocation を Provider-facing IntegrationToolService へ送信します。
+   *
+   * @param command invocation ID、Provider 署名鍵、binary unary transport、idempotency context を含む command です。
+   * @returns Provider operation、または同期完了時の result Event を含む mutation 結果です。
+   * @throws 状態遷移不正、Provider 定義不備、署名/transport 失敗、final authorization 不足時に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = await agent.executeToolInvocation(command);
+   * ```
+   */
+  async executeToolInvocation(
+    command: ExecuteToolInvocationCommand
+  ): Promise<ToolInvocationMutationResult> {
+    const result = await executeToolInvocationWithProvider({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+    this.requestWakeAfterToolResult(result, command.context.requestedAtMs);
+    return result;
+  }
+
+  /**
+   * Provider から返った Tool result を同一 Thread の Event として記録します。
+   *
+   * @param command invocation ID、結果 status、output 参照、idempotency context を含む command です。
+   * @returns ToolInvocation 更新結果と、新規 append された result Event を含む mutation 結果です。
+   * @throws 重複 result、権限不足、Thread 不在、storage append 失敗時に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = agent.recordToolResult(command);
+   * ```
+   */
+  recordToolResult(command: RecordToolResultCommand): ToolInvocationMutationResult {
+    const result = recordToolResultInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+    this.requestWakeAfterToolResult(result, command.context.requestedAtMs);
+    return result;
+  }
+
+  /**
+   * outcome_unknown の ToolInvocation を Provider operation 状態で照合します。
+   *
+   * @param command invocation ID、Provider 署名鍵、binary unary transport、idempotency context を含む command です。
+   * @returns 照合後の Provider operation、または terminal result Event を含む mutation 結果です。
+   * @throws Provider operation 不在、署名/transport 失敗、final authorization 不足時に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = await agent.reconcileToolInvocation(command);
+   * ```
+   */
+  async reconcileToolInvocation(
+    command: ReconcileToolInvocationCommand
+  ): Promise<ToolInvocationMutationResult> {
+    const result = await reconcileToolInvocationInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+    this.requestWakeAfterToolResult(result, command.context.requestedAtMs);
+    return result;
+  }
+
+  /**
+   * running / outcome_unknown の ToolInvocation を取り消します。
+   *
+   * @param command invocation ID、任意の Provider 署名鍵/transport、理由、idempotency context を含む command です。
+   * @returns 取り消し後の ToolInvocation と Provider operation 状態を含む mutation 結果です。
+   * @throws 状態遷移不正、Provider cancel 失敗、final authorization 不足時に domain error を投げます。
+   * @example
+   * ```ts
+   * const result = await agent.cancelToolInvocation(command);
+   * ```
+   */
+  cancelToolInvocation(
+    command: CancelToolInvocationCommand
+  ): Promise<ToolInvocationMutationResult> {
+    return cancelToolInvocationInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * 署名済み manifest を検証し、Integration Installation を Agent-owned storage に追加します。
+   *
+   * @param command manifest 参照、要求 grant、idempotency context を含む command です。
+   * @returns Installation、Definition、Grant、TrustKey、audit を含む install 結果です。
+   * @throws manifest 署名不正、schema 不一致、grant 不一致、final authorization 不足時に domain error を投げます。
+   */
+  installIntegration(command: InstallIntegrationCommand): Promise<InstallIntegrationResult> {
+    return agentIntegrationHandlers.installIntegration(
+      this.createIntegrationHandlerContext(),
+      command
+    );
+  }
+
+  /**
+   * Integration Installation を uninstall し、関連 capability を無効化します。
+   *
+   * @param command Installation ID、理由、idempotency context を含む command です。
+   * @returns uninstalled Installation と無効化済み Connection 一覧です。
+   */
+  uninstallIntegration(command: UninstallIntegrationCommand): UninstallIntegrationResult {
+    return agentIntegrationHandlers.uninstallIntegration(
+      this.createIntegrationHandlerContext(),
+      command
+    );
+  }
+
+  /**
+   * Installation の安全な detail を取得します。
+   *
+   * @param query Installation ID と認証済み context を含む query です。
+   * @returns Installation、Definition、Grant の snapshot です。
+   */
+  getIntegrationInstallation(
+    query: GetIntegrationInstallationQuery
+  ): GetIntegrationInstallationResult {
+    return agentIntegrationHandlers.getInstallation(this.createIntegrationHandlerContext(), query);
+  }
+
+  /**
+   * Agent scope 内の Integration Installation を一覧します。
+   *
+   * @param query page 条件と status filter を含む query です。
+   * @returns Installation 一覧と page 情報です。
+   */
+  listIntegrationInstallations(
+    query: ListIntegrationInstallationsQuery
+  ): ListIntegrationInstallationsResult {
+    return agentIntegrationHandlers.listInstallations(
+      this.createIntegrationHandlerContext(),
+      query
+    );
+  }
+
+  /**
+   * Adapter Connection を Agent-local に作成します。
+   *
+   * @param command Installation/Adapter ID と任意 metadata を含む command です。
+   * @returns 作成済み Connection と audit を返します。
+   */
+  createAdapterConnection(
+    command: CreateAdapterConnectionCommand
+  ): AdapterConnectionMutationResult {
+    return agentIntegrationHandlers.createAdapterConnection(
+      this.createIntegrationHandlerContext(),
+      command
+    );
+  }
+
+  /**
+   * Adapter Connection を無効化します。
+   *
+   * @param command Connection ID と理由を含む command です。
+   * @returns 無効化済み Connection と audit を返します。
+   */
+  deleteAdapterConnection(
+    command: DeleteAdapterConnectionCommand
+  ): AdapterConnectionMutationResult {
+    return agentIntegrationHandlers.deleteAdapterConnection(
+      this.createIntegrationHandlerContext(),
+      command
+    );
+  }
+
+  /**
+   * Agent scope 内の Adapter Connection を一覧します。
+   *
+   * @param query Installation、Adapter、status、page filter を含む query です。
+   * @returns Connection 一覧と page 情報です。
+   */
+  listAdapterConnections(query: ListAdapterConnectionsQuery): ListAdapterConnectionsResult {
+    return agentIntegrationHandlers.listAdapterConnections(
+      this.createIntegrationHandlerContext(),
+      query
+    );
+  }
+
+  /**
+   * 署名済み Integration ingress Event を受理し、必要に応じて DeliveryContext を作ります。
+   *
+   * @param command Connection、Event、signature metadata を含む Provider callback command です。
+   * @returns append 済み Event、Thread、任意 DeliveryContext を返します。
+   */
+  async publishIntegrationEvent(
+    command: PublishIntegrationEventCommand
+  ): Promise<PublishIntegrationEventResult> {
+    return agentIntegrationHandlers.publishEvent(this.createIntegrationHandlerContext(), command);
+  }
+
+  /**
+   * 署名済み Integration Tool result callback を ToolInvocation に反映します。
+   *
+   * @param command invocation、結果 status、signature metadata を含む command です。
+   * @returns ToolInvocation 更新結果と任意 result Event を返します。
+   */
+  async publishIntegrationToolResult(
+    command: PublishIntegrationToolResultCommand
+  ): Promise<ToolInvocationMutationResult> {
+    return agentIntegrationHandlers.publishToolResult(
+      this.createIntegrationHandlerContext(),
+      command
+    );
+  }
+
+  /**
+   * 署名済み Delivery result callback を AdapterDelivery ledger に反映します。
+   *
+   * @param command delivery ID、status、signature metadata を含む command です。
+   * @returns Delivery result view と任意 AdapterDelivery view を返します。
+   */
+  publishIntegrationDeliveryResult(
+    command: PublishIntegrationDeliveryResultCommand
+  ): Promise<PublishIntegrationDeliveryResult> {
+    return agentIntegrationHandlers.publishDeliveryResult(
+      this.createIntegrationHandlerContext(),
+      command
+    );
+  }
+
+  /**
+   * DeliveryContext に bind された Provider Delivery RPC を実行します。
+   *
+   * @param command DeliveryContext、payload 参照、Provider client を含む command です。
+   * @returns Provider 応答と AdapterDelivery ledger view です。
+   */
+  deliverToIntegrationProvider(
+    command: DeliverToIntegrationProviderCommand
+  ): Promise<DeliverToIntegrationProviderResult> {
+    return agentIntegrationHandlers.deliverToProvider(
+      this.createIntegrationHandlerContext(),
+      command
+    );
+  }
+
+  private createIntegrationHandlerContext(): AIAgentIntegrationHandlerContext {
+    return {
+      agentId: this.name,
+      durableObjectStorage: this.durableObjectStorage,
+      env: this.env,
+      repositories: this.repositories,
+      requestSchedulerWake: (payload) => {
+        this.requestSchedulerWake(payload);
+      },
+      requestWakeAfterToolResult: (result, requestedAtMs) => {
+        this.requestWakeAfterToolResult(result, requestedAtMs);
+      },
+    };
+  }
+
+  /**
+   * Agent-owned Schedule を作成し、Agents SDK runtime callback に登録します。
+   */
+  async createAgentSchedule(
+    command: CreateAgentScheduleCommand
+  ): Promise<CreateAgentScheduleResult> {
+    return createAndRegisterAgentSchedule({
+      agentId: this.name,
+      cancelRuntimeSchedule: async (runtimeScheduleId) => {
+        await this.cancelSchedule(runtimeScheduleId);
+      },
+      command,
+      registerRuntimeSchedule: (result) => this.registerRuntimeSchedule(result),
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Agent-owned Schedule を一件取得します。
+   */
+  getAgentSchedule(query: GetAgentScheduleQuery): GetAgentScheduleResult {
+    return getScheduleFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Agent-owned Schedule を Agent scope 内で一覧します。
+   */
+  listAgentSchedules(query: ListAgentSchedulesQuery): ListAgentSchedulesResult {
+    return listSchedulesFromStore({ agentId: this.name, query, repositories: this.repositories });
+  }
+
+  /**
+   * Agent-owned Schedule を取り消し、SDK runtime callback も停止します。
+   */
+  async cancelAgentSchedule(
+    command: CancelAgentScheduleCommand
+  ): Promise<CancelAgentScheduleResult> {
+    const result = cancelScheduleInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+    if (result.runtimeScheduleId !== undefined) await this.cancelSchedule(result.runtimeScheduleId);
+    return result;
+  }
+
+  /**
+   * Integration disabled/uninstalled 時に所有 Schedule を停止します。
+   */
+  async cleanupSchedulesForInstallation(
+    command: CleanupInstallationSchedulesCommand
+  ): Promise<CleanupInstallationSchedulesResult> {
+    const result = cleanupInstallationSchedulesInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+    for (const runtimeScheduleId of result.runtimeScheduleIds) {
+      await this.cancelSchedule(runtimeScheduleId);
+    }
+    return result;
+  }
+
+  /**
+   * Agents SDK から呼ばれる Schedule callback を Event append に変換します。
+   */
+  handleAgentScheduleCallback(payload: AgentScheduleCallbackPayload): FireAgentScheduleResult {
+    const result = fireScheduleInStore({
+      agentId: this.name,
+      command: { fireAtMs: Date.now(), scheduleId: payload.scheduleId },
+      repositories: this.repositories,
+    });
+    if (result.eventAppended)
+      this.requestSchedulerWake({ reason: 'event_accepted', requestedAtMs: Date.now() });
+    return result;
+  }
+
+  private requestWakeAfterToolResult(
+    result: ToolInvocationMutationResult,
+    requestedAtMs: number
+  ): void {
+    if (!result.replayed && result.resultEvent !== undefined) {
+      this.requestSchedulerWake({ reason: 'event_accepted', requestedAtMs });
+    }
+  }
+
+  private async registerRuntimeSchedule(
+    result: CreateAgentScheduleResult
+  ): Promise<{ readonly id: string; readonly time?: number }> {
+    if (result.runtimePlan === undefined) {
+      throw new TypeError('runtime schedule plan is required.');
+    }
+    const callbackName: keyof this = 'handleAgentScheduleCallback';
+    const payload: AgentScheduleCallbackPayload = {
+      agentId: this.name,
+      scheduleId: result.schedule.scheduleId,
+    };
+    if (result.runtimePlan.kind === 'interval') {
+      const schedule = await this.scheduleEvery(
+        result.runtimePlan.intervalSeconds,
+        callbackName,
+        payload,
+        {
+          _idempotent: true,
+        }
+      );
+      return { id: schedule.id, time: schedule.time };
+    }
+    const schedule = await this.schedule(result.runtimePlan.when, callbackName, payload, {
+      idempotent: true,
+    });
+    return { id: schedule.id, time: schedule.time };
+  }
+
+  /**
    * Accept an event into the foundation seam without running the model harness.
    */
   acceptFoundationEvent(input: AgentFoundationEventInput): AgentFoundationEventAcceptance {
-    this.assertFoundationEventInput(input);
-    const now = Date.now();
-    const identity = this.createThreadIdentity(input.threadKey);
-    const replayed = this.findExistingEvent(input.idempotencyKey);
-    if (replayed !== undefined) {
-      return this.createReplayedEventAcceptance(identity, input, replayed);
-    }
+    return acceptFoundationEventInStore({
+      agentId: this.name,
+      input,
+      repositories: this.repositories,
+      requestSchedulerWake: (payload) => this.requestSchedulerWake(payload),
+    });
+  }
 
-    const threadId = this.resolveOrCreateThread(identity, now);
-    const sectionId = this.resolveOrCreateSection(threadId, now);
-    const eventId = crypto.randomUUID();
-    const runId = crypto.randomUUID();
-    this.appendEvent(input, threadId, sectionId, eventId, now);
-    this.createPendingRun(threadId, eventId, runId, input.payloadRef, now);
-    const wake = this.recordSchedulerWake(now);
+  /**
+   * Record an Agent-local Queue scheduler wake intent behind the Connect facade.
+   */
+  requestSchedulerWake(payload: AgentLocalQueueWakePayload): AgentSchedulerWakeRecord {
+    const wake = this.repositories.schedulerWakes.recordWake(payload.requestedAtMs ?? Date.now());
+    if (!wake.coalesced) {
+      this.enqueueSchedulerWake();
+    }
+    return wake;
+  }
+
+  /**
+   * Agent-local Queue scheduler callback entrypoint for bounded AgentRun processing.
+   */
+  processPendingRuns(payload: AgentLocalQueueProcessPayload): AgentLocalQueueProcessResult {
+    const result = processAgentRunSchedulerBatch({
+      agentId: this.name,
+      maxRuns: payload.maxRuns ?? 1,
+      nowMs: Date.now(),
+      repositories: this.repositories,
+    });
+    if (result.reenqueue && this.repositories.pendingRuns.findActiveRun() === undefined) {
+      this.enqueueSchedulerWake(result.requestedMaxRuns);
+    }
     return {
-      identity,
-      idempotencyKey: input.idempotencyKey,
-      eventType: input.eventType,
-      payloadRef: input.payloadRef,
-      storageStatus: 'accepted',
-      threadId,
-      sectionId,
-      eventId,
-      runId,
-      wake,
+      agentId: result.agentId,
+      pendingCount: result.pendingCount,
+      processedCount: result.processedCount,
+      queue: 'agent_local',
+      reason: payload.reason,
+      reenqueue: result.reenqueue,
+      remainingPendingCount: result.remainingPendingCount,
+      requestedMaxRuns: result.requestedMaxRuns,
+      status: result.status,
     };
   }
 
@@ -184,239 +911,23 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
    * Return foundation-only Agent health without exposing a public DO fetch route.
    */
   checkHealth(): AgentFoundationHealth {
+    const profile = this.repositories.profile.getProfile();
     return {
       agentId: this.name,
-      status: this.state.lifecycleStatus,
+      status: (profile?.lifecycleStatus ?? this.state.lifecycleStatus) as AgentLifecycleStatus,
       storage: 'sqlite',
       queue: 'agent_local',
     };
   }
 
-  private assertFoundationEventInput(input: AgentFoundationEventInput): void {
-    if (input.idempotencyKey === '') {
-      throw new TypeError('idempotency_key must not be empty.');
-    }
-    if (input.eventType === '') {
-      throw new TypeError('event_type must not be empty.');
-    }
-  }
-
-  private findExistingEvent(idempotencyKey: string): ExistingEventRow | undefined {
-    const rows = this.sql<ExistingEventRow>`SELECT
-      event_id as eventId,
-      thread_id as threadId,
-      section_id as sectionId,
-      event_type as eventType,
-      payload_ref as payloadRef
-      FROM agent_events
-      WHERE agent_id = ${this.name} AND idempotency_key = ${idempotencyKey}
-      LIMIT 1`;
-    return rows[0];
-  }
-
-  private createReplayedEventAcceptance(
-    identity: ThreadKeyIdentity,
-    input: AgentFoundationEventInput,
-    existing: ExistingEventRow
-  ): AgentFoundationEventAcceptance {
-    const run = this.findRunForEvent(existing.eventId);
-    return {
-      identity,
-      idempotencyKey: input.idempotencyKey,
-      eventType: existing.eventType,
-      payloadRef: existing.payloadRef ?? undefined,
-      storageStatus: 'replayed',
-      threadId: existing.threadId,
-      sectionId: existing.sectionId,
-      eventId: existing.eventId,
-      runId: run?.runId ?? '',
-      wake: this.getSchedulerWakeState(),
-    };
-  }
-
-  private findRunForEvent(eventId: string): ExistingRunRow | undefined {
-    const rows = this.sql<ExistingRunRow>`SELECT run_id as runId
-      FROM agent_runs
-      WHERE agent_id = ${this.name} AND trigger_event_id = ${eventId}
-      LIMIT 1`;
-    return rows[0];
-  }
-
-  private resolveOrCreateThread(identity: ThreadKeyIdentity, now: number): string {
-    const rows = this.sql<ThreadRow>`SELECT thread_id as threadId
-      FROM agent_threads
-      WHERE agent_id = ${this.name} AND normalized_thread_key = ${identity.normalizedThreadKey}
-      LIMIT 1`;
-    const existing = rows[0];
-    if (existing !== undefined) {
-      return existing.threadId;
-    }
-
-    const threadId = crypto.randomUUID();
-    void this.sql`INSERT INTO agent_threads (
-      agent_id,
-      thread_id,
-      thread_key,
-      normalized_thread_key,
-      created_at_ms,
-      updated_at_ms
-    ) VALUES (${this.name}, ${threadId}, ${identity.threadKey}, ${identity.normalizedThreadKey}, ${now}, ${now})`;
-    return threadId;
-  }
-
-  private resolveOrCreateSection(threadId: string, now: number): string {
-    const rows = this.sql<SectionRow>`SELECT section_id as sectionId
-      FROM agent_thread_sections
-      WHERE agent_id = ${this.name} AND thread_id = ${threadId}
-      ORDER BY sequence ASC
-      LIMIT 1`;
-    const existing = rows[0];
-    if (existing !== undefined) {
-      return existing.sectionId;
-    }
-
-    const sectionId = crypto.randomUUID();
-    void this.sql`INSERT INTO agent_thread_sections (
-      agent_id,
-      thread_id,
-      section_id,
-      sequence,
-      status,
-      created_at_ms
-    ) VALUES (${this.name}, ${threadId}, ${sectionId}, 1, 'active', ${now})`;
-    return sectionId;
-  }
-
-  private appendEvent(
-    input: AgentFoundationEventInput,
-    threadId: string,
-    sectionId: string,
-    eventId: string,
-    now: number
-  ): void {
-    const sequence = this.getNextEventSequence(threadId);
-    void this.sql`INSERT INTO agent_events (
-      agent_id,
-      event_id,
-      thread_id,
-      section_id,
-      idempotency_key,
-      event_type,
-      payload_ref,
-      sequence,
-      created_at_ms
-    ) VALUES (
-      ${this.name},
-      ${eventId},
-      ${threadId},
-      ${sectionId},
-      ${input.idempotencyKey},
-      ${input.eventType},
-      ${input.payloadRef ?? null},
-      ${sequence},
-      ${now}
-    )`;
-  }
-
-  private getNextEventSequence(threadId: string): number {
-    const rows = this.sql<SequenceRow>`SELECT COALESCE(MAX(sequence), 0) + 1 as nextSequence
-      FROM agent_events
-      WHERE agent_id = ${this.name} AND thread_id = ${threadId}`;
-    return rows[0]?.nextSequence ?? 1;
-  }
-
-  private createPendingRun(
-    threadId: string,
-    eventId: string,
-    runId: string,
-    snapshotRef: string | undefined,
-    now: number
-  ): void {
-    void this.sql`INSERT INTO agent_runs (
-      agent_id,
-      run_id,
-      thread_id,
-      trigger_event_id,
-      status,
-      created_at_ms,
-      updated_at_ms
-    ) VALUES (${this.name}, ${runId}, ${threadId}, ${eventId}, 'pending', ${now}, ${now})`;
-    void this.sql`INSERT INTO agent_run_inputs (
-      agent_id,
-      run_id,
-      snapshot_ref,
-      trigger_event_id,
-      created_at_ms
-    ) VALUES (${this.name}, ${runId}, ${snapshotRef ?? null}, ${eventId}, ${now})`;
-  }
-
-  private recordSchedulerWake(now: number): AgentSchedulerWakeRecord {
-    const current = this.readSchedulerWakeState();
-    if (
-      current !== undefined &&
-      (current.wakeStatus === 'pending' || current.wakeStatus === 'running')
-    ) {
-      const pendingCount = current.pendingCount + 1;
-      void this.sql`UPDATE agent_scheduler_wake_state
-        SET pending_count = ${pendingCount}, updated_at_ms = ${now}
-        WHERE agent_id = ${this.name}`;
-      return {
-        wakeStatus: current.wakeStatus,
-        coalesced: true,
-        pendingCount,
-      };
-    }
-
-    this.upsertPendingSchedulerWake(now);
-    return {
-      wakeStatus: 'pending',
-      coalesced: false,
-      pendingCount: 1,
-    };
-  }
-
-  private getSchedulerWakeState(): AgentSchedulerWakeRecord {
-    const current = this.readSchedulerWakeState();
-    if (
-      current !== undefined &&
-      (current.wakeStatus === 'pending' || current.wakeStatus === 'running')
-    ) {
-      return {
-        wakeStatus: current.wakeStatus,
-        coalesced: true,
-        pendingCount: current.pendingCount,
-      };
-    }
-    return {
-      wakeStatus: 'pending',
-      coalesced: false,
-      pendingCount: 0,
-    };
-  }
-
-  private readSchedulerWakeState(): WakeStateRow | undefined {
-    const rows = this.sql<WakeStateRow>`SELECT
-      wake_status as wakeStatus,
-      pending_count as pendingCount
-      FROM agent_scheduler_wake_state
-      WHERE agent_id = ${this.name}
-      LIMIT 1`;
-    return rows[0];
-  }
-
-  private upsertPendingSchedulerWake(now: number): void {
-    const current = this.readSchedulerWakeState();
-    if (current === undefined) {
-      void this.sql`INSERT INTO agent_scheduler_wake_state (
-        agent_id,
-        wake_status,
-        pending_count,
-        updated_at_ms
-      ) VALUES (${this.name}, 'pending', 1, ${now})`;
-      return;
-    }
-    void this.sql`UPDATE agent_scheduler_wake_state
-      SET wake_status = 'pending', pending_count = 1, updated_at_ms = ${now}
-      WHERE agent_id = ${this.name}`;
+  private enqueueSchedulerWake(maxRuns?: number): void {
+    const payload: AgentLocalQueueProcessPayload =
+      maxRuns === undefined ? { reason: 'scheduler_wake' } : { maxRuns, reason: 'scheduler_wake' };
+    void this.queue('processPendingRuns', payload).catch(() => {
+      this.repositories.schedulerWakes.markPending(
+        Date.now(),
+        this.repositories.pendingRuns.countPendingRuns()
+      );
+    });
   }
 }

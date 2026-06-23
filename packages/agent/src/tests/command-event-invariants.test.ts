@@ -25,6 +25,9 @@ const commandMethods = new Set([
   'IntegrationIngressService.PublishEvent',
   'IntegrationIngressService.PublishToolResult',
   'IntegrationIngressService.PublishDeliveryResult',
+  'IntegrationToolService.InvokeTool',
+  'IntegrationToolService.CancelOperation',
+  'IntegrationDeliveryService.Deliver',
 ]);
 
 const eventPublishMethods = new Set([

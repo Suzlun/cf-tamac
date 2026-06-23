@@ -2,7 +2,7 @@
 
 基盤境界が確定しても、Agent が自律的な主体として動くためには、Agent lifecycle、Thread/Event、Run scheduler、Compaction/Memory、Schedule、Tool、Integration、Client 管理 UI までが一貫した domain として実装されている必要がある。単なるチャット Bot や CRUD API ではなく、外部 Event、時刻、内部状態、Tool 結果、人間の入力を受け取り、Agent が自ら次の行動を決める server-side harness が必要である。
 
-この change は、`establish-agent-service-foundation` が適用済みであることを前提に、`docs/memo/仕様設計・アーキテクチャ設定.md` の Stage 1 から Stage 8 までを機能実装としてまとめる。foundation が作成した `packages/agent`、`packages/client`、TypeSpec-to-proto 生成、Connect facade、AIAgent DO foundation、Client D1、guardrail、`packages/agent/src/typespec/src/services/agent-adapter.tsp` を再作成せず、未実装の domain behavior と相互運用を詳細化して上乗せする。Stage 9 の Discord Integration Provider は対象外にしつつ、Integration Provider と相互運用するための Agent 側 RPC、署名、Adapter/Tool/Delivery 境界は Stage 8 までの範囲に含める。
+この change は、`establish-agent-service-foundation` が適用済みであることを前提に、`docs/memo/仕様設計・アーキテクチャ設定.md` の Stage 1 から Stage 8 までを機能実装としてまとめる。foundation が作成した `packages/agent`、`packages/client`、TypeSpec-to-proto 生成、Connect facade、AIAgent DO foundation、Client D1、guardrail、`packages/agent/src/typespec/src/services/agent-adapter.tsp` を再作成せず、未実装の domain behavior と相互運用を詳細化して上乗せする。Integration Provider が外部 protocol を Adapter/Tool/Delivery capability へ正規化する境界を前提に、Agent 側 RPC、署名、Adapter/Tool/Delivery 境界を Stage 8 までの範囲に含める。外部 protocol 差分は Agent domain へ持ち込まない。
 
 ## Foundation Dependency
 
@@ -54,10 +54,10 @@
 ## Impact
 
 - Agent RPC services: AgentLifecycleService、AgentEventService、AgentThreadService、AgentRunService、AgentStateService、AgentScheduleService、AgentToolService、AgentIntegrationService（CreateAdapterConnection、DeleteAdapterConnection、ListAdapterConnections を含む）、`agent-adapter.tsp` で定義される IntegrationIngressService、AgentHealthService。
-- Provider-facing RPC services: IntegrationToolService、IntegrationDeliveryService。Agent-side Tool/Delivery interop は含めるが、Discord Provider 本体は含めない。
+- Provider-facing RPC services: IntegrationToolService、IntegrationDeliveryService。Agent-side Tool/Delivery interop は Integration/Installation 境界で扱い、外部 platform protocol 実装は Integration Provider 側の責務として Agent domain へ流入させない。
 - Durable Object domain: AIAgent class、DO SQLite schema、Agent-local Queue callbacks、Agent-owned scheduler、R2 references、Workflow/Fiber integration points。
 - Security/operations: JWT/signature verification、timestamp/nonce/idempotency tables、grant/scope matrix、rate limits、audit logs、metrics、Connect error mapping。
 - Client: Next.js App Router/OpenNext、Server Components/Server Actions、Client D1 schema/migrations、generated Connect client、management UI flows。
-- External interoperability: Integration Provider manifest、Adapter ingress、Tool Provider RPC、Delivery RPC、signed callbacks を扱うが、Discord-specific Provider implementation は含めない。
+- External interoperability: Integration Provider manifest、Adapter ingress、Tool Provider RPC、Delivery RPC、signed callbacks を扱い、Agent domain は正規化済み Integration/Adapter/Tool/Delivery model だけを参照する。
 - Root/rules docs: AGENTS.md、CODING_STANDARDS.md、CONTRIBUTING.md、coding-guardian skill/reference を新しい Agent Protobuf RPC-only 構成と package entrypoints に合わせる。
 - Testing: contract conformance、RPC security、Agent/thread concurrency、compaction/memory、schedule/tool/integration behavior、Client isolation、UI E2E/component coverage を対象にする。

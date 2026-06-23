@@ -48,6 +48,8 @@ const rpcServiceInventory = new Map<string, string[]>([
     ],
   ],
   ['IntegrationIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
+  ['IntegrationToolService', ['InvokeTool', 'GetOperation', 'CancelOperation']],
+  ['IntegrationDeliveryService', ['Deliver']],
   ['AgentHealthService', ['Check']],
 ]);
 

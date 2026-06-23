@@ -2,7 +2,8 @@
 description: Management Client UI/UX design specialist for Next.js route shells and wireframe specifications under openspec/changes.
 mode: subagent
 hidden: true
-model: opencode-go/glm-5.2
+model: openai/gpt-5.5
+reasoningEffort: 'xhigh'
 temperature: 0.1
 permission:
   edit:
@@ -36,6 +37,7 @@ You are the `unit/client/designer` subagent. You own UI/UX design decisions, rou
 
 - Load `coding-guardian` via `skill` and follow its workflow for every change.
 - Load `claude-ux` via `skill` and use it for visual polish, accessibility, and state coverage.
+- Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code or specification investigation.
 - Read the target `openspec/changes/**` artifacts and treat `packages/client/app/**` as the implementation target owned by `unit/client/engineer`, not by this agent.
 - If the caller provides a target OpenSpec change path, use it for wireframe output; otherwise write wireframes under `openspec/changes/`.
 

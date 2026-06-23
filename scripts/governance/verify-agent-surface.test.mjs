@@ -18,6 +18,164 @@ function writeFixture(root, relativePath, content) {
 }
 
 describe('Agent surface governance', () => {
+  it('[AGENT-SECURITY-S009] Lint rejects public Durable Object RPC and legacy Agent surface fixtures', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'agent-security-surface-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/worker.ts',
+        `export default {
+  fetch(request, env) {
+    const id = env.AI_AGENT.idFromName('agent-alpha');
+    return env.AI_AGENT.get(id).fetch(request);
+  },
+};
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/rest-route.ts',
+        `import { Hono } from 'hono';
+
+const app = new Hono();
+app.get('/agents', () => new Response('forbidden'));
+`
+      );
+      writeFixture(fixtureRoot, 'packages/agent/src/openapi/openapi.json', '{}\n');
+      writeFixture(fixtureRoot, 'packages/agent/src/orval/agent-client.ts', 'export const generatedBy = "orval";\n');
+
+      const issues = collectAgentSurfaceIssues(fixtureRoot);
+
+      expect(issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('[AGENT-SECURITY-S009]'),
+          expect.stringContaining('forbidden public-do-rpc-route'),
+          expect.stringContaining('forbidden hono-rest-route'),
+          expect.stringContaining('forbidden Agent OpenAPI/Orval artifact path'),
+          expect.stringContaining('forbidden orval-agent-client'),
+        ])
+      );
+      expect(collectAgentSurfaceIssues()).toEqual([]);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[AGENT-HEALTH-S002] Lint rejects REST /health and JSON health fixtures', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'agent-health-surface-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/worker.ts',
+        `export default {
+  fetch(request) {
+    if (new URL(request.url).pathname === '/health') {
+      return Response.json({ status: 'ok', health: 'serving' });
+    }
+    return new Response('use Connect');
+  },
+};
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/rpc/services/health.ts',
+        `export const service = 'AgentHealthService.Check';
+`
+      );
+
+      const issues = collectAgentSurfaceIssues(fixtureRoot);
+
+      expect(issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('[AGENT-HEALTH-S002]'),
+          expect.stringContaining('forbidden rest-health-endpoint'),
+          expect.stringContaining('forbidden json-health-response'),
+        ])
+      );
+      expect(issues).not.toEqual(expect.arrayContaining([expect.stringContaining('rpc/services/health.ts')]));
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[CLIENT-REGISTRY-S005] Lint rejects Client public Agent proxy routes and permits Server Actions', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'client-proxy-surface-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/client/app/api/client/agents/route.ts',
+        `import { createServerAgentRpcClients } from '../../../../src/server/agent-rpc';
+
+export async function POST() {
+  const clients = createServerAgentRpcClients({ agentRpcOrigin: 'https://agent.example.com' });
+  return Response.json({ proxy: clients });
+}
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/client/app/agents/actions.ts',
+        `'use server';
+
+import { createServerAgentRpcClients } from '../../src/server/agent-rpc';
+
+export async function callAgentFromServerAction() {
+  return createServerAgentRpcClients;
+}
+`
+      );
+
+      const issues = collectAgentSurfaceIssues(fixtureRoot);
+
+      expect(issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('[CLIENT-REGISTRY-S005]'),
+          expect.stringContaining('forbidden Client public Agent proxy route path'),
+          expect.stringContaining('forbidden Client public Agent proxy route'),
+        ])
+      );
+      expect(issues).not.toEqual(expect.arrayContaining([expect.stringContaining('app/agents/actions.ts')]));
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[AGENT-SECURITY-S009] Connect fixtures and Server Action boundaries remain allowed', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'allowed-agent-surface-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/rpc/connect-worker-adapter.ts',
+        `export function handleAgentConnectRequest(request) {
+  if (request.method !== 'POST') return new Response('method not allowed', { status: 405 });
+  return new Response(new Uint8Array(), { headers: { 'content-type': 'application/proto' } });
+}
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/client/app/agents/actions.ts',
+        `'use server';
+
+import { createServerAgentRpcClients } from '../../src/server/agent-rpc';
+
+export async function refreshAgentViaServerAction() {
+  return createServerAgentRpcClients;
+}
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual([]);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('[WORKSPACE-GOVERNANCE-S003] Lint rejects forbidden Agent API surface fixtures', () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), 'agent-surface-fixtures-'));
 

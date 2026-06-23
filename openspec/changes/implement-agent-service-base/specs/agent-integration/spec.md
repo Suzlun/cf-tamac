@@ -101,13 +101,13 @@ Uninstall cleanup は追跡履歴を保持しながら Integration capability �
 
 **利用者文脈**
 
-Integration を外すとき、ingress、Tool、Schedule、Delivery、trust key が残ると不要な外部入力や作用が発生する。Agent 側は Discord など特定 Provider 実装に依存せず、汎用 Integration protocol 境界で相互運用できる必要がある。
+Integration を外すとき、ingress、Tool、Schedule、Delivery、trust key が残ると不要な外部入力や作用が発生する。Agent 側は Integration/Installation に保存された Adapter、Tool、Delivery definition と grant を解釈材料とし、外部 protocol の種類、payload 形式、Provider 実装差分を Agent domain へ伝播させずに相互運用できる必要がある。
 
 **要件**
 
 - UninstallIntegration は `uninstalling` を経由して遷移 MUST し、Installation を `uninstalled` と mark する前に ingress、Adapter Connection、Integration Tool、pending ToolInvocation、Integration-owned Schedule、DeliveryContext、trust key、grant を無効化 MUST。
 - Uninstall は traceability のため Event、History、ToolInvocation 記録、Compaction、監査記録を保持 MUST。
-- Agent Service は汎用 Integration、Adapter、Tool、Delivery 相互運用性を定義 MUST し、Agent 側 Integration 振る舞いを満たすために Discord 固有 Provider 実装を要求して MUST NOT。
+- Agent Service は Integration、Adapter、Tool、Delivery 相互運用性を定義 MUST し、Agent 側の解釈と状態遷移は Installation に保存された definition、grant、Connection、DeliveryContext から決定される MUST。
 
 #### Scenario: UninstallIntegration が capabilities を disable し history を保持する (AGENT-INTEGRATION-S007)
 
@@ -116,9 +116,9 @@ Integration を外すとき、ingress、Tool、Schedule、Delivery、trust key �
 - **THEN** ingress は拒否され、Connection は `disabled` になり、Tool は `unavailable` になり、関連 Schedule は `cancelled` になり、pending ToolInvocation は `cancelled` または `outcome_unknown` として mark され、DeliveryContext は `revoked` され、trust key は `revoked` される
 - **AND** 既存の Event、History、ToolInvocation 記録、監査 Event は照会可能なままである
 
-#### Scenario: 汎用 Integration Provider が Discord 固有 code なしで動作する (AGENT-INTEGRATION-S008)
+#### Scenario: 汎用 Integration Provider が外部 protocol 差分を Agent domain へ伝播させず動作する (AGENT-INTEGRATION-S008)
 
 - **GIVEN** Provider が汎用 manifest、ingress、Tool、Delivery RPC 契約を実装している
 - **WHEN** Provider が Agent に install され、有効な Adapter Connection を通じて Event を publish する
 - **THEN** Agent Service は同じ signature、grant、Thread、Tool、Delivery rule を使用して汎用 Integration interaction を受理し処理する
-- **AND** Agent Service 内で Discord 固有 Provider package または platform payload parser は要求されない
+- **AND** Agent Service の state、authorization、Run input は Installation の definition、grant、Connection、DeliveryContext から一貫して導出される

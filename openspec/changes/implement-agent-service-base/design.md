@@ -15,7 +15,7 @@
 
 ### Out of Scope
 
-- Stage 9 の Discord Integration Provider 実装、Discord Interaction endpoint、Discord Bot token 管理、Discord command registration。Agent 側の generic Integration/Tool/Delivery interop は Stage 1-8 の対象に残す。
+- 外部 platform protocol 実装、platform endpoint、platform token 管理、platform command 登録、platform payload parser。Agent 側は Integration Provider boundary から正規化済み Adapter/Tool/Delivery capability だけを受け取り、Stage 1-8 では Agent domain に外部 protocol 差分を持ち込まない。
 - Agent の REST resource API、Agent OpenAPI artifact、Connect JSON production API、Browser からの Agent RPC 直接呼び出し、必須 native gRPC gateway、gRPC-Web。
 - Agent 横断の一覧/検索 RPC、Thread ごとの Durable Object 分割、Cloudflare Queues product を Agent mailbox 正本にする設計。
 - Agent から Client D1 を読み書きする projection、Client が Agent API を代理公開する public proxy route。
@@ -33,15 +33,16 @@
 - `packages/agent` は Cloudflare Workers + Cloudflare Agents SDK + SQLite-backed Durable Objects + R2 を前提に、Client D1 binding と Cloudflare Queues product binding を持たない。
 - `packages/client` は Next.js App Router + Cloudflare OpenNext adapter を前提に、Client 専用 D1 と server-side Connect client を所有する。
 - `@typespec/protobuf`、Buf/Protobuf-ES、Connect、Cloudflare Agents SDK、Next.js/OpenNext などの依存追加は、`pnpm-workspace.yaml` の 72 時間 minimumReleaseAge と `allowBuilds` 方針を満たす。
+- Mandatory stack applicability is documented in `mandatory-stack-applicability.md`: Next.js App Router remains primary; React Compiler, TanStack Query, Drizzle ORM for Agent Durable Object SQLite and Client D1, Tailwind/shadcn UI, jose, and zod are applicable within stated package boundaries; Prisma is not used anywhere; Vite, React Router, and KV are non-applicable unless a future spec explicitly changes the boundary.
 - 既存 lint/CI は `pnpm format:check`、`pnpm lint`、`pnpm check`、`pnpm test:run`、`pnpm check:codegen` を基準に更新する。
 - OpenSpec の main specs は空であるため、全 delta spec は ADDED Requirements のみで構成する。
 
 ## Impacted Areas
 
 - API contract: foundation の `packages/agent/src/typespec/**`、`packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**` を詳細化し、`IntegrationToolService` / `IntegrationDeliveryService` 用の Provider-facing generated clients を追加する。
-- Agent runtime: `packages/agent/src/index.ts`、`AIAgent.ts`、RPC facade、domain modules、`adapters` modules、DO SQLite schema/migrations、Agent-local Queue callbacks、R2 archive references、optional Workflow/Fiber integration points。
+- Agent runtime: `packages/agent/src/index.ts`、`AIAgent.ts`、RPC facade、domain modules、`adapters` modules、Drizzle ORM を用いる DO SQLite schema/repositories、Agent-local Queue callbacks、R2 archive references、optional Workflow/Fiber integration points。
 - Security/operations: JWT verification、Integration detached signature、raw body digest、nonce/idempotency tables、grant/scope matrix、rate limiting、audit log、metrics、Connect error mapping、secret redaction。
-- Client backend: Client D1 schema/migrations、managed agent registry、credential reference、server-side Agent RPC factory、Server Actions。
+- Client backend: Drizzle ORM を用いる Client D1 schema/repositories/migrations、managed agent registry、credential reference、server-side Agent RPC factory、Server Actions。
 - Client frontend: Agent registry、Agent detail、Threads/Events/Runs/Compactions、Schedules、Tools/Approvals、Integrations、Settings 用の Next.js App Router pages/components。
 - Tooling/docs: root/package scripts、workspace package entries、ESLint boundaries、Vitest/Playwright projects、OpenSpec scenario coverage tests、CI/codegen drift checks、AGENTS.md、CODING_STANDARDS.md、CONTRIBUTING.md、coding-guardian skill/reference。
 - Legacy surface: foundation で除去/非活性化された template `packages/typespec` OpenAPI emitter/output、`packages/frontend/api` Orval Agent SDK、`packages/backend/http` Hono zod-openapi Agent routes と OpenAPI contract tests が再導入されないことを検証する。
@@ -474,7 +475,7 @@ erDiagram
 - Public API: `AgentLifecycleService`、`AgentEventService`、`AgentThreadService`、`AgentRunService`、`AgentStateService`、`AgentScheduleService`、`AgentToolService`、`AgentIntegrationService`（CreateAdapterConnection、DeleteAdapterConnection、ListAdapterConnections を含む）、`IntegrationIngressService`、`AgentHealthService` の unary RPC。Provider-facing contract として `IntegrationToolService` と `IntegrationDeliveryService` を同じ TypeSpec/proto package から生成し、Agent は client として呼ぶ。
 - Key Data Structures: `AgentScope`、`AgentEventInput`、`ThreadView`、`RunSnapshot`、`Handoff`、`ThreadHistoryIndex`、`MemoryItem`、`ScheduleView`、`ToolDefinition`、`ToolInvocationView`、`ProviderOperation`、`IntegrationManifest`、`InstallationView`、`AdapterConnectionView`、`DeliveryContext`、`HealthStatus`、`Principal`、`Grant`、`IdempotencyRecord`。
 - Key Flows: RPC facade が binary Protobuf/auth/validation を処理し、AIAgent DO が final authorization、state transition、SQLite transaction、Queue wake、harness decision commit を行う。DO RPC は Worker-internal のみで外部公開しない。
-- Dependencies: Cloudflare Agents SDK は Agent-local Queue と Agent lifecycle、DO SQLite は Agent aggregate の正本、R2 は large body/history、Connect/Protobuf-ES は RPC transport と generated descriptor のために使う。
+- Dependencies: Cloudflare Agents SDK は Agent-local Queue と Agent lifecycle、Drizzle ORM は Agent Durable Object SQLite persistence（`drizzle-orm/durable-sqlite` または現行 documented equivalent）、DO SQLite は Agent aggregate の正本、R2 は large body/history、Connect/Protobuf-ES は RPC transport と generated descriptor のために使う。Prisma は使用しない。
 - Error Handling: Domain error を Connect code に変換し、idempotency replay は同一 digest で記録済み response、異なる digest は conflict とする。外部 Provider timeout は `outcome_unknown` と reconcile task に落とす。
 - Testing Strategy: TypeSpec/proto/codegen conformance、Connect binary rejection、DO SQLite transaction、Run scheduler、Compaction、Schedule、Tool/Integration/Security の Vitest integration/unit test を Scenario ID 付きで実装する。
 - Non-Functional: structured log、metrics、audit event、request ID/correlation ID、rate limit、secret redaction、storage threshold を標準化する。
@@ -487,7 +488,7 @@ erDiagram
 - Public API: App Router pages、Server Actions、server-only Agent RPC factory、`managed-agents.ts` / `access-credentials.ts` Client D1 repositories。
 - Key Data Structures: `client_managed_agents`、`client_agent_credential_refs`、ManagedAgent repository model、AccessCredentialRef repository model、Server Action input/result、UI view model。
 - Key Flows: Browser request を Server Component/Server Action が受け、Client D1 から registry/credential reference を読み、server-side generated Connect client で Agent RPC を呼び、UI に必要な view model だけを返す。
-- Dependencies: Next.js/OpenNext は Worker hosted UI、D1 は Client registry、generated Agent RPC client は Agent 操作、UI components は Client 内または shared UI package を使う。
+- Dependencies: Next.js/OpenNext は Worker hosted UI、Drizzle ORM は Client D1 repository（`drizzle-orm/d1`）、D1 は Client registry、generated Agent RPC client は Agent 操作、UI components は Client 内または shared UI package を使う。Prisma は使用しない。
 - Error Handling: Agent RPC error は user-facing message と retry guidance に変換し、credential secret は Browser payload に含めない。Client D1 conflict は form error として表示する。
 - Testing Strategy: Server Action/D1 repository の unit/integration、Agent RPC factory の mocked Connect tests、management UI の Playwright E2E/component tests を Scenario ID 付きで実装する。
 - Non-Functional: Agent credential 非公開、Client-side cache に secret を置かない、Agent proxy route を作らない、audit に必要な acting user 情報を server-side metadata に含める。

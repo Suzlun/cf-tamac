@@ -16,6 +16,8 @@ interface AgentThreadService {
 model ListThreadsRequest {
   @field(1) agent_id: string;
   @field(2) page?: PageRequest;
+  @field(3) status?: string;
+  @field(4) thread_key_prefix?: string;
 }
 
 @message
@@ -33,6 +35,9 @@ model GetThreadRequest {
 @message
 model GetThreadResponse {
   @field(1) thread: AgentThread;
+  @field(2) current_section?: AgentThreadSection;
+  @field(3) latest_event?: AgentEvent;
+  @field(4) latest_run?: AgentRun;
 }
 
 @message
@@ -40,6 +45,7 @@ model ListSectionsRequest {
   @field(1) agent_id: string;
   @field(2) thread_id: string;
   @field(3) page?: PageRequest;
+  @field(4) sequence_range?: TimeRange;
 }
 
 @message
@@ -57,6 +63,7 @@ model GetLatestCompactionRequest {
 @message
 model GetLatestCompactionResponse {
   @field(1) compaction?: ThreadCompaction;
+  @field(2) snapshot?: CompactionSnapshotReference;
 }
 
 @message
@@ -68,6 +75,7 @@ model GetThreadMemoryRequest {
 @message
 model GetThreadMemoryResponse {
   @field(1) memory?: ThreadMemory;
+  @field(2) items: ThreadMemoryItem[];
 }
 
 @message
@@ -76,6 +84,7 @@ model SearchThreadHistoryRequest {
   @field(2) thread_id: string;
   @field(3) query: string;
   @field(4) page?: PageRequest;
+  @field(5) filter?: ThreadHistoryFilter;
 }
 
 @message

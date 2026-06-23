@@ -35,6 +35,7 @@ You are the `unit/client/reviewer` subagent. Based on the change summary and art
 - Load `coding-guardian` via `skill` and use it as an enforcement baseline.
 - Load `claude-ux` and `gpt-ux` via `skill` as UI review references when reviewing presentation-facing work.
 - Load `orchestration-playbook` via `skill` and use its templates for acceptance.
+- Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code review.
 
 ## Required Inputs
 
