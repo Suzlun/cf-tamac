@@ -25,7 +25,7 @@ Agent Service は REST health エンドポイントではなく `AgentHealthServ
 - **THEN** 応答は安全な service と契約メタデータ、trust config version/fingerprint/loadedAt、issuer/kid/fingerprint summary とともに `serving` または `degraded` 状態を報告する
 - **AND** Agent credential、秘密鍵、生 token、Provider secret、Thread payload、Memory body、domain スナップショット、public key full value は返されない
 
-#### Scenario: REST health エンドポイントは Agent 公開 API ではない (AGENT-HEALTH-S002)
+#### Scenario: 公開 REST health endpoint は Agent 公開 API ではない (AGENT-HEALTH-S002)
 
 - **GIVEN** Agent Service が Protobuf RPC facade を公開している
 - **WHEN** caller が REST `/health`、Connect JSON、HTTP GET unary、または Browser 直接 health リクエストを Agent origin に送信する
