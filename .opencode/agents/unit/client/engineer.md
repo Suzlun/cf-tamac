@@ -76,6 +76,8 @@ If any are missing, do not start. Reply with Status BLOCKED and list missing inp
 - Do not depend on the old demo package graph. It is a deletion target, not an implementation source.
 - If the caller did not provide concrete UI/UX instructions, call `unit/client/designer` before implementing presentation-facing changes.
 - Treat a designer-authored wireframe/specification under `openspec/changes/**` as the source of truth for UI placement, states, and copy.
+- Before introducing new one-off markup for presentation-facing work, inspect and reuse existing Client UI components, design-system primitives, and shared composition patterns unless concrete user instructions or designer output justify a new component.
+- Extract new or changed UI into an appropriate Client UI component when it is product-relevant, repeated, stateful, or likely to be reused; do not duplicate route-local JSX, styles, or behavior.
 - Do not report completion until `unit/client/reviewer` returns `Approve`.
 
 ## Handoff To Designer
