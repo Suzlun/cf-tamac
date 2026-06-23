@@ -45,6 +45,8 @@ export const rpcServiceInventory = new Map([
     ],
   ],
   ['IntegrationIngressService', ['PublishEvent', 'PublishToolResult', 'PublishDeliveryResult']],
+  ['IntegrationToolService', ['InvokeTool', 'GetOperation', 'CancelOperation']],
+  ['IntegrationDeliveryService', ['Deliver']],
   ['AgentHealthService', ['Check']],
 ]);
 
@@ -73,6 +75,9 @@ const commandMethods = new Set([
   'IntegrationIngressService.PublishEvent',
   'IntegrationIngressService.PublishToolResult',
   'IntegrationIngressService.PublishDeliveryResult',
+  'IntegrationToolService.InvokeTool',
+  'IntegrationToolService.CancelOperation',
+  'IntegrationDeliveryService.Deliver',
 ]);
 
 const eventPublishMethods = new Set([

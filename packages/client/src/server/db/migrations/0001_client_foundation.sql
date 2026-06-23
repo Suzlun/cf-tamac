@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS client_managed_agents (
   agent_rpc_origin TEXT NOT NULL,
   display_name TEXT NOT NULL,
   display_order INTEGER NOT NULL DEFAULT 0,
+  pinned INTEGER NOT NULL DEFAULT 0,
   last_opened_at_ms INTEGER,
   created_at_ms INTEGER NOT NULL,
   updated_at_ms INTEGER NOT NULL

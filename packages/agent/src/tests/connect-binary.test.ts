@@ -64,7 +64,7 @@ async function readErrorCode(response: Response): Promise<string> {
 }
 
 describe('Agent Connect binary transport', () => {
-  it('[AGENT-PLATFORM-S002] Binary Connect accepted and JSON rejected', async () => {
+  it('[AGENT-PLATFORM-S002] [AGENT-HEALTH-S001] [AGENT-HEALTH-S002] Binary Connect accepted and JSON or GET rejected', async () => {
     const env = createTestEnv();
     const body = toBinary(
       CheckHealthRequestSchema,
@@ -82,8 +82,16 @@ describe('Agent Connect binary transport', () => {
     );
     expect(successBody).toMatchObject({
       agentId: 'agent-1',
+      contractPackage: 'cftamac.agent.v1',
       serviceVersion: '0.1.0',
-      status: 'active',
+      status: 'serving',
+    });
+    expect(successBody.checkedAtUnixMs > 0n).toBe(true);
+    expect(successBody.health).toMatchObject({
+      agentId: 'agent-1',
+      contractPackage: 'cftamac.agent.v1',
+      serviceVersion: '0.1.0',
+      servingStatus: 'serving',
     });
 
     const json = await handleAgentConnectRequest(
@@ -91,6 +99,12 @@ describe('Agent Connect binary transport', () => {
       env
     );
     expect(await readErrorCode(json)).toBe('unimplemented');
+
+    const connectJson = await handleAgentConnectRequest(
+      createAuthenticatedRequest({ body: '{}', contentType: 'application/connect+json' }),
+      env
+    );
+    expect(await readErrorCode(connectJson)).toBe('unimplemented');
 
     const get = await handleAgentConnectRequest(
       createAuthenticatedRequest({ contentType: 'application/proto', method: 'GET' }),

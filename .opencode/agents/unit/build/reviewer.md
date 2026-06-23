@@ -34,6 +34,7 @@ You are the `unit/build/reviewer` subagent. Based on the change summary and arti
   - `docs/**`
   - `.opencode/**`
 - Then load `orchestration-playbook` via `skill` and use its templates for acceptance
+- Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code review
 
 ## Required inputs to verify first
 

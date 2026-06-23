@@ -248,6 +248,7 @@ export default tseslint.config(
       'import/resolver': {
         typescript: {
           alwaysTryTypes: true,
+          noWarnOnMultipleProjects: true,
           project: ['./tsconfig.base.json', './packages/*/tsconfig.json'],
         },
       },

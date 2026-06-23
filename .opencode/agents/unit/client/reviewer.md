@@ -35,6 +35,7 @@ You are the `unit/client/reviewer` subagent. Based on the change summary and art
 - Load `coding-guardian` via `skill` and use it as an enforcement baseline.
 - Load `claude-ux` and `gpt-ux` via `skill` as UI review references when reviewing presentation-facing work.
 - Load `orchestration-playbook` via `skill` and use its templates for acceptance.
+- Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code review.
 
 ## Required Inputs
 
@@ -66,6 +67,8 @@ If any are missing, do not start the review. Reply with Status BLOCKED and list 
 8. Next.js Client boundary is preserved: App Router/browser-visible modules -> Server Components/Server Actions -> server-only modules -> Client D1 repositories / generated Agent RPC client.
 9. Old demo package graph is not used as an implementation source.
 10. UI/UX, layout, component placement, component composition, and user-facing copy are backed by concrete user instructions or a designer wireframe/specification under `openspec/changes/**`.
+11. Presentation-facing work reuses existing Client UI components, design-system primitives, and shared composition patterns before introducing new one-off markup, unless a concrete user instruction or designer specification justifies a new component.
+12. New or changed UI that is product-relevant, repeated, stateful, or likely to be reused is extracted into an appropriate Client UI component instead of duplicating route-local JSX, styles, or behavior.
 
 ## Rules
 

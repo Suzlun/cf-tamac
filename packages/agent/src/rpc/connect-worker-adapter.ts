@@ -1,7 +1,14 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { createFetchHandler } from '@connectrpc/connect/protocol';
 
-import { createConnectErrorResponse, createUnimplementedResponse } from './errors';
+import { createRawBodyDigest } from '../domain/security';
+
+import {
+  createConnectErrorResponse,
+  createConnectErrorResponseFromDomainError,
+  createUnimplementedResponse,
+  normalizeUnknownAgentError,
+} from './errors';
 import { createAgentRpcAuditContext, runWithAgentRpcAuditContext } from './interceptors/audit';
 import { authenticateAgentRequest } from './interceptors/authentication';
 import { authorizeAgentRequest } from './interceptors/authorization';
@@ -37,9 +44,8 @@ export function createAgentConnectFetchHandler(
       return createConnectErrorResponse(rejection.code, rejection.message);
     }
 
-    const protobufRejection = getMalformedProtobufRequestRejection(
-      new Uint8Array(await request.clone().arrayBuffer())
-    );
+    const rawBody = new Uint8Array(await request.clone().arrayBuffer());
+    const protobufRejection = getMalformedProtobufRequestRejection(rawBody);
     if (protobufRejection !== undefined) {
       return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
     }
@@ -83,7 +89,8 @@ export function createAgentConnectFetchHandler(
     const auditContext = createAgentRpcAuditContext(
       request,
       authentication.principal,
-      createReplayProtectionContext(request)
+      createReplayProtectionContext(request),
+      await createRawBodyDigest(rawBody)
     );
     return runWithAgentRpcAuditContext(auditContext, () => handler(request)).catch(
       (error: unknown) => {
@@ -102,7 +109,7 @@ export function createAgentConnectFetchHandler(
             'Agent RPC received malformed Protobuf bytes.'
           );
         }
-        return createConnectErrorResponse(Code.Internal, 'Agent RPC handler failed.');
+        return createConnectErrorResponseFromDomainError(normalizeUnknownAgentError(error));
       }
     );
   };

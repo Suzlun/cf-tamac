@@ -99,7 +99,7 @@ async function readErrorCode(response: Response): Promise<string> {
 }
 
 describe('Agent forbidden API surface', () => {
-  it('[AGENT-PLATFORM-S003] REST and Orval Agent surfaces are unreachable', async () => {
+  it('[AGENT-PLATFORM-S003] [AGENT-SECURITY-S009] [AGENT-HEALTH-S002] REST, DO, and Orval Agent surfaces are unreachable', async () => {
     const packageJson = JSON.parse(readFileSync(fileURLToPath(packageJsonPath.href), 'utf8')) as {
       readonly exports: Record<string, string>;
     };
@@ -118,5 +118,11 @@ describe('Agent forbidden API surface', () => {
       createTestEnv()
     );
     expect(await readErrorCode(postRestPath)).toBe('unimplemented');
+
+    const publicDurableObjectLikePath = await handleAgentConnectRequest(
+      createAuthenticatedRestLikeRequest('/cdn-cgi/ai-agent/agent-1/checkHealth'),
+      createTestEnv()
+    );
+    expect(await readErrorCode(publicDurableObjectLikePath)).toBe('unimplemented');
   });
 });

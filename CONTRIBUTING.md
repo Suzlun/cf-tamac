@@ -88,9 +88,9 @@ Agent public API は Connect unary binary Protobuf だけを公開します。RE
 
 ### DB
 
-Agent Service は D1 を持ちません。Agent-owned state は `AIAgent` Durable Object SQLite と Agent-owned blob storage に置きます。
+Agent Service は D1 を持ちません。Agent-owned state は Drizzle ORM（`drizzle-orm/durable-sqlite` または現行の Durable Object SQLite adapter）経由の `AIAgent` Durable Object SQLite と Agent-owned blob storage に置きます。Prisma は使用しません。
 
-Client D1 schema を変更する場合は、`packages/client/src/server/db/schema.ts` と `packages/client/src/server/db/migrations/**` を同時に更新してください。
+Client D1 schema を変更する場合は、Drizzle ORM（`drizzle-orm/d1`）を Client D1 repository layer として使い、`packages/client/src/server/db/schema.ts` と `packages/client/src/server/db/migrations/**` を同時に更新してください。Client D1 は `client_managed_agents` と `client_agent_credential_refs` だけを保持します。
 
 適用は `wrangler d1 execute ... --config packages/client/wrangler.toml --file <migration.sql>` を使います。
 

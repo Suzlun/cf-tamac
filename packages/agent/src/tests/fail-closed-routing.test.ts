@@ -2,15 +2,8 @@ import { create, toBinary } from '@bufbuild/protobuf';
 import { describe, expect, it } from 'vitest';
 
 import {
-  GetAgentRequestSchema,
-  GetEventRequestSchema,
-  GetInstallationRequestSchema,
-  GetInvocationRequestSchema,
-  GetRunRequestSchema,
-  GetScheduleRequestSchema,
-  GetStateRequestSchema,
-  GetThreadRequestSchema,
-  PublishToolResultRequestSchema,
+  DeliverRequestSchema,
+  InvokeToolRequestSchema,
 } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
@@ -53,79 +46,36 @@ async function readErrorCode(response: Response): Promise<string> {
 }
 
 describe('Agent fail-closed routing', () => {
-  it('[AGENT-PLATFORM-S009] Foundation handlers fail closed for unmapped methods', async () => {
+  it('[AGENT-PLATFORM-S009] [AGENT-SECURITY-S009] Foundation handlers fail closed for unmapped methods', async () => {
     const cases = [
       {
         body: toBinary(
-          GetAgentRequestSchema,
-          create(GetAgentRequestSchema, { agentId: 'agent-1' })
-        ),
-        path: '/cftamac.agent.v1.AgentLifecycleService/GetAgent',
-      },
-      {
-        body: toBinary(
-          GetEventRequestSchema,
-          create(GetEventRequestSchema, { agentId: 'agent-1', eventId: 'event-1' })
-        ),
-        path: '/cftamac.agent.v1.AgentEventService/GetEvent',
-      },
-      {
-        body: toBinary(
-          GetThreadRequestSchema,
-          create(GetThreadRequestSchema, { agentId: 'agent-1', threadId: 'thread-1' })
-        ),
-        path: '/cftamac.agent.v1.AgentThreadService/GetThread',
-      },
-      {
-        body: toBinary(
-          GetRunRequestSchema,
-          create(GetRunRequestSchema, { agentId: 'agent-1', runId: 'run-1' })
-        ),
-        path: '/cftamac.agent.v1.AgentRunService/GetRun',
-      },
-      {
-        body: toBinary(
-          GetStateRequestSchema,
-          create(GetStateRequestSchema, { agentId: 'agent-1' })
-        ),
-        path: '/cftamac.agent.v1.AgentStateService/GetState',
-      },
-      {
-        body: toBinary(
-          GetScheduleRequestSchema,
-          create(GetScheduleRequestSchema, { agentId: 'agent-1', scheduleId: 'schedule-1' })
-        ),
-        path: '/cftamac.agent.v1.AgentScheduleService/GetSchedule',
-      },
-      {
-        body: toBinary(
-          GetInvocationRequestSchema,
-          create(GetInvocationRequestSchema, { agentId: 'agent-1', invocationId: 'invocation-1' })
-        ),
-        path: '/cftamac.agent.v1.AgentToolService/GetInvocation',
-      },
-      {
-        body: toBinary(
-          GetInstallationRequestSchema,
-          create(GetInstallationRequestSchema, {
+          DeliverRequestSchema,
+          create(DeliverRequestSchema, {
             agentId: 'agent-1',
+            connectionId: 'connection-1',
+            deliveryContextId: 'delivery-context-1',
+            deliveryId: 'delivery-1',
+            idempotencyKey: 'idem-1',
             installationId: 'installation-1',
+            runId: 'run-1',
+            threadId: 'thread-1',
           })
         ),
-        path: '/cftamac.agent.v1.AgentIntegrationService/GetInstallation',
+        path: '/cftamac.agent.v1.IntegrationDeliveryService/Deliver',
       },
       {
         body: toBinary(
-          PublishToolResultRequestSchema,
-          create(PublishToolResultRequestSchema, {
+          InvokeToolRequestSchema,
+          create(InvokeToolRequestSchema, {
             agentId: 'agent-1',
             idempotencyKey: 'idem-1',
             installationId: 'installation-1',
             invocationId: 'invocation-1',
-            status: 'succeeded',
+            toolId: 'tool-1',
           })
         ),
-        path: '/cftamac.agent.v1.IntegrationIngressService/PublishToolResult',
+        path: '/cftamac.agent.v1.IntegrationToolService/InvokeTool',
       },
     ] as const;
 

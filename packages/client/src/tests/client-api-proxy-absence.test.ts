@@ -45,7 +45,7 @@ function appRoutePath(filePath: string): string {
 }
 
 describe('Management Client Agent API proxy absence', () => {
-  it('[MANAGEMENT-CLIENT-S008] Client exposes no Agent API proxy route', () => {
+  it('[MANAGEMENT-CLIENT-S008] [CLIENT-REGISTRY-S005] Client has no public Agent proxy route', () => {
     const appFiles = collectFiles(appRoot);
     const pageRouteManifest = appFiles
       .filter((filePath) => filePath.endsWith('/page.tsx'))
@@ -60,8 +60,10 @@ describe('Management Client Agent API proxy absence', () => {
       '/',
       '/agents',
       '/agents/:param',
+      '/agents/:param/compactions',
       '/agents/:param/events',
       '/agents/:param/integrations',
+      '/agents/:param/runs',
       '/agents/:param/schedules',
       '/agents/:param/settings',
       '/agents/:param/threads',
@@ -78,5 +80,25 @@ describe('Management Client Agent API proxy absence', () => {
         .map((pattern) => `${relativePath(filePath)} exposes ${String(pattern)}`);
     });
     expect(proxyIssues).toEqual([]);
+  });
+
+  it('[CLIENT-REGISTRY-S005] Agent operations stay behind Server Actions and Server Components', () => {
+    const appFiles = collectFiles(appRoot);
+    const serverActionFiles = collectFiles(new URL('../server/actions/', import.meta.url));
+
+    expect(serverActionFiles.length).toBeGreaterThan(0);
+
+    const proxyIssues = appFiles.flatMap((filePath) => {
+      const content = readFileSync(filePath, 'utf8');
+      return forbiddenBrowserPaths
+        .filter((pattern) => pattern.test(content))
+        .map((pattern) => `${relativePath(filePath)} exposes ${String(pattern)}`);
+    });
+    expect(proxyIssues).toEqual([]);
+
+    const serverActionSource = serverActionFiles
+      .map((filePath) => readFileSync(filePath, 'utf8'))
+      .join('\n');
+    expect(serverActionSource).toContain("'use server'");
   });
 });

@@ -34,6 +34,7 @@ You are the `unit/agent/reviewer` subagent. Based on the change summary and arti
 - Read project rules and pin them as decision baselines: `AGENTS.md`, `docs/**`, and `.opencode/**`.
 - Load `coding-guardian` via `skill` and use it as an enforcement baseline.
 - Load `orchestration-playbook` via `skill` and use its templates for acceptance.
+- Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code review.
 
 ## Required Inputs
 

@@ -13,6 +13,12 @@ export interface AuthenticatedAgentPrincipal {
     | 'INTERNAL_SERVICE'
     | 'ADMIN_OPERATOR';
   readonly scopes: readonly string[];
+  readonly actingUserId?: string;
+  readonly audience?: string;
+  readonly issuer?: string;
+  readonly jwtId?: string;
+  readonly keyId?: string;
+  readonly subject?: string;
 }
 
 /**
@@ -36,9 +42,17 @@ export function authenticateAgentRequest(request: Request): AgentAuthenticationR
   if (testPrincipalId !== null && testPrincipalId.trim() !== '') {
     return {
       principal: {
+        actingUserId: normalizeOptionalHeader(request.headers.get('x-agent-test-acting-user-id')),
+        audience: normalizeOptionalHeader(request.headers.get('x-agent-test-audience')),
+        issuer: normalizeOptionalHeader(request.headers.get('x-agent-test-issuer')),
+        jwtId: normalizeOptionalHeader(request.headers.get('x-agent-test-jwt-id')),
+        keyId: normalizeOptionalHeader(request.headers.get('x-agent-test-key-id')),
         principalId: testPrincipalId.trim(),
-        principalType: 'CLIENT_SERVICE',
+        principalType:
+          parsePrincipalType(request.headers.get('x-agent-test-principal-type')) ??
+          'CLIENT_SERVICE',
         scopes: parseScopes(request.headers.get('x-agent-test-scopes')),
+        subject: normalizeOptionalHeader(request.headers.get('x-agent-test-subject')),
       },
     };
   }
@@ -51,6 +65,24 @@ export function authenticateAgentRequest(request: Request): AgentAuthenticationR
   };
 }
 
+function parsePrincipalType(
+  rawType: string | null
+): AuthenticatedAgentPrincipal['principalType'] | undefined {
+  const normalizedType = normalizeOptionalHeader(rawType);
+  if (normalizedType === undefined) {
+    return undefined;
+  }
+  if (
+    normalizedType === 'CLIENT_SERVICE' ||
+    normalizedType === 'INTEGRATION_INSTALLATION' ||
+    normalizedType === 'INTERNAL_SERVICE' ||
+    normalizedType === 'ADMIN_OPERATOR'
+  ) {
+    return normalizedType;
+  }
+  return undefined;
+}
+
 function parseScopes(rawScopes: string | null): readonly string[] {
   if (rawScopes === null || rawScopes.trim() === '') {
     return [];
@@ -59,4 +91,11 @@ function parseScopes(rawScopes: string | null): readonly string[] {
     .split(',')
     .map((scope) => scope.trim())
     .filter((scope) => scope !== '');
+}
+
+function normalizeOptionalHeader(value: string | null): string | undefined {
+  if (value === null || value.trim() === '') {
+    return undefined;
+  }
+  return value.trim();
 }

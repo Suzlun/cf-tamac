@@ -39,6 +39,7 @@ permission:
   - `.opencode/**`
 - Then load `orchestration-playbook` via `skill` and use its templates to structure execution
 - Then load `coding-guardian` via `skill` and follow repository rules while working
+- Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code investigation
 
 # Role
 

@@ -29,6 +29,8 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/agent/src/typespec/src/common/*.tsp`: Agent common model stubs
 - `packages/agent/src/typespec/src/models/*.tsp`: Agent domain model stubs
 - `packages/agent/src/typespec/src/services/*.tsp`: RPC Service Inventory stubs, including `agent-adapter.tsp` for `IntegrationIngressService`
+- `packages/agent/src/typespec/src/services/integration-tool.tsp`: Provider-facing `IntegrationToolService` contract generated from Agent TypeSpec/proto
+- `packages/agent/src/typespec/src/services/integration-delivery.tsp`: Provider-facing `IntegrationDeliveryService` contract generated from Agent TypeSpec/proto
 - `packages/agent/buf.yaml`: Buf lint/breaking configuration
 - `packages/agent/buf.gen.yaml`: Protobuf-ES generation targets for Agent and Client outputs
 - `packages/agent/proto/cftamac/agent/v1.proto`: command-owned generated proto output; do not hand-edit

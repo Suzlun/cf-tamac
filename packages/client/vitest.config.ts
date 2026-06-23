@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -8,5 +10,12 @@ export default defineConfig({
     environment: 'node',
     include: ['src/tests/**/*.test.ts', 'src/tests/**/*.test.tsx'],
     name: 'management-client',
+  },
+  resolve: {
+    alias: {
+      'server-only': fileURLToPath(
+        new URL('./src/tests/stubs/server-only.ts', import.meta.url).href
+      ),
+    },
   },
 });
