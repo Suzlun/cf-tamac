@@ -145,28 +145,28 @@
 
 ## 12. Automated Scenario Test Tasks
 
-- [ ] 12.1 `[AGENT-LIFECYCLE-S001] InitializeAgent creates the named Agent aggregate` を title に含む automated tests を追加する。
-- [ ] 12.2 `[AGENT-LIFECYCLE-S002] GetAgent returns the Agent-local profile and config` を title に含む automated tests を追加する。
-- [ ] 12.3 `[AGENT-LIFECYCLE-S003] DestroyAgent disables mutating Agent operations` を title に含む automated tests を追加する。
-- [ ] 12.4 `[AGENT-LIFECYCLE-S004] Duplicate lifecycle command replays the recorded response` を title に含む automated tests を追加する。
-- [ ] 12.5 `[AGENT-LIFECYCLE-S005] RotateAgentCredential creates a new active generation` を title に含む automated tests を追加する。
-- [ ] 12.6 `[AGENT-LIFECYCLE-S006] UpdateConfig changes the version captured by later Runs` を title に含む automated tests を追加する。
-- [ ] 12.7 `[AGENT-EVENTING-S001] PublishEvent rejects missing or empty thread_key` を title に含む automated tests を追加する。
-- [ ] 12.8 `[AGENT-EVENTING-S002] Same Agent and same thread_key resolve to the same Thread` を title に含む automated tests を追加する。
-- [ ] 12.9 `[AGENT-EVENTING-S003] Same thread_key across different Agents remains isolated` を title に含む automated tests を追加する。
-- [ ] 12.10 `[AGENT-EVENTING-S004] Lifecycle audit Event is appended to the system Thread` を title に含む automated tests を追加する。
-- [ ] 12.11 `[AGENT-EVENTING-S005] Accepted Event is persisted before scheduler wake` を title に含む automated tests を追加する。
-- [ ] 12.12 `[AGENT-EVENTING-S006] Duplicate Event publish returns the original Event result` を title に含む automated tests を追加する。
-- [ ] 12.13 `[AGENT-EVENTING-S007] ListEvents returns ordered Events within the requested Thread` を title に含む automated tests を追加する。
+- [x] 12.1 `[AGENT-LIFECYCLE-S001] InitializeAgent creates the named Agent aggregate` を title に含む automated tests を追加する。
+- [x] 12.2 `[AGENT-LIFECYCLE-S002] GetAgent returns the Agent-local profile and config` を title に含む automated tests を追加する。
+- [x] 12.3 `[AGENT-LIFECYCLE-S003] DestroyAgent disables mutating Agent operations` を title に含む automated tests を追加する。
+- [x] 12.4 `[AGENT-LIFECYCLE-S004] Duplicate lifecycle command replays the recorded response` を title に含む automated tests を追加する。
+- [x] 12.5 `[AGENT-LIFECYCLE-S005] RotateAgentCredential creates a new active generation` を title に含む automated tests を追加する。
+- [x] 12.6 `[AGENT-LIFECYCLE-S006] UpdateConfig changes the version captured by later Runs` を title に含む automated tests を追加する。
+- [x] 12.7 `[AGENT-EVENTING-S001] PublishEvent rejects missing or empty thread_key` を title に含む automated tests を追加する。
+- [x] 12.8 `[AGENT-EVENTING-S002] Same Agent and same thread_key resolve to the same Thread` を title に含む automated tests を追加する。
+- [x] 12.9 `[AGENT-EVENTING-S003] Same thread_key across different Agents remains isolated` を title に含む automated tests を追加する。
+- [x] 12.10 `[AGENT-EVENTING-S004] Lifecycle audit Event is appended to the system Thread` を title に含む automated tests を追加する。
+- [x] 12.11 `[AGENT-EVENTING-S005] Accepted Event is persisted before scheduler wake` を title に含む automated tests を追加する。
+- [x] 12.12 `[AGENT-EVENTING-S006] Duplicate Event publish returns the original Event result` を title に含む automated tests を追加する。
+- [x] 12.13 `[AGENT-EVENTING-S007] ListEvents returns ordered Events within the requested Thread` を title に含む automated tests を追加する。
 - [x] 12.14 `[AGENT-EVENTING-S008] Large Event payload is offloaded with digest metadata` を title に含む automated tests を追加する。
-- [ ] 12.15 `[AGENT-RUNTIME-S001] Event acceptance coalesces scheduler wake` を title に含む automated tests を追加する。
-- [ ] 12.16 `[AGENT-RUNTIME-S002] Only one AgentRun is active per Agent` を title に含む automated tests を追加する。
-- [ ] 12.17 `[AGENT-RUNTIME-S003] Scheduler selects pending Thread fairly` を title に含む automated tests を追加する。
-- [ ] 12.18 `[AGENT-RUNTIME-S004] Same Thread Event arriving during a Run creates later work` を title に含む automated tests を追加する。
-- [ ] 12.19 `[AGENT-RUNTIME-S005] Different Thread Event waits without contaminating active context` を title に含む automated tests を追加する。
-- [ ] 12.20 `[AGENT-RUNTIME-S006] Interrupt prevents stale Run result commit` を title に含む automated tests を追加する。
-- [ ] 12.21 `[AGENT-RUNTIME-S007] Harness decision commits Agent-owned actions` を title に含む automated tests を追加する。
-- [ ] 12.22 `[AGENT-RUNTIME-S008] Budget exhaustion stops the Run safely` を title に含む automated tests を追加する。
+- [x] 12.15 `[AGENT-RUNTIME-S001] Event acceptance coalesces scheduler wake` を title に含む automated tests を追加する。
+- [x] 12.16 `[AGENT-RUNTIME-S002] Only one AgentRun is active per Agent` を title に含む automated tests を追加する。
+- [x] 12.17 `[AGENT-RUNTIME-S003] Scheduler selects pending Thread fairly` を title に含む automated tests を追加する。
+- [x] 12.18 `[AGENT-RUNTIME-S004] Same Thread Event arriving during a Run creates later work` を title に含む automated tests を追加する。
+- [x] 12.19 `[AGENT-RUNTIME-S005] Different Thread Event waits without contaminating active context` を title に含む automated tests を追加する。
+- [x] 12.20 `[AGENT-RUNTIME-S006] Interrupt prevents stale Run result commit` を title に含む automated tests を追加する。
+- [x] 12.21 `[AGENT-RUNTIME-S007] Harness decision commits Agent-owned actions` を title に含む automated tests を追加する。
+- [x] 12.22 `[AGENT-RUNTIME-S008] Budget exhaustion stops the Run safely` を title に含む automated tests を追加する。
 - [x] 12.23 `[AGENT-MEMORY-S001] Compaction freezes one Section and opens the next` を title に含む automated tests を追加する。
 - [x] 12.24 `[AGENT-MEMORY-S002] Event arriving during compaction enters the open Section` を title に含む automated tests を追加する。
 - [x] 12.25 `[AGENT-MEMORY-S003] Compaction creates Handoff History and MemoryDelta` を title に含む automated tests を追加する。
@@ -194,14 +194,14 @@
 - [x] 12.47 `[AGENT-INTEGRATION-S006] Agent sends Delivery response through Provider RPC` を title に含む automated tests を追加する。
 - [x] 12.48 `[AGENT-INTEGRATION-S007] UninstallIntegration disables capabilities and preserves history` を title に含む automated tests を追加する。
 - [x] 12.49 `[AGENT-INTEGRATION-S008] Generic Integration Provider keeps external protocol details outside the Agent domain` を title に含む automated tests を追加する。
-- [ ] 12.50 `[AGENT-SECURITY-S001] Valid Client Service JWT authenticates Agent RPC` を title に含む automated tests を追加する。
-- [ ] 12.51 `[AGENT-SECURITY-S002] Invalid Client JWT is rejected before mutation` を title に含む automated tests を追加する。
-- [ ] 12.52 `[AGENT-SECURITY-S003] Valid Integration signature accepts ingress within grant` を title に含む automated tests を追加する。
-- [ ] 12.53 `[AGENT-SECURITY-S004] Body tampering and nonce replay are rejected` を title に含む automated tests を追加する。
-- [ ] 12.54 `[AGENT-SECURITY-S005] Method outside Integration grant is denied by AIAgent` を title に含む automated tests を追加する。
-- [ ] 12.55 `[AGENT-SECURITY-S006] Idempotency replay preserves exactly-once command result` を title に含む automated tests を追加する。
-- [ ] 12.56 `[AGENT-SECURITY-S007] Domain errors map to stable Connect codes` を title に含む automated tests を追加する。
-- [ ] 12.57 `[AGENT-SECURITY-S008] Observability context excludes secret material` を title に含む automated tests を追加する。
+- [x] 12.50 `[AGENT-SECURITY-S001] Valid Client Service JWT authenticates Agent RPC` を title に含む automated tests を追加する。
+- [x] 12.51 `[AGENT-SECURITY-S002] Invalid Client JWT is rejected before mutation` を title に含む automated tests を追加する。
+- [x] 12.52 `[AGENT-SECURITY-S003] Valid Integration signature accepts ingress within grant` を title に含む automated tests を追加する。
+- [x] 12.53 `[AGENT-SECURITY-S004] Body tampering and nonce replay are rejected` を title に含む automated tests を追加する。
+- [x] 12.54 `[AGENT-SECURITY-S005] Method outside Integration grant is denied by AIAgent` を title に含む automated tests を追加する。
+- [x] 12.55 `[AGENT-SECURITY-S006] Idempotency replay preserves exactly-once command result` を title に含む automated tests を追加する。
+- [x] 12.56 `[AGENT-SECURITY-S007] Domain errors map to stable Connect codes` を title に含む automated tests を追加する。
+- [x] 12.57 `[AGENT-SECURITY-S008] Observability context excludes secret material` を title に含む automated tests を追加する。
 - [x] 12.58 `[CLIENT-REGISTRY-S001] Managed Agent registry persists display and ordering metadata` を title に含む automated tests を追加する。
 - [x] 12.59 `[CLIENT-REGISTRY-S002] Credential reference stores no plaintext secret` を title に含む automated tests を追加する。
 - [x] 12.60 `[CLIENT-REGISTRY-S003] Server Action calls Agent RPC with generated Connect client` を title に含む automated tests を追加する。
@@ -217,14 +217,14 @@
 - [x] 12.70 `[CLIENT-MANAGEMENT-S008] Integration screen installs lists and uninstalls generic Integration` を title に含む automated tests を追加する。
 - [x] 12.71 `[CLIENT-MANAGEMENT-S009] Browser does not receive Agent credentials or call Agent RPC directly` を title に含む automated tests を追加する。
 - [x] 12.72 `[AGENT-TOOL-S008] Tool cancellation propagates to Provider operation` を title に含む automated tests を追加する。
-- [ ] 12.73 `[AGENT-SECURITY-S009] Durable Object RPC stays behind the Connect facade` を title に含む automated tests を追加する。
-- [ ] 12.74 `[AGENT-HEALTH-S001] Check returns safe serving status through Protobuf RPC` を title に含む automated tests を追加する。
-- [ ] 12.75 `[AGENT-HEALTH-S002] REST health endpoint is not an Agent public API` を title に含む automated tests を追加する。
-- [ ] 12.76 `[AGENT-EVENTING-S009] ListThreads GetThread and ListSections stay Agent scoped` を title に含む automated tests を追加する。
+- [x] 12.73 `[AGENT-SECURITY-S009] Durable Object RPC stays behind the Connect facade` を title に含む automated tests を追加する。
+- [x] 12.74 `[AGENT-HEALTH-S001] Check returns safe serving status through Protobuf RPC` を title に含む automated tests を追加する。
+- [x] 12.75 `[AGENT-HEALTH-S002] REST health endpoint is not an Agent public API` を title に含む automated tests を追加する。
+- [x] 12.76 `[AGENT-EVENTING-S009] ListThreads GetThread and ListSections stay Agent scoped` を title に含む automated tests を追加する。
 - [x] 12.77 `[AGENT-MEMORY-S008] Thread memory and history queries return scoped references` を title に含む automated tests を追加する。
-- [ ] 12.78 `[AGENT-RUNTIME-S009] GetRun and ListRuns expose immutable snapshots` を title に含む automated tests を追加する。
-- [ ] 12.79 `[AGENT-RUNTIME-S010] CancelRun interrupts pending or running work idempotently` を title に含む automated tests を追加する。
-- [ ] 12.80 `[AGENT-LIFECYCLE-S007] GetState and GetConfig return Agent-local snapshots` を title に含む automated tests を追加する。
+- [x] 12.78 `[AGENT-RUNTIME-S009] GetRun and ListRuns expose immutable snapshots` を title に含む automated tests を追加する。
+- [x] 12.79 `[AGENT-RUNTIME-S010] CancelRun interrupts pending or running work idempotently` を title に含む automated tests を追加する。
+- [x] 12.80 `[AGENT-LIFECYCLE-S007] GetState and GetConfig return Agent-local snapshots` を title に含む automated tests を追加する。
 
 ## 13. Documentation / OpenSpec Sync / Release Verification
 
@@ -235,13 +235,13 @@
 - [x] 13.5 Agent Service local dev、generation、deployment、Client D1 migration、Integration Provider integration profile、安全な secret handling の package README/runbooks を更新する。
 - [x] 13.6 `scripts/governance/verify-agent-surface.mjs` を更新し、Stage 1〜8 の forbidden Agent surface、public DO RPC route、REST `/health`、old OpenAPI/Orval/Hono regression、Client public Agent proxy route を検出する。完了条件は [AGENT-SECURITY-S009]、[AGENT-HEALTH-S002]、[CLIENT-REGISTRY-S005] の guardrail 観点を script diagnostics で説明できること。
 - [x] 13.7 `scripts/governance/verify-agent-surface.test.mjs` を更新し、`[AGENT-SECURITY-S009]`、`[AGENT-HEALTH-S002]`、`[CLIENT-REGISTRY-S005]` を title に含む fixture tests で forbidden surface と許可される Connect/Server Action 境界を検証する。
-- [ ] 13.8 `pnpm gen:agent:proto`、`pnpm gen:agent:rpc`、`pnpm check:codegen` を実行し、generated drift がなくなるまで source files を修正する。
-- [ ] 13.9 `pnpm format:check` を実行し、必要な整形は通常の format scripts で反映する。
-- [ ] 13.10 `pnpm lint` を実行し、OpenSpec validation と scenario coverage を含め、各 non-manual Scenario ID が automated test titles に現れることを確認する。
-- [ ] 13.11 `pnpm check` を実行し、TypeScript/TypeSpec compile errors を解消する。
-- [ ] 13.12 `pnpm test:run`、focused Agent/Client package tests、Client management UI の Playwright E2E を実行する。
-- [ ] 13.13 `pnpm build` を実行し、Agent Worker と Client Worker の build outputs を確認する。
-- [ ] 13.14 staging smoke tests を実行し、AgentHealthService.Check、InitializeAgent、PublishEvent、ListThreads/GetThread/ListSections、GetLatestCompaction/GetThreadMemory/SearchThreadHistory、GetRun/ListRuns/CancelRun、GetState/GetConfig、Run scheduling、Compaction、storage threshold signals、Schedule、Tool Invoke/GetOperation/CancelOperation、Integration ingress/delivery、Client UI flows を確認する。
-- [ ] 13.15 foundation で除去/非活性化された旧 Agent OpenAPI/Orval/Hono surfaces が再導入されていないことを検証する。完了条件は Agent `@typespec/openapi3` emitter/output、Orval Agent SDK、Hono zod-openapi Agent route、OpenAPI contract test が workspace scripts から到達不能であること。
-- [ ] 13.16 implementation approval workflow 後に OpenSpec deltas を main specs へ sync/archive し、`openspec validate --all --strict` と scenario coverage を再実行する。
-- [ ] 13.17 Agent RPC profile、Client management setup、Integration Provider interoperability、operational metrics、rollback steps、外部 protocol 差分を Agent domain へ伝播させない運用境界を含む release notes を準備する。
+- [x] 13.8 `pnpm gen:agent:proto`、`pnpm gen:agent:rpc`、`pnpm check:codegen` を実行し、generated drift がなくなるまで source files を修正する。
+- [x] 13.9 `pnpm format:check` を実行し、必要な整形は通常の format scripts で反映する。
+- [x] 13.10 `pnpm lint` を実行し、OpenSpec validation と scenario coverage を含め、各 non-manual Scenario ID が automated test titles に現れることを確認する。
+- [x] 13.11 `pnpm check` を実行し、TypeScript/TypeSpec compile errors を解消する。
+- [x] 13.12 `pnpm test:run`、focused Agent/Client package tests、Client management UI の Playwright E2E を実行する。
+- [x] 13.13 `pnpm build` を実行し、Agent Worker と Client Worker の build outputs を確認する。
+- [x] 13.14 staging smoke tests を実行し、AgentHealthService.Check、InitializeAgent、PublishEvent、ListThreads/GetThread/ListSections、GetLatestCompaction/GetThreadMemory/SearchThreadHistory、GetRun/ListRuns/CancelRun、GetState/GetConfig、Run scheduling、Compaction、storage threshold signals、Schedule、Tool Invoke/GetOperation/CancelOperation、Integration ingress/delivery、Client UI flows を確認する。
+- [x] 13.15 foundation で除去/非活性化された旧 Agent OpenAPI/Orval/Hono surfaces が再導入されていないことを検証する。完了条件は Agent `@typespec/openapi3` emitter/output、Orval Agent SDK、Hono zod-openapi Agent route、OpenAPI contract test が workspace scripts から到達不能であること。
+- [x] 13.16 implementation approval workflow 後に OpenSpec deltas を main specs へ sync/archive し、`openspec validate --all --strict` と scenario coverage を再実行する。
+- [x] 13.17 Agent RPC profile、Client management setup、Integration Provider interoperability、operational metrics、rollback steps、外部 protocol 差分を Agent domain へ伝播させない運用境界を含む release notes を準備する。

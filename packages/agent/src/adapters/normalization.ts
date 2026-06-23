@@ -179,8 +179,14 @@ function optionalText(
   record: Readonly<Record<string, unknown>>,
   names: readonly string[]
 ): string | undefined {
-  for (const name of names) {
-    const value = normalizeOptionalText(record[name]);
+  const entries = Object.entries(record);
+  for (const expectedName of names) {
+    // 外部 manifest 由来の record を動的 index で読まず、許可済み候補名と一致する own entry だけを選びます。
+    const matchedEntry = entries.find(([recordName]) => recordName === expectedName);
+    if (matchedEntry === undefined) continue;
+    // 候補名の優先順位を保ったまま値だけを取り出し、空白や Unicode 表記揺れを正規化します。
+    const [, rawValue] = matchedEntry;
+    const value = normalizeOptionalText(rawValue);
     if (value !== undefined) return value;
   }
   return undefined;

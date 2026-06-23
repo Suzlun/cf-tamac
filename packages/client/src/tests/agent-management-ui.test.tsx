@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { buildDestroyConfirmSchema } from '../components/schemas/agent-settings';
+
 const agentListPath = new URL('../components/agent-list.tsx', import.meta.url);
 const registrationFormPath = new URL('../components/agent-registration-form.tsx', import.meta.url);
 const registrationSchemaPath = new URL(
@@ -10,7 +12,7 @@ const registrationSchemaPath = new URL(
   import.meta.url
 );
 const dataTablePath = new URL('../components/data-table.tsx', import.meta.url);
-const formFieldPath = new URL('../components/form-field.tsx', import.meta.url);
+const formFieldPath = new URL('../components/ui/form.tsx', import.meta.url);
 const errorAlertPath = new URL('../components/error-alert.tsx', import.meta.url);
 const signalBadgePath = new URL('../components/signal-badge.tsx', import.meta.url);
 const emptyStatePath = new URL('../components/empty-state.tsx', import.meta.url);
@@ -35,6 +37,7 @@ const credentialRotationPath = new URL(
   '../components/credential-rotation-section.tsx',
   import.meta.url
 );
+const settingsSchemaPath = new URL('../components/schemas/agent-settings.ts', import.meta.url);
 const confirmDialogPath = new URL('../components/confirm-dialog.tsx', import.meta.url);
 const detailDrawerPath = new URL('../components/detail-drawer.tsx', import.meta.url);
 const threadListPath = new URL('../components/thread-list.tsx', import.meta.url);
@@ -276,12 +279,12 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     const formField = read(formFieldPath);
 
     // The error node has an id that matches the aria-describedby pattern.
-    expect(formField).toContain('errorId');
+    expect(formField).toContain('formMessageId');
     expect(formField).toContain('describedBy');
     expect(formField).toContain('role="alert"');
 
     // The helper text also has an id for aria-describedby.
-    expect(formField).toContain('helperId');
+    expect(formField).toContain('formDescriptionId');
   });
 });
 
@@ -342,7 +345,9 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     const settingsForm = read(settingsFormPath);
     const configSection = read(configSectionPath);
     const credentialRotation = read(credentialRotationPath);
+    const settingsSchema = read(settingsSchemaPath);
     const lifecycleActions = read(agentLifecycleActionPath);
+    const settingsSources = `${settingsForm}\n${configSection}\n${credentialRotation}\n${settingsSchema}`;
 
     expect(settingsPage).toContain('getAgentConfig');
     expect(settingsPage).toContain('getAgentOverview');
@@ -353,8 +358,17 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     expect(settingsForm).toContain('onUpdateConfig');
     expect(settingsForm).toContain('onRotateCredential');
     expect(settingsForm).toContain('router.refresh');
-    expect(settingsForm).toContain('Config must be valid JSON.');
+    expect(settingsSources).toContain('Config must be valid JSON.');
     expect(settingsForm).toContain('Agent configuration and credentials');
+    expect(settingsSources).toContain('useForm');
+    expect(settingsSources).toContain('zodResolver');
+    expect(settingsSources).toContain('agentConfigSchema');
+    expect(settingsSources).toContain('credentialLookupSchema');
+    expect(settingsSources).toContain('buildDestroyConfirmSchema');
+    expect(settingsSources).toContain('RhfFormField');
+    expect(settingsSources).toContain('FormControl');
+    expect(settingsSources).toContain('FormMessage');
+    expect(settingsSources).toContain('confirmAgentId');
 
     expect(configSection).toContain('AgentStateService.UpdateConfig');
     expect(configSection).toContain('ConfirmDialog');
@@ -410,6 +424,14 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     expect(detailDrawer).toContain('onOpenAutoFocus={handleOpenAutoFocus}');
     expect(detailDrawer).toContain('onCloseAutoFocus={handleCloseAutoFocus}');
     expect(toolView).toContain('initialFocusSelector="[data-drawer-initial-focus=\'true\']"');
+  });
+
+  it('[CLIENT-MANAGEMENT-S004] Destroy confirmation requires an exact Agent ID echo', () => {
+    const schema = buildDestroyConfirmSchema('agent-alpha');
+
+    // type-to-confirm は前後空白も許容せず、UI copy の「完全一致」を validation でも守る。
+    expect(schema.safeParse({ confirmAgentId: 'agent-alpha' }).success).toBe(true);
+    expect(schema.safeParse({ confirmAgentId: ' agent-alpha ' }).success).toBe(false);
   });
 });
 
@@ -478,6 +500,8 @@ describe('Schedule management tab (CLIENT-MANAGEMENT-S006)', () => {
     expect(scheduleList).toContain('New Schedule');
     expect(scheduleList).toContain('ScheduleCreateForm');
     expect(scheduleList).toContain('Create Schedule?');
+    expect(scheduleList).toContain('ErrorAlert');
+    expect(scheduleList).toContain('role="status"');
     expect(scheduleList).toContain('nextFireAtUnixMs');
     expect(scheduleList).toContain('overlap_policy');
     expect(scheduleList).toContain('Cancel Schedule');
@@ -493,7 +517,8 @@ describe('Schedule management tab (CLIENT-MANAGEMENT-S006)', () => {
     expect(scheduleCreateSources).toContain('Fire at is required.');
     expect(scheduleCreateSources).toContain('Interval seconds must be a positive number.');
     expect(scheduleCreateSources).toContain('Idempotency key');
-    expect(scheduleCreateSources).toContain('queue-next: enqueue a separate Run.');
+    expect(scheduleCreateSources).toContain('queue-next');
+    expect(scheduleCreateSources).toContain('enqueue a separate Run.');
     expect(operations).toContain("buildScopedPageRequest(agentId, 'schedules'");
     expect(operations).toContain('clients.schedules.createSchedule');
     expect(operations).toContain('clients.schedules.cancelSchedule');
@@ -551,6 +576,8 @@ describe('Integration management tab (CLIENT-MANAGEMENT-S008)', () => {
     expect(integrationsPage).toContain('uninstallIntegration');
     expect(integrationsPage).toContain('getIntegrationManagementPermission');
     expect(integrationView).toContain('Integration installations');
+    expect(integrationView).toContain('ErrorAlert');
+    expect(integrationView).toContain('role="status"');
     expect(integrationView).toContain('canManageIntegrations');
     expect(integrationPermissionControls).toContain('INTEGRATION_PERMISSION_COPY_ID');
     expect(integrationPermissionControls).toContain(

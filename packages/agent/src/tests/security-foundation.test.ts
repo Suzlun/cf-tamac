@@ -2,6 +2,7 @@ import { Code } from '@connectrpc/connect';
 import { describe, expect, it } from 'vitest';
 
 import { createAgentDomainError } from '../domain/errors';
+import { decideAgentFinalAuthorization } from '../domain/final-authorization';
 import { encodeBase64UrlBytes, encodeBase64UrlJson } from '../domain/security/base64url';
 import { signBytesWithAgentKey, verifyBytesWithAgentKey } from '../domain/security/crypto';
 import { createRawBodyDigest } from '../domain/security/digest';
@@ -124,6 +125,76 @@ describe('Agent security foundation', () => {
     });
 
     expect(result).toMatchObject({ reason: 'expired', status: 'rejected' });
+  });
+
+  it('[AGENT-SECURITY-S003] Valid Integration signature accepts ingress within grant', async () => {
+    // Provider から届く Protobuf body を digest 化し、署名ベースへ固定します。
+    const rawBodyDigest = await createRawBodyDigest(textEncoder.encode('publish-event-protobuf'));
+    const canonical = {
+      agentId: 'agent-alpha',
+      connectionId: 'conn-1',
+      idempotencyKey: 'ingress-idem-1',
+      installationId: 'inst-1',
+      method: 'PublishEvent',
+      nonce: 'ingress-nonce-1',
+      rawBodyDigest,
+      service: 'cftamac.agent.v1.IntegrationIngressService',
+      timestampUnixMs: nowUnixMs,
+    };
+    // 署名検証は時刻、nonce、body digest、key identity を通し、成功時だけ Integration principal を生成します。
+    const signature = await signBytesWithAgentKey({
+      algorithm: 'HS256',
+      data: textEncoder.encode(createIntegrationSignatureBase(canonical)),
+      key: 'integration-secret',
+    });
+
+    const verified = await verifyIntegrationDetachedSignature({
+      algorithm: 'HS256',
+      canonical,
+      keyId: 'integration-key-1',
+      keyResolver: () => ({
+        algorithm: 'HS256',
+        key: 'integration-secret',
+        keyId: 'integration-key-1',
+      }),
+      nonceRepository: new MemoryNonceRepository(),
+      nowUnixMs,
+      signature,
+    });
+
+    expect(verified.status).toBe('verified');
+    if (verified.status !== 'verified') {
+      throw new Error('expected verified Integration signature');
+    }
+
+    // AIAgent 側の最終認可では、Connection に scope された ingress grant だけで PublishEvent を許可します。
+    const authorization = decideAgentFinalAuthorization({
+      agentId: 'agent-alpha',
+      capability: {
+        adapterConnectionId: 'conn-1',
+        capabilityId: 'conn-1',
+        capabilityKind: 'integration',
+        installationId: 'inst-1',
+        ownerAgentId: 'agent-alpha',
+      },
+      credentialState: 'active',
+      lifecycleState: 'active',
+      operation: {
+        action: 'event.publish',
+        method: 'PublishEvent',
+        service: 'cftamac.agent.v1.IntegrationIngressService',
+      },
+      principal: {
+        ...verified.principal,
+        grantDetails: [{ capability: 'agent.event', scopeRef: 'adapter_connection:conn-1' }],
+        grants: ['agent.event'],
+      },
+      requiredGrants: ['agent.event'],
+      requiredPrincipalTypes: ['INTEGRATION_INSTALLATION'],
+      requiredScopes: [],
+    });
+
+    expect(authorization).toMatchObject({ matchedGrants: ['agent.event'], status: 'allow' });
   });
 
   it('[AGENT-SECURITY-S004] Body tampering and nonce replay are rejected', async () => {

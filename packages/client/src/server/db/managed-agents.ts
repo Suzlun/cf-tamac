@@ -5,12 +5,32 @@ import { asc, desc } from 'drizzle-orm/sql/expressions/select';
 import { clientManagedAgentsTable } from './schema';
 
 /**
- * Inferred select row type for the managed agents table.
+ * managed agents table から Drizzle が推論する select row 型です。
+ *
+ * @remarks
+ * repository 内部だけで使い、public API には raw Drizzle row を露出しません。Client D1 schema と TypeScript record 変換の境界を明確にします。
  */
 type ManagedAgentRow = typeof clientManagedAgentsTable.$inferSelect;
 
 /**
- * Client-owned managed Agent registry record.
+ * Client-owned managed Agent registry record です。
+ *
+ * @remarks
+ * Client D1 の `client_managed_agents` table だけから作られる表示 metadata です。Agent Worker の authoritative domain state、
+ * credential secret、Agent domain snapshot は含みません。`lastOpenedAtMs` は未閲覧の場合 `undefined` になります。
+ *
+ * @example
+ * ```ts
+ * const record: ManagedAgentRecord = {
+ *   agentId: 'agent-alpha',
+ *   agentRpcOrigin: 'https://agent.example.com',
+ *   displayName: 'Agent Alpha',
+ *   displayOrder: 0,
+ *   pinned: false,
+ *   createdAtMs: Date.now(),
+ *   updatedAtMs: Date.now(),
+ * };
+ * ```
  */
 export interface ManagedAgentRecord {
   readonly agentId: string;
@@ -24,7 +44,11 @@ export interface ManagedAgentRecord {
 }
 
 /**
- * Input for creating or updating a managed Agent registry record.
+ * managed Agent registry record を作成または更新する入力です。
+ *
+ * @remarks
+ * `displayOrder` は省略時に `0` として扱います。入力は Client-owned 台帳 metadata に限定され、Agent RPC credential や
+ * Agent domain snapshot は repository に渡しません。
  */
 export interface UpsertManagedAgentInput {
   readonly agentId: string;
@@ -34,7 +58,10 @@ export interface UpsertManagedAgentInput {
 }
 
 /**
- * Input for renaming a managed Agent without changing order or pin state.
+ * managed Agent の表示名だけを変更する入力です。
+ *
+ * @remarks
+ * rename は `displayName` と `updatedAtMs` だけを変更します。表示順、pin 状態、Agent Worker domain state には副作用を与えません。
  */
 export interface RenameManagedAgentInput {
   readonly agentId: string;
@@ -42,7 +69,10 @@ export interface RenameManagedAgentInput {
 }
 
 /**
- * Ordered entry for bulk reorder operations.
+ * bulk reorder operation の 1 行分を表す入力です。
+ *
+ * @remarks
+ * `agentId` と `displayOrder` のみを持ちます。Client UI の並び順 metadata を更新するための値で、Agent Service には送信しません。
  */
 export interface ManagedAgentOrderEntry {
   readonly agentId: string;
@@ -50,7 +80,17 @@ export interface ManagedAgentOrderEntry {
 }
 
 /**
- * Client-owned managed Agent repository operations.
+ * Client-owned managed Agent repository operations です。
+ *
+ * @remarks
+ * すべての method は Drizzle D1 adapter を server-only repository layer に閉じ込め、caller には `ManagedAgentRecord` だけを返します。
+ * Agent domain snapshot table を扱わず、`client_managed_agents` table だけを読み書きします。
+ *
+ * @example
+ * ```ts
+ * const repo = createManagedAgentRepository(env.CLIENT_DB);
+ * const agents = await repo.listManagedAgents();
+ * ```
  */
 export interface ManagedAgentRepository {
   readonly createManagedAgent: (input: UpsertManagedAgentInput) => Promise<ManagedAgentRecord>;
@@ -72,11 +112,14 @@ export interface ManagedAgentRepository {
 }
 
 /**
- * Create a Client D1 repository for managed Agent records using Drizzle ORM.
+ * Drizzle ORM を使う managed Agent records 用 Client D1 repository を作成します。
  *
- * The Drizzle D1 driver is confined to this server-only repository layer.
- * Repository callers receive `ManagedAgentRecord` browser-safe types, never
- * raw Drizzle rows.
+ * @param d1 - Cloudflare Worker の `CLIENT_DB` D1 binding です。
+ * @returns `client_managed_agents` table だけを操作する `ManagedAgentRepository` を返します。
+ * @throws repository 作成時には通常 error を投げませんが、返された method の実行時に D1/validation error が発生し得ます。
+ * @remarks
+ * Drizzle D1 driver はこの server-only repository layer に閉じ込めます。caller には raw row を返さず、browser-safe な
+ * `ManagedAgentRecord` へ変換します。Agent domain snapshot や credential secret を model/query しません。
  */
 export function createManagedAgentRepository(d1: D1Database): ManagedAgentRepository {
   const db = drizzle(d1, { schema: { clientManagedAgentsTable } });

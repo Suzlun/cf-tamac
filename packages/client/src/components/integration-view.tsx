@@ -6,6 +6,7 @@ import { AgentToken } from './agent-token';
 import { ConfirmDialog } from './confirm-dialog';
 import { ControlRoomFrame } from './control-room-frame';
 import { DetailDrawer } from './detail-drawer';
+import { ErrorAlert } from './error-alert';
 import { IntegrationInstallForm, type InstallFormState } from './integration-install-form';
 import { InstallationDetail } from './integration-installation-detail';
 import {
@@ -430,8 +431,14 @@ function IntegrationInstallPanel({
 }) {
   return (
     <>
-      {error !== undefined ? <div className="state-error readout">{error}</div> : null}
-      {success !== undefined ? <div className="state-success readout">{success}</div> : null}
+      {error !== undefined ? (
+        <ErrorAlert title="Integration mutation failed" message={error} />
+      ) : null}
+      {success !== undefined ? (
+        <div className="state-success readout" role="status">
+          {success}
+        </div>
+      ) : null}
       {showInstall ? (
         <IntegrationInstallForm
           pending={pending}

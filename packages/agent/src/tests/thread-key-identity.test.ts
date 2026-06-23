@@ -23,4 +23,21 @@ describe('Thread key identity', () => {
     expect(composed.normalizedThreadKey).not.toContain('connection:');
     expect(composed.normalizedThreadKey).not.toContain('principal:');
   });
+
+  it('[AGENT-EVENTING-S003] Same thread_key across different Agents remains isolated', () => {
+    // 同じ外部 thread_key は正規化後も同じ文字列として扱い、暗黙 prefix を混ぜません。
+    const alpha = createThreadKeyIdentity('agent-alpha', 'shared:ops');
+    const beta = createThreadKeyIdentity('agent-beta', 'shared:ops');
+
+    // Agent ID は identity の一部なので、同じ thread_key でも別 Agent の Thread 空間へ分離されます。
+    expect(alpha.normalizedThreadKey).toBe(beta.normalizedThreadKey);
+    expect(alpha.threadKey).toBe('shared:ops');
+    expect(beta.threadKey).toBe('shared:ops');
+    expect(alpha.agentId).toBe('agent-alpha');
+    expect(beta.agentId).toBe('agent-beta');
+    expect({ agentId: alpha.agentId, normalizedThreadKey: alpha.normalizedThreadKey }).not.toEqual({
+      agentId: beta.agentId,
+      normalizedThreadKey: beta.normalizedThreadKey,
+    });
+  });
 });

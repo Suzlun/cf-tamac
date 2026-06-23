@@ -1,17 +1,30 @@
 'use client';
 
-import { useState, type ChangeEvent } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
+import { type FieldErrors, type UseFormReturn, useForm } from 'react-hook-form';
 
 import { ConfirmDialog } from './confirm-dialog';
-import { FormField } from './form-field';
+import {
+  buildInitialCredentialReferenceValues,
+  credentialLookupSchema,
+  type CredentialReferenceFieldName,
+  type CredentialReferenceValues,
+} from './schemas/agent-settings';
 import { SignalBadge } from './signal-badge';
+import { Button } from './ui/button';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField as RhfFormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from './ui/form';
+import { Input } from './ui/input';
 
-interface RotateResult {
-  readonly referenceValue: string;
-  readonly keyId: string;
-  readonly fingerprintValue: string;
-  readonly maskedHint: string;
-}
+type RotateResult = CredentialReferenceValues;
 
 interface CurrentCredentialView {
   readonly status: string;
@@ -29,11 +42,27 @@ interface CredentialRotationSectionProps {
 }
 
 /**
- * Credential rotation section of the Agent settings page.
+ * Agent settings 画面の credential rotation section を描画します。
  *
- * Shows the rotate button, confirmation dialog, and the new reference form
- * that appears after a successful rotation. The reference fields capture
- * opaque lookup metadata, never plaintext secrets.
+ * @param actingOperatorId - confirmation dialog に表示する browser-safe operator identifier です。scope や credential は含みません。
+ * @param currentCredential - Agent RPC から server-side で取得した現在の credential summary です。secret material は含みません。
+ * @param pending - 親 settings form が mutation 実行中であることを示す flag です。`true` の間は rotate と保存を止めます。
+ * @param onRotate - 明示確認後に credential rotation Server Action wrapper を呼ぶ callback です。Browser は Agent RPC を直接呼びません。
+ * @param onSaveReference - rotation 後に operator が入力した reference metadata を保存する callback です。平文 secret は渡しません。
+ * @returns 現在 credential summary、rotation confirmation、RHF/Zod reference form を含む section を返します。
+ * @remarks
+ * reference metadata 入力は `react-hook-form`、`zodResolver(credentialLookupSchema)`、shadcn `Form` primitives で構成します。
+ * rotation 成功後だけ保存 form を表示し、古い入力値は `buildInitialCredentialReferenceValues` で必ず reset します。
+ *
+ * @example
+ * ```tsx
+ * <CredentialRotationSection
+ *   actingOperatorId="operator-1"
+ *   pending={false}
+ *   onRotate={rotateThroughServerAction}
+ *   onSaveReference={saveReferenceThroughServerAction}
+ * />
+ * ```
  */
 export function CredentialRotationSection({
   actingOperatorId,
@@ -43,44 +72,45 @@ export function CredentialRotationSection({
   onSaveReference,
 }: CredentialRotationSectionProps) {
   const [rotateDialogOpen, setRotateDialogOpen] = useState(false);
-  const [rotateResult, setRotateResult] = useState<RotateResult | undefined>();
-  const canSaveReference =
-    rotateResult !== undefined &&
-    rotateResult.referenceValue !== '' &&
-    rotateResult.keyId !== '' &&
-    rotateResult.fingerprintValue !== '' &&
-    rotateResult.maskedHint !== '';
+  const [referenceFormVisible, setReferenceFormVisible] = useState(false);
+  const form = useForm<CredentialReferenceValues>({
+    resolver: zodResolver(credentialLookupSchema),
+    defaultValues: buildInitialCredentialReferenceValues(),
+    mode: 'onChange',
+    shouldFocusError: true,
+  });
 
-  const handleRotate = async () => {
+  const handleRotate = async (): Promise<void> => {
+    // rotation が成功した場合だけ新 generation 用の reference form を空値で開き、古い reference metadata を混ぜない。
     const result = await onRotate();
     if (result !== undefined) {
-      setRotateResult({ referenceValue: '', keyId: '', fingerprintValue: '', maskedHint: '' });
+      form.reset(buildInitialCredentialReferenceValues());
+      setReferenceFormVisible(true);
       setRotateDialogOpen(false);
     }
   };
 
-  const updateField =
-    (field: keyof RotateResult) =>
-    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const value = event.currentTarget.value;
-      setRotateResult((prev) => (prev === undefined ? prev : { ...prev, [field]: value }));
-    };
-
-  const handleSaveNewReference = async () => {
-    if (rotateResult === undefined) return;
-    const saved = await onSaveReference(rotateResult);
+  const handleSaveNewReference = async (values: CredentialReferenceValues): Promise<void> => {
+    // Zod validation を通過した browser-safe metadata だけを親 Server Action wrapper へ渡す。
+    const saved = await onSaveReference(values);
     if (saved) {
-      setRotateResult(undefined);
+      form.reset(buildInitialCredentialReferenceValues());
+      setReferenceFormVisible(false);
     }
+  };
+
+  const handleInvalidReference = (fieldErrors: FieldErrors<CredentialReferenceValues>): void => {
+    // invalid submit は FormMessage に任せ、最初の invalid field へ focus を戻して修正位置を明確にする。
+    focusFirstInvalidCredentialField(form, fieldErrors);
   };
 
   return (
     <section className="readout" aria-labelledby="credential-heading">
       <strong id="credential-heading">Credential rotation</strong>
       <CurrentCredentialSummary credential={currentCredential} />
-      <button
+      <Button
         type="button"
-        className="primary-action"
+        variant="default"
         onClick={() => {
           setRotateDialogOpen(true);
         }}
@@ -88,14 +118,13 @@ export function CredentialRotationSection({
         aria-disabled={pending}
       >
         Rotate credential
-      </button>
-      {rotateResult !== undefined ? (
+      </Button>
+      {referenceFormVisible ? (
         <NewReferenceForm
-          rotateResult={rotateResult}
+          form={form}
           pending={pending}
-          canSaveReference={canSaveReference}
-          onFieldChange={updateField}
           onSave={handleSaveNewReference}
+          onInvalid={handleInvalidReference}
         />
       ) : null}
 
@@ -119,78 +148,91 @@ export function CredentialRotationSection({
   );
 }
 
-function NewReferenceForm({
-  rotateResult,
-  pending,
-  canSaveReference,
-  onFieldChange,
-  onSave,
-}: {
-  readonly rotateResult: RotateResult;
+interface NewReferenceFormProps {
+  readonly form: UseFormReturn<CredentialReferenceValues>;
   readonly pending: boolean;
-  readonly canSaveReference: boolean;
-  readonly onFieldChange: (
-    field: keyof RotateResult
-  ) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
-  readonly onSave: () => Promise<void>;
-}) {
+  readonly onSave: (values: CredentialReferenceValues) => Promise<void>;
+  readonly onInvalid: (fieldErrors: FieldErrors<CredentialReferenceValues>) => void;
+}
+
+function NewReferenceForm({ form, pending, onSave, onInvalid }: NewReferenceFormProps) {
+  const saveDisabled = pending || !form.formState.isValid;
+
   return (
-    <div style={{ marginTop: '1rem' }}>
+    <div className="mt-4">
       <p className="eyebrow">New reference</p>
-      <FormField
-        id="newCredentialRef"
-        label="New credential reference"
-        value={rotateResult.referenceValue}
-        onChange={onFieldChange('referenceValue')}
-        disabled={pending}
-        autoComplete="off"
-        required
-      />
-      <FormField
-        id="newKeyId"
-        label="New key ID"
-        value={rotateResult.keyId}
-        onChange={onFieldChange('keyId')}
-        disabled={pending}
-        autoComplete="off"
-        required
-      />
-      <FormField
-        id="newPublicFingerprint"
-        label="New public fingerprint"
-        value={rotateResult.fingerprintValue}
-        onChange={onFieldChange('fingerprintValue')}
-        disabled={pending}
-        autoComplete="off"
-        required
-      />
-      <FormField
-        id="newMaskedHint"
-        label="New masked hint"
-        value={rotateResult.maskedHint}
-        onChange={onFieldChange('maskedHint')}
-        disabled={pending}
-        autoComplete="off"
-        required
-      />
-      <button
-        type="button"
-        className="primary-action"
-        onClick={() => {
-          void onSave();
-        }}
-        disabled={pending || !canSaveReference}
-        aria-disabled={pending || !canSaveReference}
-      >
-        Save new reference
-      </button>
+      <Form {...form}>
+        <form
+          onSubmit={(event) => {
+            // reference 保存は RHF/Zod の validation を通過した時だけ親 callback へ進める。
+            void form.handleSubmit(onSave, onInvalid)(event);
+          }}
+          noValidate
+        >
+          <CredentialTextField
+            form={form}
+            name="referenceValue"
+            label="New credential reference"
+            helper="Opaque lookup reference. Do not enter plaintext secret material."
+            disabled={pending}
+          />
+          <CredentialTextField form={form} name="keyId" label="New key ID" disabled={pending} />
+          <CredentialTextField
+            form={form}
+            name="fingerprintValue"
+            label="New public fingerprint"
+            disabled={pending}
+          />
+          <CredentialTextField
+            form={form}
+            name="maskedHint"
+            label="New masked hint"
+            disabled={pending}
+          />
+          <Button
+            type="submit"
+            variant="default"
+            disabled={saveDisabled}
+            aria-disabled={saveDisabled}
+          >
+            Save new reference
+          </Button>
+        </form>
+      </Form>
     </div>
+  );
+}
+
+interface CredentialTextFieldProps {
+  readonly form: UseFormReturn<CredentialReferenceValues>;
+  readonly name: CredentialReferenceFieldName;
+  readonly label: string;
+  readonly helper?: string;
+  readonly disabled: boolean;
+}
+
+function CredentialTextField({ form, name, label, helper, disabled }: CredentialTextFieldProps) {
+  return (
+    <RhfFormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          {helper !== undefined ? <FormDescription>{helper}</FormDescription> : null}
+          <FormControl>
+            <Input {...field} disabled={disabled} autoComplete="off" required />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
   );
 }
 
 function CurrentCredentialSummary({ credential }: { readonly credential?: CurrentCredentialView }) {
   return (
-    <div className="readout" aria-label="Current credential" style={{ marginBottom: '1rem' }}>
+    <div className="readout mb-4" aria-label="Current credential">
       <strong>Current credential</strong>
       <p>generation {credential?.generation ?? '—'}</p>
       <p>
@@ -204,4 +246,26 @@ function CurrentCredentialSummary({ credential }: { readonly credential?: Curren
       <p>masked hint: {credential?.maskedHint ?? '—'}</p>
     </div>
   );
+}
+
+function focusFirstInvalidCredentialField(
+  form: UseFormReturn<CredentialReferenceValues>,
+  fieldErrors: FieldErrors<CredentialReferenceValues>
+): void {
+  // schema と同じ field order で明示分岐し、動的 property access を避けながら最初の error へ focus する。
+  if (fieldErrors.referenceValue !== undefined) {
+    form.setFocus('referenceValue');
+    return;
+  }
+  if (fieldErrors.keyId !== undefined) {
+    form.setFocus('keyId');
+    return;
+  }
+  if (fieldErrors.fingerprintValue !== undefined) {
+    form.setFocus('fingerprintValue');
+    return;
+  }
+  if (fieldErrors.maskedHint !== undefined) {
+    form.setFocus('maskedHint');
+  }
 }

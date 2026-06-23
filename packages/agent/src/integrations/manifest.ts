@@ -442,8 +442,14 @@ function optionalText(
   record: Readonly<Record<string, unknown>>,
   names: readonly string[]
 ): string | undefined {
-  for (const name of names) {
-    const value = normalizeOptionalText(record[name]);
+  const entries = Object.entries(record);
+  for (const expectedName of names) {
+    // manifest JSON は外部入力なので、任意 key の添字アクセスを避けて許可済み候補名だけを照合します。
+    const matchedEntry = entries.find(([recordName]) => recordName === expectedName);
+    if (matchedEntry === undefined) continue;
+    // 候補名順の優先度を維持しつつ、値は文字列として安全に正規化してから返します。
+    const [, rawValue] = matchedEntry;
+    const value = normalizeOptionalText(rawValue);
     if (value !== undefined) return value;
   }
   return undefined;
@@ -486,9 +492,14 @@ function decodeBase64Url(value: string): Uint8Array {
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+  const record = value as Readonly<Record<string, unknown>>;
+  // 署名対象 JSON は own entry を key 順に並べ、動的添字アクセスなしで値を再帰的に正規化します。
+  const sortedEntries = Object.entries(record).sort(([leftKey], [rightKey]) => {
+    if (leftKey < rightKey) return -1;
+    if (leftKey > rightKey) return 1;
+    return 0;
+  });
+  return `{${sortedEntries
+    .map(([key, nestedValue]) => `${JSON.stringify(key)}:${stableStringify(nestedValue)}`)
     .join(',')}}`;
 }

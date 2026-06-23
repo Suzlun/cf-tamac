@@ -88,7 +88,10 @@ describe('Agent Stage 6 Tool implementation', () => {
     expect(service).toContain('approveInvocation(request)');
     expect(service).toContain('rejectInvocation(request)');
     expect(operations).toContain('tool.approval.decide');
-    expect(operations).toContain('actorId: input.command.context.principal.actingUserId');
+    // 実装の改行や Prettier 整形に依存せず、acting user を優先して actorId に記録する意図だけを検証します。
+    expect(operations).toMatch(
+      /actorId:\s*input\.command\.context\.principal\.actingUserId\s*\?\?\s*input\.command\.context\.principal\.principalId/u
+    );
     expect(operations).toContain('reason: input.command.reason');
     expect(operations).toContain('recordToolAudit(');
   });

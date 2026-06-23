@@ -25,7 +25,20 @@ import {
 const INTEGRATION_MANAGEMENT_DENIED_REASON = 'You do not have permission to manage Integrations.';
 
 /**
- * Input for registering a managed Agent in the Client ledger.
+ * Client D1 の管理対象 Agent 台帳へ登録または更新する入力です。
+ *
+ * @remarks
+ * `agentId` と `agentRpcOrigin` は Agent Service を識別する metadata であり、credential secret や Agent domain snapshot は含めません。
+ * `displayOrder` は Client-owned list の表示順だけに使われ、Agent Worker の状態は変更しません。
+ *
+ * @example
+ * ```ts
+ * const input: RegisterManagedAgentInput = {
+ *   agentId: 'agent-alpha',
+ *   agentRpcOrigin: 'https://agent.example.com',
+ *   displayName: 'Agent Alpha',
+ * };
+ * ```
  */
 export interface RegisterManagedAgentInput {
   readonly agentId: string;
@@ -35,7 +48,23 @@ export interface RegisterManagedAgentInput {
 }
 
 /**
- * Input for saving a credential reference without secret material.
+ * 平文 secret を含めずに credential 参照 metadata を保存する入力です。
+ *
+ * @remarks
+ * `credentialRef` は server-side secret 解決の lookup key であり、Browser へ返す Server Action result からは除外します。
+ * `publicFingerprint` と `maskedHint` は operator が識別できる metadata で、private key や raw shared secret は扱いません。
+ *
+ * @example
+ * ```ts
+ * const input: SaveCredentialReferenceInput = {
+ *   agentId: 'agent-alpha',
+ *   credentialRef: 'wrangler-secret:agent-alpha',
+ *   keyId: 'key-2026-06',
+ *   publicFingerprint: 'sha256:abc123',
+ *   maskedHint: 'ed25519:ab…12',
+ *   status: 'active',
+ * };
+ * ```
  */
 export interface SaveCredentialReferenceInput {
   readonly agentId: string;
@@ -47,7 +76,23 @@ export interface SaveCredentialReferenceInput {
 }
 
 /**
- * Register or update Client-owned managed Agent metadata.
+ * Client-owned 管理対象 Agent metadata を登録または更新します。
+ *
+ * @param input - Agent ID、RPC origin、表示名、任意の表示順を含む台帳入力です。
+ * @returns upsert 後に Client D1 から読み戻した `ManagedAgentRecord` を返します。
+ * @throws D1 binding が利用できない場合、または repository validation/persistence に失敗した場合に error を投げます。
+ * @remarks
+ * この Server Action は Client D1 の registry metadata だけを書き換え、Agent Worker へは RPC しません。成功後は Agent list と
+ * detail route を revalidate します。
+ *
+ * @example
+ * ```ts
+ * await registerManagedAgent({
+ *   agentId: 'agent-alpha',
+ *   agentRpcOrigin: 'https://agent.example.com',
+ *   displayName: 'Agent Alpha',
+ * });
+ * ```
  */
 export async function registerManagedAgent(
   input: RegisterManagedAgentInput
@@ -60,7 +105,13 @@ export async function registerManagedAgent(
 }
 
 /**
- * Mark a managed Agent as opened by the management shell.
+ * management shell から Agent を開いた時刻を Client D1 台帳へ記録します。
+ *
+ * @param agentId - 最終閲覧時刻を更新する管理対象 Agent ID です。
+ * @returns 対象が存在する場合は更新後の record、存在しない場合は `undefined` を返します。
+ * @throws D1 read/write に失敗した場合に error を投げます。
+ * @remarks
+ * Agent Worker の domain state は変更せず、Client-owned `lastOpenedAtMs` と `updatedAtMs` だけを更新します。
  */
 export async function markManagedAgentOpened(
   agentId: string
@@ -72,11 +123,14 @@ export async function markManagedAgentOpened(
 }
 
 /**
- * Save a Client-owned credential reference and return a browser-safe view.
+ * Client-owned credential reference を保存し、browser-safe な表示用 metadata だけを返します。
  *
- * The returned `BrowserSafeCredentialReference` excludes `credentialRef` and
- * `publicFingerprint` so that Server Action results cannot leak secret lookup
- * material to browser bundles or rendered HTML.
+ * @param input - Agent ID、credential lookup reference、key ID、fingerprint、masked hint、status を含む保存入力です。
+ * @returns `credentialRef` と `publicFingerprint` を除外した `BrowserSafeCredentialReference` を返します。
+ * @throws D1 write、validation、read-back に失敗した場合に error を投げます。
+ * @remarks
+ * Server Action result が Browser bundle や HTML に secret lookup material を漏らさないよう、保存後すぐ browser-safe 変換を行います。
+ * 成功後は settings route を revalidate します。
  */
 export async function saveCredentialReference(
   input: SaveCredentialReferenceInput
@@ -90,7 +144,13 @@ export async function saveCredentialReference(
 }
 
 /**
- * Save credential lookup metadata from browser-safe settings forms.
+ * settings form から渡された browser-safe credential lookup metadata を保存します。
+ *
+ * @param input - UI field 名の `referenceValue` / `fingerprintValue` を含む reference metadata です。
+ * @returns browser-safe credential reference metadata を返します。
+ * @throws `saveCredentialReference` と同じ validation/D1 error を投げます。
+ * @remarks
+ * UI field 名を server repository 入力へ変換する薄い Server Action wrapper です。平文 secret は受け取らず、Agent RPC も呼びません。
  */
 export async function saveAgentAccessLookup(input: {
   readonly agentId: string;
@@ -111,11 +171,15 @@ export async function saveAgentAccessLookup(input: {
 }
 
 /**
- * Validate and persist a managed Agent registration atomically at UI level.
+ * managed Agent registration を検証し、UI 操作単位で原子的に永続化します。
  *
- * Validation completes before any Client D1 write. If the credential metadata
- * write fails after creating a new registry row, the registry row is removed so
- * the UI never leaves a partially created managed Agent.
+ * @param input - Agent 台帳 metadata と credential reference metadata を含む registration form 入力です。
+ * @param options - test や上位 flow が既存 Agent 判定などを差し替えるための任意 option です。
+ * @returns 成功時は登録済み Agent ID、失敗時は field-level/form-level error を含む browser-safe result を返します。
+ * @throws 予期しない D1 障害など、rollback 不能な infrastructure error は呼び出し元へ伝播します。
+ * @remarks
+ * validation は Client D1 write より前に完了します。credential metadata 保存が registry row 作成後に失敗した場合は row を削除し、
+ * UI に partial registration を残しません。
  */
 export async function submitManagedAgentRegistration(
   input: ManagedAgentRegistrationInput,
@@ -201,7 +265,13 @@ export async function getIntegrationManagementPermission(): Promise<BrowserSafeI
 }
 
 /**
- * Fetch browser-safe managed Agent display metadata for route shells.
+ * route shell 表示に使う managed Agent metadata を Client D1 から取得します。
+ *
+ * @param agentId - 取得対象の管理対象 Agent ID です。
+ * @returns 対象 record が存在する場合は `ManagedAgentRecord`、存在しない場合は `undefined` を返します。
+ * @throws D1 read に失敗した場合に error を投げます。
+ * @remarks
+ * 返す値は Client-owned 台帳 metadata だけで、credential secret や Agent domain snapshot は含みません。
  */
 export async function getManagedAgentForDisplay(
   agentId: string
@@ -211,7 +281,12 @@ export async function getManagedAgentForDisplay(
 }
 
 /**
- * List all managed Agents from the Client D1 registry.
+ * Client D1 registry に登録されたすべての managed Agent を一覧します。
+ *
+ * @returns pin、表示順、最終閲覧時刻で repository が並べた `ManagedAgentRecord` 配列を返します。
+ * @throws D1 read に失敗した場合に error を投げます。
+ * @remarks
+ * この一覧は Client-owned 台帳だけを読み、Agent Worker への横断 list RPC は行いません。
  */
 export async function listManagedAgents(): Promise<readonly ManagedAgentRecord[]> {
   const env = getClientWorkerEnv();
@@ -219,7 +294,11 @@ export async function listManagedAgents(): Promise<readonly ManagedAgentRecord[]
 }
 
 /**
- * Browser-safe credential status hint for a managed Agent list row.
+ * managed Agent list row に表示する browser-safe credential 状態 hint です。
+ *
+ * @remarks
+ * `credentialRef`、`publicFingerprint`、secret material は含めず、list UI が必要とする表示 metadata と credential status だけを持ちます。
+ * Agent domain state の snapshot ではなく、Client D1 の registry/credential reference metadata から導出されます。
  */
 export interface ManagedAgentCredentialHint {
   readonly agentId: string;
@@ -232,10 +311,13 @@ export interface ManagedAgentCredentialHint {
 }
 
 /**
- * List managed Agents with a browser-safe credential status hint.
+ * managed Agent 一覧に browser-safe credential status hint を付けて返します。
  *
- * The credential reference itself and any secret lookup material are never
- * returned; only the aggregate status from `client_agent_credential_refs`.
+ * @returns registry metadata と credential status を結合した `ManagedAgentCredentialHint` 配列です。
+ * @throws D1 read に失敗した場合に error を投げます。
+ * @remarks
+ * credential reference そのものや secret lookup material は返しません。`client_agent_credential_refs` の状態だけを集約し、
+ * Browser には list 表示に必要な安全な文字列だけを渡します。
  */
 export async function listManagedAgentsWithCredentialStatus(): Promise<
   readonly ManagedAgentCredentialHint[]
@@ -263,10 +345,13 @@ export async function listManagedAgentsWithCredentialStatus(): Promise<
 }
 
 /**
- * Fetch a managed Agent and its active credential reference for editing.
+ * edit form の初期表示に使う managed Agent と active credential metadata を取得します。
  *
- * Returns browser-safe credential metadata only; secret material and the
- * credential reference lookup path are excluded from the result.
+ * @param agentId - 取得対象の管理対象 Agent ID です。
+ * @returns Agent record と browser-safe credential metadata を返します。Agent が存在しない場合は両方 `undefined` です。
+ * @throws D1 read に失敗した場合に error を投げます。
+ * @remarks
+ * credential secret material と lookup path は result から除外し、edit form は metadata と空の reference 入力だけを扱います。
  */
 export async function getManagedAgentForEdit(agentId: string): Promise<{
   readonly agent: ManagedAgentRecord | undefined;
@@ -288,7 +373,14 @@ export async function getManagedAgentForEdit(agentId: string): Promise<{
 }
 
 /**
- * Rename a managed Agent without changing order or pin state.
+ * managed Agent の表示名だけを変更します。
+ *
+ * @param agentId - rename 対象の管理対象 Agent ID です。
+ * @param displayName - 新しい Client UI 表示名です。
+ * @returns 対象が存在する場合は更新後 record、存在しない場合は `undefined` を返します。
+ * @throws 空の入力や D1 write に失敗した場合に error を投げます。
+ * @remarks
+ * 表示順、pin 状態、Agent Worker domain state は変更しません。成功後は list と detail route を revalidate します。
  */
 export async function renameManagedAgent(
   agentId: string,
@@ -305,7 +397,14 @@ export async function renameManagedAgent(
 }
 
 /**
- * Pin or unpin a managed Agent in the registry.
+ * managed Agent の pin 状態を Client D1 registry で切り替えます。
+ *
+ * @param agentId - pin 状態を変更する管理対象 Agent ID です。
+ * @param pinned - `true` の場合は pin、`false` の場合は unpin します。
+ * @returns 対象が存在する場合は更新後 record、存在しない場合は `undefined` を返します。
+ * @throws D1 write に失敗した場合に error を投げます。
+ * @remarks
+ * Client UI の並び順 metadata だけを変更し、Agent Worker へは RPC しません。
  */
 export async function setManagedAgentPinned(
   agentId: string,
@@ -321,7 +420,13 @@ export async function setManagedAgentPinned(
 }
 
 /**
- * Reorder managed Agents in the registry.
+ * managed Agent の表示順を Client D1 registry で一括更新します。
+ *
+ * @param entries - Agent ID と新しい表示順の組み合わせです。空配列の場合は現在の一覧を返します。
+ * @returns 更新後の managed Agent 一覧を repository の標準順序で返します。
+ * @throws 空の Agent ID、不正な表示順、D1 write に失敗した場合に error を投げます。
+ * @remarks
+ * Client-owned order metadata だけを変更し、Agent domain state や credential reference は変更しません。
  */
 export async function reorderManagedAgents(
   entries: readonly { readonly agentId: string; readonly displayOrder: number }[]
@@ -333,7 +438,13 @@ export async function reorderManagedAgents(
 }
 
 /**
- * Delete a managed Agent from the Client D1 registry.
+ * managed Agent を Client D1 registry から削除します。
+ *
+ * @param agentId - 削除対象の管理対象 Agent ID です。
+ * @returns 削除が完了したら `void` を返します。
+ * @throws D1 delete に失敗した場合に error を投げます。
+ * @remarks
+ * Client の台帳 metadata だけを削除します。Agent Worker の aggregate 破壊は settings の lifecycle Server Action が担当します。
  */
 export async function deleteManagedAgent(agentId: string): Promise<void> {
   const env = getClientWorkerEnv();

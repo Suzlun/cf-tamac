@@ -5,12 +5,34 @@ import { asc } from 'drizzle-orm/sql/expressions/select';
 import { clientAgentCredentialRefsTable } from './schema';
 
 /**
- * Inferred select row type for the credential references table.
+ * credential references table から Drizzle が推論する select row 型です。
+ *
+ * @remarks
+ * repository 内部だけで使い、public API へ raw Drizzle row を露出しません。browser-safe 変換の前段として schema 境界を固定します。
  */
 type CredentialReferenceRow = typeof clientAgentCredentialRefsTable.$inferSelect;
 
 /**
- * Client-owned credential reference record without secret material.
+ * secret material を含まない Client-owned credential reference record です。
+ *
+ * @remarks
+ * Client D1 の `client_agent_credential_refs` table から作られる credential lookup metadata です。`credentialRef` は
+ * server-side secret 解決用の reference であり、Browser に返す型へ変換するときは除外します。private key、raw shared secret、
+ * Provider secret は保持しません。
+ *
+ * @example
+ * ```ts
+ * const record: CredentialReferenceRecord = {
+ *   agentId: 'agent-alpha',
+ *   credentialRef: 'wrangler-secret:agent-alpha',
+ *   keyId: 'key-2026-06',
+ *   publicFingerprint: 'sha256:abc123',
+ *   maskedHint: 'ed25519:ab…12',
+ *   status: 'active',
+ *   createdAtMs: Date.now(),
+ *   updatedAtMs: Date.now(),
+ * };
+ * ```
  */
 export interface CredentialReferenceRecord {
   readonly agentId: string;
@@ -24,7 +46,11 @@ export interface CredentialReferenceRecord {
 }
 
 /**
- * Input for creating or updating a credential reference.
+ * credential reference を作成または更新する入力です。
+ *
+ * @remarks
+ * secret 本体ではなく lookup reference と operator 向け metadata だけを受け取ります。`agentId` と `credentialRef` の組で upsert し、
+ * 平文 secret や raw JWT 署名 material は D1 に保存しません。
  */
 export interface UpsertCredentialReferenceInput {
   readonly agentId: string;
@@ -36,7 +62,17 @@ export interface UpsertCredentialReferenceInput {
 }
 
 /**
- * Client-owned credential reference repository operations.
+ * Client-owned credential reference repository operations です。
+ *
+ * @remarks
+ * すべての method は `client_agent_credential_refs` table だけを扱います。Agent domain snapshot table、Agent runtime source、
+ * secret material は扱いません。Browser へ返す場合は caller が `toBrowserSafeCredentialReference` で lookup fields を除外します。
+ *
+ * @example
+ * ```ts
+ * const repo = createCredentialReferenceRepository(env.CLIENT_DB);
+ * const refs = await repo.listCredentialReferences('agent-alpha');
+ * ```
  */
 export interface CredentialReferenceRepository {
   readonly upsertCredentialReference: (
@@ -53,11 +89,14 @@ export interface CredentialReferenceRepository {
 }
 
 /**
- * Create a Client D1 repository for credential references using Drizzle ORM.
+ * Drizzle ORM を使う credential references 用 Client D1 repository を作成します。
  *
- * The Drizzle D1 driver is confined to this server-only repository layer.
- * Repository callers receive `CredentialReferenceRecord` browser-safe types,
- * never raw Drizzle rows or secret material.
+ * @param d1 - Cloudflare Worker の `CLIENT_DB` D1 binding です。
+ * @returns `client_agent_credential_refs` table だけを操作する `CredentialReferenceRepository` を返します。
+ * @throws repository 作成時には通常 error を投げませんが、返された method の実行時に D1/validation error が発生し得ます。
+ * @remarks
+ * Drizzle D1 driver はこの server-only repository layer に閉じ込めます。raw Drizzle row は `CredentialReferenceRecord` へ変換し、
+ * secret material は model/query しません。
  */
 export function createCredentialReferenceRepository(d1: D1Database): CredentialReferenceRepository {
   const db = drizzle(d1, { schema: { clientAgentCredentialRefsTable } });

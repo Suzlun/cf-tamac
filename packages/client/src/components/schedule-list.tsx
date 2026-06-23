@@ -7,6 +7,7 @@ import { AgentToken } from './agent-token';
 import { ConfirmDialog } from './confirm-dialog';
 import { ControlRoomFrame } from './control-room-frame';
 import { DetailDrawer } from './detail-drawer';
+import { ErrorAlert } from './error-alert';
 import { generateIdempotencyKey } from './generate-idempotency-key';
 import { PaginationBar } from './pagination-bar';
 import { ScheduleCreateForm } from './schedule-create-form';
@@ -338,8 +339,12 @@ function ScheduleListContent({
         </button>
       </div>
 
-      {error !== undefined ? <div className="state-error readout">{error}</div> : null}
-      {success !== undefined ? <div className="state-success readout">{success}</div> : null}
+      {error !== undefined ? <ErrorAlert title="Schedule mutation failed" message={error} /> : null}
+      {success !== undefined ? (
+        <div className="state-success readout" role="status">
+          {success}
+        </div>
+      ) : null}
 
       {showCreate ? (
         <ScheduleCreateForm
