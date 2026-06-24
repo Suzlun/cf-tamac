@@ -552,7 +552,7 @@ flowchart TD
 - `pnpm check:codegen` を実行し、generated drift がないことを確認する。
 - `pnpm test:agent`、`pnpm test:management-client`、`pnpm test:governance`、`pnpm test:e2e` を実行する。
 - `pnpm check:agent && pnpm check:management-client` を実行する。
-- `pnpm build:foundation` を実行する。
+- `pnpm build` を実行する。
 - Management Client で signing key を生成し、public trust config を Agent Worker secret に設定し、Agent health verification を実行する。
 - Rotation、emergency revoke、break-glass recovery runbook を staging で確認し、本番適用前に public trust config fingerprint を記録する。
 

@@ -25,7 +25,7 @@
 2. 開発サーバー
    ```bash
    pnpm dev:agent              # @cf-tamac/agent
-   pnpm dev:management-client  # @cf-tamac/client
+   pnpm dev:client  # @cf-tamac/client
    ```
 
 ## 依存関係とサプライチェーン対策
@@ -109,7 +109,7 @@ pnpm check
 ```bash
 pnpm test          # すべて（vitest workspace）
 pnpm test:agent    # @cf-tamac/agent
-pnpm test:management-client # @cf-tamac/client
+pnpm test:client # @cf-tamac/client
 pnpm test:governance # governance scripts
 pnpm test:e2e      # Playwright（変更が e2e に影響する場合）
 ```
@@ -118,8 +118,8 @@ Agent/Client package を触った場合は、必要に応じて次も確認し�
 
 ```bash
 pnpm check:agent
-pnpm check:management-client
-pnpm build:foundation
+pnpm check:client
+pnpm build
 ```
 
 ## プルリクエストの流れ

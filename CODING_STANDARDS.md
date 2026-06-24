@@ -102,7 +102,7 @@ OK例: `packages/agent/src/rpc/**`、`packages/client/src/server/**`、`packages
 
 **Rule: Worker bindings は Agent と Client で分離する。**
 Summary: Agent Worker は `AI_AGENT` と `AGENT_BLOBS`、Client Worker は `CLIENT_DB` と credential refs を所有します。
-Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:agent` via `packages/agent/src/tests/agent-worker-bindings.test.ts`; `pnpm test:management-client` via `packages/client/src/tests/client-bindings.test.ts`; configs `packages/agent/wrangler.toml` and `packages/client/wrangler.toml`.
+Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:agent` via `packages/agent/src/tests/agent-worker-bindings.test.ts`; `pnpm test:client` via `packages/client/src/tests/client-bindings.test.ts`; configs `packages/agent/wrangler.toml` and `packages/client/wrangler.toml`.
 NG例: Agent Worker に `CLIENT_DB`、D1、Cloudflare Queues binding を追加する、または Client Worker に `AI_AGENT`、`AGENT_BLOBS`、R2 binding を追加する。
 OK例: `packages/agent/wrangler.toml` は `AI_AGENT` Durable Object と `AGENT_BLOBS` R2 を持ち、`packages/client/wrangler.toml` は `CLIENT_DB` を持つ。
 
@@ -110,7 +110,7 @@ OK例: `packages/agent/wrangler.toml` は `AI_AGENT` Durable Object と `AGENT_B
 
 **Rule: Browser-visible Client modules は server-only Agent RPC、credentials、generated RPC construction、Connect runtime を import しない。**
 Summary: Browser bundle に Agent RPC credential seam や direct Agent RPC invocation logic を入れません。
-Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:management-client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
+Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
 NG例: `packages/client/app/page.tsx` から `@connectrpc/connect`、`@cf-tamac/client-agent-rpc/**`、`packages/client/src/server/**` を import する。
 OK例: Agent RPC client construction は `packages/client/src/server/agent-rpc/**` に閉じ、App Router は Server Components/Server Actions 経由で使う。
 
@@ -122,43 +122,43 @@ OK例: Agent 通信は server-only Agent RPC module または Server Actions/Ser
 
 **Rule: Browser-visible Client source に credential/D1/RPC seam 文字列を置かない。**
 Summary: Browser-visible source に Agent credential headers、Client D1 seam、server Agent RPC factory 名を漏らしません。
-Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:management-client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
+Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
 NG例: `createServerAgentRpcClients`、`CLIENT_DB`、`credentialRef`、`credential_ref`、`Authorization`、`Bearer` を app/browser-visible source に置く。
 OK例: Credential refs と Agent RPC metadata は `packages/client/src/server/**` に閉じる。
 
 **Rule: Client Agent RPC server modules は `server-only` boundary を持つ。**
 Summary: `packages/client/src/server/agent-rpc/**` は server-only module として明示します。
-Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:management-client` via `packages/client/src/tests/client-import-graph.test.ts`.
+Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/client-import-graph.test.ts`.
 NG例: `packages/client/src/server/agent-rpc/create-client.ts` から `import 'server-only';` を消す。
 OK例: Client Agent RPC factory modules は先頭で `import 'server-only';` を宣言する。
 
 **Rule: Client server-side Agent RPC は generated Agent RPC code と Connect runtime だけを使う。**
 Summary: Client server-side RPC module は Agent runtime source を import せず、Client 側 generated descriptors を使います。
-Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:management-client` via `packages/client/src/tests/client-import-graph.test.ts`.
+Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/client-import-graph.test.ts`.
 NG例: `packages/client/src/server/agent-rpc/**` から `packages/agent/src/**` や `@cf-tamac/agent` runtime source を import する。
 OK例: `@cf-tamac/client-agent-rpc/cftamac/agent/v1_pb` と `@connectrpc/connect` を server-only module から使い、binary format を維持する。
 
 **Rule: Client Worker は Agent API proxy routes を公開しない。**
 Summary: Client App Router に `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding handler を置きません。
-Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm test:management-client` via `packages/client/src/tests/client-api-proxy-absence.test.ts`.
+Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm test:client` via `packages/client/src/tests/client-api-proxy-absence.test.ts`.
 NG例: `packages/client/app/api/agent/route.ts` や `packages/client/src/foo/proxy.ts` で Agent RPC を forward する。
 OK例: `packages/client/app/agents/**/page.tsx` の route shells と Server Actions を internal UI boundary として使う。
 
 **Rule: Client App Router route manifest は Agent management shell に限定する。**
 Summary: Client UI route graph は Agent registry/detail sections だけを公開し、demo/API route を足しません。
-Enforcement point: `pnpm test:management-client` via `packages/client/src/tests/client-api-proxy-absence.test.ts` and `packages/client/src/tests/management-navigation.test.tsx`.
+Enforcement point: `pnpm test:client` via `packages/client/src/tests/client-api-proxy-absence.test.ts` and `packages/client/src/tests/management-navigation.test.tsx`.
 NG例: `packages/client/app/api/**` route handler、旧 demo route、Agent proxy route を追加する。
 OK例: `/`、`/agents`、`/agents/new`、`/agents/[agentId]`、`threads`、`events`、`schedules`、`tools`、`integrations`、`settings` の shell routes に留める。
 
 **Rule: Client UI は Agent registry shell を表示し、旧 demo content を表示しない。**
 Summary: Management Client の UI は Agent 管理 shell であり、`hello` / `users` demo experience を表示しません。
-Enforcement point: `pnpm test:management-client` via `packages/client/src/tests/agent-registry-shell.test.tsx` and `packages/client/src/tests/management-navigation.test.tsx`.
+Enforcement point: `pnpm test:client` via `packages/client/src/tests/agent-registry-shell.test.tsx` and `packages/client/src/tests/management-navigation.test.tsx`.
 NG例: `management-content.tsx` や route shells に旧 `hello` / `users` navigation/content を戻す。
 OK例: `Agent registry`、`Register the first managed Agent.`、`New Agent record`、`Preview detail shell`、`agent_id:` を含む shell を表示する。
 
 **Rule: Client D1 は management ledger だけを保持し、Agent-domain snapshots を保存しない。**
 Summary: Client-owned D1 は managed Agent records と credential refs だけを持ちます。
-Enforcement point: `pnpm test:management-client` via `packages/client/src/tests/client-d1-schema.test.ts`, `packages/client/src/tests/client-repository-boundary.test.ts`, and `packages/client/src/server/db/schema.ts`.
+Enforcement point: `pnpm test:client` via `packages/client/src/tests/client-d1-schema.test.ts`, `packages/client/src/tests/client-repository-boundary.test.ts`, and `packages/client/src/server/db/schema.ts`.
 NG例: Client D1 に Agent events、thread memory、state snapshots、schedules、tool invocations、integration installations、adapter connections、compaction bodies を保存する table/API を追加する。
 OK例: `client_managed_agents` と `client_agent_credential_refs` だけを Client-owned management data として扱う。
 
@@ -231,8 +231,8 @@ OK例: legacy demo は deletion/history/negative test の文脈だけで扱い�
 **Rule: CI は `.github/workflows/ci.yml` の順序で verification を実行する。**
 Summary: PR/push verification は install、format、lint、type checks、tests、codegen drift、codegen smoke の順で走ります。
 Enforcement point: GitHub Actions via `.github/workflows/ci.yml`.
-NG例: `pnpm lint`、`pnpm test:agent && pnpm test:management-client`、`pnpm check:codegen` を通さずに PR ready と判断する。
-OK例: CI order は `pnpm install --frozen-lockfile`、`pnpm format:check`、`pnpm lint`、`pnpm check`、`pnpm check:agent && pnpm check:management-client`、`pnpm test:run`、`pnpm test:agent && pnpm test:management-client`、`pnpm check:codegen`、`pnpm gen:agent:proto && pnpm gen:agent:rpc`。
+NG例: `pnpm lint`、`pnpm test:agent && pnpm test:client`、`pnpm check:codegen` を通さずに PR ready と判断する。
+OK例: CI order は `pnpm install --frozen-lockfile`、`pnpm format:check`、`pnpm lint`、`pnpm check`、`pnpm check:agent && pnpm check:client`、`pnpm test:run`、`pnpm test:agent && pnpm test:client`、`pnpm check:codegen`、`pnpm gen:agent:proto && pnpm gen:agent:rpc`。
 
 **Rule: Formatting は Prettier の対象ファイルで一致させる。**
 Summary: TS/TSX/JS/JSX/JSON/Markdown は Prettier config に一致している必要があります。

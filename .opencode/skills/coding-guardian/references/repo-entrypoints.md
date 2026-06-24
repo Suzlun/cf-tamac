@@ -49,7 +49,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/client/src/server/actions/managed-agents.ts`: Server Actions for Client-owned management ledger interactions
 - `packages/client/src/server/agent-rpc/**`: server-only generated Agent RPC client factory and auth metadata
 - `packages/client/src/server/db/**`: Client D1 schema, migrations, managed Agent records, and credential reference repositories only
-- `packages/client/src/tests/*.test.ts*`: `MANAGEMENT-CLIENT-*` Scenario ID coverage
+- `packages/client/src/tests/*.test.ts*`: `client-*` Scenario ID coverage
 
 ## Git hooks
 

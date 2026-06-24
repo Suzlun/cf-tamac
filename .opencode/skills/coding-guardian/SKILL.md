@@ -73,7 +73,7 @@ description: Enforce this repository's real Agent/Client foundation, TypeSpec-to
 - Agent/Client foundation 変更: relevant package checks/tests plus `pnpm lint`
 - Governance 変更: relevant script tests plus `pnpm lint`
 - JS / TS / TSX 変更: `pnpm lint` -> `pnpm test:run`
-- Client-focused 変更: `pnpm test:management-client`
+- Client-focused 変更: `pnpm test:client`
 - Agent-focused 変更: `pnpm test:agent`
 - Release-ready な変更や横断変更: `pnpm build`
 - Skill 変更: `python3 .opencode/skills/opencode-skills-devkit/scripts/validate_skills.py --root .`

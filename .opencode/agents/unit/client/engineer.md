@@ -92,9 +92,9 @@ After every change, run as needed:
 
 ```bash
 pnpm lint
-pnpm test:management-client
-pnpm check:management-client
-pnpm build:management-client
+pnpm test:client
+pnpm check:client
+pnpm build:client
 ```
 
 For `packages/client/**` changes, inspect browser-visible route/bundle boundaries for Agent credential or proxy exposure.
