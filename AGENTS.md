@@ -30,9 +30,9 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 - Install: `corepack enable && pnpm install`
 - Dev (Agent Worker): `pnpm dev:agent`
-- Dev (Management Client): `pnpm dev:management-client`
-- Build Agent/Client: `pnpm build:foundation`
-- Check Agent/Client: `pnpm check:agent && pnpm check:management-client`
+- Dev (Management Client): `pnpm dev:client`
+- Build Agent/Client: `pnpm build`
+- Check Agent/Client: `pnpm check:agent && pnpm check:client`
 
 ## API Contract (TypeSpec)
 
@@ -48,7 +48,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 - All unit tests: `pnpm test:run`
 - Agent tests: `pnpm test:agent`
-- Management Client tests: `pnpm test:management-client`
+- Management Client tests: `pnpm test:client`
 - Governance tests: `pnpm test:governance`
 - E2E: `pnpm test:e2e`
 

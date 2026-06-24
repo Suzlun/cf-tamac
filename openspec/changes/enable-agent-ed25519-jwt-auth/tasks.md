@@ -114,5 +114,5 @@
 - [ ] 11.9 `pnpm test:governance` を実行し、forbidden surface、package boundary、scenario coverage tests が通ることを確認する。
 - [ ] 11.10 `pnpm test:e2e` を実行し、Management Client signing key/trust export/health verification E2E が通ることを確認する。
 - [ ] 11.11 `pnpm check:agent && pnpm check:management-client` を実行し、Agent/Client package checks が通ることを確認する。
-- [ ] 11.12 `pnpm build:foundation` を実行し、Agent/Client build が通ることを確認する。
+- [ ] 11.12 `pnpm build` を実行し、Agent/Client build が通ることを確認する。
 - [ ] 11.13 `pnpm lint:openspec` を実行し、OpenSpec validation と Scenario ID coverage check が通ることを確認する。

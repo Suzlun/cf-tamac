@@ -71,19 +71,19 @@ pnpm install
 
 ```bash
 pnpm dev:agent
-pnpm dev:management-client
+pnpm dev:client
 ```
 
 ```bash
 pnpm check:agent
-pnpm check:management-client
-pnpm build:foundation
+pnpm check:client
+pnpm build
 ```
 
 ```bash
 pnpm lint
 pnpm test:agent
-pnpm test:management-client
+pnpm test:client
 pnpm test:governance
 pnpm test:run
 ```
