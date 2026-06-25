@@ -108,6 +108,19 @@ export function mapPublishIntegrationEventResponse(
     deliveryContext: mapDeliveryContext(result.deliveryContext),
     event: mapEvent(result.event),
     replayed: result.replayed,
+    requestedModelPolicy:
+      result.requestedModelPolicy === undefined
+        ? undefined
+        : {
+            decisionSchemaVersion: result.requestedModelPolicy.decisionSchemaVersion,
+            modelId: result.requestedModelPolicy.modelId,
+            policyDigest: result.requestedModelPolicy.policyDigest,
+            policyRef: result.requestedModelPolicy.policyRef,
+            provider: result.requestedModelPolicy.provider,
+            safeMetadataRef: mapPayload(result.requestedModelPolicy.safeMetadataRef),
+            status: result.requestedModelPolicy.status,
+            version: BigInt(result.requestedModelPolicy.version),
+          },
     thread: {
       agentId: result.thread.agentId,
       createdAtUnixMs: BigInt(result.thread.createdAtMs),
@@ -144,6 +157,8 @@ export function mapPublishDeliveryResultResponse(
     delivery: mapDelivery(result.delivery),
     replayed: result.replayed,
     result: result.result,
+    resumeAction: result.resumeAction,
+    safeMetadataRef: mapPayload(result.safeMetadataRef),
   };
 }
 
@@ -210,6 +225,7 @@ function mapConnection(connection: AdapterConnectionView) {
   return {
     adapterId: connection.adapterId,
     agentId: connection.agentId,
+    allowedModelPolicyRefs: [...connection.allowedModelPolicyRefs],
     connectionId: connection.connectionId,
     connectionKey: connection.connectionKey,
     createdAtUnixMs: BigInt(connection.createdAtMs),
@@ -219,6 +235,7 @@ function mapConnection(connection: AdapterConnectionView) {
     grantSummaryRef: connection.grantSummaryRef,
     installationId: connection.installationId,
     metadataRef: mapRef(connection.metadataRef),
+    modelPolicyGrantRef: mapRef(connection.modelPolicyGrantRef),
     status: connection.status,
   };
 }
@@ -235,6 +252,8 @@ function mapDeliveryContext(context: DeliveryContextView | undefined) {
     expiresAtUnixMs: optionalBigInt(context.expiresAtMs),
     installationId: context.installationId,
     metadataRef: mapRef(context.metadataRef),
+    modelPolicyDigest: context.modelPolicyDigest,
+    modelPolicyRef: context.modelPolicyRef,
     status: context.status,
     threadId: context.threadId,
   };

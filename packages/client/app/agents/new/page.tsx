@@ -1,6 +1,7 @@
 import {
   getManagedAgentForEdit,
   submitManagedAgentRegistration,
+  validateManagedAgentRegistrationModelPolicy,
 } from '@cf-tamac/client/server/actions/managed-agents';
 
 import { AgentRegistrationForm } from '../../../src/components/agent-registration-form';
@@ -27,6 +28,10 @@ export default async function NewAgentPage({ searchParams }: NewAgentPageProps) 
           values,
           editAgentId === '' ? {} : { existingAgentId: editAgentId }
         );
+      }}
+      onValidateModelPolicy={async (values) => {
+        'use server';
+        return validateManagedAgentRegistrationModelPolicy(values);
       }}
     />
   );

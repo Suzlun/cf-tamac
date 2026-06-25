@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +9,7 @@ import {
   createClientServiceJwt,
   type ResolvedAgentRpcCredential,
 } from '../server/agent-rpc/authentication';
+import { createE2eFakeAgentRpcClients } from '../server/agent-rpc/e2e-fake-clients';
 import {
   AgentRpcOperationError,
   normalizeAgentRpcError,
@@ -37,6 +39,12 @@ function makeCredentialRecord(
   };
 }
 
+function readRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
 describe('Server-side Agent RPC client factory', () => {
   it('[CLIENT-REGISTRY-S003] generated Connect factory stays server-only and binary', () => {
     const source = readFileSync(
@@ -51,6 +59,7 @@ describe('Server-side Agent RPC client factory', () => {
     expect(source).toContain('useBinaryFormat: true');
     expect(source).toContain('useHttpGet: false');
     expect(source).toContain('createClient(AgentLifecycleService, transport)');
+    expect(source).toContain('createClient(AgentModelPolicyService, transport)');
     expect(source).toContain('createClient(AgentStateService, transport)');
   });
 
@@ -72,6 +81,28 @@ describe('Server-side Agent RPC client factory', () => {
     expect(headers.get('x-client-key-id')).toBe('key-001');
     expect(headers.get('x-client-acting-operator-id')).toBe('operator-001');
     expect(headers.get('x-client-acting-scopes')).toBe('agent:read agent:write');
+  });
+
+  it('[CLIENT-MANAGEMENT-S018] E2E fake safe metadata digest matches inline bytes', async () => {
+    const clients = createE2eFakeAgentRpcClients('agent-alpha');
+    const getModelPolicy = clients.modelPolicies.getModelPolicy as unknown as (
+      request: Record<string, unknown>
+    ) => Promise<Record<string, unknown>>;
+
+    const response = await getModelPolicy({
+      agentId: 'agent-alpha',
+      policyRef: 'workers-ai-default',
+    });
+    const policy = readRecord(response.policy);
+    const safeMetadataRef = readRecord(policy?.safeMetadataRef);
+    const inlineBytes = safeMetadataRef?.inlineBytes;
+
+    expect(inlineBytes).toBeInstanceOf(Uint8Array);
+    expect(safeMetadataRef?.sha256).toBe(
+      createHash('sha256')
+        .update(inlineBytes instanceof Uint8Array ? inlineBytes : new Uint8Array())
+        .digest('hex')
+    );
   });
 
   it('[CLIENT-REGISTRY-S003] auth headers omit acting user context when not provided', () => {

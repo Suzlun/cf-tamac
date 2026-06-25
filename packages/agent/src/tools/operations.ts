@@ -14,6 +14,7 @@ import {
   assertInvokableDefinition,
   assertProviderOperationBelongsToInvocation,
   assertProviderResultIdentity,
+  assertToolResultCanResumeRun,
   assertTransition,
   beginToolMutationCommand,
   createProviderNonce,
@@ -338,6 +339,7 @@ function recordToolResultCore(input: {
     const existingResult = repositories.tools.findResultEventByInvocation(invocation.invocationId);
     if (existingResult !== undefined)
       return { ...createInvocationResult(input.agentId, repositories, invocation), replayed: true };
+    assertToolResultCanResumeRun(repositories, invocation);
     const persisted = appendToolResultEvent({ ...input, repositories }, invocation);
     const updated = repositories.tools.markInvocationResult({
       invocationId: invocation.invocationId,
@@ -639,6 +641,12 @@ function appendToolResultEvent(
       message: 'ToolInvocation Thread not found.',
     });
   return input.repositories.transaction((repositories) => {
+    repositories.pendingRuns.transitionRunStatus({
+      fromStatus: 'waiting',
+      nowMs: input.command.context.requestedAtMs,
+      runId: invocation.runId,
+      toStatus: 'pending',
+    });
     const persisted = appendAgentEventToThreadInRepositories({
       causationId: invocation.runId,
       correlationId: input.command.context.correlationId,

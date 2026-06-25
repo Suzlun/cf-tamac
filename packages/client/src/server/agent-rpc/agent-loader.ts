@@ -10,6 +10,7 @@ import { getClientWorkerEnv } from '../env';
 
 import { deriveActingUserContext } from './acting-user';
 import { createServerAgentRpcClients, type ServerAgentRpcClients } from './create-client';
+import { createE2eFakeAgentRpcClients, isE2eFakeAgentRpcEnabled } from './e2e-fake-clients';
 
 /**
  * managed Agent 用の server-side Agent RPC clients 読み込み結果。
@@ -54,6 +55,11 @@ export async function loadAgentRpcClients(agentId: string): Promise<AgentRpcClie
   const activeCredential = credentials.find((ref) => ref.status === 'active');
   if (activeCredential === undefined) {
     throw new Error('No active credential reference found for managed Agent.');
+  }
+
+  if (isE2eFakeAgentRpcEnabled()) {
+    // E2E では Client D1 の registry/credential metadata 読み取りまでは実経路を通し、外部 Agent RPC だけを server-only fake に置き換える。
+    return { clients: createE2eFakeAgentRpcClients(agentId, managedAgent), managedAgent };
   }
 
   const resolvedSecret = await resolveCredentialSecret(

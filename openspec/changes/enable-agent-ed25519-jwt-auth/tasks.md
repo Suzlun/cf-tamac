@@ -110,9 +110,9 @@
 - [ ] 11.5 `pnpm check` を実行し、workspace package checks が通ることを確認する。
 - [ ] 11.6 `pnpm test:run` を実行し、root Vitest suite が通ることを確認する。
 - [ ] 11.7 `pnpm test:agent` を実行し、Agent security/health/interceptor tests が通ることを確認する。
-- [ ] 11.8 `pnpm test:management-client` を実行し、Client D1/signing/UI/browser secrecy tests が通ることを確認する。
+- [ ] 11.8 `pnpm test:client` を実行し、Client D1/signing/UI/browser secrecy tests が通ることを確認する。
 - [ ] 11.9 `pnpm test:governance` を実行し、forbidden surface、package boundary、scenario coverage tests が通ることを確認する。
 - [ ] 11.10 `pnpm test:e2e` を実行し、Management Client signing key/trust export/health verification E2E が通ることを確認する。
-- [ ] 11.11 `pnpm check:agent && pnpm check:management-client` を実行し、Agent/Client package checks が通ることを確認する。
+- [ ] 11.11 `pnpm check:agent && pnpm check:client` を実行し、Agent/Client package checks が通ることを確認する。
 - [ ] 11.12 `pnpm build` を実行し、Agent/Client build が通ることを確認する。
 - [ ] 11.13 `pnpm lint:openspec` を実行し、OpenSpec validation と Scenario ID coverage check が通ることを確認する。

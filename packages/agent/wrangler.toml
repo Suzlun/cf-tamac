@@ -15,6 +15,9 @@ new_sqlite_classes = ["AIAgent"]
 binding = "AGENT_BLOBS"
 bucket_name = "cf-tamac-agent-blobs"
 
+[ai]
+binding = "AI"
+
 [vars]
 AGENT_RPC_AUDIENCE = "cf-tamac-agent"
 

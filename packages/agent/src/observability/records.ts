@@ -9,13 +9,18 @@ export interface AgentObservabilityCorrelationFields {
   readonly causationId?: string;
   readonly compactionId?: string;
   readonly correlationId?: string;
+  readonly decisionSummary?: string;
   readonly eventId?: string;
   readonly idempotencyKey?: string;
   readonly installationId?: string;
   readonly method?: string;
+  readonly modelPolicyDigest?: string;
+  readonly modelPolicyRef?: string;
   readonly principalId?: string;
   readonly principalType?: string;
+  readonly promptDigest?: string;
   readonly requestId?: string;
+  readonly responseDigest?: string;
   readonly runId?: string;
   readonly service?: string;
   readonly threadId?: string;

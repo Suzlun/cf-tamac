@@ -27,11 +27,29 @@ export type RequiredAgentSecretName = (typeof requiredAgentSecretNames)[number];
 export type AgentWorkerSecrets = Record<RequiredAgentSecretName, string>;
 
 /**
+ * Workers AI binding のうち、Agent Worker が model 実行 adapter へ渡す最小インターフェイスです。
+ *
+ * @remarks
+ * Cloudflare runtime 固有の型を domain/runtime 下位レイヤーへ伝搬させないため、env 境界で
+ * `run` のみを持つ構造として扱います。binding が存在しない local/test 環境では `undefined` を許容し、
+ * provider adapter が model call 前に fail closed します。
+ *
+ * @example
+ * ```ts
+ * const result = await env.AI?.run('@cf/meta/llama-3.1-8b-instruct', { prompt: '...' });
+ * ```
+ */
+export interface AgentWorkersAiBinding {
+  run(model: string, input: unknown): Promise<unknown>;
+}
+
+/**
  * Agent Worker Cloudflare bindings owned by the Agent runtime.
  */
 export interface AgentWorkerBindings {
   readonly AI_AGENT: DurableObjectNamespace<AIAgent>;
   readonly AGENT_BLOBS: R2Bucket;
+  readonly AI?: AgentWorkersAiBinding;
 }
 
 /**

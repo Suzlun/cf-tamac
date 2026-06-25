@@ -21,6 +21,8 @@ const integrationTableInitializerPath = new URL(
   import.meta.url
 );
 const memorySchemaPath = new URL('../storage/memory-schema.ts', import.meta.url);
+const modelInvocationSchemaPath = new URL('../storage/model-invocation-schema.ts', import.meta.url);
+const modelPolicySchemaPath = new URL('../storage/model-policy-schema.ts', import.meta.url);
 const scheduleSchemaPath = new URL('../storage/schedule-schema.ts', import.meta.url);
 const toolSchemaPath = new URL('../storage/tool-schema.ts', import.meta.url);
 const repositoriesPath = new URL('../storage/repositories.ts', import.meta.url);
@@ -101,10 +103,15 @@ describe('Agent DO SQLite storage foundation', () => {
       'utf8'
     );
     const memorySchema = readFileSync(fileURLToPath(memorySchemaPath.href), 'utf8');
+    const modelInvocationSchema = readFileSync(
+      fileURLToPath(modelInvocationSchemaPath.href),
+      'utf8'
+    );
+    const modelPolicySchema = readFileSync(fileURLToPath(modelPolicySchemaPath.href), 'utf8');
     const scheduleSchema = readFileSync(fileURLToPath(scheduleSchemaPath.href), 'utf8');
     const toolSchema = readFileSync(fileURLToPath(toolSchemaPath.href), 'utf8');
     const compactDrizzleSchema =
-      `${drizzleSchema}\n${memorySchema}\n${scheduleSchema}\n${toolSchema}\n${integrationSchema}`.replace(
+      `${drizzleSchema}\n${memorySchema}\n${modelInvocationSchema}\n${modelPolicySchema}\n${scheduleSchema}\n${toolSchema}\n${integrationSchema}`.replace(
         /\s+/g,
         ''
       );
@@ -155,7 +162,8 @@ describe('Agent DO SQLite storage foundation', () => {
 
     expect(aiAgentSource).toContain('acceptFoundationEvent(input: AgentFoundationEventInput)');
     expect(aiAgentSource).toContain('requestSchedulerWake(payload: AgentLocalQueueWakePayload)');
-    expect(aiAgentSource).toContain('processPendingRuns(payload: AgentLocalQueueProcessPayload)');
+    expect(aiAgentSource).toContain('processPendingRuns(');
+    expect(aiAgentSource).toContain('payload: AgentLocalQueueProcessPayload');
     expect(aiAgentSource).toContain('checkHealth(): AgentFoundationHealth');
     expect(aiAgentSource).not.toMatch(/\n\s*fetch\s*\(/);
     expect(workerSource).toContain('handleAgentConnectRequest(request, env)');

@@ -20,4 +20,19 @@ describe('Agent Worker bindings', () => {
     expect(config).not.toMatch(/\[\[queues\.(?:producers|consumers)]]/);
     expect(config).not.toMatch(/binding\s*=\s*".*D1.*"/);
   });
+
+  it('[AGENT-PLATFORM-S015] Agent Worker bindings include Workers AI and exclude Client storage', () => {
+    const config = readFileSync(fileURLToPath(wranglerConfigPath.href), 'utf8');
+
+    expect(config).toContain('[[durable_objects.bindings]]');
+    expect(config).toContain('name = "AI_AGENT"');
+    expect(config).toContain('[[r2_buckets]]');
+    expect(config).toContain('binding = "AGENT_BLOBS"');
+    expect(config).toContain('[ai]');
+    expect(config).toContain('binding = "AI"');
+
+    expect(config).not.toContain('CLIENT_DB');
+    expect(config).not.toMatch(/\[\[d1_databases]]/);
+    expect(config).not.toMatch(/\[\[queues\.(?:producers|consumers)]]/);
+  });
 });

@@ -99,7 +99,10 @@ export function AgentConfigSection({
     <section className="readout" aria-labelledby="config-heading">
       <strong id="config-heading">Config</strong>
       <p>Current config version: v{configVersion}</p>
-      <p className="form-helper">Changes are sent to AgentStateService.UpdateConfig.</p>
+      <p className="form-helper">
+        Changes are sent to AgentStateService.UpdateConfig. Default model policy is managed above;
+        config JSON updates cannot override modelPolicyRef.
+      </p>
       <p aria-live="polite" className="form-helper">
         {isEditing ? 'Config editor active.' : 'Config editor read-only.'}
       </p>

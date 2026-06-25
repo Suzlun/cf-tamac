@@ -48,7 +48,7 @@ interface ClientServiceJwtPayload {
   readonly acting_user_id: string;
 }
 
-const CLIENT_SERVICE_ISSUER = 'cf-tamac-management-client';
+const CLIENT_SERVICE_ISSUER = 'cf-tamac-client';
 const CLIENT_SERVICE_AUDIENCE = 'agent service';
 const CLIENT_SERVICE_JWT_TTL_SECONDS = 300;
 

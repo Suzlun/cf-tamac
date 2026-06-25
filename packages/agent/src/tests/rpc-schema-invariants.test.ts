@@ -16,6 +16,16 @@ const rpcServiceInventory = new Map<string, string[]>([
     'AgentLifecycleService',
     ['InitializeAgent', 'GetAgent', 'DestroyAgent', 'RotateAgentCredential'],
   ],
+  [
+    'AgentModelPolicyService',
+    [
+      'UpsertModelPolicy',
+      'GetModelPolicy',
+      'ListModelPolicies',
+      'ArchiveModelPolicy',
+      'ValidateModelPolicy',
+    ],
+  ],
   ['AgentEventService', ['PublishEvent', 'GetEvent', 'ListEvents']],
   [
     'AgentThreadService',

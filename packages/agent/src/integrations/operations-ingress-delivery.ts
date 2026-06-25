@@ -7,6 +7,7 @@ import {
 } from '../domain/agent-operation-utils';
 import { createAgentDomainError } from '../domain/errors';
 import { publishEventInStore } from '../events';
+import { appendAgentEventToThreadInRepositories } from '../events/mailbox';
 import { recordToolResultInStore } from '../tools';
 
 import { mapAdapterDeliveryRow, mapDeliveryContextRow } from './mappers';
@@ -27,7 +28,11 @@ import { getIntegrationDeliveryProviderRequestRecord } from './provider-client';
 import { verifyIntegrationIngressSignature } from './security';
 
 import type { AgentEventBlobWriter } from '../events';
-import type { AgentAdapterDeliveryRow, AgentStorageRepositories } from '../storage';
+import type {
+  AgentAdapterConnectionRow,
+  AgentAdapterDeliveryRow,
+  AgentStorageRepositories,
+} from '../storage';
 import type {
   DeliverToIntegrationProviderCommand,
   DeliverToIntegrationProviderResult,
@@ -48,6 +53,14 @@ export async function publishIntegrationEventInStore(input: {
 }): Promise<PublishIntegrationEventResult> {
   assertAgentContext(input.agentId, input.command.context);
   const connection = resolveIngressConnection(input.repositories, input.command);
+  const ingressContext = {
+    ...input.command.context,
+    principal: {
+      ...input.command.context.principal,
+      connectionId: connection.connectionId,
+      installationId: connection.installationId,
+    },
+  };
   const adapter = requireAdapterDefinition(
     input.repositories,
     connection.installationId,
@@ -55,17 +68,23 @@ export async function publishIntegrationEventInStore(input: {
   );
   await verifyIntegrationIngressSignature({
     agentId: input.agentId,
-    canonicalBodyDigest: input.command.context.bodyDigest,
+    canonicalBodyDigest: ingressContext.bodyDigest,
     connectionId: connection.connectionId,
-    idempotencyKey: requireContextIdempotency(input.command.context),
+    idempotencyKey: requireContextIdempotency(ingressContext),
     installationId: input.command.installationId,
     method: 'PublishEvent',
     repositories: input.repositories,
     signature: input.command.signature,
   });
+  assertIntegrationModelPolicyOverrideAllowed(
+    input.repositories,
+    connection,
+    adapter,
+    input.command.modelPolicyRef
+  );
   authorizeIntegrationOperation(
     input.repositories,
-    input.command.context,
+    ingressContext,
     'integration.ingress.event',
     'PublishEvent',
     'ingress',
@@ -83,9 +102,10 @@ export async function publishIntegrationEventInStore(input: {
     agentId: input.agentId,
     blobWriter: input.blobWriter,
     command: {
-      context: input.command.context,
+      context: ingressContext,
       deliveryContextId,
       eventType: input.command.eventType,
+      modelPolicyRef: input.command.modelPolicyRef,
       occurredAtMs: input.command.occurredAtMs,
       payload: input.command.payload,
       payloadContentType: input.command.payloadContentType,
@@ -108,6 +128,8 @@ export async function publishIntegrationEventInStore(input: {
           expiresAtMs: deliveryInput.expiresAtMs,
           installationId: connection.installationId,
           metadataRef: deliveryInput.metadataRef,
+          modelPolicyDigest: eventResult.event.modelPolicy?.policyDigest,
+          modelPolicyRef: eventResult.event.requestedModelPolicyRef,
           status: 'active',
           threadId: eventResult.thread.threadId,
         });
@@ -116,8 +138,96 @@ export async function publishIntegrationEventInStore(input: {
       deliveryContext === undefined ? undefined : mapDeliveryContextRow(deliveryContext),
     event: eventResult.event,
     replayed: eventResult.replayed,
+    requestedModelPolicy: eventResult.event.modelPolicy,
     thread: eventResult.thread,
   };
+}
+
+function assertIntegrationModelPolicyOverrideAllowed(
+  repositories: AgentStorageRepositories,
+  connection: AgentAdapterConnectionRow,
+  adapter: { readonly allowedModelPolicyRefs: string | null; readonly installationId: string },
+  requestedPolicyRef: string | undefined
+): void {
+  const policyRef = requestedPolicyRef?.trim().normalize('NFC');
+  if (policyRef === undefined || policyRef === '') return;
+  const installation = requireInstallation(repositories, connection.installationId);
+  const installationAllowed = collectInstallationPolicyRefs(repositories, installation);
+  const adapterAllowed = mergePolicyRefs(
+    parsePolicyRefList(adapter.allowedModelPolicyRefs),
+    installationAllowed
+  );
+  const connectionAllowed = mergePolicyRefs(
+    parsePolicyRefList(connection.allowedModelPolicyRefs),
+    adapterAllowed
+  );
+  if (
+    installationAllowed.length === 0 ||
+    adapterAllowed.length === 0 ||
+    connectionAllowed.length === 0 ||
+    !installationAllowed.includes(policyRef) ||
+    !adapterAllowed.includes(policyRef) ||
+    !connectionAllowed.includes(policyRef)
+  ) {
+    throw createAgentDomainError({
+      kind: 'authorization',
+      message: 'Integration model policy override is outside the Adapter Connection allowlist.',
+      target: 'model_policy_ref',
+    });
+  }
+  if (repositories.modelPolicies.getActivePolicy(policyRef) === undefined) {
+    throw createAgentDomainError({
+      kind: 'precondition',
+      message: 'Requested model policy is not active for this Agent.',
+      target: 'model_policy_ref',
+    });
+  }
+}
+
+function collectInstallationPolicyRefs(
+  repositories: AgentStorageRepositories,
+  installation: { readonly allowedModelPolicyRefs: string | null; readonly installationId: string }
+): readonly string[] {
+  const stored = parsePolicyRefList(installation.allowedModelPolicyRefs);
+  const grantRefs = repositories.integrations
+    .listGrants(installation.installationId)
+    .filter((grant) => grant.status === 'active')
+    .map((grant) => extractPolicyRefFromGrant(grant.scope))
+    .filter((entry): entry is string => entry !== undefined);
+  return mergePolicyRefs(stored, grantRefs);
+}
+
+function extractPolicyRefFromGrant(grant: string): string | undefined {
+  if (grant.startsWith('model_policy:'))
+    return normalizePolicyRef(grant.slice('model_policy:'.length));
+  if (grant.startsWith('agent.model_policy.override:')) {
+    return normalizePolicyRef(grant.slice('agent.model_policy.override:'.length));
+  }
+  return undefined;
+}
+
+function normalizePolicyRef(value: string): string | undefined {
+  const normalized = value.trim().normalize('NFC');
+  return normalized === '' ? undefined : normalized;
+}
+
+function mergePolicyRefs(
+  primary: readonly string[],
+  fallback: readonly string[]
+): readonly string[] {
+  const source = primary.length === 0 ? fallback : primary;
+  return [...new Set(source)];
+}
+
+function parsePolicyRefList(value: string | null): readonly string[] {
+  if (value === null || value === '') return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is string => typeof entry === 'string' && entry !== '');
+  } catch {
+    return [];
+  }
 }
 
 /** IntegrationIngressService.PublishToolResult を検証して Tool result に委譲します。 */
@@ -201,25 +311,31 @@ export async function publishIntegrationDeliveryResultInStore(input: {
     },
     ['integration.delivery.result']
   );
-  const updated = input.repositories.integrations.updateDeliveryStatus({
-    deliveryId: delivery.deliveryId,
-    providerOperationId: input.command.providerOperationId,
-    status: input.command.status,
-    updatedAtMs: input.command.context.requestedAtMs,
-  });
-  const result = {
-    delivery: mapAdapterDeliveryRow(updated),
-    replayed: false,
-    result: {
-      agentId: input.agentId,
-      connectionId: updated.connectionId,
-      deliveryContextId: updated.deliveryContextId,
-      deliveryId: input.command.deliveryId,
-      installationId: input.command.installationId,
+  const result = input.repositories.transaction((repositories) => {
+    const classification = classifyDeliveryResult(repositories, delivery, input.command.status);
+    if (classification === 'stale_callback') {
+      return createDeliveryResultResponse(input.agentId, input.command, delivery, {
+        replayed: false,
+        resumeAction: classification,
+      });
+    }
+    const updated = repositories.integrations.updateDeliveryStatus({
+      deliveryId: delivery.deliveryId,
       providerOperationId: input.command.providerOperationId,
       status: input.command.status,
-    },
-  } satisfies PublishIntegrationDeliveryResult;
+      updatedAtMs: input.command.context.requestedAtMs,
+    });
+    applyDeliveryResumeAction(
+      repositories,
+      updated,
+      classification,
+      input.command.context.requestedAtMs
+    );
+    return createDeliveryResultResponse(input.agentId, input.command, updated, {
+      replayed: false,
+      resumeAction: classification,
+    });
+  });
   recordAgentIdempotency({
     context: input.command.context,
     operationName: publishDeliveryResultOperationName,
@@ -227,6 +343,124 @@ export async function publishIntegrationDeliveryResultInStore(input: {
     response: result,
   });
   return result;
+}
+
+function createDeliveryResultResponse(
+  agentId: string,
+  command: PublishIntegrationDeliveryResultCommand,
+  delivery: AgentAdapterDeliveryRow,
+  options: { readonly replayed: boolean; readonly resumeAction: string }
+): PublishIntegrationDeliveryResult {
+  const mappedDelivery = mapAdapterDeliveryRow(delivery);
+  const result = {
+    delivery: mappedDelivery,
+    replayed: options.replayed,
+    resumeAction: options.resumeAction,
+    result: {
+      agentId,
+      connectionId: delivery.connectionId,
+      deliveryContextId: delivery.deliveryContextId,
+      deliveryId: command.deliveryId,
+      installationId: command.installationId,
+      providerOperationId: command.providerOperationId,
+      resumeAction: options.resumeAction,
+      runId: delivery.runId ?? undefined,
+      status: command.status,
+    },
+  } satisfies PublishIntegrationDeliveryResult;
+  return result;
+}
+
+function classifyDeliveryResult(
+  repositories: AgentStorageRepositories,
+  delivery: AgentAdapterDeliveryRow,
+  status: string
+): 'follow_up_event' | 'resume' | 'stale_callback' | 'terminal_failure' {
+  if (isTerminalDeliveryLedgerStatus(delivery.status)) return 'stale_callback';
+  if (delivery.runId === null) return 'follow_up_event';
+  const run = repositories.pendingRuns.findRunById(delivery.runId);
+  const snapshot = repositories.pendingRuns.findRunInputSnapshot(delivery.runId);
+  if (run === undefined || snapshot === undefined) return 'stale_callback';
+  if (run.status !== 'waiting') return 'stale_callback';
+  if (isFailureDeliveryStatus(status)) return 'terminal_failure';
+  if (isFollowUpDeliveryStatus(status)) return 'follow_up_event';
+  return 'resume';
+}
+
+function applyDeliveryResumeAction(
+  repositories: AgentStorageRepositories,
+  delivery: AgentAdapterDeliveryRow,
+  action: 'follow_up_event' | 'resume' | 'terminal_failure',
+  nowMs: number
+): void {
+  if (action === 'resume' && delivery.runId !== null) {
+    repositories.pendingRuns.transitionRunStatus({
+      fromStatus: 'waiting',
+      nowMs,
+      runId: delivery.runId,
+      toStatus: 'pending',
+    });
+    return;
+  }
+  if (action === 'terminal_failure' && delivery.runId !== null) {
+    repositories.pendingRuns.transitionRunStatus({
+      fromStatus: 'waiting',
+      nowMs,
+      runId: delivery.runId,
+      toStatus: 'failed',
+    });
+    return;
+  }
+  appendDeliveryFollowUpEvent(repositories, delivery, nowMs);
+}
+
+function appendDeliveryFollowUpEvent(
+  repositories: AgentStorageRepositories,
+  delivery: AgentAdapterDeliveryRow,
+  nowMs: number
+): void {
+  const context = requireDeliveryContext(repositories, delivery.deliveryContextId);
+  const thread = repositories.threads.findByThreadId(context.threadId);
+  if (thread === undefined) {
+    throw createAgentDomainError({
+      kind: 'not_found',
+      message: 'DeliveryContext Thread not found.',
+    });
+  }
+  appendAgentEventToThreadInRepositories({
+    causationId: delivery.deliveryId,
+    createdAtMs: nowMs,
+    deliveryContextId: delivery.deliveryContextId,
+    eventId: crypto.randomUUID(),
+    eventType: 'integration.delivery.result',
+    idempotencyKey: `delivery-result:${delivery.deliveryId}:${String(nowMs)}`,
+    occurredAtMs: nowMs,
+    repositories,
+    requestDigest: delivery.requestDigest ?? undefined,
+    source: 'agent.integration',
+    target: {
+      mode: 'thread_id',
+      normalizedThreadKey: thread.normalizedThreadKey,
+      threadId: thread.threadId,
+      threadKey: thread.threadKey,
+    },
+  });
+}
+
+function isFailureDeliveryStatus(status: string): boolean {
+  return ['cancelled', 'failed', 'rejected', 'terminal_failure', 'timed_out', 'timeout'].includes(
+    status
+  );
+}
+
+function isFollowUpDeliveryStatus(status: string): boolean {
+  return ['follow_up', 'follow_up_event', 'provider_event'].includes(status);
+}
+
+function isTerminalDeliveryLedgerStatus(status: string): boolean {
+  return ['cancelled', 'delivered', 'failed', 'rejected', 'succeeded', 'terminal_failure'].includes(
+    status
+  );
 }
 
 function requireDeliveryResultBinding(input: {
@@ -252,6 +486,23 @@ function requireDeliveryResultBinding(input: {
       kind: 'authorization',
       message: 'Delivery result does not match the original DeliveryContext.',
       target: 'delivery_context_id',
+    });
+  }
+  if (delivery.providerOperationId !== null && input.command.providerOperationId === undefined) {
+    throw createAgentDomainError({
+      kind: 'precondition',
+      message: 'Delivery result provider operation identity is required.',
+      target: 'provider_operation_id',
+    });
+  }
+  if (
+    delivery.providerOperationId !== null &&
+    input.command.providerOperationId !== delivery.providerOperationId
+  ) {
+    throw createAgentDomainError({
+      kind: 'precondition',
+      message: 'Delivery result provider operation identity does not match.',
+      target: 'provider_operation_id',
     });
   }
   const context = requireDeliveryContext(input.repositories, delivery.deliveryContextId);

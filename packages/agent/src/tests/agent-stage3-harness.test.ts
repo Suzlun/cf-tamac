@@ -13,6 +13,7 @@ import type { HarnessBudgetDimension, HarnessBudgetPolicy, HarnessBudgetRequest 
 import type {
   AgentConfigRow,
   AgentEventRow,
+  AgentModelPolicyRow,
   AgentProfileRow,
   AgentRunInputSnapshotRow,
   AgentRunInterruptRow,
@@ -61,6 +62,43 @@ describe('Agent Stage 3 harness runtime', () => {
     ]);
     expect(context.parts[3]?.events?.some((event) => event.threadId === 'thread-b')).toBe(false);
     expect(context.parts[6]?.triggerEvent?.eventId).toBe('event-a3');
+  });
+
+  it('[AGENT-MEMORY-S009] preserves model input metadata without raw history body', () => {
+    const snapshot = createSnapshot('run-a1', 'thread-a', 'event-a3');
+    const context = buildHarnessContext({
+      agentId,
+      events: [
+        { ...createEvent('event-a1', 'thread-a', 1), requestDigest: 'digest-event-a1' },
+        { ...createEvent('event-a2', 'thread-a', 2), payloadSha256: 'sha-event-a2' },
+        { ...createEvent('event-a3', 'thread-a', 3), requestDigest: 'digest-event-a3' },
+      ],
+      policy: {
+        agentMemoryRefs: ['agent-memory://v7#digest=agent'],
+        handoffRef: 'handoff://ready#digest=handoff',
+        identity: 'Agent identity: agent-alpha',
+        policy: 'Policy: obey safe context metadata.',
+        retrievedHistoryRefs: ['history://thread-a/section-4#digest=history'],
+        threadMemoryText: 'ThreadMemory safe summary only.',
+      },
+      snapshot,
+      triggerEvent: { ...createEvent('event-a3', 'thread-a', 3), requestDigest: 'digest-event-a3' },
+    });
+
+    expect(context.parts.find((part) => part.kind === 'thread_memory')?.metadata).toMatchObject({
+      provenanceRef: 'thread-memory://v4',
+      version: 4,
+    });
+    expect(context.parts.find((part) => part.kind === 'retrieved_history')?.metadata).toMatchObject(
+      { historyRefs: ['history://thread-a/section-4#digest=history'] }
+    );
+    expect(context.parts.find((part) => part.kind === 'trigger_event')?.metadata).toMatchObject({
+      digest: expect.any(String),
+      eventId: 'event-a3',
+      provenanceRef: 'event:event-a3',
+    });
+    expect(JSON.stringify(context)).not.toContain('raw prompt');
+    expect(JSON.stringify(context)).not.toContain('raw history body');
   });
 
   it('[AGENT-RUNTIME-S006] stores interrupts and blocks stale generation commits', () => {
@@ -142,7 +180,33 @@ describe('Agent Stage 3 harness runtime', () => {
     });
   });
 
-  it('[AGENT-RUNTIME-S007] interprets supported decisions with typed downstream seams', () => {
+  it('[AGENT-RUNTIME-S013] Stale policy digest blocks commit before side effects', () => {
+    const runtime = createCommitGuardRuntime({
+      activePolicyDigest: 'b'.repeat(64),
+      snapshotPolicyDigest: 'a'.repeat(64),
+    });
+
+    const blocked = guardHarnessRunResultCommit({
+      currentCapabilityGeneration: createCurrentCapabilityGeneration(0, 0),
+      expected: createExpectedGeneration('snapshot://run-a1', 4),
+      nowMs: 240,
+      repositories: runtime.repositories,
+      runId: 'run-a1',
+    });
+
+    expect(blocked).toMatchObject({
+      allowed: false,
+      reason: 'model_policy_mismatch',
+      staleResultDiscarded: true,
+    });
+    expect(runtime.interrupts[0]).toMatchObject({
+      interruptType: 'model_policy_mismatch',
+      requestedStatus: 'interrupted',
+    });
+    expect(runtime.run.status).toBe('interrupted');
+  });
+
+  it('[AGENT-RUNTIME-S007] [AGENT-RUNTIME-S014] interprets supported decisions with typed downstream seams', () => {
     const records = [] as ReturnType<typeof interpretHarnessDecisions>['records'][number][];
     const result = interpretHarnessDecisions({
       budgetPolicy: {
@@ -202,12 +266,12 @@ describe('Agent Stage 3 harness runtime', () => {
     ]);
     expect(records.map((record) => record.status)).toEqual([
       'applied',
+      'applied',
+      'applied',
       'pending',
       'pending',
       'pending',
-      'pending',
-      'pending',
-      'pending',
+      'applied',
       'applied',
     ]);
     expect(records.map((record) => record.seam)).toEqual([
@@ -222,7 +286,7 @@ describe('Agent Stage 3 harness runtime', () => {
     ]);
   });
 
-  it('[AGENT-RUNTIME-S008] enforces all budget dimensions before committing actions', () => {
+  it('[AGENT-RUNTIME-S008] [AGENT-RUNTIME-S016] enforces all budget dimensions before committing actions', () => {
     const usage = createEmptyHarnessBudgetUsage(0);
     const cases: readonly {
       readonly dimension: HarnessBudgetDimension;
@@ -323,9 +387,12 @@ function createAllowedCommitGuard() {
   } as const;
 }
 
-function createCommitGuardRuntime() {
+function createCommitGuardRuntime(options?: {
+  readonly activePolicyDigest?: string;
+  readonly snapshotPolicyDigest?: string;
+}) {
   const run = createRun('run-a1', 'thread-a', 'event-a3', 'running');
-  const snapshot = createSnapshot('run-a1', 'thread-a', 'event-a3');
+  const snapshot = createSnapshot('run-a1', 'thread-a', 'event-a3', options?.snapshotPolicyDigest);
   const audits: { readonly eventType: string; readonly principalRef?: string }[] = [];
   const interrupts: Mutable<AgentRunInterruptRow>[] = [];
   let configVersion = 4;
@@ -336,6 +403,11 @@ function createCommitGuardRuntime() {
       },
     },
     config: { getLatestConfig: () => createConfig(configVersion) },
+    modelPolicies: {
+      getActivePolicy: (policyRef: string) =>
+        createPolicy(policyRef, options?.activePolicyDigest ?? 'a'.repeat(64)),
+      tableName: 'agent_model_policies',
+    },
     pendingRuns: {
       findRunById: (runId: string) => (run.runId === runId ? run : undefined),
       findRunInputSnapshot: (runId: string) => (snapshot.runId === runId ? snapshot : undefined),
@@ -461,13 +533,21 @@ function createRun(
 function createSnapshot(
   runId: string,
   threadId: string,
-  triggerEventId: string
+  triggerEventId: string,
+  policyDigest?: string
 ): AgentRunInputSnapshotRow {
   return {
     configVersion: 4,
     createdAtMs: 1,
+    decisionSchemaVersion: policyDigest === undefined ? undefined : 'v1',
     integrationVersion: 0,
     latestReadyCompactionRef: 'compaction://ready-5',
+    modelId: policyDigest === undefined ? undefined : '@cf/meta/llama-3.1-8b-instruct',
+    modelPolicySource: policyDigest === undefined ? undefined : 'agent_default',
+    modelPolicyVersion: policyDigest === undefined ? undefined : 1,
+    modelProvider: policyDigest === undefined ? undefined : 'workers-ai',
+    resolvedModelPolicyDigest: policyDigest,
+    resolvedModelPolicyRef: policyDigest === undefined ? undefined : 'workers-ai-default',
     runId,
     snapshotRef: `snapshot://${runId}`,
     threadId,
@@ -478,5 +558,35 @@ function createSnapshot(
     triggerEventId,
     triggerEventStartSequence: 1,
     uncompactedUpperSequence: 3,
+  };
+}
+
+function createPolicy(policyRef: string, digest: string): AgentModelPolicyRow {
+  return {
+    archivedAtMs: null,
+    budgetMetadataRef: null,
+    budgetMetadataSha256: null,
+    createdAtMs: 1,
+    createdByPrincipalId: 'principal-1',
+    credentialRef: null,
+    decisionSchemaVersion: 'v1',
+    generationMaxOutputTokens: null,
+    generationParametersRef: null,
+    generationParametersSha256: null,
+    generationTemperature: null,
+    generationTopP: null,
+    modelId: '@cf/meta/llama-3.1-8b-instruct',
+    policyDigest: digest,
+    policyRef,
+    provider: 'workers-ai',
+    safeMetadataRef: null,
+    safeMetadataSha256: null,
+    safetyMetadataRef: null,
+    safetyMetadataSha256: null,
+    status: 'active',
+    updatedAtMs: 1,
+    updatedByPrincipalId: 'principal-1',
+    validatedAtMs: 1,
+    version: 1,
   };
 }

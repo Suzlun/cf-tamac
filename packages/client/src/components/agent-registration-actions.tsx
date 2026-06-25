@@ -1,0 +1,41 @@
+'use client';
+
+import { Button } from './ui/button';
+
+/**
+ * Agent registration form の action row props です。
+ *
+ * @remarks
+ * Browser では cancel と submit の UI 状態だけを扱います。Agent RPC と Client D1 write は親の
+ * Server Action callback に閉じます。
+ */
+export interface RegistrationActionsProps {
+  readonly isEdit: boolean;
+  readonly pending: boolean;
+  readonly onCancel: () => void;
+}
+
+/**
+ * Agent registration form の cancel/register buttons を描画します。
+ *
+ * @param props - edit mode、pending 状態、cancel callback を含む props です。
+ * @returns form の最後に配置する action row を返します。
+ */
+export function RegistrationActions({ isEdit, pending, onCancel }: RegistrationActionsProps) {
+  return (
+    <div className="action-row">
+      <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+        Cancel
+      </Button>
+      <Button type="submit" variant="default" disabled={pending} aria-disabled={pending}>
+        {pending
+          ? isEdit
+            ? 'Saving changes…'
+            : 'Registering Agent and seeding policy…'
+          : isEdit
+            ? 'Save changes'
+            : 'Register Agent'}
+      </Button>
+    </div>
+  );
+}

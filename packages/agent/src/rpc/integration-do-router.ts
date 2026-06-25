@@ -218,6 +218,7 @@ export async function dispatchPublishIntegrationEvent(
     deliveryMetadataRef: mapPayloadReference(event?.deliveryContext?.metadataRef),
     eventType: event?.eventType ?? '',
     installationId: request.installationId,
+    modelPolicyRef: event?.modelPolicyRef,
     occurredAtMs: toNumber(event?.occurredAtUnixMs),
     payload: event?.payload,
     payloadContentType: event?.payloadContentType,

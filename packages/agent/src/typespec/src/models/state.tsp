@@ -14,6 +14,8 @@ model AgentStateSnapshot {
   @field(8) config_version: string;
   @field(9) capability_summary?: AgentCapabilitySummary;
   @field(10) updated_at_unix_ms: int64;
+  @field(11) default_model_policy?: AgentModelPolicySummary;
+  @field(12) model_execution?: ModelExecutionCapability;
 }
 
 @message

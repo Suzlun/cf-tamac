@@ -17,6 +17,8 @@ export function ensureAgentFoundationTables(database: AgentStorageDatabase): voi
   ensureIdentityAndSecurityTables(database);
   ensureThreadAndEventTables(database);
   ensureRunAndWakeTables(database);
+  ensureModelPolicyTables(database);
+  ensureModelInvocationTables(database);
   ensureScheduleTables(database);
   ensureAgentToolTables(database);
   ensureAgentIntegrationTables(database);
@@ -179,6 +181,11 @@ function ensureThreadAndEventTables(database: AgentStorageDatabase): void {
     correlation_id TEXT,
     causation_id TEXT,
     delivery_context_id TEXT,
+    requested_model_policy_ref TEXT,
+    requested_model_policy_digest TEXT,
+    requested_model_policy_version INTEGER,
+    requested_model_policy_validation_status TEXT,
+    policy_override_source TEXT,
     run_id TEXT,
     agent_sequence INTEGER NOT NULL,
     thread_sequence INTEGER NOT NULL,
@@ -219,6 +226,17 @@ function ensureRunAndWakeTables(database: AgentStorageDatabase): void {
     config_version INTEGER NOT NULL DEFAULT 0,
     tool_set_version INTEGER NOT NULL DEFAULT 0,
     integration_version INTEGER NOT NULL DEFAULT 0,
+    requested_model_policy_ref TEXT,
+    resolved_model_policy_ref TEXT,
+    resolved_model_policy_digest TEXT,
+    model_provider TEXT,
+    model_id TEXT,
+    model_policy_version INTEGER,
+    model_policy_source TEXT,
+    decision_schema_version TEXT,
+    generation_max_output_tokens INTEGER,
+    generation_temperature TEXT,
+    generation_top_p TEXT,
     created_at_ms INTEGER NOT NULL,
     PRIMARY KEY (agent_id, run_id)
   )`);
@@ -266,6 +284,71 @@ function ensureRunAndWakeTables(database: AgentStorageDatabase): void {
     pending_count INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL
   )`);
+}
+
+function ensureModelPolicyTables(database: AgentStorageDatabase): void {
+  void database.run(sql`CREATE TABLE IF NOT EXISTS agent_model_policies (
+    agent_id TEXT NOT NULL,
+    policy_ref TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    decision_schema_version TEXT NOT NULL,
+    policy_digest TEXT NOT NULL,
+    generation_max_output_tokens INTEGER,
+    generation_parameters_ref TEXT,
+    generation_parameters_sha256 TEXT,
+    generation_temperature TEXT,
+    generation_top_p TEXT,
+    budget_metadata_ref TEXT,
+    budget_metadata_sha256 TEXT,
+    safety_metadata_ref TEXT,
+    safety_metadata_sha256 TEXT,
+    safe_metadata_ref TEXT,
+    safe_metadata_sha256 TEXT,
+    credential_ref TEXT,
+    created_by_principal_id TEXT,
+    updated_by_principal_id TEXT,
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    archived_at_ms INTEGER,
+    validated_at_ms INTEGER,
+    PRIMARY KEY (agent_id, policy_ref),
+    UNIQUE (agent_id, policy_digest)
+  )`);
+}
+
+function ensureModelInvocationTables(database: AgentStorageDatabase): void {
+  void database.run(sql`CREATE TABLE IF NOT EXISTS agent_model_invocations (
+    agent_id TEXT NOT NULL,
+    invocation_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    policy_ref TEXT NOT NULL,
+    policy_digest TEXT NOT NULL,
+    decision_schema_version TEXT NOT NULL,
+    request_digest TEXT,
+    response_digest TEXT,
+    provider_error_category TEXT,
+    input_token_count INTEGER,
+    output_token_count INTEGER,
+    latency_ms INTEGER,
+    attempt INTEGER NOT NULL,
+    lease_owner TEXT,
+    lease_expires_at_ms INTEGER,
+    heartbeat_at_ms INTEGER,
+    safe_metadata_ref TEXT,
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (agent_id, invocation_id),
+    UNIQUE (agent_id, run_id, attempt)
+  )`);
+  void database.run(sql`CREATE INDEX IF NOT EXISTS agent_model_invocations_run_status_idx
+    ON agent_model_invocations (agent_id, run_id, status)`);
 }
 
 function ensureScheduleTables(database: AgentStorageDatabase): void {

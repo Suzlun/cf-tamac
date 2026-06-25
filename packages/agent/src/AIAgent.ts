@@ -11,6 +11,7 @@ import {
   type AgentEventView,
   type AgentIdentity,
   type AgentLifecycleStatus,
+  type AgentModelExecutionCapabilityView,
   type AgentScopedQuery,
   type GetAgentStateResult,
   type DestroyAgentCommand,
@@ -31,10 +32,20 @@ import {
   type ListAgentSectionsResult,
   type ListAgentThreadsQuery,
   type ListAgentThreadsResult,
+  type ListAgentModelPoliciesQuery,
+  type ListAgentModelPoliciesResult,
   type PublishAgentEventCommand,
   type PublishAgentEventResult,
   type RotateAgentCredentialCommand,
   type RotateAgentCredentialResult,
+  type UpsertAgentModelPolicyCommand,
+  type UpsertAgentModelPolicyResult,
+  type GetAgentModelPolicyQuery,
+  type AgentModelPolicyView,
+  type ArchiveAgentModelPolicyCommand,
+  type ArchiveAgentModelPolicyResult,
+  type ValidateAgentModelPolicyQuery,
+  type ValidateAgentModelPolicyResult,
   type SearchAgentThreadHistoryQuery,
   type SearchAgentThreadHistoryResult,
   type UpdateAgentConfigCommand,
@@ -48,10 +59,19 @@ import {
   rotateAgentCredentialInStore,
   updateAgentConfigInStore,
 } from './domain/lifecycle-operations';
+import {
+  archiveAgentModelPolicyInStore,
+  getAgentModelPolicyFromStore,
+  listAgentModelPoliciesFromStore,
+  upsertAgentModelPolicyInStore,
+  validateAgentModelPolicyInStore,
+} from './domain/model-policy-operations';
 import { getAgentStateFromStore } from './domain/state-operations';
 import { getEventFromStore, listEventsFromStore, publishEventInStore } from './events';
+import { createWorkersAiModelProvider } from './model-provider-workers-ai';
 import {
   cancelRunInStore,
+  executeStartedAgentRun,
   getRunFromStore,
   listRunsFromStore,
   processAgentRunSchedulerBatch,
@@ -244,6 +264,81 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
   }
 
   /**
+   * Agent-owned model policy を検証して upsert します。
+   *
+   * @param command 認証済み context と secret-free policy 入力を含む command です。
+   * @returns 保存済み policy、安全な validation、audit、replay 状態を返します。
+   * @throws validation、authorization、digest precondition 失敗時に AgentDomainError を投げます。
+   */
+  upsertModelPolicy(command: UpsertAgentModelPolicyCommand): UpsertAgentModelPolicyResult {
+    return upsertAgentModelPolicyInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Agent-owned model policy を一件取得します。
+   *
+   * @param query 認証済み context と policy ref を含む query です。
+   * @returns secret-free な model policy view です。
+   * @throws policy が存在しない、または read 権限が不足する場合に AgentDomainError を投げます。
+   */
+  getModelPolicy(query: GetAgentModelPolicyQuery): AgentModelPolicyView {
+    return getAgentModelPolicyFromStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Agent scope 内の model policy を一覧します。
+   *
+   * @param query 認証済み context、status filter、page 条件を含む query です。
+   * @returns Agent-scoped policy 一覧と page metadata です。
+   * @throws cursor scope 不一致、または read 権限不足時に AgentDomainError を投げます。
+   */
+  listModelPolicies(query: ListAgentModelPoliciesQuery): ListAgentModelPoliciesResult {
+    return listAgentModelPoliciesFromStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Agent-owned model policy を archived に遷移させます。
+   *
+   * @param command 認証済み context、policy ref、理由を含む command です。
+   * @returns archived policy、audit、replay 状態を返します。
+   * @throws policy 不在、authorization 不足、idempotency conflict 時に AgentDomainError を投げます。
+   */
+  archiveModelPolicy(command: ArchiveAgentModelPolicyCommand): ArchiveAgentModelPolicyResult {
+    return archiveAgentModelPolicyInStore({
+      agentId: this.name,
+      command,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
+   * Model policy 入力を状態変更なしで検証します。
+   *
+   * @param query 認証済み context と policy 入力を含む query です。
+   * @returns validation 結果と保存前 preview を返します。
+   * @throws read/validation 権限が不足する場合に AgentDomainError を投げます。
+   */
+  validateModelPolicy(query: ValidateAgentModelPolicyQuery): ValidateAgentModelPolicyResult {
+    return validateAgentModelPolicyInStore({
+      agentId: this.name,
+      query,
+      repositories: this.repositories,
+    });
+  }
+
+  /**
    * Publish an external Event into the Agent-owned mailbox and Event Log.
    */
   async publishEvent(command: PublishAgentEventCommand): Promise<PublishAgentEventResult> {
@@ -348,6 +443,7 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
   getState(query: AgentScopedQuery): GetAgentStateResult {
     return getAgentStateFromStore({
       agentId: this.name,
+      modelExecution: this.readModelExecutionCapability(),
       query,
       repositories: this.repositories,
       storageUsageCurrentBytes: readDurableObjectSqlDatabaseSizeBytes(this.durableObjectStorage),
@@ -708,10 +804,26 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
   publishIntegrationDeliveryResult(
     command: PublishIntegrationDeliveryResultCommand
   ): Promise<PublishIntegrationDeliveryResult> {
-    return agentIntegrationHandlers.publishDeliveryResult(
+    const result = agentIntegrationHandlers.publishDeliveryResult(
       this.createIntegrationHandlerContext(),
       command
     );
+    void result
+      .then((deliveryResult) => {
+        if (
+          !deliveryResult.replayed &&
+          ['follow_up_event', 'resume'].includes(deliveryResult.resumeAction ?? '')
+        ) {
+          this.requestSchedulerWake({
+            reason: 'event_accepted',
+            requestedAtMs: command.context.requestedAtMs,
+          });
+        }
+      })
+      .catch(() => {
+        // 元の Promise を呼び出し元へ返しているため、wake 監視側では同じ失敗を再送出しない。
+      });
+    return result;
   }
 
   /**
@@ -884,13 +996,26 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
   /**
    * Agent-local Queue scheduler callback entrypoint for bounded AgentRun processing.
    */
-  processPendingRuns(payload: AgentLocalQueueProcessPayload): AgentLocalQueueProcessResult {
+  async processPendingRuns(
+    payload: AgentLocalQueueProcessPayload
+  ): Promise<AgentLocalQueueProcessResult> {
+    const nowMs = Date.now();
     const result = processAgentRunSchedulerBatch({
       agentId: this.name,
       maxRuns: payload.maxRuns ?? 1,
-      nowMs: Date.now(),
+      nowMs,
       repositories: this.repositories,
     });
+    const modelProvider = createWorkersAiModelProvider(this.env.AI);
+    for (const startedRun of result.startedRuns) {
+      await executeStartedAgentRun({
+        agentId: this.name,
+        modelProvider,
+        nowMs,
+        repositories: this.repositories,
+        startedRun,
+      });
+    }
     if (result.reenqueue && this.repositories.pendingRuns.findActiveRun() === undefined) {
       this.enqueueSchedulerWake(result.requestedMaxRuns);
     }
@@ -914,9 +1039,41 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
     const profile = this.repositories.profile.getProfile();
     return {
       agentId: this.name,
+      modelExecution: this.readModelExecutionCapability(),
       status: (profile?.lifecycleStatus ?? this.state.lifecycleStatus) as AgentLifecycleStatus,
       storage: 'sqlite',
       queue: 'agent_local',
+    };
+  }
+
+  /**
+   * Workers AI 実行能力を secret-free metadata として読み出します。
+   *
+   * @returns binding の存在、default policy の safe identity、provider/model、readiness status を返します。
+   */
+  private readModelExecutionCapability(): AgentModelExecutionCapabilityView {
+    const config = this.repositories.config.getLatestConfig();
+    const defaultPolicy =
+      config?.modelPolicyRef === null || config?.modelPolicyRef === undefined
+        ? undefined
+        : this.repositories.modelPolicies.getPolicy(config.modelPolicyRef);
+    const bindingPresent = this.env.AI !== undefined;
+    const modelStatus =
+      bindingPresent && defaultPolicy?.status === 'active'
+        ? 'serving'
+        : bindingPresent
+          ? 'degraded'
+          : 'unavailable';
+    return {
+      bindingPresent,
+      checkedAtMs: Date.now(),
+      defaultPolicyDigest: defaultPolicy?.policyDigest,
+      defaultPolicyRef: defaultPolicy?.policyRef,
+      modelId: defaultPolicy?.modelId,
+      provider: defaultPolicy?.provider,
+      safeDetailRef:
+        defaultPolicy === undefined ? 'agent-model-policy://missing-default' : undefined,
+      status: modelStatus,
     };
   }
 

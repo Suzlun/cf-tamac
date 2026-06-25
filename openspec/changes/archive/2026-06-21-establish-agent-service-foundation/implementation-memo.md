@@ -6,7 +6,7 @@
 - `openspec/changes/establish-agent-service-foundation/proposal.md`
 - `openspec/changes/establish-agent-service-foundation/design.md`
 - `openspec/changes/establish-agent-service-foundation/specs/agent-platform/spec.md`
-- `openspec/changes/establish-agent-service-foundation/specs/management-client/spec.md`
+- `openspec/changes/establish-agent-service-foundation/specs/client/spec.md`
 - `openspec/changes/establish-agent-service-foundation/specs/workspace-governance/spec.md`
 - `openspec/changes/establish-agent-service-foundation/tasks.md`
 

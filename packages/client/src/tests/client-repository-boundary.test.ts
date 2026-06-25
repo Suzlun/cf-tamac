@@ -59,4 +59,29 @@ describe('Management Client repository boundary', () => {
       expect(repositorySource).not.toContain(forbiddenTerm);
     }
   });
+
+  it('[CLIENT-REGISTRY-S009] Client D1 does not store authoritative model policy bodies or secrets', () => {
+    const repositorySource = repositoryFiles
+      .map((filePath) => readFileSync(fileURLToPath(filePath.href), 'utf8'))
+      .join('\n');
+    const schemaSource = readFileSync(
+      fileURLToPath(new URL('../server/db/schema.ts', import.meta.url).href),
+      'utf8'
+    );
+    const migrationSource = readFileSync(
+      fileURLToPath(
+        new URL('../server/db/migrations/0001_client_foundation.sql', import.meta.url).href
+      ),
+      'utf8'
+    );
+    const allD1Sources = `${repositorySource}\n${schemaSource}\n${migrationSource}`;
+
+    expect(allD1Sources).not.toContain('model_policy_body');
+    expect(allD1Sources).not.toContain('agent_model_policies');
+    expect(allD1Sources).not.toContain('generation_parameters_ref');
+    expect(allD1Sources).not.toContain('provider_token');
+    expect(allD1Sources).not.toContain('raw_prompt');
+    expect(allD1Sources).not.toContain('raw_completion');
+    expect(allD1Sources).not.toContain('raw_reasoning');
+  });
 });

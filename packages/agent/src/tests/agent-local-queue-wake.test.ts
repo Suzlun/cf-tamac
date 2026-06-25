@@ -60,7 +60,8 @@ describe('Agent-local Queue wake foundation', () => {
       foundationEventsSource.lastIndexOf('requestSchedulerWake(')
     );
     expect(aiAgentSource).toContain('requestSchedulerWake(payload: AgentLocalQueueWakePayload)');
-    expect(aiAgentSource).toContain('processPendingRuns(payload: AgentLocalQueueProcessPayload)');
+    expect(aiAgentSource).toContain('processPendingRuns(');
+    expect(aiAgentSource).toContain('payload: AgentLocalQueueProcessPayload');
     expect(aiAgentSource).toContain("this.queue('processPendingRuns'");
     expect(aiAgentSource).toContain("reason: 'event_accepted'");
     expect(tableInitializer).toContain('pending_since_ms INTEGER NOT NULL');

@@ -14,7 +14,16 @@ import type { AgentWorkerEnv } from '../env';
 const baseUrl = 'https://agent.example.test';
 const healthRpcPath = '/cftamac.agent.v1.AgentHealthService/Check';
 
-function createTestEnv(): {
+function createTestEnv(modelExecution?: {
+  readonly bindingPresent: boolean;
+  readonly checkedAtMs: number;
+  readonly defaultPolicyDigest?: string;
+  readonly defaultPolicyRef?: string;
+  readonly modelId?: string;
+  readonly provider?: string;
+  readonly safeDetailRef?: string;
+  readonly status: 'serving' | 'degraded' | 'unavailable';
+}): {
   readonly env: AgentWorkerEnv;
   readonly routedNames: readonly string[];
 } {
@@ -31,6 +40,7 @@ function createTestEnv(): {
           ({
             checkHealth: () => ({
               agentId: (id as { readonly name: string }).name,
+              modelExecution,
               queue: 'agent_local',
               status: 'active',
               storage: 'sqlite',
@@ -116,6 +126,46 @@ describe('Agent health RPC', () => {
       env
     );
     expect(await readErrorCode(restHealth)).toBe('unimplemented');
+  });
+
+  it('[AGENT-HEALTH-S004] Health Check reports model execution readiness with safe metadata', async () => {
+    const { env } = createTestEnv({
+      bindingPresent: true,
+      checkedAtMs: 1_700_000_000_000,
+      defaultPolicyDigest: 'a'.repeat(64),
+      defaultPolicyRef: 'workers-ai-default',
+      modelId: '@cf/meta/llama-3.1-8b-instruct',
+      provider: 'workers-ai',
+      status: 'serving',
+    });
+    const requestBytes = toBinary(
+      CheckHealthRequestSchema,
+      create(CheckHealthRequestSchema, { agentId: 'agent-health' })
+    );
+
+    const response = await handleAgentConnectRequest(
+      createHealthRequest(healthRpcPath, requestBytes),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = fromBinary(
+      CheckHealthResponseSchema,
+      new Uint8Array(await response.arrayBuffer())
+    );
+    expect(responseBody.modelExecution).toMatchObject({
+      bindingPresent: true,
+      checkedAtUnixMs: 1_700_000_000_000n,
+      defaultPolicyDigest: 'a'.repeat(64),
+      defaultPolicyRef: 'workers-ai-default',
+      modelId: '@cf/meta/llama-3.1-8b-instruct',
+      provider: 'workers-ai',
+      status: 'serving',
+    });
+    expect(responseBody.health?.modelExecution).toMatchObject(responseBody.modelExecution ?? {});
+    expect(stringifyHealthResponse(responseBody)).not.toMatch(
+      /credential|secret|bearer|raw prompt|raw completion|thread payload|memory body/i
+    );
   });
 });
 

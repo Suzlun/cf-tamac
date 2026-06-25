@@ -92,7 +92,7 @@ Agent Service は `AGENT_CONTROL_PLANE_TRUST` を production Client Service trus
 
 #### Scenario: 信頼設定が issuer と Ed25519 public key policy を解決する (AGENT-SECURITY-S010)
 
-- **GIVEN** `AGENT_CONTROL_PLANE_TRUST` が issuer `cf-tamac-management-client`、kid `client-key-1`、active Ed25519 public JWK、allowed Agent、allowed scopes を含む
+- **GIVEN** `AGENT_CONTROL_PLANE_TRUST` が issuer `cf-tamac-client`、kid `client-key-1`、active Ed25519 public JWK、allowed Agent、allowed scopes を含む
 - **WHEN** Client Service が同じ issuer/kid と policy 内の Agent/scope を持つ署名済み JWT で Agent RPC を呼ぶ
 - **THEN** Agent Service は public key と principal policy を解決する
 - **AND** 認証済み principal は Client Service principalType と許可 scope を持つ

@@ -1,3 +1,6 @@
+import { validateRegistrationModelPolicyValues } from '../../components/schemas/agent-registration';
+
+import type { ModelPolicyDraftValues } from '../../components/schemas/model-policy';
 import type {
   CredentialReferenceRepository,
   ManagedAgentRecord,
@@ -12,6 +15,12 @@ type RegistrationFieldName =
   | 'agentRpcOrigin'
   | 'displayName'
   | 'displayOrder'
+  | 'modelPolicy.policyRef'
+  | 'modelPolicy.provider'
+  | 'modelPolicy.model'
+  | 'modelPolicy.temperature'
+  | 'modelPolicy.topP'
+  | 'modelPolicy.maxOutputTokens'
   | 'referenceValue'
   | 'keyId'
   | 'publicFingerprint'
@@ -28,6 +37,7 @@ export interface NormalizedManagedAgentRegistrationInput {
   readonly agentRpcOrigin: string;
   readonly displayName: string;
   readonly displayOrder: number;
+  readonly modelPolicy: ModelPolicyDraftValues;
   readonly referenceValue: string;
   readonly keyId: string;
   readonly publicFingerprint: string;
@@ -43,6 +53,7 @@ export interface ManagedAgentRegistrationInput {
   readonly agentRpcOrigin: string;
   readonly displayName: string;
   readonly displayOrder: string;
+  readonly modelPolicy: ModelPolicyDraftValues;
   readonly referenceValue: string;
   readonly keyId: string;
   readonly publicFingerprint: string;
@@ -134,11 +145,23 @@ function normalizeRegistrationInput(
     agentRpcOrigin: input.agentRpcOrigin.trim(),
     displayName: input.displayName.trim(),
     displayOrder: parseDisplayOrder(input.displayOrder),
+    modelPolicy: normalizeModelPolicyDraft(input.modelPolicy),
     referenceValue: input.referenceValue.trim(),
     keyId: input.keyId.trim(),
     publicFingerprint: input.publicFingerprint.trim(),
     maskedHint: input.maskedHint.trim(),
     status: input.status.trim(),
+  };
+}
+
+function normalizeModelPolicyDraft(modelPolicy: ModelPolicyDraftValues): ModelPolicyDraftValues {
+  return {
+    policyRef: modelPolicy.policyRef.trim(),
+    provider: modelPolicy.provider,
+    model: modelPolicy.model.trim(),
+    temperature: modelPolicy.temperature.trim(),
+    topP: modelPolicy.topP.trim(),
+    maxOutputTokens: modelPolicy.maxOutputTokens.trim(),
   };
 }
 
@@ -148,6 +171,7 @@ function collectRegistrationFieldErrors(
 ): RegistrationFieldErrors {
   const errors: RegistrationFieldErrors = {};
   addAgentIdentityErrors(errors, input);
+  addModelPolicyErrors(errors, input.modelPolicy);
   addCredentialLookupErrors(errors, input);
   if (rawDisplayOrder.trim() !== '' && !/^\d+$/.test(rawDisplayOrder.trim())) {
     errors.displayOrder = 'Sort order must be a non-negative integer.';
@@ -156,6 +180,23 @@ function collectRegistrationFieldErrors(
     errors.status = 'Status must be active, pending, or rotating.';
   }
   return errors;
+}
+
+function addModelPolicyErrors(
+  errors: RegistrationFieldErrors,
+  modelPolicy: ModelPolicyDraftValues
+): void {
+  const mappedErrors = validateRegistrationModelPolicyValues(modelPolicy);
+  setRegistrationError(errors, 'modelPolicy.policyRef', mappedErrors['modelPolicy.policyRef']);
+  setRegistrationError(errors, 'modelPolicy.provider', mappedErrors['modelPolicy.provider']);
+  setRegistrationError(errors, 'modelPolicy.model', mappedErrors['modelPolicy.model']);
+  setRegistrationError(errors, 'modelPolicy.temperature', mappedErrors['modelPolicy.temperature']);
+  setRegistrationError(errors, 'modelPolicy.topP', mappedErrors['modelPolicy.topP']);
+  setRegistrationError(
+    errors,
+    'modelPolicy.maxOutputTokens',
+    mappedErrors['modelPolicy.maxOutputTokens']
+  );
 }
 
 function addAgentIdentityErrors(
@@ -220,12 +261,34 @@ function hasFieldErrors(errors: RegistrationFieldErrors): boolean {
     errors.agentRpcOrigin !== undefined ||
     errors.displayName !== undefined ||
     errors.displayOrder !== undefined ||
+    errors['modelPolicy.policyRef'] !== undefined ||
+    errors['modelPolicy.provider'] !== undefined ||
+    errors['modelPolicy.model'] !== undefined ||
+    errors['modelPolicy.temperature'] !== undefined ||
+    errors['modelPolicy.topP'] !== undefined ||
+    errors['modelPolicy.maxOutputTokens'] !== undefined ||
     errors.referenceValue !== undefined ||
     errors.keyId !== undefined ||
     errors.publicFingerprint !== undefined ||
     errors.maskedHint !== undefined ||
     errors.status !== undefined
   );
+}
+
+function setRegistrationError(
+  errors: RegistrationFieldErrors,
+  fieldName: RegistrationFieldName,
+  message: string | undefined
+): void {
+  if (message === undefined) {
+    return;
+  }
+  if (fieldName === 'modelPolicy.policyRef') errors['modelPolicy.policyRef'] = message;
+  if (fieldName === 'modelPolicy.provider') errors['modelPolicy.provider'] = message;
+  if (fieldName === 'modelPolicy.model') errors['modelPolicy.model'] = message;
+  if (fieldName === 'modelPolicy.temperature') errors['modelPolicy.temperature'] = message;
+  if (fieldName === 'modelPolicy.topP') errors['modelPolicy.topP'] = message;
+  if (fieldName === 'modelPolicy.maxOutputTokens') errors['modelPolicy.maxOutputTokens'] = message;
 }
 
 function registrationFieldErrorResult(

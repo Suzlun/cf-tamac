@@ -5,11 +5,16 @@ import {
   rotateAgentCredential,
   updateAgentConfig,
 } from '@cf-tamac/client/server/actions/agent-lifecycle';
+import { saveDefaultModelPolicy } from '@cf-tamac/client/server/actions/agent-operations';
 import {
   getActingOperatorId,
   getManagedAgentForEdit,
   saveAgentAccessLookup,
 } from '@cf-tamac/client/server/actions/managed-agents';
+import {
+  getDefaultModelPolicyForManagedAgent,
+  validateModelPolicyForManagedAgent,
+} from '@cf-tamac/client/server/actions/model-policies';
 
 import { AgentSettingsForm } from '../../../../src/components/agent-settings-form';
 import { ControlRoomFrame } from '../../../../src/components/control-room-frame';
@@ -83,9 +88,10 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
     );
   }
 
-  const [configResult, overviewResult] = await Promise.allSettled([
+  const [configResult, overviewResult, policyResult] = await Promise.allSettled([
     getAgentConfig(agentId),
     getAgentOverview(agentId),
+    getDefaultModelPolicyForManagedAgent(agentId),
   ]);
 
   if (configResult.status === 'rejected') {
@@ -99,10 +105,14 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
 
   const actingOperatorId = await getActingOperatorId();
   const overview = overviewResult.status === 'fulfilled' ? overviewResult.value : undefined;
+  const defaultPolicy =
+    policyResult.status === 'fulfilled' ? policyResult.value.metadata : undefined;
   const initialNotice =
     overviewResult.status === 'rejected'
       ? safeSettingsErrorMessage(overviewResult.reason)
-      : undefined;
+      : policyResult.status === 'rejected'
+        ? safeSettingsErrorMessage(policyResult.reason)
+        : undefined;
   const currentCredential = {
     generation: overview?.credential?.generation ?? overview?.credentialGeneration,
     status: overview?.credential?.status ?? managedAgent.credential?.status ?? 'unknown',
@@ -115,10 +125,13 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
       agentId={agentId}
       displayName={managedAgent.agent.displayName}
       initialConfig={configResult.value}
+      initialModelPolicy={defaultPolicy}
       currentCredential={currentCredential}
       actingOperatorId={actingOperatorId}
       initialNotice={initialNotice}
       onUpdateConfig={updateAgentConfig}
+      onValidateModelPolicy={validateModelPolicyForManagedAgent}
+      onSaveDefaultModelPolicy={saveDefaultModelPolicy}
       onRotateCredential={rotateAgentCredential}
       onSaveAccessLookup={saveSettingsCredentialReference}
       onDestroy={destroyAgent}

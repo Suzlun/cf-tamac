@@ -16,6 +16,8 @@ model AdapterConnection {
   @field(10) created_at_unix_ms: int64;
   @field(11) disabled_at_unix_ms?: int64;
   @field(12) metadata_ref?: BytePayloadReference;
+  @field(13) allowed_model_policy_refs: string[];
+  @field(14) model_policy_grant_ref?: BytePayloadReference;
 }
 
 @message
@@ -28,6 +30,10 @@ model AdapterDeliveryResult {
   @field(6) connection_id?: string;
   @field(7) delivery_context_id?: string;
   @field(8) provider_operation_id?: string;
+  @field(9) run_id?: string;
+  @field(10) decision_id?: string;
+  @field(11) resume_action?: string;
+  @field(12) safe_metadata_ref?: BytePayloadReference;
 }
 
 @message
@@ -53,6 +59,8 @@ model DeliveryContext {
   @field(9) created_at_unix_ms: int64;
   @field(10) expires_at_unix_ms?: int64;
   @field(11) metadata_ref?: BytePayloadReference;
+  @field(12) model_policy_ref?: string;
+  @field(13) model_policy_digest?: string;
 }
 
 @message

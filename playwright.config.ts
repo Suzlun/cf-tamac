@@ -10,8 +10,8 @@ export default defineConfig({
   fullyParallel: true,
   /* CI環境でのリトライ設定 */
   retries: process.env.CI !== undefined ? 2 : 0,
-  /* CI環境でのワーカー数 */
-  workers: process.env.CI !== undefined ? 1 : undefined,
+  /* Next dev/Turbopack の chunk 再生成競合を避けるため、ローカルと CI の両方で 1 worker に固定する */
+  workers: 1,
   /* レポーター設定 */
   reporter: 'html',
   /* 共通設定 */
@@ -29,7 +29,7 @@ export default defineConfig({
   /* テスト前にサーバーを起動 */
   webServer: [
     {
-      command: 'pnpm dev:management-client',
+      command: 'E2E_FAKE_AGENT_RPC=1 pnpm dev:client',
       url: 'http://localhost:3000',
       reuseExistingServer: process.env.CI === undefined,
       timeout: 120 * 1000,

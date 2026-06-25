@@ -1,6 +1,11 @@
 import { assertAgentRunStatusTransition, assertRunStatus, isActiveRunStatus } from './foundation';
 
-import type { AgentRunInputSnapshotRow, AgentRunRow, AgentStorageRepositories } from '../storage';
+import type {
+  AgentEventRow,
+  AgentRunInputSnapshotRow,
+  AgentRunRow,
+  AgentStorageRepositories,
+} from '../storage';
 
 /**
  * Input for one bounded AgentRun scheduler batch.
@@ -139,12 +144,24 @@ export function createImmutableRunSnapshot(input: {
   const activeThreadMemory = input.repositories.memory.findActiveThreadMemoryVersion(
     input.run.threadId
   );
+  const modelPolicy = resolveRunModelPolicy(input.repositories, triggerEvent);
   return input.repositories.pendingRuns.createRunInputSnapshot({
-    configVersion: resolveConfigVersion(input.repositories),
+    configVersion: modelPolicy.configVersion,
     createdAtMs: input.nowMs,
+    decisionSchemaVersion: modelPolicy.decisionSchemaVersion,
+    generationMaxOutputTokens: modelPolicy.generationMaxOutputTokens,
+    generationTemperature: modelPolicy.generationTemperature,
+    generationTopP: modelPolicy.generationTopP,
     integrationVersion: 0,
     latestReadyCompactionRef:
       latestReadyCompaction?.outputRef ?? latestReadyCompaction?.historyRef ?? null,
+    modelId: modelPolicy.modelId,
+    modelPolicySource: modelPolicy.source,
+    modelPolicyVersion: modelPolicy.version,
+    modelProvider: modelPolicy.provider,
+    requestedModelPolicyRef: modelPolicy.requestedPolicyRef,
+    resolvedModelPolicyDigest: modelPolicy.policyDigest,
+    resolvedModelPolicyRef: modelPolicy.policyRef,
     runId: input.run.runId,
     snapshotRef: createRunSnapshotRef(input.agentId, input.run.runId),
     threadId: input.run.threadId,
@@ -156,6 +173,51 @@ export function createImmutableRunSnapshot(input: {
     triggerEventStartSequence,
     uncompactedUpperSequence: triggerEventEndSequence,
   });
+}
+
+function resolveRunModelPolicy(
+  repositories: AgentStorageRepositories,
+  triggerEvent: AgentEventRow
+): {
+  readonly configVersion: number;
+  readonly decisionSchemaVersion?: string;
+  readonly generationMaxOutputTokens?: number;
+  readonly generationTemperature?: string;
+  readonly generationTopP?: string;
+  readonly modelId?: string;
+  readonly policyDigest?: string;
+  readonly policyRef?: string;
+  readonly provider?: string;
+  readonly requestedPolicyRef?: string;
+  readonly source?: 'agent_default' | 'event_override';
+  readonly version?: number;
+} {
+  const config = repositories.config.getLatestConfig();
+  const requestedPolicyRef = triggerEvent.requestedModelPolicyRef ?? undefined;
+  const eventPolicy =
+    requestedPolicyRef === undefined
+      ? undefined
+      : repositories.modelPolicies.getActivePolicy(requestedPolicyRef);
+  const defaultPolicyRef = config?.modelPolicyRef ?? undefined;
+  const defaultPolicy =
+    requestedPolicyRef === undefined && defaultPolicyRef !== undefined
+      ? repositories.modelPolicies.getActivePolicy(defaultPolicyRef)
+      : undefined;
+  const selected = eventPolicy ?? defaultPolicy;
+  return {
+    configVersion: config?.configVersion ?? resolveConfigVersion(repositories),
+    decisionSchemaVersion: selected?.decisionSchemaVersion,
+    generationMaxOutputTokens: selected?.generationMaxOutputTokens ?? undefined,
+    generationTemperature: selected?.generationTemperature ?? undefined,
+    generationTopP: selected?.generationTopP ?? undefined,
+    modelId: selected?.modelId,
+    policyDigest: selected?.policyDigest,
+    policyRef: selected?.policyRef,
+    provider: selected?.provider,
+    requestedPolicyRef,
+    source: requestedPolicyRef === undefined ? 'agent_default' : 'event_override',
+    version: selected?.version,
+  };
 }
 
 function startPendingRun(

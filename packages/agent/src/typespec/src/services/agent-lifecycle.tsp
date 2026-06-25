@@ -18,6 +18,7 @@ model InitializeAgentRequest {
   @field(4) initial_config?: AgentConfig;
   @field(5) credential_policy?: CredentialRotationPolicy;
   @field(6) security?: SecurityMetadata;
+  @field(7) initial_model_policy?: AgentModelPolicyInput;
 }
 
 @message
@@ -27,6 +28,7 @@ model InitializeAgentResponse {
   @field(3) credential?: AccessCredential;
   @field(4) audit?: AgentAuditRecord;
   @field(5) thread_key_rule?: ThreadKeyIdentityRule;
+  @field(6) default_model_policy?: AgentModelPolicySummary;
 }
 
 @message
@@ -40,6 +42,7 @@ model GetAgentResponse {
   @field(2) config?: AgentConfig;
   @field(3) active_credential?: AccessCredential;
   @field(4) capability_summary?: AgentCapabilitySummary;
+  @field(5) default_model_policy?: AgentModelPolicySummary;
 }
 
 @message

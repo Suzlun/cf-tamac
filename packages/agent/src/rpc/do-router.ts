@@ -61,6 +61,7 @@ import {
   requireAgentId,
   toNumber,
 } from './message-mappers';
+import { mapModelPolicyCommandInput } from './model-policy-message-mappers';
 
 import type { AgentWorkerEnv } from '../env';
 import type { MessageInitShape } from '@bufbuild/protobuf';
@@ -112,6 +113,19 @@ export async function dispatchAgentHealthCheck(
   const servingStatus = mapLifecycleStatusToServingStatus(health.status);
   const dependencyStatusRef =
     request.includeDependencies === true ? createSafeDependencyStatusRef(health) : undefined;
+  const modelExecution =
+    health.modelExecution === undefined
+      ? undefined
+      : {
+          bindingPresent: health.modelExecution.bindingPresent,
+          checkedAtUnixMs: BigInt(health.modelExecution.checkedAtMs),
+          defaultPolicyDigest: health.modelExecution.defaultPolicyDigest,
+          defaultPolicyRef: health.modelExecution.defaultPolicyRef,
+          modelId: health.modelExecution.modelId,
+          provider: health.modelExecution.provider,
+          safeDetailRef: health.modelExecution.safeDetailRef,
+          status: health.modelExecution.status,
+        };
 
   return {
     agentId: health.agentId,
@@ -123,9 +137,11 @@ export async function dispatchAgentHealthCheck(
       checkedAtUnixMs,
       contractPackage: agentContractPackage,
       dependencyStatusRef,
+      modelExecution,
       serviceVersion: agentServiceVersion,
       servingStatus,
     },
+    modelExecution,
     serviceVersion: agentServiceVersion,
     status: servingStatus,
   };
@@ -152,6 +168,10 @@ export async function dispatchInitializeAgent(
     credential: mapCredentialCommand(agentId, request.credentialPolicy, request.idempotencyKey),
     displayName: request.displayName,
     initialConfig: mapConfigCommand(request.initialConfig),
+    initialModelPolicy:
+      request.initialModelPolicy === undefined
+        ? undefined
+        : mapModelPolicyCommandInput(request.initialModelPolicy),
   });
   return mapInitializeAgentResponse(result);
 }
@@ -306,6 +326,7 @@ export async function dispatchPublishEvent(
     payload: event?.payload,
     payloadContentType: event?.payloadContentType,
     payloadReference: mapPayloadReference(event?.payloadReference),
+    modelPolicyRef: event?.modelPolicyRef,
     source: event?.source ?? 'client',
     threadKey: request.threadKey,
   });

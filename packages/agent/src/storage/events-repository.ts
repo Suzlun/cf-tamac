@@ -29,6 +29,11 @@ export interface AgentEventRow {
   readonly correlationId: string | null;
   readonly causationId: string | null;
   readonly deliveryContextId?: string | null;
+  readonly policyOverrideSource?: string | null;
+  readonly requestedModelPolicyDigest?: string | null;
+  readonly requestedModelPolicyRef?: string | null;
+  readonly requestedModelPolicyValidationStatus?: string | null;
+  readonly requestedModelPolicyVersion?: number | null;
   readonly runId: string | null;
   readonly createdAtMs: number;
 }
@@ -65,6 +70,11 @@ export interface AppendAgentEventInput {
   readonly correlationId?: string;
   readonly causationId?: string;
   readonly deliveryContextId?: string;
+  readonly policyOverrideSource?: string;
+  readonly requestedModelPolicyDigest?: string;
+  readonly requestedModelPolicyRef?: string;
+  readonly requestedModelPolicyValidationStatus?: string;
+  readonly requestedModelPolicyVersion?: number;
   readonly runId?: string;
   readonly createdAtMs: number;
 }
@@ -124,6 +134,11 @@ export function createAgentEventsRepository(
           payloadRef: input.payloadRef ?? null,
           payloadSha256: input.payloadSha256 ?? null,
           payloadStorageClass: input.payloadStorageClass ?? null,
+          policyOverrideSource: input.policyOverrideSource ?? null,
+          requestedModelPolicyDigest: input.requestedModelPolicyDigest ?? null,
+          requestedModelPolicyRef: input.requestedModelPolicyRef ?? null,
+          requestedModelPolicyValidationStatus: input.requestedModelPolicyValidationStatus ?? null,
+          requestedModelPolicyVersion: input.requestedModelPolicyVersion ?? null,
           requestDigest: input.requestDigest ?? null,
           runId: input.runId ?? null,
           sectionId: input.sectionId,

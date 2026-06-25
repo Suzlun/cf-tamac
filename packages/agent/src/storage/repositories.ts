@@ -10,6 +10,8 @@ import { createAgentHistoryRepository } from './history-repository';
 import { createAgentIdempotencyRepository } from './idempotency-repository';
 import { createAgentIntegrationsRepository } from './integrations-repository';
 import { createAgentMemoryRepository } from './memory-repository';
+import { createAgentModelInvocationRepository } from './model-invocation-repository';
+import { createAgentModelPolicyRepository } from './model-policy-repository';
 import { createAgentPendingRunsRepository } from './pending-runs-repository';
 import { createAgentPrincipalsRepository } from './principals-repository';
 import { createAgentProfileRepository } from './profile-repository';
@@ -34,6 +36,8 @@ import type { AgentHistoryRepository } from './history-repository';
 import type { AgentIdempotencyRepository } from './idempotency-repository';
 import type { AgentIntegrationsRepository } from './integrations-repository';
 import type { AgentMemoryRepository } from './memory-repository';
+import type { AgentModelInvocationRepository } from './model-invocation-repository';
+import type { AgentModelPolicyRepository } from './model-policy-repository';
 import type { AgentPendingRunsRepository } from './pending-runs-repository';
 import type { AgentPrincipalsRepository } from './principals-repository';
 import type { AgentProfileRepository } from './profile-repository';
@@ -60,6 +64,8 @@ export interface AgentStorageRepositories {
   readonly idempotency: AgentIdempotencyRepository;
   readonly integrations: AgentIntegrationsRepository;
   readonly memory: AgentMemoryRepository;
+  readonly modelInvocations: AgentModelInvocationRepository;
+  readonly modelPolicies: AgentModelPolicyRepository;
   readonly pendingRuns: AgentPendingRunsRepository;
   readonly principals: AgentPrincipalsRepository;
   readonly profile: AgentProfileRepository;
@@ -101,6 +107,8 @@ function createAgentStorageRepositorySet(
     idempotency: createAgentIdempotencyRepository(agentId, database),
     integrations: createAgentIntegrationsRepository(agentId, database),
     memory: createAgentMemoryRepository(agentId, database),
+    modelInvocations: createAgentModelInvocationRepository(agentId, database),
+    modelPolicies: createAgentModelPolicyRepository(agentId, database),
     pendingRuns: createAgentPendingRunsRepository(agentId, database),
     principals: createAgentPrincipalsRepository(agentId, database),
     profile: createAgentProfileRepository(agentId, database),

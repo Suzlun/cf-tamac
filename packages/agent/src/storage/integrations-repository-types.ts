@@ -9,6 +9,8 @@ export interface AgentIntegrationInstallationRow {
   readonly integrationId: string;
   readonly manifestDigestSha256: string | null;
   readonly manifestRef: string | null;
+  readonly allowedModelPolicyRefs: string | null;
+  readonly modelPolicyGrantRef: string | null;
   readonly providerBaseUrl: string | null;
   readonly providerId: string | null;
   readonly publicKeyRef: string | null;
@@ -73,6 +75,8 @@ export interface AgentIntegrationAdapterRow {
   readonly ingressGrant: string;
   readonly installationId: string;
   readonly integrationId: string;
+  readonly allowedModelPolicyRefs: string | null;
+  readonly modelPolicyGrantRef: string | null;
   readonly schemaRef: string | null;
   readonly status: string;
 }
@@ -91,6 +95,8 @@ export interface AgentAdapterConnectionRow {
   readonly externalSubject: string | null;
   readonly grantSummaryRef: string | null;
   readonly installationId: string;
+  readonly allowedModelPolicyRefs: string | null;
+  readonly modelPolicyGrantRef: string | null;
   readonly metadataRef: string | null;
   readonly status: string;
 }
@@ -108,6 +114,8 @@ export interface AgentDeliveryContextRow {
   readonly expiresAtMs: number | null;
   readonly installationId: string;
   readonly metadataRef: string | null;
+  readonly modelPolicyDigest: string | null;
+  readonly modelPolicyRef: string | null;
   readonly status: string;
   readonly threadId: string;
 }
@@ -240,6 +248,8 @@ export interface UpsertAgentIntegrationAdapterInput {
   readonly ingressGrant: string;
   readonly installationId: string;
   readonly integrationId: string;
+  readonly allowedModelPolicyRefs?: readonly string[];
+  readonly modelPolicyGrantRef?: string;
   readonly schemaRef?: string;
   readonly status: string;
 }
@@ -254,6 +264,8 @@ export interface CreateAgentAdapterConnectionInput {
   readonly externalSubject?: string;
   readonly grantSummaryRef?: string;
   readonly installationId: string;
+  readonly allowedModelPolicyRefs?: readonly string[];
+  readonly modelPolicyGrantRef?: string;
   readonly metadataRef?: string;
   readonly status: string;
 }
@@ -268,6 +280,8 @@ export interface CreateAgentDeliveryContextInput {
   readonly expiresAtMs?: number;
   readonly installationId: string;
   readonly metadataRef?: string;
+  readonly modelPolicyDigest?: string;
+  readonly modelPolicyRef?: string;
   readonly status: string;
   readonly threadId: string;
 }
@@ -334,11 +348,13 @@ export interface RevokeInstallationRowsInput {
 }
 
 interface InstallationWritableFields {
+  readonly allowedModelPolicyRefs?: readonly string[];
   readonly grantSummaryRef?: string;
   readonly installedAtMs?: number;
   readonly integrationId: string;
   readonly manifestDigestSha256?: string;
   readonly manifestRef?: string;
+  readonly modelPolicyGrantRef?: string;
   readonly providerBaseUrl?: string;
   readonly providerId?: string;
   readonly publicKeyRef?: string;

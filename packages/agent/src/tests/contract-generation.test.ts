@@ -14,6 +14,10 @@ const agentAdapterTypeSpecPath = new URL(
   '../typespec/src/services/agent-adapter.tsp',
   import.meta.url
 );
+const agentModelPolicyTypeSpecPath = new URL(
+  '../typespec/src/services/agent-model-policy.tsp',
+  import.meta.url
+);
 
 const forbiddenOpenApiPaths = [
   new URL('../../openapi', import.meta.url),
@@ -25,6 +29,16 @@ const rpcServiceInventory = new Map<string, string[]>([
   [
     'AgentLifecycleService',
     ['InitializeAgent', 'GetAgent', 'DestroyAgent', 'RotateAgentCredential'],
+  ],
+  [
+    'AgentModelPolicyService',
+    [
+      'UpsertModelPolicy',
+      'GetModelPolicy',
+      'ListModelPolicies',
+      'ArchiveModelPolicy',
+      'ValidateModelPolicy',
+    ],
   ],
   ['AgentEventService', ['PublishEvent', 'GetEvent', 'ListEvents']],
   [
@@ -80,6 +94,14 @@ const expectedMessages = [
   'AgentRun',
   'AgentRunInput',
   'RunSnapshotReference',
+  'AgentModelPolicyInput',
+  'AgentModelPolicy',
+  'AgentModelPolicySummary',
+  'AgentModelPolicyValidationResult',
+  'ModelPolicyValidationIssue',
+  'RunModelPolicySnapshot',
+  'AgentModelInvocationSummary',
+  'ModelExecutionCapability',
   'ThreadCompaction',
   'CompactionSnapshotReference',
   'ThreadHistoryResult',
@@ -153,6 +175,60 @@ function collectProtoServiceUniquenessIssues(protoText: string): string[] {
   return issues;
 }
 
+interface ProtoMethodDescriptor {
+  readonly input: string;
+  readonly method: string;
+  readonly output: string;
+}
+
+function collectProtoMethodDescriptors(protoText: string): Map<string, ProtoMethodDescriptor[]> {
+  const services = new Map<string, ProtoMethodDescriptor[]>();
+  const serviceMatches = protoText.matchAll(
+    /service\s+(?<service>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g
+  );
+
+  for (const serviceMatch of serviceMatches) {
+    const service = serviceMatch.groups?.service;
+    const body = serviceMatch.groups?.body;
+    if (service === undefined || body === undefined) continue;
+    const methods = [
+      ...body.matchAll(
+        /rpc\s+(?<method>[A-Za-z]\w*)\s*\(\s*(?<input>[A-Za-z]\w*)\s*\)\s*returns\s*\(\s*(?<output>[A-Za-z]\w*)\s*\)/g
+      ),
+    ].map((methodMatch) => ({
+      input: methodMatch.groups?.input ?? '',
+      method: methodMatch.groups?.method ?? '',
+      output: methodMatch.groups?.output ?? '',
+    }));
+    services.set(service, methods);
+  }
+
+  return services;
+}
+
+function collectProtoMessageFields(protoText: string): Map<string, Set<string>> {
+  const messages = new Map<string, Set<string>>();
+  const messageMatches = protoText.matchAll(
+    /message\s+(?<message>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g
+  );
+
+  for (const messageMatch of messageMatches) {
+    const message = messageMatch.groups?.message;
+    const body = messageMatch.groups?.body;
+    if (message === undefined || body === undefined) continue;
+    const fields = new Set<string>();
+    for (const fieldMatch of body.matchAll(
+      /(?:optional\s+)?[A-Za-z][\w.<>]*\s+(?<field>[A-Z_a-z]\w*)\s*=/g
+    )) {
+      const field = fieldMatch.groups?.field;
+      if (field !== undefined) fields.add(field);
+    }
+    messages.set(message, fields);
+  }
+
+  return messages;
+}
+
 function readPackageScripts(url: URL): Record<string, string> {
   const parsed = JSON.parse(readText(url)) as { readonly scripts?: Record<string, string> };
   return parsed.scripts ?? {};
@@ -190,6 +266,74 @@ describe('Agent contract generation', () => {
     for (const forbiddenPath of forbiddenOpenApiPaths) {
       expect(existsSync(fileURLToPath(forbiddenPath.href))).toBe(false);
     }
+  });
+
+  it('[AGENT-MODEL-POLICY-S004] AgentModelPolicyService exposes Agent-scoped secret-free descriptors', () => {
+    const protoText = readText(protoPath);
+    const generatedRpcText = readText(generatedRpcPath);
+    const serviceMethods = collectProtoMethodDescriptors(protoText).get('AgentModelPolicyService');
+    const messages = collectProtoMessageFields(protoText);
+
+    // 生成済み descriptor だけを検査し、runtime/storage 実装に踏み込まず契約不変条件を確認します。
+    expect(serviceMethods?.map((method) => method.method)).toEqual([
+      'UpsertModelPolicy',
+      'GetModelPolicy',
+      'ListModelPolicies',
+      'ArchiveModelPolicy',
+      'ValidateModelPolicy',
+    ]);
+    expect(generatedRpcText).toContain('export const AgentModelPolicyService');
+
+    for (const method of serviceMethods ?? []) {
+      expect(messages.get(method.input)?.has('agent_id')).toBe(true);
+    }
+    expect(messages.get('UpsertModelPolicyRequest')?.has('idempotency_key')).toBe(true);
+    expect(messages.get('ArchiveModelPolicyRequest')?.has('idempotency_key')).toBe(true);
+
+    for (const responseMessage of [
+      'AgentModelPolicy',
+      'AgentModelPolicySummary',
+      'AgentModelPolicyValidationResult',
+      'ModelPolicyValidationIssue',
+      'UpsertModelPolicyResponse',
+      'GetModelPolicyResponse',
+      'ListModelPoliciesResponse',
+      'ArchiveModelPolicyResponse',
+      'ValidateModelPolicyResponse',
+    ]) {
+      const responseFields = messages.get(responseMessage);
+      expect(responseFields).toBeDefined();
+      for (const field of responseFields ?? []) {
+        expect(field).not.toMatch(/credential|secret|raw_?prompt|raw_?completion|raw_?reasoning/i);
+      }
+    }
+  });
+
+  it('[AGENT-PLATFORM-S016] AgentModelPolicyService remains generated Protobuf RPC-only', () => {
+    const protoText = readText(protoPath);
+    const generatedRpcText = readText(generatedRpcPath);
+    const agentModelPolicyTypeSpecText = readText(agentModelPolicyTypeSpecPath);
+    const services = collectProtoServices(protoText);
+
+    // policy 管理を REST/OpenAPI/Orval へ分岐させず、TypeSpec と Protobuf-ES descriptor だけで公開します。
+    expect(services.get('AgentModelPolicyService')).toEqual(
+      new Set([
+        'UpsertModelPolicy',
+        'GetModelPolicy',
+        'ListModelPolicies',
+        'ArchiveModelPolicy',
+        'ValidateModelPolicy',
+      ])
+    );
+    expect(agentModelPolicyTypeSpecText).toContain('@Protobuf.service');
+    expect(agentModelPolicyTypeSpecText).toContain('interface AgentModelPolicyService');
+    expect(generatedRpcText).toContain('export const AgentModelPolicyService');
+    expect(protoText).toContain('service AgentModelPolicyService');
+
+    for (const forbiddenPath of forbiddenOpenApiPaths) {
+      expect(existsSync(fileURLToPath(forbiddenPath.href))).toBe(false);
+    }
+    expect(agentModelPolicyTypeSpecText).not.toMatch(/openapi|orval|rest|json api/i);
   });
 
   it('[AGENT-PLATFORM-S001] TypeSpec, Buf, RPC generation, and drift guard scripts stay wired', () => {

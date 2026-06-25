@@ -5,6 +5,7 @@ import {
   AgentIntegrationService,
   AgentHealthService,
   AgentLifecycleService,
+  AgentModelPolicyService,
   AgentRunService,
   AgentScheduleService,
   AgentStateService,
@@ -18,6 +19,7 @@ import { createAgentEventService } from './services/events';
 import { createAgentHealthService } from './services/health';
 import { createAgentIntegrationService } from './services/integrations';
 import { createAgentLifecycleService } from './services/lifecycle';
+import { createAgentModelPolicyService } from './services/model-policies';
 import { createAgentRunService } from './services/runs';
 import { createAgentScheduleService } from './services/schedules';
 import { createAgentStateService } from './services/state';
@@ -38,6 +40,7 @@ export function registerAgentRpcServices(
   router.service(AgentIntegrationService, createAgentIntegrationService(env));
   router.service(AgentHealthService, createAgentHealthService(env));
   router.service(AgentLifecycleService, createAgentLifecycleService(env));
+  router.service(AgentModelPolicyService, createAgentModelPolicyService(env));
   router.service(AgentRunService, createAgentRunService(env));
   router.service(AgentScheduleService, createAgentScheduleService(env));
   router.service(AgentStateService, createAgentStateService(env));

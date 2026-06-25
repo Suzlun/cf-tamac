@@ -20,6 +20,8 @@ model GetRunResponse {
   @field(1) run: AgentRun;
   @field(2) input?: AgentRunInput;
   @field(3) snapshot?: RunSnapshotReference;
+  @field(4) model_policy_snapshot?: RunModelPolicySnapshot;
+  @field(5) model_invocation?: AgentModelInvocationSummary;
 }
 
 @message
@@ -35,6 +37,7 @@ model ListRunsRequest {
 model ListRunsResponse {
   @field(1) runs: AgentRun[];
   @field(2) page: PageResponse;
+  @field(3) model_policies: RunModelPolicySnapshot[];
 }
 
 @message

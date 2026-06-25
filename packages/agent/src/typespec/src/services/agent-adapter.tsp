@@ -29,6 +29,7 @@ model PublishIntegrationEventResponse {
   @field(2) thread: AgentThread;
   @field(3) delivery_context?: DeliveryContext;
   @field(4) replayed: boolean;
+  @field(5) requested_model_policy?: AgentModelPolicySummary;
 }
 
 @message
@@ -74,4 +75,6 @@ model PublishDeliveryResultResponse {
   @field(1) result: AdapterDeliveryResult;
   @field(2) delivery?: AdapterDelivery;
   @field(3) replayed: boolean;
+  @field(4) resume_action?: string;
+  @field(5) safe_metadata_ref?: BytePayloadReference;
 }

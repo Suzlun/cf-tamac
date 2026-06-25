@@ -11,6 +11,8 @@ const commandMethods = new Set([
   'AgentLifecycleService.InitializeAgent',
   'AgentLifecycleService.DestroyAgent',
   'AgentLifecycleService.RotateAgentCredential',
+  'AgentModelPolicyService.UpsertModelPolicy',
+  'AgentModelPolicyService.ArchiveModelPolicy',
   'AgentEventService.PublishEvent',
   'AgentRunService.CancelRun',
   'AgentStateService.UpdateConfig',

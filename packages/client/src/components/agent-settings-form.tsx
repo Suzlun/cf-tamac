@@ -12,23 +12,21 @@ import { ControlRoomFrame } from './control-room-frame';
 import { CredentialRotationSection } from './credential-rotation-section';
 import { ErrorAlert } from './error-alert';
 import { generateIdempotencyKey } from './generate-idempotency-key';
+import { ModelPolicySettingsSection } from './model-policy-settings-section';
 import {
   buildDestroyConfirmSchema,
   parseAgentConfigJson,
   type CredentialReferenceValues,
   type DestroyConfirmValues,
 } from './schemas/agent-settings';
-import { Button } from './ui/button';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField as RhfFormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from './ui/form';
-import { Input } from './ui/input';
+import { DangerZoneSection, DestroyConfirmField } from './settings-danger-zone';
+
+import type {
+  BrowserSafeModelPolicyMetadata,
+  BrowserSafeModelPolicyMutationResult,
+  BrowserSafeModelPolicySaveResult,
+  ModelPolicyDraftValues,
+} from './schemas/model-policy';
 
 interface ConfigSnapshot {
   readonly agentId: string;
@@ -49,6 +47,7 @@ interface AgentSettingsFormProps {
   readonly displayName: string;
   readonly initialConfig: ConfigSnapshot;
   readonly currentCredential?: CredentialSnapshot;
+  readonly initialModelPolicy?: BrowserSafeModelPolicyMetadata;
   readonly actingOperatorId: string;
   readonly initialNotice?: string;
   readonly onUpdateConfig: (
@@ -71,6 +70,15 @@ interface AgentSettingsFormProps {
     readonly maskedHint: string;
     readonly status: string;
   }) => Promise<unknown>;
+  readonly onValidateModelPolicy: (
+    agentId: string,
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicyMutationResult>;
+  readonly onSaveDefaultModelPolicy: (
+    agentId: string,
+    idempotencyKey: string,
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicySaveResult>;
   readonly onDestroy: (
     agentId: string,
     idempotencyKey: string,
@@ -168,6 +176,8 @@ export function AgentSettingsForm(props: AgentSettingsFormProps) {
         state={state}
         destroyForm={destroyForm}
         onSaveConfig={handlers.handleSaveConfig}
+        onValidatePolicyDraft={handlers.handleValidateModelPolicy}
+        onSaveDefaultPolicyDraft={handlers.handleSaveDefaultModelPolicy}
         onRotate={handlers.handleRotate}
         onSaveNewReference={handlers.handleSaveNewReference}
         onOpenDestroyDialog={handleOpenDestroyDialog}
@@ -180,6 +190,13 @@ export function AgentSettingsForm(props: AgentSettingsFormProps) {
 
 interface SettingsHandlers {
   readonly handleSaveConfig: (configJson: string) => Promise<boolean>;
+  readonly handleValidateModelPolicy: (
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicyMutationResult>;
+  readonly handleSaveDefaultModelPolicy: (
+    idempotencyKey: string,
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicySaveResult>;
   readonly handleRotate: () => Promise<{ readonly generation: number } | undefined>;
   readonly handleSaveNewReference: (result: CredentialReferenceValues) => Promise<boolean>;
   readonly handleDestroy: () => Promise<void>;
@@ -209,6 +226,51 @@ function createSettingsHandlers(
     } catch (error_) {
       updateState({ error: error_ instanceof Error ? error_.message : 'Config update failed.' });
       return false;
+    } finally {
+      updateState({ pending: false });
+    }
+  };
+
+  const handleValidateModelPolicy = async (
+    draft: ModelPolicyDraftValues
+  ): Promise<BrowserSafeModelPolicyMutationResult> => {
+    updateState({ error: undefined, success: undefined, pending: true });
+    try {
+      return await props.onValidateModelPolicy(props.agentId, draft);
+    } catch (error_) {
+      return {
+        ok: false,
+        fieldErrors: {},
+        formError:
+          error_ instanceof Error ? error_.message : 'Default model policy validation failed.',
+        warnings: [],
+      };
+    } finally {
+      updateState({ pending: false });
+    }
+  };
+
+  const handleSaveDefaultModelPolicy = async (
+    idempotencyKey: string,
+    draft: ModelPolicyDraftValues
+  ): Promise<BrowserSafeModelPolicySaveResult> => {
+    updateState({ error: undefined, success: undefined, pending: true });
+    try {
+      const result = await props.onSaveDefaultModelPolicy(props.agentId, idempotencyKey, draft);
+      if (result.ok && result.metadata !== undefined) {
+        updateState({
+          success: `Default model policy saved as ${result.metadata.policyRef}; config updated to v${result.configVersion ?? result.metadata.configVersion ?? 'unknown'}.`,
+        });
+        router.refresh();
+      }
+      return result;
+    } catch (error_) {
+      return {
+        ok: false,
+        fieldErrors: {},
+        formError: error_ instanceof Error ? error_.message : 'Default model policy save failed.',
+        warnings: [],
+      };
     } finally {
       updateState({ pending: false });
     }
@@ -278,13 +340,27 @@ function createSettingsHandlers(
     }
   };
 
-  return { handleSaveConfig, handleRotate, handleSaveNewReference, handleDestroy };
+  return {
+    handleSaveConfig,
+    handleValidateModelPolicy,
+    handleSaveDefaultModelPolicy,
+    handleRotate,
+    handleSaveNewReference,
+    handleDestroy,
+  };
 }
 
 interface SettingsContentProps extends AgentSettingsFormProps {
   readonly state: SettingsState;
   readonly destroyForm: UseFormReturn<DestroyConfirmValues>;
   readonly onSaveConfig: (configJson: string) => Promise<boolean>;
+  readonly onValidatePolicyDraft: (
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicyMutationResult>;
+  readonly onSaveDefaultPolicyDraft: (
+    idempotencyKey: string,
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicySaveResult>;
   readonly onRotate: () => Promise<{ readonly generation: number } | undefined>;
   readonly onSaveNewReference: (result: CredentialReferenceValues) => Promise<boolean>;
   readonly onOpenDestroyDialog: () => void;
@@ -296,12 +372,15 @@ function SettingsContent({
   agentId,
   displayName,
   initialConfig,
+  initialModelPolicy,
   currentCredential,
   actingOperatorId,
   initialNotice,
   state,
   destroyForm,
   onSaveConfig,
+  onValidatePolicyDraft,
+  onSaveDefaultPolicyDraft,
   onRotate,
   onSaveNewReference,
   onOpenDestroyDialog,
@@ -327,6 +406,14 @@ function SettingsContent({
           <span>{state.success}</span>
         </div>
       ) : null}
+
+      <ModelPolicySettingsSection
+        agentId={agentId}
+        initialMetadata={initialModelPolicy}
+        pending={state.pending}
+        onValidatePolicy={onValidatePolicyDraft}
+        onSavePolicy={onSaveDefaultPolicyDraft}
+      />
 
       <AgentConfigSection
         configVersion={initialConfig.configVersion}
@@ -368,66 +455,5 @@ function SettingsContent({
         />
       </ConfirmDialog>
     </>
-  );
-}
-
-interface DestroyConfirmFieldProps {
-  readonly form: UseFormReturn<DestroyConfirmValues>;
-  readonly agentId: string;
-  readonly pending: boolean;
-  readonly onConfirm: () => Promise<void>;
-}
-
-function DestroyConfirmField({ form, agentId, pending, onConfirm }: DestroyConfirmFieldProps) {
-  return (
-    <Form {...form}>
-      <form
-        onSubmit={(event) => {
-          // Enter submit でも ConfirmDialog と同じ validation/Server Action path に統一する。
-          event.preventDefault();
-          void onConfirm();
-        }}
-        noValidate
-      >
-        <RhfFormField
-          control={form.control}
-          name="confirmAgentId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{`Type the Agent ID "${agentId}" to confirm`}</FormLabel>
-              <FormDescription>
-                Destroy confirmation is enabled only when the value exactly matches this Agent ID.
-              </FormDescription>
-              <FormControl>
-                <Input {...field} disabled={pending} autoComplete="off" required />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </form>
-    </Form>
-  );
-}
-
-interface DangerZoneSectionProps {
-  readonly pending: boolean;
-  readonly onOpenDestroyDialog: () => void;
-}
-
-function DangerZoneSection({ pending, onOpenDestroyDialog }: DangerZoneSectionProps) {
-  return (
-    <section className="readout" aria-labelledby="danger-heading">
-      <strong id="danger-heading">Danger zone</strong>
-      <Button
-        type="button"
-        variant="destructive"
-        onClick={onOpenDestroyDialog}
-        disabled={pending}
-        aria-disabled={pending}
-      >
-        Destroy Agent
-      </Button>
-    </section>
   );
 }

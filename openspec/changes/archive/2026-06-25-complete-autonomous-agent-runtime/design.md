@@ -34,7 +34,7 @@
 - `packages/agent/src/observability/**`: safe metadata、redaction、failure category、prompt/response digest。
 - `packages/client/app/**`、`packages/client/src/components/**`、`packages/client/src/server/actions/**`: Agent creation/settings model policy UI と server-only RPC action。
 - `scripts/codegen/check-agent-codegen-drift.mjs` と tests: RPC inventory、schema invariants、Scenario ID coverage、secret/browser boundary。
-- Operational configuration: `packages/agent/wrangler.toml` の Workers AI binding と smoke readiness。
+- Operational configuration: `packages/agent/wrangler.toml` の Workers AI binding、`playwright.config.ts` の Management Client E2E 起動 command、smoke readiness。
 
 ## Directory Tree
 
@@ -43,6 +43,7 @@ openspec/changes/complete-autonomous-agent-runtime
 ├─ proposal.md
 ├─ design.md
 ├─ tasks.md
+├─ staging-smoke-notes.md
 └─ specs
    ├─ agent-model-policy/spec.md
    ├─ agent-model-invocation/spec.md
@@ -91,12 +92,14 @@ packages
 │     ├─ storage/repositories.ts
 │     ├─ storage/model-policy-schema.ts
 │     ├─ storage/model-policy-repository.ts
+│     ├─ storage/model-policy-generation-parameters.ts
 │     ├─ storage/model-invocation-schema.ts
 │     ├─ storage/model-invocation-repository.ts
 │     ├─ domain/final-authorization.ts
 │     ├─ domain/lifecycle-operations.ts
 │     ├─ domain/state-operations.ts
 │     ├─ domain/errors.ts
+│     ├─ domain/safe-inline-json.ts
 │     ├─ events/operations.ts
 │     ├─ runs/scheduler.ts
 │     ├─ runs/operations.ts
@@ -146,81 +149,86 @@ scripts
 └─ codegen/check-agent-codegen-drift.mjs
 tests
 └─ e2e/management-model-policy.spec.ts
+playwright.config.ts
 ```
 
 ## New / Changed Files
 
-| Type       | File                                                                                      | Change                                                                                                   |
-| ---------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Add        | `openspec/changes/complete-autonomous-agent-runtime/specs/agent-model-policy/spec.md`     | Agent-owned model policy の正本仕様を追加する。                                                          |
-| Add        | `openspec/changes/complete-autonomous-agent-runtime/specs/agent-model-invocation/spec.md` | ModelProvider、model request/output、ledger、recovery、安全性の仕様を追加する。                          |
-| Update     | `packages/agent/wrangler.toml`                                                            | Workers AI `AI` binding を Agent Worker に追加し、Client D1/Queues を持たない境界を維持する。            |
-| Update     | `packages/agent/src/env.ts`                                                               | `AgentWorkerEnv` に `AI` binding と readiness 判定に必要な型を追加する。                                 |
-| Update     | `packages/agent/src/typespec/main.tsp`                                                    | model policy model/service を TypeSpec tree に読み込ませる。                                             |
-| Add        | `packages/agent/src/typespec/src/models/model-policy.tsp`                                 | policy ref、version、status、digest、安全な provider/model metadata、request/response model を定義する。 |
-| Update     | `packages/agent/src/typespec/src/models/agent.tsp`                                        | `AgentConfig.modelPolicyRef` と initial model policy seed の契約を更新する。                             |
-| Update     | `packages/agent/src/typespec/src/models/event.tsp`                                        | Event-scoped optional `modelPolicyRef` と safe metadata を追加する。                                     |
-| Update     | `packages/agent/src/typespec/src/models/run.tsp`                                          | Run snapshot、model policy identity、decision schema、invocation metadata を追加する。                   |
-| Add        | `packages/agent/src/typespec/src/services/agent-model-policy.tsp`                         | `AgentModelPolicyService` の policy 管理 RPC を定義する。                                                |
-| Update     | `packages/agent/src/typespec/src/services/agent-event.tsp`                                | Client Event publish の policy override request/response を反映する。                                    |
-| Update     | `packages/agent/src/typespec/src/services/agent-adapter.tsp`                              | Integration ingress の policy override と delivery result metadata を反映する。                          |
-| Update     | `packages/agent/src/typespec/src/services/agent-health.tsp`                               | model execution capability status を health response に追加する。                                        |
-| Update     | `packages/agent/src/typespec/src/services/agent-lifecycle.tsp`                            | initialize 時の initial policy seed と config ref を追加する。                                           |
-| Update     | `packages/agent/src/typespec/src/services/agent-state.tsp`                                | default model policy の safe metadata と `UpdateConfig` validation を追加する。                          |
-| Update     | `packages/agent/src/typespec/src/services/agent-run.tsp`                                  | Run query に policy snapshot、invocation、safe failure metadata を追加する。                             |
-| Generated  | `packages/agent/proto/cftamac/agent/v1.proto`                                             | TypeSpec から生成し、手編集しない。                                                                      |
-| Generated  | `packages/agent/src/generated/rpc/cftamac/agent/v1_pb.ts`                                 | Agent RPC descriptors を生成し、手編集しない。                                                           |
-| Generated  | `packages/client/src/generated/agent-rpc/cftamac/agent/v1_pb.ts`                          | Client 用 Agent RPC descriptors を生成し、手編集しない。                                                 |
-| Update     | `scripts/codegen/check-agent-codegen-drift.mjs`                                           | `AgentModelPolicyService` と model policy invariant を codegen drift guard に追加する。                  |
-| Add        | `packages/agent/src/storage/model-policy-schema.ts`                                       | model policy tables と digest/version/status metadata を定義する。                                       |
-| Add        | `packages/agent/src/storage/model-policy-repository.ts`                                   | Agent-owned policy upsert/get/list/archive/validate 用 repository を追加する。                           |
-| Add        | `packages/agent/src/storage/model-invocation-schema.ts`                                   | raw prompt/completion を持たない invocation ledger と lease columns を定義する。                         |
-| Add        | `packages/agent/src/storage/model-invocation-repository.ts`                               | invocation attempt、heartbeat、status、digest、usage、recovery 用 repository を追加する。                |
-| Update     | `packages/agent/src/storage/schema.ts`                                                    | model policy schema、invocation schema、Run snapshot/Event policy metadata を統合する。                  |
-| Update     | `packages/agent/src/storage/table-initializer.ts`                                         | Agent-owned SQLite table 初期化に model policy と invocation ledger を含める。                           |
-| Update     | `packages/agent/src/storage/repositories.ts`                                              | repository factory に model policy と invocation ledger を接続する。                                     |
-| Update     | `packages/agent/src/AIAgent.types.ts`                                                     | DO command/query 型に policy、model execution、waiting/resume metadata を追加する。                      |
-| Update     | `packages/agent/src/AIAgent.ts`                                                           | model policy RPC、Run execution loop、Workers AI provider seam を DO method として接続する。             |
-| Add        | `packages/agent/src/model-provider-workers-ai.ts`                                         | Workers AI binding を pure `ModelProvider` interface に適合させる adapter を追加する。                   |
-| Add        | `packages/agent/src/harness/model-io.ts`                                                  | model request、provider result、decision schema parse、安全な digest helper を定義する。                 |
-| Update     | `packages/agent/src/harness/context-builder.ts`                                           | Context Builder output を stable ordering と safe metadata で model input へ渡す。                       |
-| Update     | `packages/agent/src/harness/decisions.ts`                                                 | typed decision schema、safe summary、decision commit result を拡張する。                                 |
-| Update     | `packages/agent/src/harness/commit-guard.ts`                                              | policy digest、config、capability、lease generation の stale guard を追加する。                          |
-| Update     | `packages/agent/src/harness/budget.ts`                                                    | model call、token usage、provider cost unit を budget accounting に含める。                              |
-| Update     | `packages/agent/src/runs/scheduler.ts`                                                    | pending Run start から model execution loop へ接続し、snapshot を拡張する。                              |
-| Update     | `packages/agent/src/runs/operations.ts`                                                   | Run status、waiting/resume、provider failure、budget failure、recovery を実装する。                      |
-| Update     | `packages/agent/src/runs/views.ts`                                                        | Run query 用に safe model metadata、invocation summary、failure category を返す。                        |
-| Update     | `packages/agent/src/events/operations.ts`                                                 | Event model policy override validation と requested ref 保存を追加する。                                 |
-| Update     | `packages/agent/src/domain/final-authorization.ts`                                        | model policy scope と Integration allowlist の final authorization を追加する。                          |
-| Update     | `packages/agent/src/domain/lifecycle-operations.ts`                                       | InitializeAgent と UpdateConfig の policy seed/ref validation を追加する。                               |
-| Update     | `packages/agent/src/domain/state-operations.ts`                                           | GetConfig/GetState の safe model policy metadata を追加する。                                            |
-| Update     | `packages/agent/src/domain/errors.ts`                                                     | model execution failure category と Connect code mapping source を追加する。                             |
-| Update     | `packages/agent/src/tools/operations.ts`                                                  | `invoke_tool` decision、waiting Run、Tool result resume、stale result rejection を接続する。             |
-| Update     | `packages/agent/src/schedules/operations.ts`                                              | `create_schedule` decision から Agent-owned Schedule を作成する経路を接続する。                          |
-| Update     | `packages/agent/src/integrations/operations.ts`                                           | Installation/Connection model policy allowlist を管理する。                                              |
-| Update     | `packages/agent/src/integrations/operations-ingress-delivery.ts`                          | Integration ingress override と Delivery result resume 分類を追加する。                                  |
-| Update     | `packages/agent/src/observability/records.ts`                                             | model policy、invocation、failure、budget の safe observability record を追加する。                      |
-| Update     | `packages/agent/src/observability/redaction.ts`                                           | raw prompt/completion/reasoning/credential の redaction guard を強化する。                               |
-| Update     | `packages/agent/src/rpc/router.ts`                                                        | `AgentModelPolicyService` を generated descriptors から登録する。                                        |
-| Update     | `packages/agent/src/rpc/do-router.ts`                                                     | Model policy DO command/query を routing する。                                                          |
-| Add        | `packages/agent/src/rpc/model-policy-do-router.ts`                                        | policy RPC と AIAgent DO method の boundary を分離する。                                                 |
-| Add        | `packages/agent/src/rpc/model-policy-message-mappers.ts`                                  | generated model policy messages と domain command/query を変換する。                                     |
-| Add        | `packages/agent/src/rpc/services/model-policies.ts`                                       | AgentModelPolicyService handler を追加する。                                                             |
-| Update     | `packages/agent/src/rpc/services/health.ts`                                               | model execution readiness を health response へ追加する。                                                |
-| Add/Update | `packages/agent/src/tests/*.test.ts`                                                      | Scenario ID 付きで policy、invocation、run execution、binding、health、schema invariants を検証する。    |
-| Add        | `packages/client/src/server/actions/model-policies.ts`                                    | Client server-only model policy validation/upsert/config update action を追加する。                      |
-| Update     | `packages/client/src/server/actions/agent-lifecycle.ts`                                   | Agent creation flow で initial policy と config ref を Agent RPC へ渡す。                                |
-| Update     | `packages/client/src/server/actions/agent-operations.ts`                                  | Settings 更新で policy upsert と UpdateConfig を順序付きに呼ぶ。                                         |
-| Add        | `packages/client/src/components/model-policy-fields.tsx`                                  | Browser-safe model policy 入力部品を追加する。                                                           |
-| Add        | `packages/client/src/components/model-policy-summary.tsx`                                 | safe policy metadata 表示部品を追加する。                                                                |
-| Update     | `packages/client/src/components/agent-registration-form.tsx`                              | Agent creation form に default model policy 入力を追加する。                                             |
-| Update     | `packages/client/src/components/agent-settings-form.tsx`                                  | Settings form に default model policy 更新 UI を追加する。                                               |
-| Update     | `packages/client/src/components/schemas/agent-registration.ts`                            | initial policy 入力 validation を追加する。                                                              |
-| Update     | `packages/client/src/components/schemas/agent-settings.ts`                                | settings policy 入力 validation を追加する。                                                             |
-| Update     | `packages/client/app/agents/new/page.tsx`                                                 | server action と form 初期値に model policy fields を接続する。                                          |
-| Update     | `packages/client/app/agents/[agentId]/settings/page.tsx`                                  | Agent RPC から取得した safe policy metadata を Settings に表示する。                                     |
-| Add/Update | `packages/client/src/tests/*.test.tsx`                                                    | Client UI、server action、browser secrecy、D1 boundary を Scenario ID 付きで検証する。                   |
-| Add        | `tests/e2e/management-model-policy.spec.ts`                                               | Agent creation/settings model policy flow と Browser secrecy を Playwright で検証する。                  |
+| Type       | File                                                                                      | Change                                                                                                              |
+| ---------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Add        | `openspec/changes/complete-autonomous-agent-runtime/specs/agent-model-policy/spec.md`     | Agent-owned model policy の正本仕様を追加する。                                                                     |
+| Add        | `openspec/changes/complete-autonomous-agent-runtime/specs/agent-model-invocation/spec.md` | ModelProvider、model request/output、ledger、recovery、安全性の仕様を追加する。                                     |
+| Update     | `packages/agent/wrangler.toml`                                                            | Workers AI `AI` binding を Agent Worker に追加し、Client D1/Queues を持たない境界を維持する。                       |
+| Update     | `packages/agent/src/env.ts`                                                               | `AgentWorkerEnv` に `AI` binding と readiness 判定に必要な型を追加する。                                            |
+| Update     | `packages/agent/src/typespec/main.tsp`                                                    | model policy model/service を TypeSpec tree に読み込ませる。                                                        |
+| Add        | `packages/agent/src/typespec/src/models/model-policy.tsp`                                 | policy ref、version、status、digest、安全な provider/model metadata、request/response model を定義する。            |
+| Update     | `packages/agent/src/typespec/src/models/agent.tsp`                                        | `AgentConfig.modelPolicyRef` と initial model policy seed の契約を更新する。                                        |
+| Update     | `packages/agent/src/typespec/src/models/event.tsp`                                        | Event-scoped optional `modelPolicyRef` と safe metadata を追加する。                                                |
+| Update     | `packages/agent/src/typespec/src/models/run.tsp`                                          | Run snapshot、model policy identity、decision schema、invocation metadata を追加する。                              |
+| Add        | `packages/agent/src/typespec/src/services/agent-model-policy.tsp`                         | `AgentModelPolicyService` の policy 管理 RPC を定義する。                                                           |
+| Update     | `packages/agent/src/typespec/src/services/agent-event.tsp`                                | Client Event publish の policy override request/response を反映する。                                               |
+| Update     | `packages/agent/src/typespec/src/services/agent-adapter.tsp`                              | Integration ingress の policy override と delivery result metadata を反映する。                                     |
+| Update     | `packages/agent/src/typespec/src/services/agent-health.tsp`                               | model execution capability status を health response に追加する。                                                   |
+| Update     | `packages/agent/src/typespec/src/services/agent-lifecycle.tsp`                            | initialize 時の initial policy seed と config ref を追加する。                                                      |
+| Update     | `packages/agent/src/typespec/src/services/agent-state.tsp`                                | default model policy の safe metadata と `UpdateConfig` validation を追加する。                                     |
+| Update     | `packages/agent/src/typespec/src/services/agent-run.tsp`                                  | Run query に policy snapshot、invocation、safe failure metadata を追加する。                                        |
+| Generated  | `packages/agent/proto/cftamac/agent/v1.proto`                                             | TypeSpec から生成し、手編集しない。                                                                                 |
+| Generated  | `packages/agent/src/generated/rpc/cftamac/agent/v1_pb.ts`                                 | Agent RPC descriptors を生成し、手編集しない。                                                                      |
+| Generated  | `packages/client/src/generated/agent-rpc/cftamac/agent/v1_pb.ts`                          | Client 用 Agent RPC descriptors を生成し、手編集しない。                                                            |
+| Update     | `scripts/codegen/check-agent-codegen-drift.mjs`                                           | `AgentModelPolicyService` と model policy invariant を codegen drift guard に追加する。                             |
+| Add        | `packages/agent/src/storage/model-policy-schema.ts`                                       | model policy tables と digest/version/status metadata を定義する。                                                  |
+| Add        | `packages/agent/src/storage/model-policy-repository.ts`                                   | Agent-owned policy upsert/get/list/archive/validate 用 repository を追加する。                                      |
+| Add        | `packages/agent/src/storage/model-policy-generation-parameters.ts`                        | inline safe JSON から generation parameter を検証・抽出し、provider request に渡す安全な数値へ正規化する。          |
+| Add        | `packages/agent/src/storage/model-invocation-schema.ts`                                   | raw prompt/completion を持たない invocation ledger と lease columns を定義する。                                    |
+| Add        | `packages/agent/src/storage/model-invocation-repository.ts`                               | invocation attempt、heartbeat、status、digest、usage、recovery 用 repository を追加する。                           |
+| Update     | `packages/agent/src/storage/schema.ts`                                                    | model policy schema、invocation schema、Run snapshot/Event policy metadata を統合する。                             |
+| Update     | `packages/agent/src/storage/table-initializer.ts`                                         | Agent-owned SQLite table 初期化に model policy と invocation ledger を含める。                                      |
+| Update     | `packages/agent/src/storage/repositories.ts`                                              | repository factory に model policy と invocation ledger を接続する。                                                |
+| Update     | `packages/agent/src/AIAgent.types.ts`                                                     | DO command/query 型に policy、model execution、waiting/resume metadata を追加する。                                 |
+| Update     | `packages/agent/src/AIAgent.ts`                                                           | model policy RPC、Run execution loop、Workers AI provider seam を DO method として接続する。                        |
+| Add        | `packages/agent/src/model-provider-workers-ai.ts`                                         | Workers AI binding を pure `ModelProvider` interface に適合させる adapter を追加する。                              |
+| Add        | `packages/agent/src/harness/model-io.ts`                                                  | model request、provider result、decision schema parse、安全な digest helper を定義する。                            |
+| Update     | `packages/agent/src/harness/context-builder.ts`                                           | Context Builder output を stable ordering と safe metadata で model input へ渡す。                                  |
+| Update     | `packages/agent/src/harness/decisions.ts`                                                 | typed decision schema、safe summary、decision commit result を拡張する。                                            |
+| Update     | `packages/agent/src/harness/commit-guard.ts`                                              | policy digest、config、capability、lease generation の stale guard を追加する。                                     |
+| Update     | `packages/agent/src/harness/budget.ts`                                                    | model call、token usage、provider cost unit を budget accounting に含める。                                         |
+| Update     | `packages/agent/src/runs/scheduler.ts`                                                    | pending Run start から model execution loop へ接続し、snapshot を拡張する。                                         |
+| Update     | `packages/agent/src/runs/operations.ts`                                                   | Run status、waiting/resume、provider failure、budget failure、recovery を実装する。                                 |
+| Update     | `packages/agent/src/runs/views.ts`                                                        | Run query 用に safe model metadata、invocation summary、failure category を返す。                                   |
+| Update     | `packages/agent/src/events/operations.ts`                                                 | Event model policy override validation と requested ref 保存を追加する。                                            |
+| Update     | `packages/agent/src/domain/final-authorization.ts`                                        | model policy scope と Integration allowlist の final authorization を追加する。                                     |
+| Update     | `packages/agent/src/domain/lifecycle-operations.ts`                                       | InitializeAgent と UpdateConfig の policy seed/ref validation を追加する。                                          |
+| Update     | `packages/agent/src/domain/state-operations.ts`                                           | GetConfig/GetState の safe model policy metadata を追加する。                                                       |
+| Update     | `packages/agent/src/domain/errors.ts`                                                     | model execution failure category と Connect code mapping source を追加する。                                        |
+| Add        | `packages/agent/src/domain/safe-inline-json.ts`                                           | 復元した safe inline metadata の `inlineBytes` と `sha256` を一致させる同期 helper を追加する。                     |
+| Update     | `packages/agent/src/tools/operations.ts`                                                  | `invoke_tool` decision、waiting Run、Tool result resume、stale result rejection を接続する。                        |
+| Update     | `packages/agent/src/schedules/operations.ts`                                              | `create_schedule` decision から Agent-owned Schedule を作成する経路を接続する。                                     |
+| Update     | `packages/agent/src/integrations/operations.ts`                                           | Installation/Connection model policy allowlist を管理する。                                                         |
+| Update     | `packages/agent/src/integrations/operations-ingress-delivery.ts`                          | Integration ingress override と Delivery result resume 分類を追加する。                                             |
+| Update     | `packages/agent/src/observability/records.ts`                                             | model policy、invocation、failure、budget の safe observability record を追加する。                                 |
+| Update     | `packages/agent/src/observability/redaction.ts`                                           | raw prompt/completion/reasoning/credential の redaction guard を強化する。                                          |
+| Update     | `packages/agent/src/rpc/router.ts`                                                        | `AgentModelPolicyService` を generated descriptors から登録する。                                                   |
+| Update     | `packages/agent/src/rpc/do-router.ts`                                                     | Model policy DO command/query を routing する。                                                                     |
+| Add        | `packages/agent/src/rpc/model-policy-do-router.ts`                                        | policy RPC と AIAgent DO method の boundary を分離する。                                                            |
+| Add        | `packages/agent/src/rpc/model-policy-message-mappers.ts`                                  | generated model policy messages と domain command/query を変換する。                                                |
+| Add        | `packages/agent/src/rpc/services/model-policies.ts`                                       | AgentModelPolicyService handler を追加する。                                                                        |
+| Update     | `packages/agent/src/rpc/services/health.ts`                                               | model execution readiness を health response へ追加する。                                                           |
+| Add/Update | `packages/agent/src/tests/*.test.ts`                                                      | Scenario ID 付きで policy、invocation、run execution、binding、health、schema invariants を検証する。               |
+| Add        | `packages/client/src/server/actions/model-policies.ts`                                    | Client server-only model policy validation/upsert/config update action を追加する。                                 |
+| Update     | `packages/client/src/server/actions/agent-lifecycle.ts`                                   | Agent creation flow で initial policy と config ref を Agent RPC へ渡す。                                           |
+| Update     | `packages/client/src/server/actions/agent-operations.ts`                                  | Settings 更新で policy upsert と UpdateConfig を順序付きに呼ぶ。                                                    |
+| Add        | `packages/client/src/components/model-policy-fields.tsx`                                  | Browser-safe model policy 入力部品を追加する。                                                                      |
+| Add        | `packages/client/src/components/model-policy-summary.tsx`                                 | safe policy metadata 表示部品を追加する。                                                                           |
+| Update     | `packages/client/src/components/agent-registration-form.tsx`                              | Agent creation form に default model policy 入力を追加する。                                                        |
+| Update     | `packages/client/src/components/agent-settings-form.tsx`                                  | Settings form に default model policy 更新 UI を追加する。                                                          |
+| Update     | `packages/client/src/components/schemas/agent-registration.ts`                            | initial policy 入力 validation を追加する。                                                                         |
+| Update     | `packages/client/src/components/schemas/agent-settings.ts`                                | settings policy 入力 validation を追加する。                                                                        |
+| Update     | `packages/client/app/agents/new/page.tsx`                                                 | server action と form 初期値に model policy fields を接続する。                                                     |
+| Update     | `packages/client/app/agents/[agentId]/settings/page.tsx`                                  | Agent RPC から取得した safe policy metadata を Settings に表示する。                                                |
+| Add/Update | `packages/client/src/tests/*.test.tsx`                                                    | Client UI、server action、browser secrecy、D1 boundary を Scenario ID 付きで検証する。                              |
+| Add        | `tests/e2e/management-model-policy.spec.ts`                                               | Agent creation/settings model policy flow と Browser secrecy を Playwright で検証する。                             |
+| Update     | `playwright.config.ts`                                                                    | Playwright webServer を root script に存在する `pnpm dev:client` へ合わせ、Management Client E2E を再現可能にする。 |
+| Add        | `openspec/changes/complete-autonomous-agent-runtime/staging-smoke-notes.md`               | default policy と Event override の staging smoke 記録項目を safe metadata/digest 限定で固定する。                  |
 
 ## System Diagram
 
