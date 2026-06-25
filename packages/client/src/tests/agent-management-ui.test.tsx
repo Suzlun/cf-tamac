@@ -258,6 +258,18 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(registrationAction).toContain('deleteManagedAgent');
     expect(managedAgents).toContain('validateModelPolicyForRegistration');
     expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
+
+    const submitStart = managedAgents.indexOf(
+      'export async function submitManagedAgentRegistration'
+    );
+    const validateActionStart = managedAgents.indexOf(
+      'export async function validateManagedAgentRegistrationModelPolicy'
+    );
+    const submitAction = managedAgents.slice(submitStart, validateActionStart);
+    expect(submitAction).not.toContain('validateModelPolicyForRegistration');
+    expect(submitAction.indexOf('persistManagedAgentRegistration')).toBeLessThan(
+      submitAction.indexOf('initializeAgentWithDefaultModelPolicy')
+    );
   });
 
   it('[CLIENT-MANAGEMENT-S002] Form has pending, success, and error states', () => {

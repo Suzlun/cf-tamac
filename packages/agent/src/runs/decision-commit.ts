@@ -66,8 +66,9 @@ export interface CommitHarnessDecisionSideEffectsResult {
 export function commitHarnessDecisionSideEffects(
   input: CommitHarnessDecisionSideEffectsInput
 ): CommitHarnessDecisionSideEffectsResult {
-  const sideEffects: AgentRunDecisionCommitSideEffect[] = [];
   const recordByDecisionId = new Map(input.records.map((record) => [record.decisionId, record]));
+  validateDecisionSideEffectInputs(input, recordByDecisionId);
+  const sideEffects: AgentRunDecisionCommitSideEffect[] = [];
   for (const decision of input.decisions) {
     const record = recordByDecisionId.get(decision.decisionId);
     if (record === undefined || record.status === 'blocked') continue;
@@ -78,6 +79,41 @@ export function commitHarnessDecisionSideEffects(
     sideEffects,
     waiting: sideEffects.some((effect) => effect.waitsForExternalResult),
   };
+}
+
+function validateDecisionSideEffectInputs(
+  input: CommitHarnessDecisionSideEffectsInput,
+  recordByDecisionId: ReadonlyMap<string, HarnessDecisionRecord>
+): void {
+  for (const decision of input.decisions) {
+    const record = recordByDecisionId.get(decision.decisionId);
+    if (record === undefined || record.status === 'blocked') continue;
+    validateDecisionSideEffectInput(input, decision);
+    if (decision.type === 'stop') break;
+  }
+}
+
+function validateDecisionSideEffectInput(
+  input: CommitHarnessDecisionSideEffectsInput,
+  decision: HarnessDecision
+): void {
+  switch (decision.type) {
+    case 'create_schedule':
+    case 'emit_event':
+      requireTriggerEvent(input);
+      return;
+    case 'invoke_tool':
+      requireToolDefinition(input.repositories, decision.toolId);
+      return;
+    case 'respond':
+      requireDeliveryContext(input, decision.deliveryContextId);
+      return;
+    case 'request_human_approval':
+    case 'stop':
+    case 'update_state':
+    case 'write_memory':
+      return;
+  }
 }
 
 function commitDecisionSideEffect(
@@ -304,8 +340,7 @@ function commitDeliveryDecision(
   input: CommitHarnessDecisionSideEffectsInput,
   decision: Extract<HarnessDecision, { readonly type: 'respond' }>
 ): AgentRunDecisionCommitSideEffect {
-  const context = input.repositories.integrations.findDeliveryContext(decision.deliveryContextId);
-  if (context === undefined) throw new Error('DeliveryContext is required before respond commit.');
+  const context = requireDeliveryContext(input, decision.deliveryContextId);
   const deliveryId = createDecisionResourceId(
     'delivery',
     input.snapshot.runId,
@@ -334,6 +369,15 @@ function commitDeliveryDecision(
     ref: deliveryId,
     waitsForExternalResult: true,
   };
+}
+
+function requireDeliveryContext(
+  input: CommitHarnessDecisionSideEffectsInput,
+  deliveryContextId: string
+) {
+  const context = input.repositories.integrations.findDeliveryContext(deliveryContextId);
+  if (context === undefined) throw new Error('DeliveryContext is required before respond commit.');
+  return context;
 }
 
 function commitPendingApprovalDecision(

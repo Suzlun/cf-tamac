@@ -185,8 +185,9 @@ export async function saveAgentAccessLookup(input: {
  * @returns 成功時は登録済み Agent ID、失敗時は field-level/form-level error を含む browser-safe result を返します。
  * @throws 予期しない D1 障害など、rollback 不能な infrastructure error は呼び出し元へ伝播します。
  * @remarks
- * validation は Client D1 write より前に完了します。credential metadata 保存が registry row 作成後に失敗した場合は row を削除し、
- * UI に partial registration を残しません。
+ * 入力形状 validation は Client D1 write より前に完了します。credential metadata 保存または Agent 初期化が registry row 作成後に
+ * 失敗した場合は row を削除し、UI に partial registration を残しません。初期 model policy は未初期化 Agent でも受け付ける
+ * `InitializeAgent` の `initialModelPolicy` として検証・seed し、登録前に初期化済み profile 前提の policy RPC は呼びません。
  */
 export async function submitManagedAgentRegistration(
   input: ManagedAgentRegistrationInput,
@@ -198,21 +199,6 @@ export async function submitManagedAgentRegistration(
       ok: false,
       fieldErrors: validation.fieldErrors,
       formError: 'Correct the highlighted fields before registering the Agent.',
-    };
-  }
-
-  const policyValidation = await validateModelPolicyForRegistration({
-    agentId: validation.value.agentId,
-    agentRpcOrigin: validation.value.agentRpcOrigin,
-    credentialReference: validation.value.referenceValue,
-    keyId: validation.value.keyId,
-    modelPolicy: validation.value.modelPolicy,
-  });
-  if (!policyValidation.ok) {
-    return {
-      ok: false,
-      fieldErrors: toRegistrationModelPolicyFieldErrors(policyValidation.fieldErrors),
-      formError: policyValidation.formError ?? 'The default model policy could not be validated.',
     };
   }
 

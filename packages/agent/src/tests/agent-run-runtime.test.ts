@@ -23,6 +23,7 @@ import type {
   AgentModelInvocationRow,
   AgentModelPolicyRow,
   AgentProfileRow,
+  AgentRunInterruptRow,
   AgentRunBudgetLedgerRow,
   AgentRunInputSnapshotRow,
   AgentRunRow,
@@ -457,6 +458,101 @@ describe('Agent Stage 3 Run runtime core', () => {
     expect(next.startedRuns[0]).toMatchObject({ runId: 'run-next' });
   });
 
+  it('[AGENT-RUNTIME-S013] user cancel guard result is not overwritten as failed', async () => {
+    const runtime = createRuntimeHarness({
+      defaultModelPolicyRef: 'policy-default',
+      interrupt: createRunInterrupt('run-cancelled', 'user_cancel', 'cancelled'),
+    });
+    runtime.addThread('thread-cancelled', 0, null);
+    runtime.addEvent('event-cancelled', 'thread-cancelled', 1);
+    runtime.addRun(
+      createRun('run-cancelled', 'thread-cancelled', 'event-cancelled', 'pending', 0, 10, null)
+    );
+    const startedRun = processAgentRunSchedulerBatch({
+      agentId,
+      maxRuns: 1,
+      nowMs: 700,
+      repositories: runtime.repositories,
+    }).startedRuns[0];
+    expect(startedRun).toBeDefined();
+    if (startedRun === undefined) throw new Error('Expected scheduler to start a Run.');
+
+    const result = await executeStartedAgentRun({
+      agentId,
+      modelProvider: createDeterministicModelProvider(),
+      nowMs: 750,
+      repositories: runtime.repositories,
+      startedRun,
+    });
+
+    expect(result).toMatchObject({
+      failureCategory: 'stale_generation',
+      runId: 'run-cancelled',
+      status: 'cancelled',
+    });
+    expect(runtime.findRun('run-cancelled')).toMatchObject({ status: 'cancelled' });
+    expect(runtime.budgetLedger).toHaveLength(0);
+  });
+
+  it('[AGENT-RUNTIME-S014] invalid decision batch is rejected before partial side effects', async () => {
+    const runtime = createRuntimeHarness({ defaultModelPolicyRef: 'policy-default' });
+    runtime.addThread('thread-invalid-commit', 0, null);
+    runtime.addEvent('event-invalid-commit', 'thread-invalid-commit', 1);
+    runtime.addRun(
+      createRun(
+        'run-invalid-commit',
+        'thread-invalid-commit',
+        'event-invalid-commit',
+        'pending',
+        0,
+        10,
+        null
+      )
+    );
+    const startedRun = processAgentRunSchedulerBatch({
+      agentId,
+      maxRuns: 1,
+      nowMs: 800,
+      repositories: runtime.repositories,
+    }).startedRuns[0];
+    expect(startedRun).toBeDefined();
+    if (startedRun === undefined) throw new Error('Expected scheduler to start a Run.');
+
+    const result = await executeStartedAgentRun({
+      agentId,
+      modelProvider: createDecisionModelProvider([
+        {
+          decisionId: 'memory-1',
+          memoryScope: 'thread',
+          operationRef: 'memory-operation://must-not-persist',
+          type: 'write_memory',
+        },
+        {
+          decisionId: 'respond-1',
+          deliveryContextId: 'missing-delivery-context',
+          responseRef: 'response://must-not-persist',
+          type: 'respond',
+        },
+      ]),
+      nowMs: 850,
+      repositories: runtime.repositories,
+      startedRun,
+    });
+
+    expect(result).toMatchObject({
+      failureCategory: 'malformed_model_output',
+      runId: 'run-invalid-commit',
+      status: 'failed',
+    });
+    expect(runtime.findRun('run-invalid-commit')).toMatchObject({ status: 'failed' });
+    expect(runtime.threadMemoryItems).toHaveLength(0);
+    expect(runtime.threadMemoryVersions).toHaveLength(0);
+    expect(runtime.events).toHaveLength(1);
+    expect(runtime.schedules).toHaveLength(0);
+    expect(runtime.toolInvocations).toHaveLength(0);
+    expect(runtime.budgetLedger[0]).toMatchObject({ budgetDimension: 'malformed_model_output' });
+  });
+
   it('[AGENT-MODEL-POLICY-S003] Disabled or archived policy is rejected before model call', async () => {
     const runtime = createRuntimeHarness({
       defaultModelPolicyRef: 'policy-disabled',
@@ -514,6 +610,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 function createRuntimeHarness(options?: {
   readonly defaultModelPolicyRef?: string;
   readonly inactivePolicyRefs?: readonly string[];
+  readonly interrupt?: AgentRunInterruptRow;
 }) {
   const events: AgentEventRow[] = [];
   const budgetLedger: AgentRunBudgetLedgerRow[] = [];
@@ -845,7 +942,8 @@ function createRuntimeHarness(options?: {
     runtime: {
       budgetLedgerTableName: 'agent_run_budget_ledger',
       decisionTableName: 'agent_harness_decision_records',
-      findLatestRunInterrupt: () => undefined,
+      findLatestRunInterrupt: (runId: string) =>
+        options?.interrupt?.runId === runId ? options.interrupt : undefined,
       interruptTableName: 'agent_run_interrupts',
       listBudgetLedgerEntries: (runId: string) =>
         budgetLedger.filter((entry) => entry.runId === runId),
@@ -901,6 +999,33 @@ function createRuntimeHarness(options?: {
         decisionRecords.push(row);
         return row;
       },
+      recordRunInterrupt(input: {
+        readonly createdAtMs: number;
+        readonly interruptId: string;
+        readonly interruptType: string;
+        readonly reason: string;
+        readonly requestedStatus: string;
+        readonly runId: string;
+        readonly safeAuditRef?: string;
+        readonly snapshotRef?: string;
+      }) {
+        return {
+          createdAtMs: input.createdAtMs,
+          interruptId: input.interruptId,
+          interruptType: input.interruptType,
+          reason: input.reason,
+          requestedStatus: input.requestedStatus,
+          runId: input.runId,
+          safeAuditRef: input.safeAuditRef ?? null,
+          snapshotRef: input.snapshotRef ?? null,
+        };
+      },
+    },
+    integrations: {
+      createAdapterDelivery: () => {
+        throw new Error('Adapter delivery commit is not supported by this runtime harness.');
+      },
+      findDeliveryContext: () => undefined,
     },
     schedules: {
       insertSchedule(input: InsertAgentScheduleInput) {
@@ -1048,6 +1173,23 @@ function createRun(
     threadId,
     triggerEventId,
     updatedAtMs: pendingSinceMs,
+  };
+}
+
+function createRunInterrupt(
+  runId: string,
+  interruptType: string,
+  requestedStatus: string
+): AgentRunInterruptRow {
+  return {
+    createdAtMs: 1,
+    interruptId: `interrupt:${runId}`,
+    interruptType,
+    reason: `safe ${interruptType}`,
+    requestedStatus,
+    runId,
+    safeAuditRef: `agent-run://${runId}/interrupt`,
+    snapshotRef: null,
   };
 }
 

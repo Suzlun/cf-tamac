@@ -38,7 +38,7 @@ export interface ExecuteStartedAgentRunResult {
   readonly failureCategory?: ModelProviderFailureCategory | 'stale_generation';
   readonly invocationId?: string;
   readonly runId: string;
-  readonly status: 'completed' | 'failed' | 'interrupted' | 'waiting';
+  readonly status: 'cancelled' | 'completed' | 'failed' | 'interrupted' | 'waiting';
 }
 
 /**
@@ -207,12 +207,11 @@ function commitModelOutput(
       threadId: snapshot.threadId,
     });
     if (!guard.allowed) {
-      failRun(input.repositories, snapshot.runId, input.nowMs, 'stale_generation');
       return {
         failureCategory: 'stale_generation',
         invocationId,
         runId: snapshot.runId,
-        status: 'interrupted',
+        status: readGuardTerminalStatus(guard.currentStatus),
       };
     }
     const sideEffects = commitHarnessDecisionSideEffects({
@@ -237,6 +236,12 @@ function commitModelOutput(
       status: 'failed',
     };
   }
+}
+
+function readGuardTerminalStatus(
+  status: string | undefined
+): Extract<ExecuteStartedAgentRunResult['status'], 'cancelled' | 'interrupted'> {
+  return status === 'cancelled' ? 'cancelled' : 'interrupted';
 }
 
 function requireSnapshotPolicy(snapshot: AgentRunSchedulerStartedRun['snapshot']) {
