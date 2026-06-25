@@ -9,7 +9,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/tests/**/*.test.ts', 'src/tests/**/*.test.tsx'],
-    name: 'management-client',
+    name: 'client',
   },
   resolve: {
     alias: {

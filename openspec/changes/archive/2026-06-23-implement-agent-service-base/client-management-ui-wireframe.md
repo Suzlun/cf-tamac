@@ -1535,12 +1535,12 @@ This is a wireframe-only artifact under `openspec/changes/**`. No code, generate
 
 The engineer should verify implementation against this wireframe using:
 
-- `pnpm test:management-client` (component + Server Action tests), including:
+- `pnpm test:client` (component + Server Action tests), including:
   - TanStack Query hook secrecy tests (no Agent RPC / Drizzle / database imports in Client Components or query hooks) per §9.6 items 6-8.
   - Drizzle schema boundary test (only `client_managed_agents` + `client_agent_credential_refs` modeled; Prisma is not used) per §9.6 item 10.
   - React Compiler build pass + `react-compiler/react-compiler` lint clean per §9.6 item 9.
   - shadcn/ui component theme tests (control-room tokens applied, no default light theme, no default blue ring) per §4.7.
 - `pnpm test:e2e` (Playwright flows for §6.1-§6.8, including browser credential non-exposure per `[CLIENT-MANAGEMENT-S009]`).
 - `pnpm lint` (OpenSpec validate + scenario coverage + boundary checks, including the new Client Component import boundaries for Agent RPC / Drizzle / database modules).
-- `pnpm check:management-client` (TypeScript + build with `reactCompiler: true`).
+- `pnpm check:client` (TypeScript + build with `reactCompiler: true`).
 - Manual secret-non-exposure audit per §9.6.

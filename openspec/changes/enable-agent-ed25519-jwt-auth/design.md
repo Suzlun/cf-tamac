@@ -550,8 +550,8 @@ flowchart TD
 - Agent staging Worker に `AGENT_CONTROL_PLANE_TRUST` と `AGENT_RPC_AUDIENCE` を設定する。
 - `pnpm gen:agent:proto && pnpm gen:agent:rpc` を実行し、generated output を更新する。
 - `pnpm check:codegen` を実行し、generated drift がないことを確認する。
-- `pnpm test:agent`、`pnpm test:management-client`、`pnpm test:governance`、`pnpm test:e2e` を実行する。
-- `pnpm check:agent && pnpm check:management-client` を実行する。
+- `pnpm test:agent`、`pnpm test:client`、`pnpm test:governance`、`pnpm test:e2e` を実行する。
+- `pnpm check:agent && pnpm check:client` を実行する。
 - `pnpm build` を実行する。
 - Management Client で signing key を生成し、public trust config を Agent Worker secret に設定し、Agent health verification を実行する。
 - Rotation、emergency revoke、break-glass recovery runbook を staging で確認し、本番適用前に public trust config fingerprint を記録する。
@@ -565,7 +565,7 @@ flowchart TD
 - Management Client は signing key lifecycle、Agent key selection、trust config export、health verification、rotation/revoke/recovery guidance を提供する。
 - Agent health response は trust diagnostic を返し、key material と token body を返さない。
 - Docs、governance scripts、scenario-linked automated tests が production credential boundary を検証する。
-- `pnpm check:codegen`、`pnpm test:agent`、`pnpm test:management-client`、`pnpm test:governance`、`pnpm check:agent && pnpm check:management-client` が成功する。
+- `pnpm check:codegen`、`pnpm test:agent`、`pnpm test:client`、`pnpm test:governance`、`pnpm check:agent && pnpm check:client` が成功する。
 
 ## Open Issues
 

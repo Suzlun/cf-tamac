@@ -76,7 +76,7 @@
 - [x] 7.13 `packages/agent/src/tests/thread-key-identity.test.ts` に `[AGENT-PLATFORM-S013] Thread key identity is normalized and Agent-scoped` を追加し、512 UTF-8 bytes 以下の受理された `thread_key` について same `agent_id` + Unicode NFC normalized `thread_key` は同じ `thread_id`、case difference は別 Thread、異なる Integration/Adapter/Connection/principal の暗黙 prefix は付与されないこと、different `agent_id` は別 Thread になることを検査する。
 - [x] 7.14 `packages/agent/src/tests/protobuf-field-stability.test.ts` に `[AGENT-PLATFORM-S014] Protobuf field numbers and service methods are stable` を追加し、TypeSpec `@field(n)` 明示、generated proto field number、deleted field reserve、field number reuse detection、service 名 uniqueness、同一 service 内 method 名 uniqueness を検査する。
 
-## 8. Automated tests for `management-client`
+## 8. Automated tests for `client`
 
 - [x] 8.1 `packages/client/src/tests/agent-registry-shell.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[MANAGEMENT-CLIENT-S001] Agent registry shell renders without demo content` を追加し、`/agents` empty state と detail section navigation を検査する。
 - [x] 8.2 `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts` と `tests/e2e/management-agent-rpc-secrecy.spec.ts` に `[MANAGEMENT-CLIENT-S002] Browser bundle excludes Agent RPC credentials` を追加し、browser-delivered chunks、server-only RPC client construction、direct Agent RPC invocation absence を検査する。
@@ -101,7 +101,7 @@
 
 ## 10. Final-scope correction before replacement verification
 
-- [x] 10.1 OpenSpec spec unit directories と Scenario IDs を suffix-less names に移行する。対象は `agent-platform` / `AGENT-PLATFORM-S###`、`management-client` / `MANAGEMENT-CLIENT-S###`、`workspace-governance` / `WORKSPACE-GOVERNANCE-S###` であり、層 prefix は新規 tests/specs/docs に残さない。
+- [x] 10.1 OpenSpec spec unit directories と Scenario IDs を suffix-less names に移行する。対象は `agent-platform` / `AGENT-PLATFORM-S###`、`client` / `MANAGEMENT-CLIENT-S###`、`workspace-governance` / `WORKSPACE-GOVERNANCE-S###` であり、層 prefix は新規 tests/specs/docs に残さない。
 - [x] 10.2 packages/agent と packages/client の既存 tests、E2E specs、governance tests、OpenSpec coverage references を 10.1 の Scenario IDs に合わせて rename し、旧層付き Scenario ID references が残らないことを検査する。
 - [x] 10.3 `.opencode/agents/unit/backend/**` と `.opencode/agents/unit/frontend/**` を `.opencode/agents/unit/agent/**` と `.opencode/agents/unit/client/**` へ移行し、applier/delegation guidance、coding-guardian entrypoints、governance fixtures を更新する。
 - [x] 10.4 `eslint.config.js`、`CODING_STANDARDS.md`、`scripts/governance/verify-package-boundaries.mjs` に Agent layer direction と Next.js Client server/browser boundary を正式ルールとして追加し、旧 demo package boundary を primary rule として参照しない。

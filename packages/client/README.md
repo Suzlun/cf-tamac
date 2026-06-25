@@ -20,14 +20,14 @@
 corepack enable
 pnpm install
 pnpm dev:agent
-pnpm dev:management-client
+pnpm dev:client
 ```
 
 Useful local checks:
 
 ```bash
-pnpm check:management-client
-pnpm test:management-client
+pnpm check:client
+pnpm test:client
 pnpm lint
 ```
 

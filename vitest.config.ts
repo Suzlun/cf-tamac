@@ -20,7 +20,7 @@ export default defineConfig({
         extends: './packages/client/vitest.config.ts',
         root: './packages/client',
         test: {
-          name: 'management-client',
+          name: 'client',
         },
       },
       {

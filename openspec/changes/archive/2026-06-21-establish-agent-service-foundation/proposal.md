@@ -24,7 +24,7 @@
 ### New Spec Units
 
 - `agent-platform`: New。Agent Service の Protobuf RPC-only 契約、Connect facade、AIAgent Durable Object runtime、Agent-owned storage/binding/dependency 境界、サンプル機能を含まない公開 surface を定義する。
-- `management-client`: New。Next.js 管理 UI の責務、Browser から Agent RPC を直接呼ばない server-side invocation、Client D1 所有範囲、Agent domain snapshot を保存しない表示境界を定義する。
+- `client`: New。Next.js 管理 UI の責務、Browser から Agent RPC を直接呼ばない server-side invocation、Client D1 所有範囲、Agent domain snapshot を保存しない表示境界を定義する。
 - `workspace-governance`: New。repo-level scripts、TypeSpec/proto generation、Buf/Protobuf-ES drift checks、OpenSpec/spec-test coverage、supply-chain policy、禁止 API surface の lint guardrail を定義する。
 
 ### Modified Spec Units
@@ -34,7 +34,7 @@
 ## Naming
 
 - `agent-platform` の Scenario ID prefix は `AGENT-PLATFORM` を使用する。
-- `management-client` の Scenario ID prefix は `MANAGEMENT-CLIENT` を使用する。
+- `client` の Scenario ID prefix は `MANAGEMENT-CLIENT` を使用する。
 - `workspace-governance` の Scenario ID prefix は `WORKSPACE-GOVERNANCE` を使用する。
 - Scenario ID prefix に presentation/implementation-layer suffix は含めない。旧 demo package の分類は、foundation 後の仕様単位名、Scenario ID、documented package boundary には残さない。
 

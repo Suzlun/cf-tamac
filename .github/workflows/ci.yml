@@ -39,13 +39,13 @@ jobs:
         run: pnpm check
 
       - name: Agent and Client package checks
-        run: pnpm check:agent && pnpm check:management-client
+        run: pnpm check:agent && pnpm check:client
 
       - name: Unit tests
         run: pnpm test:run
 
       - name: Agent and Client package tests
-        run: pnpm test:agent && pnpm test:management-client
+        run: pnpm test:agent && pnpm test:client
 
       - name: Codegen drift check
         run: pnpm check:codegen
