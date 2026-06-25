@@ -160,6 +160,9 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 - Do not hand-edit `generated/**`.
 - Do not hand-edit command-owned Agent outputs: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, or `packages/client/src/generated/agent-rpc/**`.
 - Do not route generated RPC output edits to implementers; route source/config/codegen command changes instead.
+- Do not implement or request tests whose purpose is to prove that a previous route, old navigation item, deleted screen, deprecated file, demo page, or legacy behavior is absent.
+- If `tasks.md`, specs, or design test plans require old-surface absence tests, stop and return `BLOCKED` so the proposal artifacts can be corrected before implementation.
+- Removal-related implementation may delete old files/routes when required by the accepted design, but verification must target the positive supported surface or enduring security boundary instead.
 - Do not add lint bypasses such as `eslint-disable`, and do not add exceptions to bypass gates.
 - Dependency changes, version changes, permission boundary changes, and destructive changes are ask-first items. Stop and report instead of executing them.
 - Only the following subagents may be called via `task`: `planner`, `unit/agent/engineer`, `unit/agent/reviewer`, `unit/client/engineer`, `unit/client/reviewer`, `unit/client/designer`, `unit/build/builder`, and `unit/build/reviewer`.

@@ -104,7 +104,7 @@
 ## Integration notes for unit/client/engineer
 
 - `packages/client/app/agents/[agentId]/threads/page.tsx`: master-detail へ再設計。server component で Thread 一覧 RPC、詳細は query/segment で個別 RPC。
-- 既存 `/agents/[agentId]/compactions` route は本画面の Memory パネルへ統合し、個別 route を廃止方向。
+- Compaction / Memory 情報は本画面の Memory パネルに配置し、Thread context から因果関係を追えるようにする。
 - メモリ/Compaction データは全て Agent RPC。Client D1 非使用。
 
 ## Open questions / assumptions

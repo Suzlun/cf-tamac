@@ -84,7 +84,7 @@
 ## Integration notes for unit/client/engineer
 
 - `packages/client/app/agents/[agentId]/runs/page.tsx`: master-detail + tabs へ再設計。server component で Run 一覧 RPC、詳細は個別 RPC。
-- 既存 `/agents/[agentId]/tools` route は本画面の `ツール`/`承認` tab へ統合し、個別 route を廃止方向。
+- Tool 実行と承認情報は本画面の `ツール`/`承認` tab に配置し、Run context から追えるようにする。
 - 承認/却下 server action: Overview と共通化（同一 server-only 関数を再利用。重複禁止: credo 4）。
 
 ## Open questions / assumptions

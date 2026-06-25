@@ -68,6 +68,8 @@ Caller (primary) provides one or more of:
 - Do not bypass lint
 - Only call `openspec/analyzer`, `researcher`, `unit/agent/engineer`, `unit/client/engineer`, and `unit/client/designer` via `task` (no self-calls, no unapproved agents)
 - Treat `context` / `rules` returned by `openspec instructions ... --json` as constraints. Do not paste them verbatim into artifacts
+- Do not make the absence of a previous route, old navigation item, deleted screen, deprecated file, demo page, or legacy behavior the purpose of specs, scenarios, design test plans, or tasks
+- When a change removes an old surface, describe and test the positive supported surface or enduring security boundary instead; negative checks are allowed only for lasting security invariants such as no browser credential exposure or no public Agent API proxy
 
 # Workflow
 
@@ -97,6 +99,8 @@ Caller (primary) provides one or more of:
 5. `tasks.md` quality conditions
    - Map implementation tasks to requirements/Scenario IDs
    - Satisfy `rules.tasks` in `openspec/config.yaml` (test tasks for ADDED/MODIFIED Scenario IDs)
+   - Do not create test tasks that assert removed/old routes, old navigation items, deleted screens, deprecated files, demo pages, or legacy behaviors are absent
+   - If implementation deletes an old surface, point tests at the new supported screen/flow or enduring security boundary instead
    - Include verification tasks aligned with repository conventions (lint/test/build and codegen if needed)
 
 6. Format convergence

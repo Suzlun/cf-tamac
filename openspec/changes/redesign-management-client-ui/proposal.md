@@ -9,9 +9,9 @@ Management Client の現行 UI は、Agent を本番運用する管理者が状�
 - Management Client の navigation を、global area と selected-Agent area に分離する。
 - Global area は `Agents` と `Global Settings` だけを表示し、cross-Agent UI はこの 2 画面に限定する。
 - Selected-Agent area は、選択中 Agent に対する `Overview`、`Threads`、`Events`、`Runs`、`Schedules`、`Integrations`、`Settings` を左サイドバーで表示する。
-- Agent 未選択時は selected-Agent menu を hidden または disabled にし、Agent selection guidance を表示する。
-- `New Agent` は独立 side-menu item ではなく、`Agents` screen 内の action として扱う。
-- `Tools` と `Compactions` は独立 top-level menu にせず、Runs、Events、Threads、Overview、Settings など Agent-scoped context の detail/metadata として扱う。
+- Agent 未選択時は Agent selection guidance を表示する。
+- Agent registration は `Agents` screen 内の action として扱う。
+- Tool と Compaction は Runs、Events、Threads、Overview、Settings など Agent-scoped context の detail/metadata として扱う。
 - Desktop と mobile の responsive shell、empty/loading/error/permission states、keyboard/focus behavior、secret-safe error copy を UI contract に含める。
 - Management Client の server/browser boundary、Client-owned D1、server-only Agent RPC、no-proxy route、Protobuf RPC-only Agent surface は維持する。
 
@@ -23,7 +23,7 @@ None.
 
 ### Modified Spec Units
 
-- `management-client`: Management Client の route shell、navigation IA、browser secrecy、no-proxy 境界、global/selected-Agent sidebar behavior を更新する。Security concern: Browser bundle に Agent credential、direct Agent RPC invocation、Agent proxy route を入れない。
+- `management-client`: Management Client の route shell、navigation IA、browser secrecy、no-proxy 境界、global/selected-Agent sidebar behavior を更新し、旧 surface 不在目的の demo-free requirement を archive sync で削除する。Security concern: Browser bundle に Agent credential、direct Agent RPC invocation、Agent proxy route を入れない。
 - `client-management`: Agent list/registration/selection、Agent-scoped Overview/Threads/Events/Runs/Schedules/Integrations/Settings の UX contract、card/summary-first presentation、states/accessibility/test coverage を更新する。Security concern: Agent domain snapshots は Client D1 に保存せず、必要な Agent-owned data は server-side Agent RPC から取得する。
 
 ## Naming

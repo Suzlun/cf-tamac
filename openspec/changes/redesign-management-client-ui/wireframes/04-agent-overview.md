@@ -92,7 +92,7 @@
 
 - `packages/client/app/agents/[agentId]/page.tsx`: Overview として再設計。server component で Agent RPC を並列取得（Promise.all）し、display 用 shape に変換。
 - 承認/却下 server action: `packages/client/src/server/actions/` 配下。ToolInvocation 承認 RPC を呼ぶ。Browser-visible component は RPC import 禁止。
-- 既存 `/agents/[agentId]/compactions` route は Overview + Threads 詳細へ統合し、個別 route は廃止方向（delta spec で扱う）。
+- Compaction summary は Overview と Threads 詳細に配置し、Agent-scoped context で確認できるようにする。
 
 ## Open questions / assumptions
 

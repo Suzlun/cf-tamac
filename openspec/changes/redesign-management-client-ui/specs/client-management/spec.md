@@ -15,7 +15,6 @@ Agent 管理者は、登録済み Agent を一覧し、表示名、pin、並び�
 - Client UI は Agent ID、RPC origin、表示名、credential 参照入力、initial model policy を検証する Agent registration flow を `Agents` 画面内 action として提供 MUST。
 - Client UI は Agent selection を `Agents` 画面内 action として提供 MUST。選択 action は Server Action で最終閲覧 metadata を更新し、selected-Agent area へ遷移 SHALL。
 - Client UI は台帳変更に Server Actions または Server Components を使用 MUST し、Agent credential を Client 側 JavaScript に露出して MUST NOT。
-- `New Agent` は independent sidebar item、independent screen、independent route として公開 MUST NOT。
 
 #### Scenario: Agent list が registry 表示と並び順を支援する (CLIENT-MANAGEMENT-S001)
 
@@ -37,7 +36,6 @@ Agent 管理者は、登録済み Agent を一覧し、表示名、pin、並び�
 - **GIVEN** 運用者が Management Client の Global area を利用している
 - **WHEN** `/agents` 画面を開く
 - **THEN** Agent list、Agent registration action、Agent selection action が同じ画面で表示される
-- **AND** `New Agent` は side navigation item または independent route として表示されない
 - **AND** Agent card は status、credential hint、last-opened、pin state を色だけでなく label と icon で表示する
 
 ### Requirement: Thread Event Run と Compaction exploration UI
@@ -46,14 +44,13 @@ Client UI は Thread、Event、Run、Compaction、Memory の exploration view �
 
 **Customer Context**
 
-Agent の自律判断を運用するには、Thread、Event、Run、Compaction、Handoff、History、Memory をたどって「何が起きたか」「なぜそう判断したか」を確認できる画面が必要である。一方で Compaction を独立 top-level screen として扱うと、Thread/Memory 文脈から切り離され、運用者は同じ Agent-owned history を複数の入口で探す必要がある。
+Agent の自律判断を運用するには、Thread、Event、Run、Compaction、Handoff、History、Memory をたどって「何が起きたか」「なぜそう判断したか」を確認できる画面が必要である。Compaction を Thread/Memory 文脈の中で扱うことで、運用者は同じ Agent-owned history を一貫した因果関係で確認できる。
 
 **要件**
 
 - Client UI は Thread key、状態、Section、latest Event、latest Run、Memory/Compaction 要約を持つ Thread 一覧/詳細画面を提供 MUST。
 - Client UI は sequence、type、source、状態、スナップショット、判断出力、因果 link を持つ Event と Run の view を提供 MUST。
 - Client UI は latest Handoff、History 参照、Memory 版、provenance、rebase 状態を公開する Compaction と Memory の view を、Overview または Threads detail の metadata として提供 MUST。
-- Client UI は Compaction を independent top-level navigation item または independent top-level route として公開 MUST NOT。
 - これらの画面のすべてのデータは Agent RPC からサーバー側で取得 MUST し、Agent domain スナップショットを Client D1 に保存せずに描画 MUST。
 
 #### Scenario: Thread Event Run と Compaction views が Agent-owned history を表示する (CLIENT-MANAGEMENT-S005)
@@ -76,13 +73,13 @@ Client UI は selected-Agent area として、選択中 Agent に属する Overv
 
 **Requirement**
 
-Selected-Agent area は登録済み Agent が選択されている場合にのみ active SHALL。
+Selected-Agent area は登録済み Agent が選択されている場合に active SHALL。
 
 Selected-Agent area は `Overview`、`Threads`、`Events`、`Runs`、`Schedules`、`Integrations`、`Settings` を left sidebar の Agent-scoped navigation item として表示 SHALL。
 
-Agent 未選択時は selected-Agent navigation items を hidden または disabled にし、`Agents` 画面への guidance を表示 MUST。
+Agent 未選択時は selected-Agent navigation area に `Agents` 画面への guidance を表示 MUST。
 
-Topbar は selected Agent display と `Agents` 画面への導線だけを提供 SHALL。Topbar は cross-Agent quick switcher を提供 MUST NOT。
+Topbar は selected Agent display と `Agents` 画面への導線を提供 SHALL。
 
 #### Scenario: Selected-Agent screens activate only for selected Agent (CLIENT-MANAGEMENT-S011)
 
@@ -90,15 +87,15 @@ Topbar は selected Agent display と `Agents` 画面への導線だけを提供
 - **WHEN** selected-Agent area の navigation を表示する
 - **THEN** Overview、Threads、Events、Runs、Schedules、Integrations、Settings が left sidebar に表示される
 - **AND** 各 screen は選択中 Agent の Agent ID に scope された data だけを表示する
-- **AND** Agent 未選択時は selected-Agent items が hidden または disabled になり、`Agents` 画面への guidance が表示される
+- **AND** Agent 未選択時は `Agents` 画面への guidance が表示される
 
 ### Requirement: Tools and Compactions as Agent-scoped detail metadata
 
-Client UI は Tool と Compaction を independent top-level screens としてではなく、Agent-scoped screen の detail/metadata として提供 SHALL。
+Client UI は Tool と Compaction を Agent-scoped screen の detail/metadata として提供 SHALL。
 
 **Customer Context**
 
-管理者は Tool invocation、Tool approval、Tool catalog、Compaction、History、Memory を確認する必要がある。ただし、それらを top-level menu として分散させると、Run、Thread、Integration、Overview の文脈から切り離され、因果関係と所有境界を理解しにくくなる。
+管理者は Tool invocation、Tool approval、Tool catalog、Compaction、History、Memory を確認する必要がある。Run、Thread、Integration、Overview の文脈に沿って表示することで、因果関係と所有境界を理解しやすくなる。
 
 **Requirement**
 
@@ -108,8 +105,6 @@ Tool invocation と Tool approval は Runs detail、Events detail、Overview app
 
 Compaction、Handoff、History、Memory metadata は Overview summary または Threads detail に表示 SHALL。
 
-Tools と Compactions は independent top-level navigation item、independent top-level route、Global area screen として表示 MUST NOT。
-
 All Tool and Compaction data SHALL be fetched server-side through generated Agent RPC usage and SHALL NOT be persisted as Client D1 Agent-domain snapshots.
 
 #### Scenario: Tools and Compactions are shown inside Agent-scoped context (CLIENT-MANAGEMENT-S012)
@@ -118,7 +113,6 @@ All Tool and Compaction data SHALL be fetched server-side through generated Agen
 - **WHEN** 運用者が Overview、Threads detail、Events detail、Runs detail、Integrations detail、Settings を確認する
 - **THEN** Tool catalog、Tool invocation、Tool approval は Integrations、Runs、Events、Overview、Settings の Agent-scoped context に表示される
 - **AND** Compaction、Handoff、History、Memory metadata は Overview または Threads detail に表示される
-- **AND** Tools と Compactions は top-level navigation item または independent route として表示されない
 
 ### Requirement: Global Settings UI
 

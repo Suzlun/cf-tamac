@@ -83,7 +83,7 @@
 ## Integration notes for unit/client/engineer
 
 - `packages/client/app/agents/[agentId]/integrations/page.tsx`: master-detail + tabs へ再設計。server action で Integration install/uninstall/list（CLIENT-MANAGEMENT-S008）。
-- 既存 `/agents/[agentId]/tools` route は本画面の `ツール` tab へ統合し、個別 route を廃止方向。
+- Tool catalog は本画面の `ツール` tab に配置し、Integration context から確認できるようにする。
 
 ## Open questions / assumptions
 

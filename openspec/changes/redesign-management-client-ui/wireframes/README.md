@@ -63,11 +63,11 @@
 | Integrations | `/agents/[agentId]/integrations` | Integration install/list/uninstall（Tool カタログを含む） |
 | Settings     | `/agents/[agentId]/settings`     | API・credential・model policy・一般設定                   |
 
-### トップレベルから除外する項目（制約準拠）
+### Agent-scoped detail に配置する項目
 
-- **New Agent**: 独立サイドバー項目・独立 screen・独立 route にしない。`Agents` 画面内のプライマリアクションから同一画面内の登録 panel / dialog を開く。
-- **Tools**: 独立トップレベルにしない。以下へ分散: Tool カタログ=Integrations／Tool 実行=Runs／ToolInvocation 承認=Overview の承認キュー + Runs 詳細／Tool 設定=Settings。
-- **Compactions**: 独立トップレベルにしない。集約サマリ=Overview／詳細=Threads の Thread 詳細内「Memory & Compaction」パネル。
+- **Agent registration**: `Agents` 画面内のプライマリアクションから同一画面内の登録 panel / dialog を開く。
+- **Tools**: Tool カタログ=Integrations／Tool 実行=Runs／ToolInvocation 承認=Overview の承認キュー + Runs 詳細／Tool 設定=Settings。
+- **Compactions**: 集約サマリ=Overview／詳細=Threads の Thread 詳細内「Memory & Compaction」パネル。
 
 ### ルート正規化
 

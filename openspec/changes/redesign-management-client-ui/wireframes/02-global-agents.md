@@ -8,7 +8,7 @@
 ## Route & URL
 
 - 一覧: `GET /agents`
-- 新規登録: `/agents` の「エージェントを追加」ボタンから同一画面内の登録 panel / dialog を起動する。`/agents/new` は独立 screen / route として扱わない。
+- 新規登録: `/agents` の「エージェントを追加」ボタンから同一画面内の登録 panel / dialog を起動する。
 - 選択: 一覧 card の「開く」で Server Action `selectManagedAgent` → selected-Agent area へ遷移。
 
 ## Desktop layout — 一覧 (>= 1024px)
@@ -78,7 +78,7 @@
 
 ## Desktop layout — New Agent 登録（Agents 画面内 panel / dialog）
 
-`New Agent` を独立 sidebar 項目・独立 screen・独立 route にせず、「画面内アクションから開く登録フロー」として再設計。
+Agent registration を「Agents 画面内アクションから開く登録フロー」として再設計。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -158,7 +158,7 @@
 ## Integration notes for unit/client/engineer
 
 - `packages/client/app/agents/page.tsx`: 既存 `AgentList` を card-first 仕様へ更新（client component は props 受けのまま、内部 render を card 化）。`listManagedAgentsWithCredentialStatus` 再利用。
-- `packages/client/app/agents/new/page.tsx`: 独立 route としては廃止し、登録 stepper は `/agents` 画面内の panel / dialog へ統合する。server action で `InitializeAgent` + model policy フローを構成（CLIENT-MANAGEMENT-S017/S002）。
+- Agent registration stepper は `/agents` 画面内の panel / dialog へ統合する。server action で `InitializeAgent` + model policy フローを構成（CLIENT-MANAGEMENT-S017/S002）。
 - 新規 server-only: `selectManagedAgent`。`packages/client/src/server/actions/managed-agents.ts` に集約（既存 `setManagedAgentPinned`/`markManagedAgentOpened` と同所。重複禁止）。
 - `packages/client/src/components/agent-list.tsx` を card grid へ。新規 `agent-card.tsx`。
 

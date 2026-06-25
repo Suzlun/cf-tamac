@@ -112,6 +112,12 @@ artifacts:
       - Good: "Agent public API は generated Protobuf RPC services と binary Connect transport のみを公開しなければならない。"
       - Package/path references are allowed only when they express enduring responsibility boundaries or externally relevant structural guarantees.
 
+      Legacy-surface rules:
+      - Specs MUST NOT make the absence of a previous route, old navigation item, deleted screen, deprecated file, demo page, or legacy behavior the purpose of a requirement or scenario.
+      - Do not write scenarios whose main assertion is that an old route/path/link/tab/menu item no longer exists.
+      - If a removal is part of the implementation, express the enduring end-state as the positive supported surface, ownership boundary, or security boundary instead of naming the removed surface.
+      - Security boundaries may use negative assertions only when they are enduring product invariants, such as no browser credential exposure or no public Agent API proxy; they MUST NOT be framed as old-surface cleanup.
+
       Scenario rules:
       - Each scenario MUST be a level-4 heading:
         - `#### Scenario: <name> (<SCENARIO_ID>)`
@@ -260,6 +266,8 @@ artifacts:
       - A single Scenario ID may be covered by multiple tests (1:N). Add multiple E2E/IT/UT rows referencing the same Scenario ID as needed (happy/error/boundary/security/performance/etc.).
       - Automated tests MUST include the Scenario ID in the test title in brackets:
         - Example: `test('[AGENT-LIFECYCLE-S001] Agent 初期化が成功する', async () => { ... })`
+      - Automated tests MUST NOT be created to prove that a previous route, old navigation item, deleted screen, deprecated file, demo page, or legacy behavior is absent.
+      - Removal-related verification MUST instead assert the positive supported surface or enduring security boundary that remains after implementation.
 
       Rollback/Migration/Release:
       - If DB or contract changes exist, include rollback and migration steps.
@@ -287,6 +295,8 @@ artifacts:
       - For each ADDED/MODIFIED Scenario ID, include a task to add/update automated tests.
       - It is valid (and often expected) to add multiple tests per Scenario ID (1:N) to cover different categories.
       - Automated tests MUST reference Scenario IDs in test titles using brackets.
+      - Tasks MUST NOT ask implementers to add/update tests whose purpose is to prove that a previous route, old navigation item, deleted screen, deprecated file, demo page, or legacy behavior is absent.
+      - When implementation removes an old surface, test tasks MUST target the positive supported surface or enduring security boundary instead.
       - Include tasks for updating docs (spec/design) when behavior changes.
 
       Task boundary rules:
