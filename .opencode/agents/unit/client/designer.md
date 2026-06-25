@@ -2,8 +2,7 @@
 description: Management Client UI/UX design specialist for Next.js route shells and wireframe specifications under openspec/changes.
 mode: subagent
 hidden: true
-model: openai/gpt-5.5
-reasoningEffort: 'xhigh'
+model: zai-coding-plan/glm-5.2
 temperature: 0.1
 permission:
   edit:
