@@ -11,7 +11,7 @@ interface NewAgentPageProps {
 }
 
 /**
- * Add or edit managed Agent registration page (CLIENT-MANAGEMENT-S002).
+ * Add or edit managed Agent registration page (AGENT-MANAGEMENT-UI-S002).
  */
 export default async function NewAgentPage({ searchParams }: NewAgentPageProps) {
   const { edit } = await searchParams;

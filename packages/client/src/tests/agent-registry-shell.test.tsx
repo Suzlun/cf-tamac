@@ -22,7 +22,7 @@ const expectedRouteFiles = [
 ];
 
 describe('Management Client Agent registry shell', () => {
-  it('[MANAGEMENT-CLIENT-S001] Agent registry shell renders without demo content', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S001] Agent registry shell renders without demo content', () => {
     const registryPage = readFileSync(fileURLToPath(registryPagePath.href), 'utf8');
     const detailPage = readFileSync(fileURLToPath(detailPagePath.href), 'utf8');
     const sectionNav = readFileSync(fileURLToPath(sectionNavPath.href), 'utf8');

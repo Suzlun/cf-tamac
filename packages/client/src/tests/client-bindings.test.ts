@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const wranglerConfigPath = new URL('../../wrangler.toml', import.meta.url);
 
 describe('Management Client Worker bindings', () => {
-  it('[MANAGEMENT-CLIENT-S005] Client Worker binding set is isolated from Agent runtime', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S005] Client Worker binding set is isolated from Agent runtime', () => {
     const config = readFileSync(fileURLToPath(wranglerConfigPath.href), 'utf8');
 
     expect(config).toContain('[[d1_databases]]');

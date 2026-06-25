@@ -18,7 +18,7 @@ Agent 管理者は Client Service signing key を Management Client から生成
 - Client UI は status 変更または deletion が Agent trust config 更新を必要とする場合、運用者に明示 MUST。
 - Signing key 操作は server-side validation と確定済み永続化結果に基づいて UI 状態を更新 MUST。
 
-#### Scenario: 署名鍵管理画面が key lifecycle を扱う (CLIENT-MANAGEMENT-S010)
+#### Scenario: 署名鍵管理画面が key lifecycle を扱う (AGENT-MANAGEMENT-UI-S010)
 
 - **GIVEN** 運用者が Management Client の signing key 管理画面を開いている
 - **WHEN** 運用者が Ed25519 key pair を生成し、default selection を変更し、key を `disabled` または `deleted` にする
@@ -26,7 +26,7 @@ Agent 管理者は Client Service signing key を Management Client から生成
 - **AND** Server Action は Client D1 の signing key record を更新する
 - **AND** Agent trust config 更新が必要な操作では警告と次の確認 action が表示される
 
-#### Scenario: ブラウザーが signing material を受け取らない (CLIENT-MANAGEMENT-S011)
+#### Scenario: ブラウザーが signing material を受け取らない (AGENT-MANAGEMENT-UI-S011)
 
 - **GIVEN** 運用者が signing key generation、detail 表示、status 更新を行っている
 - **WHEN** ブラウザー network response、HTML、JavaScript bundle、storage が検査される
@@ -50,7 +50,7 @@ Client UI は managed Agent ごとの signing key selection と Agent health ver
 - Client UI は Agent key / Client key の不整合を、secret を含まない対処可能な error message として表示 MUST。
 - Browser-visible code は Agent RPC credential、private key 復号、JWT signing、direct Agent RPC invocation logic を含んで MUST NOT。
 
-#### Scenario: Agent 詳細が issuer/kid/fingerprint と疎通結果を表示する (CLIENT-MANAGEMENT-S012)
+#### Scenario: Agent 詳細が issuer/kid/fingerprint と疎通結果を表示する (AGENT-MANAGEMENT-UI-S012)
 
 - **GIVEN** managed Agent `agent-alpha` が signing issuer/kid/public fingerprint を持っている
 - **WHEN** 運用者が Agent detail で health verification を実行する
@@ -77,7 +77,7 @@ Client UI は Agent Worker に設定できる public-only trust config JSON を�
 - Client UI は Agent trust config JSON schema validation 結果を表示 SHALL。
 - Client UI は public fingerprint を表示し、Agent registry record と照合できる SHALL。
 
-#### Scenario: 信頼設定 export が公開情報だけの JSON を生成する (CLIENT-MANAGEMENT-S013)
+#### Scenario: 信頼設定 export が公開情報だけの JSON を生成する (AGENT-MANAGEMENT-UI-S013)
 
 - **GIVEN** Client signing key store に active key と disabled key が存在する
 - **WHEN** 運用者が issuer、allowed Agent、allowed scope、key status を選択して trust config を生成する
@@ -85,7 +85,7 @@ Client UI は Agent Worker に設定できる public-only trust config JSON を�
 - **AND** JSON は issuer、kid、kty、crv、x、status、principalType、allowedAgentIds、allowedScopes、fingerprint 照合情報を含む
 - **AND** private key parameter `d`、private JWK plaintext、encrypted private JWK は含まれない
 
-#### Scenario: 広い scope selection は警告と schema validation を表示する (CLIENT-MANAGEMENT-S014)
+#### Scenario: 広い scope selection は警告と schema validation を表示する (AGENT-MANAGEMENT-UI-S014)
 
 - **GIVEN** 運用者が `allowedAgentIds = ["*"]` または高権限 scope を選択している
 - **WHEN** trust config export preview が更新される
@@ -109,14 +109,14 @@ Client UI は signing key rotation、emergency revoke、break-glass recovery の
 - Client UI は `ADMIN_OPERATOR` issuer と高権限 scope の用途を break-glass recovery として区別して表示 SHALL。
 - Client UI は recovery key を Client-managed signing key store とは別管理にする必要を表示 SHALL。
 
-#### Scenario: 鍵交代 guidance が trust config と Agent verification を結び付ける (CLIENT-MANAGEMENT-S015)
+#### Scenario: 鍵交代 guidance が trust config と Agent verification を結び付ける (AGENT-MANAGEMENT-UI-S015)
 
 - **GIVEN** 運用者が signing key rotation flow を開いている
 - **WHEN** 運用者が rotation 対象 key を生成し、Agent trust config export を確認し、managed Agent の signing kid を切り替え、health verification を実行する
 - **THEN** UI は各段階の completion 状態と現在の issuer/kid/fingerprint を表示する
 - **AND** health verification が成功するまで retired/revoked 操作を安全確認なしで完了扱いにしない
 
-#### Scenario: 緊急失効と break-glass recovery guidance が表示される (CLIENT-MANAGEMENT-S016)
+#### Scenario: 緊急失効と break-glass recovery guidance が表示される (AGENT-MANAGEMENT-UI-S016)
 
 - **GIVEN** 運用者が signing key detail または recovery guidance を開いている
 - **WHEN** 運用者が compromised key、revoked status、ADMIN_OPERATOR issuer の説明を確認する

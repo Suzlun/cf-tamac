@@ -19,7 +19,7 @@ interface AgentIntegrationsPageProps {
 }
 
 /**
- * Integration installation management page（CLIENT-MANAGEMENT-S008）。
+ * Integration installation management page（AGENT-MANAGEMENT-UI-S008）。
  *
  * Integration install/list/uninstall を server-side Agent RPC に閉じ、Provider
  * identity や Adapter/Tool/Delivery capability は browser-safe metadata のみで表示する。

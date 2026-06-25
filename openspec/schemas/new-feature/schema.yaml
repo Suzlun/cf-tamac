@@ -19,14 +19,14 @@ artifacts:
 
       Spec Unit rules:
       - Spec Unit = `<capability>`
-      - `<capability>`: kebab-case enduring responsibility name (e.g., `agent-lifecycle`, `client-management`, `workspace-governance`)
+      - `<capability>`: kebab-case enduring responsibility name (e.g., `agent-lifecycle`, `agent-management-ui`, `workspace-governance`)
       - Delta spec file path (within the change): `specs/<capability>/spec.md`
       - Main spec file path (source of truth after archiving/sync): `openspec/specs/<capability>/spec.md`
       - Do not append layer abbreviations to Spec Unit names; split responsibilities by capability/ownership names instead.
 
       Naming rules:
       - Scenario ID format: `<CAPABILITY>-S###` (e.g., `AGENT-LIFECYCLE-S001`)
-      - Requirement reference ID format (for planning/traceability): `<CAPABILITY>-R###` (e.g., `CLIENT-MANAGEMENT-R002`)
+      - Requirement reference ID format (for planning/traceability): `<CAPABILITY>-R###` (e.g., `AGENT-MANAGEMENT-UI-R002`)
       - `<CAPABILITY>` is `<capability>` uppercased with hyphens.
 
       Document structure:
@@ -56,7 +56,7 @@ artifacts:
 
       Naming section requirements:
       - Confirm the Scenario ID prefix you will use (derived from `<capability>`).
-      - Confirm that related responsibilities use distinct capability names when they need separate specs (e.g., `CLIENT-REGISTRY-*` vs `CLIENT-MANAGEMENT-*`).
+      - Confirm that related responsibilities use distinct capability names when they need separate specs (e.g., `CLIENT-REGISTRY-*` vs `AGENT-MANAGEMENT-UI-*`).
 
       Proposal boundary rules:
       - proposal.md explains why the change is needed and which lasting Spec Units are affected.
@@ -253,7 +253,7 @@ artifacts:
 
       Test naming conventions (recommended):
       - Scenario ID: `<CAPABILITY>-S###` (e.g., `AGENT-LIFECYCLE-S001`)
-      - Requirement reference ID: `<CAPABILITY>-R###` (e.g., `CLIENT-MANAGEMENT-R002`)
+      - Requirement reference ID: `<CAPABILITY>-R###` (e.g., `AGENT-MANAGEMENT-UI-R002`)
       - Category (`CAT`): `HAP`, `ERR`, `BND`, `PERM`, `SEC`, `A11Y`, `PERF`, `REG`, `SMK`
       - UAT ID: `UAT-<CAPABILITY>-<CAT>-###`
       - E2E ID: `E2E-<CAPABILITY>-<CAT>-###`
@@ -261,7 +261,7 @@ artifacts:
       - UT ID: `UT-<CAPABILITY>-<CAT>-###`
 
       Traceability rules:
-      - UAT rows SHOULD reference a requirement reference ID (e.g., `CLIENT-MANAGEMENT-R001`) and the requirement name.
+      - UAT rows SHOULD reference a requirement reference ID (e.g., `AGENT-MANAGEMENT-UI-R001`) and the requirement name.
       - E2E/IT/UT rows SHOULD reference a Scenario ID.
       - A single Scenario ID may be covered by multiple tests (1:N). Add multiple E2E/IT/UT rows referencing the same Scenario ID as needed (happy/error/boundary/security/performance/etc.).
       - Automated tests MUST include the Scenario ID in the test title in brackets:

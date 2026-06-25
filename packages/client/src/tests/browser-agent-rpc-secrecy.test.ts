@@ -39,7 +39,7 @@ function relativePath(filePath: string): string {
 }
 
 describe('Management Client browser Agent RPC secrecy', () => {
-  it('[MANAGEMENT-CLIENT-S002] Browser bundle excludes Agent RPC credentials', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S002] Browser bundle excludes Agent RPC credentials', () => {
     const browserIssues = collectFiles(appRoot).flatMap((filePath) => {
       const content = readFileSync(filePath, 'utf8');
       return forbiddenBrowserPatterns

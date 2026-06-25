@@ -2,7 +2,7 @@
 
 ### Requirement: Server-side management UI shell
 
-Management Client は、Agent credential や direct Agent RPC invocation を Browser code へ露出せず、server-side Agent management shell を render MUST。
+Management Client shell は、Agent credential や direct Agent RPC invocation を Browser code へ露出せず、server-side Agent management shell を render MUST。
 
 **Customer Context**
 
@@ -34,28 +34,28 @@ Agent registration は `Agents` 画面内 action として提供 SHALL。
 
 ToolInvocation、Tool catalog、Tool approval、Compaction、History、Handoff、Memory metadata は Agent-scoped Overview、Threads、Events、Runs、Integrations、Settings の detail/metadata として表示 SHALL。
 
-#### Scenario: Agent registry shell renders for a browser user (MANAGEMENT-CLIENT-S001)
+#### Scenario: Agent registry shell renders for a browser user (MANAGEMENT-CLIENT-SHELL-S001)
 
 - **GIVEN** browser user が management Client を開く
 - **WHEN** `/agents` route が render される
 - **THEN** page は Agent registry shell、empty-state guidance、Agent registration action、Agent selection affordance、Global Settings への navigation を表示する
 - **AND** selected-Agent navigation は Agent 未選択時に選択 guidance を表示する
 
-#### Scenario: Browser bundles do not call Agent RPC directly (MANAGEMENT-CLIENT-S002)
+#### Scenario: Browser bundles do not call Agent RPC directly (MANAGEMENT-CLIENT-SHELL-S002)
 
 - **GIVEN** Client production build が利用できる
 - **WHEN** browser-delivered chunks を検査する
 - **THEN** Agent RPC origin invocation code と Agent credential material はそれらの chunks に存在しない
 - **AND** Agent RPC client construction は server-side modules からのみ到達可能である
 
-#### Scenario: Left sidebar separates global and selected-Agent navigation (MANAGEMENT-CLIENT-S009)
+#### Scenario: Left sidebar separates global and selected-Agent navigation (MANAGEMENT-CLIENT-SHELL-S009)
 
 - **GIVEN** browser user が management Client を開き、Agent を選択していない
 - **WHEN** management shell が render される
 - **THEN** left sidebar は Global area として `Agents` と `Global Settings` を表示する
 - **AND** Selected-Agent area は Agent 選択への guidance を表示する
 
-#### Scenario: Selected-Agent area activates for registered Agent context (MANAGEMENT-CLIENT-S010)
+#### Scenario: Selected-Agent area activates for registered Agent context (MANAGEMENT-CLIENT-SHELL-S010)
 
 - **GIVEN** browser user が Client D1 に登録済みの Agent を選択している
 - **WHEN** selected-Agent route が render される

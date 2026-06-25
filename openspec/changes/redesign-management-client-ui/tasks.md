@@ -1,6 +1,6 @@
 ## 1. OpenSpec and UI Contract Inputs
 
-- [ ] 1.1 Read `proposal.md`, `design.md`, `specs/management-client/spec.md`, `specs/client-management/spec.md`, and `wireframes/*.md`; pin `/` → `/agents`, `/settings`, Agents-screen registration, selected-Agent left sidebar, and Agent-scoped Tool/Compaction detail placement as implementation decisions.
+- [ ] 1.1 Read `proposal.md`, `design.md`, `specs/management-client-shell/spec.md`, `specs/agent-management-ui/spec.md`, and `wireframes/*.md`; pin `/` → `/agents`, `/settings`, Agents-screen registration, selected-Agent left sidebar, and Agent-scoped Tool/Compaction detail placement as implementation decisions.
 - [ ] 1.2 Confirm the implementation branch does not edit `packages/agent/src/typespec/**`, `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, or `packages/client/src/generated/agent-rpc/**`; keep Agent API impact at zero for this change.
 
 ## 2. Route Shell and Navigation
@@ -43,21 +43,21 @@
 
 ## 6. Scenario-Covered Automated Tests
 
-- [ ] 6.1 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-S001] Agent registry shell renders for a browser user` covering `/agents`, registration action, and selected-Agent guidance state.
-- [ ] 6.2 Add/update `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts` with a test titled `[MANAGEMENT-CLIENT-S002] Browser bundles do not call Agent RPC directly` covering the redesigned shell and card components.
-- [ ] 6.3 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-S009] Left sidebar separates global and selected-Agent navigation` covering Global area and Agent-unselected state.
-- [ ] 6.4 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-S010] Selected-Agent area activates for registered Agent context` covering the seven selected-Agent items and Topbar selected-Agent display.
-- [ ] 6.5 Add/update `packages/client/src/tests/client-api-proxy-absence.test.ts` with a test titled `[MANAGEMENT-CLIENT-S008] Client exposes no Agent API proxy routes` covering the public Agent API proxy security boundary.
-- [ ] 6.6 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-S001] Root entry opens the Agent registry shell` covering `/` redirect behavior and Agent registry guidance.
-- [ ] 6.7 Add/update `packages/client/src/tests/agent-registry-shell.test.tsx` or `management-navigation.test.tsx` with a test titled `[CLIENT-MANAGEMENT-S001] Agent list が registry 表示と並び順を支援する` covering card-first pinned ordering and last-opened update.
-- [ ] 6.8 Add/update `packages/client/src/tests/agent-registry-shell.test.tsx` with a test titled `[CLIENT-MANAGEMENT-S002] Add Agent フォームが connection メタデータをアクセシブルに検証する` covering in-page registration validation and accessible error linkage.
-- [ ] 6.9 Add/update `packages/client/src/tests/agent-registry-shell.test.tsx` with a test titled `[CLIENT-MANAGEMENT-S010] Agents screen owns Agent registration and selection` covering registration action, selection action, and status labels.
-- [ ] 6.10 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[CLIENT-MANAGEMENT-S011] Selected-Agent screens activate only for selected Agent` covering Agent-scoped routes and selected-agent-required state.
-- [ ] 6.11 Add/update `packages/client/src/tests/management-navigation.test.tsx` or dedicated component tests with a test titled `[CLIENT-MANAGEMENT-S012] Tools and Compactions are shown inside Agent-scoped context` covering Tool/Compaction metadata in Overview/Threads/Runs/Integrations/Settings.
-- [ ] 6.12 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[CLIENT-MANAGEMENT-S013] Global Settings handles only Client-wide settings` covering `/settings` content and absence of Agent-specific data.
-- [ ] 6.13 Add/update `packages/client/src/tests/client-d1-schema.test.ts` and `client-repository-boundary.test.ts` with tests titled `[CLIENT-MANAGEMENT-S013] Client D1 remains limited to management metadata` covering no Agent-domain snapshot table or repository write.
-- [ ] 6.14 Add/update component tests with a test titled `[CLIENT-MANAGEMENT-S014] Screens expose actionable states without leaking secrets` covering loading/empty/error/disabled/pending states and secret-safe copy.
-- [ ] 6.15 Add/update `packages/client/src/tests/client-repository-boundary.test.ts` with a test titled `[CLIENT-MANAGEMENT-S005] Thread Event Run と Compaction views が Agent-owned history を表示する` covering server-side Agent RPC reads and no Client D1 persistence for Agent-owned history.
+- [ ] 6.1 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-SHELL-S001] Agent registry shell renders for a browser user` covering `/agents`, registration action, and selected-Agent guidance state.
+- [ ] 6.2 Add/update `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts` with a test titled `[MANAGEMENT-CLIENT-SHELL-S002] Browser bundles do not call Agent RPC directly` covering the redesigned shell and card components.
+- [ ] 6.3 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-SHELL-S009] Left sidebar separates global and selected-Agent navigation` covering Global area and Agent-unselected state.
+- [ ] 6.4 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-SHELL-S010] Selected-Agent area activates for registered Agent context` covering the seven selected-Agent items and Topbar selected-Agent display.
+- [ ] 6.5 Add/update `packages/client/src/tests/client-api-proxy-absence.test.ts` with a test titled `[MANAGEMENT-CLIENT-SHELL-S008] Client exposes no Agent API proxy routes` covering the public Agent API proxy security boundary.
+- [ ] 6.6 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[MANAGEMENT-CLIENT-SHELL-S001] Root entry opens the Agent registry shell` covering `/` redirect behavior and Agent registry guidance.
+- [ ] 6.7 Add/update `packages/client/src/tests/agent-registry-shell.test.tsx` or `management-navigation.test.tsx` with a test titled `[AGENT-MANAGEMENT-UI-S001] Agent list が registry 表示と並び順を支援する` covering card-first pinned ordering and last-opened update.
+- [ ] 6.8 Add/update `packages/client/src/tests/agent-registry-shell.test.tsx` with a test titled `[AGENT-MANAGEMENT-UI-S002] Add Agent フォームが connection メタデータをアクセシブルに検証する` covering in-page registration validation and accessible error linkage.
+- [ ] 6.9 Add/update `packages/client/src/tests/agent-registry-shell.test.tsx` with a test titled `[AGENT-MANAGEMENT-UI-S010] Agents screen owns Agent registration and selection` covering registration action, selection action, and status labels.
+- [ ] 6.10 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[AGENT-MANAGEMENT-UI-S011] Selected-Agent screens activate only for selected Agent` covering Agent-scoped routes and selected-agent-required state.
+- [ ] 6.11 Add/update `packages/client/src/tests/management-navigation.test.tsx` or dedicated component tests with a test titled `[AGENT-MANAGEMENT-UI-S012] Tools and Compactions are shown inside Agent-scoped context` covering Tool/Compaction metadata in Overview/Threads/Runs/Integrations/Settings.
+- [ ] 6.12 Add/update `packages/client/src/tests/management-navigation.test.tsx` with a test titled `[AGENT-MANAGEMENT-UI-S013] Global Settings handles only Client-wide settings` covering `/settings` content and absence of Agent-specific data.
+- [ ] 6.13 Add/update `packages/client/src/tests/client-d1-schema.test.ts` and `client-repository-boundary.test.ts` with tests titled `[AGENT-MANAGEMENT-UI-S013] Client D1 remains limited to management metadata` covering no Agent-domain snapshot table or repository write.
+- [ ] 6.14 Add/update component tests with a test titled `[AGENT-MANAGEMENT-UI-S014] Screens expose actionable states without leaking secrets` covering loading/empty/error/disabled/pending states and secret-safe copy.
+- [ ] 6.15 Add/update `packages/client/src/tests/client-repository-boundary.test.ts` with a test titled `[AGENT-MANAGEMENT-UI-S005] Thread Event Run と Compaction views が Agent-owned history を表示する` covering server-side Agent RPC reads and no Client D1 persistence for Agent-owned history.
 
 ## 7. Verification and Review
 

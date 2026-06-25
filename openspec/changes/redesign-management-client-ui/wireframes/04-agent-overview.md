@@ -62,8 +62,8 @@
 ## Data & state contract（server-only 境界）
 
 - 全データ server-side Agent RPC から取得。`GetAgent`（profile/lifecycle/config/capability 要約）+ 承認待ち ToolInvocation 一覧 + 最近活動 + Memory/Compaction 集約。
-- **Agent-domain snapshot を Client D1 に保存しない**。毎回 RPC から取得（management-client spec S003/S004）。
-- 承認/却下: server action が acting user context 付きで Agent RPC を呼ぶ（CLIENT-MANAGEMENT-S007）。
+- **Agent-domain snapshot を Client D1 に保存しない**。毎回 RPC から取得（management-client-shell spec S003/S004）。
+- 承認/却下: server action が acting user context 付きで Agent RPC を呼ぶ（AGENT-MANAGEMENT-UI-S007）。
 
 ## States
 

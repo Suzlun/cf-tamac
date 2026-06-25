@@ -3,7 +3,7 @@
 ## Intent & Users
 
 - 顧客: 管理者。汎用 Integration manifest で install/list/uninstall し、Adapter Connection・Tool・Delivery capability・setup 状態を確認したい。
-- 目的: Integration の install/list/uninstall と、それが提供する **Tool カタログ（Tool definition/Installation 所有関係）をここに集約**し、Tools トップレベルを廃止する根拠とする（CLIENT-MANAGEMENT-S008）。
+- 目的: Integration の install/list/uninstall と、それが提供する **Tool カタログ（Tool definition/Installation 所有関係）をここに集約**し、Tools トップレベルを廃止する根拠とする（AGENT-MANAGEMENT-UI-S008）。
 
 ## Route & URL
 
@@ -43,7 +43,7 @@
      - `ツール` = Tool カタログ（Tool definition, Installation 所有関係, invocation 状態サマリ）。**Tools トップレベル廃止の代替（カタログ側）**。実行/承認は Runs/Overview へ導線。
      - `アダプタ` = Adapter Connection 状態・grant・setup 手順。
      - `権限付与` = grant 一覧・状態。
-3. `+ インテグレーションを追加`: manifest 入力/選択 → server 側で署名検証 → install（CLIENT-MANAGEMENT-S008）。
+3. `+ インテグレーションを追加`: manifest 入力/選択 → server 側で署名検証 → install（AGENT-MANAGEMENT-UI-S008）。
 
 ## Mobile layout (< 1024px)
 
@@ -51,7 +51,7 @@
 
 ## Data & state contract（server-only 境界）
 
-- 全て server-side Agent RPC。Integration manifest の署名検証も server 側。manifest/署名 material を Browser に渡さない（CLIENT-MANAGEMENT-S008/S009）。
+- 全て server-side Agent RPC。Integration manifest の署名検証も server 側。manifest/署名 material を Browser に渡さない（AGENT-MANAGEMENT-UI-S008/S009）。
 - install/uninstall は acting user context 必須。
 
 ## States
@@ -82,7 +82,7 @@
 
 ## Integration notes for unit/client/engineer
 
-- `packages/client/app/agents/[agentId]/integrations/page.tsx`: master-detail + tabs へ再設計。server action で Integration install/uninstall/list（CLIENT-MANAGEMENT-S008）。
+- `packages/client/app/agents/[agentId]/integrations/page.tsx`: master-detail + tabs へ再設計。server action で Integration install/uninstall/list（AGENT-MANAGEMENT-UI-S008）。
 - Tool catalog は本画面の `ツール` tab に配置し、Integration context から確認できるようにする。
 
 ## Open questions / assumptions

@@ -12,7 +12,7 @@ interface AgentThreadsPageProps {
 }
 
 /**
- * Agent Thread list page（CLIENT-MANAGEMENT-S005）。
+ * Agent Thread list page（AGENT-MANAGEMENT-UI-S005）。
  *
  * Agent-owned Thread を Server Action 経由で取得し、filter と cursor を
  * Agent scope に閉じたまま表示コンポーネントへ渡す。

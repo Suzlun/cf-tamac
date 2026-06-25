@@ -117,8 +117,8 @@ function read(filePath: URL): string {
   return readFileSync(fileURLToPath(filePath.href), 'utf8');
 }
 
-describe('Agent list page (CLIENT-MANAGEMENT-S001)', () => {
-  it('[CLIENT-MANAGEMENT-S001] Agent list displays registry fields from browser-safe data', () => {
+describe('Agent list page (AGENT-MANAGEMENT-UI-S001)', () => {
+  it('[AGENT-MANAGEMENT-UI-S001] Agent list displays registry fields from browser-safe data', () => {
     const agentList = read(agentListPath);
     const agentsPage = read(agentsPagePath);
     const dataTable = read(dataTablePath);
@@ -168,7 +168,7 @@ describe('Agent list page (CLIENT-MANAGEMENT-S001)', () => {
     expect(hintInterface).not.toContain('publicFingerprint');
   });
 
-  it('[CLIENT-MANAGEMENT-S001] Agent list uses shadcn-style UI primitives', () => {
+  it('[AGENT-MANAGEMENT-UI-S001] Agent list uses shadcn-style UI primitives', () => {
     const dataTable = read(dataTablePath);
     const signalBadge = read(signalBadgePath);
     const emptyState = read(emptyStatePath);
@@ -198,8 +198,8 @@ describe('Agent list page (CLIENT-MANAGEMENT-S001)', () => {
   });
 });
 
-describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
-  it('[CLIENT-MANAGEMENT-S002] Form provides accessible validation with aria-describedby', () => {
+describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form provides accessible validation with aria-describedby', () => {
     const formField = read(formFieldPath);
     const registrationForm = read(registrationFormPath);
     const registrationSchema = read(registrationSchemaPath);
@@ -243,7 +243,7 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(newAgentPage).toContain("'use server'");
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Server validation runs before writes and rolls back partial registration', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Server validation runs before writes and rolls back partial registration', () => {
     const registrationAction = read(registrationActionPath);
     const managedAgents = read(managedAgentsPath);
 
@@ -272,7 +272,7 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     );
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Form has pending, success, and error states', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form has pending, success, and error states', () => {
     const registrationForm = read(registrationFormPath);
     const registrationActions = read(registrationActionsPath);
 
@@ -291,7 +291,7 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(registrationForm).toContain('/agents/');
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Form does not persist client-side secrets', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form does not persist client-side secrets', () => {
     const registrationForm = read(registrationFormPath);
     const formField = read(formFieldPath);
     const managedAgents = read(managedAgentsPath);
@@ -317,7 +317,7 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(formField).not.toContain('privateKey');
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Form errors are associated with inputs via aria-describedby', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form errors are associated with inputs via aria-describedby', () => {
     const formField = read(formFieldPath);
 
     // The error node has an id that matches the aria-describedby pattern.
@@ -330,8 +330,8 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
   });
 });
 
-describe('Agent overview page (CLIENT-MANAGEMENT-S003)', () => {
-  it('[CLIENT-MANAGEMENT-S003] Agent overview renders server-side profile and config data', () => {
+describe('Agent overview page (AGENT-MANAGEMENT-UI-S003)', () => {
+  it('[AGENT-MANAGEMENT-UI-S003] Agent overview renders server-side profile and config data', () => {
     const overviewPage = read(agentOverviewPagePath);
     const lifecycleActions = read(agentLifecycleActionPath);
 
@@ -363,7 +363,7 @@ describe('Agent overview page (CLIENT-MANAGEMENT-S003)', () => {
     expect(credentialInterface).not.toContain('secretReference');
   });
 
-  it('[CLIENT-MANAGEMENT-S003] Agent overview maps safe RPC error states', () => {
+  it('[AGENT-MANAGEMENT-UI-S003] Agent overview maps safe RPC error states', () => {
     const overviewPage = read(agentOverviewPagePath);
 
     expect(overviewPage).toContain('This Agent is not registered in the Client ledger.');
@@ -381,8 +381,8 @@ describe('Agent overview page (CLIENT-MANAGEMENT-S003)', () => {
   });
 });
 
-describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
-  it('[CLIENT-MANAGEMENT-S004] Settings uses Server Actions for config update and credential rotation', () => {
+describe('Agent settings page (AGENT-MANAGEMENT-UI-S004)', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] Settings uses Server Actions for config update and credential rotation', () => {
     const settingsPage = read(agentSettingsPagePath);
     const settingsForm = read(settingsFormPath);
     const configSection = read(configSectionPath);
@@ -432,7 +432,7 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     expect(lifecycleActions).toContain('revalidatePath(`/agents/${agentId}`)');
   });
 
-  it('[CLIENT-MANAGEMENT-S004] Settings browser components do not expose credential lookup payloads', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] Settings browser components do not expose credential lookup payloads', () => {
     const settingsForm = read(settingsFormPath);
     const credentialRotation = read(credentialRotationPath);
 
@@ -448,7 +448,7 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     }
   });
 
-  it('[CLIENT-MANAGEMENT-S004] ConfirmDialog traps focus and preserves pending state', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] ConfirmDialog traps focus and preserves pending state', () => {
     const confirmDialog = read(confirmDialogPath);
     const detailDrawer = read(detailDrawerPath);
     const toolView = read(toolViewPath);
@@ -468,7 +468,7 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     expect(toolView).toContain('initialFocusSelector="[data-drawer-initial-focus=\'true\']"');
   });
 
-  it('[CLIENT-MANAGEMENT-S004] Destroy confirmation requires an exact Agent ID echo', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] Destroy confirmation requires an exact Agent ID echo', () => {
     const schema = buildDestroyConfirmSchema('agent-alpha');
 
     // type-to-confirm は前後空白も許容せず、UI copy の「完全一致」を validation でも守る。
@@ -477,8 +477,8 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
   });
 });
 
-describe('Default model policy management UI (CLIENT-MANAGEMENT-S017, CLIENT-MANAGEMENT-S018)', () => {
-  it('[CLIENT-MANAGEMENT-S017] Agent creation flow sends initial model policy through server-side RPC', () => {
+describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MANAGEMENT-UI-S018)', () => {
+  it('[AGENT-MANAGEMENT-UI-S017] Agent creation flow sends initial model policy through server-side RPC', () => {
     const registrationForm = read(registrationFormPath);
     const newAgentPage = read(newAgentPagePath);
     const managedAgents = read(managedAgentsPath);
@@ -501,7 +501,7 @@ describe('Default model policy management UI (CLIENT-MANAGEMENT-S017, CLIENT-MAN
     expect(modelPolicyActions).not.toContain('sessionStorage');
   });
 
-  it('[CLIENT-MANAGEMENT-S018] Settings safely updates policy before config and renders safe metadata', () => {
+  it('[AGENT-MANAGEMENT-UI-S018] Settings safely updates policy before config and renders safe metadata', () => {
     const settingsPage = read(agentSettingsPagePath);
     const settingsForm = read(settingsFormPath);
     const settingsSection = read(modelPolicySettingsSectionPath);
@@ -541,8 +541,8 @@ describe('Default model policy management UI (CLIENT-MANAGEMENT-S017, CLIENT-MAN
   });
 });
 
-describe('Agent-owned history tabs (CLIENT-MANAGEMENT-S005)', () => {
-  it('[CLIENT-MANAGEMENT-S005] Thread Event Run and Compaction tabs show Agent-owned history', () => {
+describe('Agent-owned history tabs (AGENT-MANAGEMENT-UI-S005)', () => {
+  it('[AGENT-MANAGEMENT-UI-S005] Thread Event Run and Compaction tabs show Agent-owned history', () => {
     const threadList = read(threadListPath);
     const eventList = read(eventListPath);
     const runList = read(runListPath);
@@ -590,8 +590,8 @@ describe('Agent-owned history tabs (CLIENT-MANAGEMENT-S005)', () => {
   });
 });
 
-describe('Schedule management tab (CLIENT-MANAGEMENT-S006)', () => {
-  it('[CLIENT-MANAGEMENT-S006] Schedule tab creates and cancels schedules', () => {
+describe('Schedule management tab (AGENT-MANAGEMENT-UI-S006)', () => {
+  it('[AGENT-MANAGEMENT-UI-S006] Schedule tab creates and cancels schedules', () => {
     const schedulesPage = read(agentSchedulesPagePath);
     const scheduleList = read(scheduleListPath);
     const scheduleCreateForm = read(scheduleCreateFormPath);
@@ -632,8 +632,8 @@ describe('Schedule management tab (CLIENT-MANAGEMENT-S006)', () => {
   });
 });
 
-describe('Tool approval tab (CLIENT-MANAGEMENT-S007)', () => {
-  it('[CLIENT-MANAGEMENT-S007] Tool approval screen requires explicit action', () => {
+describe('Tool approval tab (AGENT-MANAGEMENT-UI-S007)', () => {
+  it('[AGENT-MANAGEMENT-UI-S007] Tool approval screen requires explicit action', () => {
     const toolsPage = read(agentToolsPagePath);
     const toolView = read(toolViewPath);
     const toolReviewContent = read(toolReviewContentPath);
@@ -661,8 +661,8 @@ describe('Tool approval tab (CLIENT-MANAGEMENT-S007)', () => {
   });
 });
 
-describe('Integration management tab (CLIENT-MANAGEMENT-S008)', () => {
-  it('[CLIENT-MANAGEMENT-S008] Integration screen installs lists and uninstalls generic Integration', () => {
+describe('Integration management tab (AGENT-MANAGEMENT-UI-S008)', () => {
+  it('[AGENT-MANAGEMENT-UI-S008] Integration screen installs lists and uninstalls generic Integration', () => {
     const integrationsPage = read(agentIntegrationsPagePath);
     const integrationView = read(integrationViewPath);
     const integrationPermissionControls = read(integrationPermissionControlsPath);
@@ -744,8 +744,8 @@ describe('Integration management tab (CLIENT-MANAGEMENT-S008)', () => {
   });
 });
 
-describe('Browser secrecy boundaries (CLIENT-MANAGEMENT-S009)', () => {
-  it('[CLIENT-MANAGEMENT-S009] Browser-visible components do not import server-only modules', () => {
+describe('Browser secrecy boundaries (AGENT-MANAGEMENT-UI-S009)', () => {
+  it('[AGENT-MANAGEMENT-UI-S009] Browser-visible components do not import server-only modules', () => {
     const agentList = read(agentListPath);
     const registrationForm = read(registrationFormPath);
     const registrationActions = read(registrationActionsPath);

@@ -102,7 +102,7 @@ describe('Acting user context derivation', () => {
 
     expect(context.operatorId).not.toBe('');
     expect(context.scopes.length).toBeGreaterThan(0);
-    expect(context.operatorId).toBe('client-management-test-operator');
+    expect(context.operatorId).toBe('agent-management-ui-test-operator');
     expect(context.scopes).toContain('agent:read');
   });
 });

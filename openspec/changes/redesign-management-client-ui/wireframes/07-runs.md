@@ -44,7 +44,7 @@
    - ヘッダ: Run ID, 状態, Thread, 開始/所要, model policy ref。
    - in-detail tabs: `概要`/`ステップ`/`ツール`/`承認`。
      - `ツール` = Tool 実行（ToolInvocation の試行/結果/Event）。**Tools トップレベル廃止の主要代替**。
-     - `承認` = 当該 Run に紐づく pending_approval ToolInvocation の承認/却下（CLIENT-MANAGEMENT-S007）。Overview の承認キューと同 source。
+     - `承認` = 当該 Run に紐づく pending_approval ToolInvocation の承認/却下（AGENT-MANAGEMENT-UI-S007）。Overview の承認キューと同 source。
 3. `ToolInvocationCard`（`ツール`/`承認` 内）: Tool 名, 状態, 試行回数, risk, by Thread, 入力要約, 結果 Event link, `実行詳細`/`承認`/`却下`/`詳細`。
 
 ## Mobile layout (< 1024px)
@@ -55,7 +55,7 @@
 ## Data & state contract（server-only 境界）
 
 - Run 一覧・詳細・ToolInvocation は全て server-side Agent RPC。Agent-domain snapshot を Client D1 非保存。
-- 承認/却下: server action が acting user context 付きで Agent RPC（CLIENT-MANAGEMENT-S007）。明示的 user confirmation 必須。
+- 承認/却下: server action が acting user context 付きで Agent RPC（AGENT-MANAGEMENT-UI-S007）。明示的 user confirmation 必須。
 
 ## States
 

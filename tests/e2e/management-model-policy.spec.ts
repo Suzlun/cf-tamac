@@ -26,7 +26,7 @@ interface BrowserSecrecyProbe {
   readonly scriptTextReads: Promise<string>[];
 }
 
-test('[CLIENT-MANAGEMENT-S017] Agent creation flow が initial model policy を server-side で送信する', async ({
+test('[AGENT-MANAGEMENT-UI-S017] Agent creation flow が initial model policy を server-side で送信する', async ({
   page,
 }, testInfo) => {
   const secrecyProbe = startBrowserSecrecyProbe(page);
@@ -59,7 +59,7 @@ test('[CLIENT-MANAGEMENT-S017] Agent creation flow が initial model policy を 
   await assertBrowserSecrecy(page, secrecyProbe);
 });
 
-test('[CLIENT-MANAGEMENT-S018] Settings 画面が default model policy を安全に更新する', async ({
+test('[AGENT-MANAGEMENT-UI-S018] Settings 画面が default model policy を安全に更新する', async ({
   page,
 }, testInfo) => {
   const secrecyProbe = startBrowserSecrecyProbe(page);

@@ -44,7 +44,7 @@
 1. `PageHeader`: `h1 エージェント`。右に toolbar。
 2. Toolbar: `検索`（表示名/Agent ID の前方・部分一致、client-side または server 検索）, `エージェントを追加`（primary button → 同一画面内の登録 panel / dialog）。
 3. `AgentList`（card-first。既存 `packages/client/src/components/agent-list.tsx` を card 化へ再設計）。
-   - グループ: `ピン留め` / `その他`（既存 pin/並び順メタデータを使用。CLIENT-MANAGEMENT-S001）。
+   - グループ: `ピン留め` / `その他`（既存 pin/並び順メタデータを使用。AGENT-MANAGEMENT-UI-S001）。
    - `AgentCard`（各 Agent）:
      - 行1: アバターシード + 表示名（`/agents/[id]` link）。
      - 行2: status pill（アイコン+色+ラベル）+ config version。
@@ -107,9 +107,9 @@ Agent registration を「Agents 画面内アクションから開く登録フロ
 ```
 
 - ステップ: `1.接続情報` → `2.表示情報` → `3.初期モデルポリシー` → `4.確認`。
-- `接続を検証`: server-side で RPC origin 到達性と credential 参照の有効性を検証（credential 値は browser に渡さず、参照キーのみ送信）。CLIENT-MANAGEMENT-S002。
-- `ポリシーを検証`: server-side で `ValidateModelPolicy` RPC（CLIENT-MANAGEMENT-S017）。Provider credential・生 token は非表示。
-- 最終 `登録して選択`: server-side で `InitializeAgent` + initial model policy + `initialConfig.modelPolicyRef` を同一フローで送信（CLIENT-MANAGEMENT-S017）。成功後、自動的に選択状態にして `/agents/[id]`（Overview）へ遷移。
+- `接続を検証`: server-side で RPC origin 到達性と credential 参照の有効性を検証（credential 値は browser に渡さず、参照キーのみ送信）。AGENT-MANAGEMENT-UI-S002。
+- `ポリシーを検証`: server-side で `ValidateModelPolicy` RPC（AGENT-MANAGEMENT-UI-S017）。Provider credential・生 token は非表示。
+- 最終 `登録して選択`: server-side で `InitializeAgent` + initial model policy + `initialConfig.modelPolicyRef` を同一フローで送信（AGENT-MANAGEMENT-UI-S017）。成功後、自動的に選択状態にして `/agents/[id]`（Overview）へ遷移。
 
 ## Mobile layout — New Agent
 
@@ -120,7 +120,7 @@ Agent registration を「Agents 画面内アクションから開く登録フロ
 
 - 一覧: `listManagedAgentsWithCredentialStatus`（既存 server action）から managed Agent records + credential status（masked hint のみ）を取得。Browser に credential 値は渡さない。
 - 選択: `selectManagedAgent`（新規 server action）→ cookie 書換 + `markManagedAgentOpened` 更新。
-- 登録: server-only モジュールが generated Agent RPC client を使用。Browser-visible module は RPC client / Connect runtime / credential 解決ロジックを import しない（CLIENT-MANAGEMENT-S017）。
+- 登録: server-only モジュールが generated Agent RPC client を使用。Browser-visible module は RPC client / Connect runtime / credential 解決ロジックを import しない（AGENT-MANAGEMENT-UI-S017）。
 
 ## States
 
@@ -158,7 +158,7 @@ Agent registration を「Agents 画面内アクションから開く登録フロ
 ## Integration notes for unit/client/engineer
 
 - `packages/client/app/agents/page.tsx`: 既存 `AgentList` を card-first 仕様へ更新（client component は props 受けのまま、内部 render を card 化）。`listManagedAgentsWithCredentialStatus` 再利用。
-- Agent registration stepper は `/agents` 画面内の panel / dialog へ統合する。server action で `InitializeAgent` + model policy フローを構成（CLIENT-MANAGEMENT-S017/S002）。
+- Agent registration stepper は `/agents` 画面内の panel / dialog へ統合する。server action で `InitializeAgent` + model policy フローを構成（AGENT-MANAGEMENT-UI-S017/S002）。
 - 新規 server-only: `selectManagedAgent`。`packages/client/src/server/actions/managed-agents.ts` に集約（既存 `setManagedAgentPinned`/`markManagedAgentOpened` と同所。重複禁止）。
 - `packages/client/src/components/agent-list.tsx` を card grid へ。新規 `agent-card.tsx`。
 

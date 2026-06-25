@@ -83,7 +83,7 @@ describe('Server-side Agent RPC client factory', () => {
     expect(headers.get('x-client-acting-scopes')).toBe('agent:read agent:write');
   });
 
-  it('[CLIENT-MANAGEMENT-S018] E2E fake safe metadata digest matches inline bytes', async () => {
+  it('[AGENT-MANAGEMENT-UI-S018] E2E fake safe metadata digest matches inline bytes', async () => {
     const clients = createE2eFakeAgentRpcClients('agent-alpha');
     const getModelPolicy = clients.modelPolicies.getModelPolicy as unknown as (
       request: Record<string, unknown>

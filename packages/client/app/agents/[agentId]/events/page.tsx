@@ -12,7 +12,7 @@ interface AgentEventsPageProps {
 }
 
 /**
- * Agent Event log page（CLIENT-MANAGEMENT-S005）。
+ * Agent Event log page（AGENT-MANAGEMENT-UI-S005）。
  *
  * Thread 選択と Event type filter を Server Action へ渡し、Agent-owned Event
  * payload は metadata のみを Browser へ渡す。

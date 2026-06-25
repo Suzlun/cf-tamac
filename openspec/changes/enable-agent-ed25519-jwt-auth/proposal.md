@@ -19,13 +19,13 @@
 
 ### New Spec Units
 
-- なし。既存の `agent-security`、`client-registry`、`client-management`、`agent-health`、`workspace-governance` の責務範囲内で要件を変更する。
+- なし。既存の `agent-security`、`client-registry`、`agent-management-ui`、`agent-health`、`workspace-governance` の責務範囲内で要件を変更する。
 
 ### Modified Spec Units
 
 - `agent-security`: Modified。Ed25519 JWT、`AGENT_CONTROL_PLANE_TRUST`、method scope matrix、`jti` replay protection、Agent-local authorization、secret-free audit/metrics を Agent 本番認証の契約として定義する。横断関心はセキュリティと失敗時拒否の振る舞い。
 - `client-registry`: Modified。Client D1 に暗号化済み署名鍵ストアと managed Agent の issuer/kid/fingerprint metadata を持ち、server-only module だけが秘密鍵復号と JWT 署名を行う契約へ拡張する。横断関心は secret isolation と永続化変更。
-- `client-management`: Modified。Management Client UI/server actions が署名鍵ライフサイクル、Agent ごとの鍵選択、信頼設定 export、鍵交代/失効/復旧 guidance、health verification を提供する契約へ拡張する。横断関心は security UX とブラウザー境界。
+- `agent-management-ui`: Modified。Management Client UI/server actions が署名鍵ライフサイクル、Agent ごとの鍵選択、信頼設定 export、鍵交代/失効/復旧 guidance、health verification を提供する契約へ拡張する。横断関心は security UX とブラウザー境界。
 - `agent-health`: Modified。Agent health RPC が信頼設定の version/fingerprint/loadedAt と、現在の issuer/kid/fingerprint の検証結果を key material なしで返す契約へ拡張する。横断関心は安全な診断。
 - `workspace-governance`: Modified。Runbook、guardrail、scenario coverage、bundle/source checks が Ed25519 JWT 認証、信頼設定、Client signing material 非露出、鍵交代/失効/復旧手順を検証する契約へ拡張する。横断関心は運用とセキュリティ検証。
 
@@ -33,7 +33,7 @@
 
 - `agent-security` は `AGENT-SECURITY` を Scenario ID prefix とする。
 - `client-registry` は `CLIENT-REGISTRY` を Scenario ID prefix とする。
-- `client-management` は `CLIENT-MANAGEMENT` を Scenario ID prefix とする。
+- `agent-management-ui` は `AGENT-MANAGEMENT-UI` を Scenario ID prefix とする。
 - `agent-health` は `AGENT-HEALTH` を Scenario ID prefix とする。
 - `workspace-governance` は `WORKSPACE-GOVERNANCE` を Scenario ID prefix とする。
 - Agent 認証、Client 台帳、Client UI、健全性診断、workspace 検証は責務が異なるため、関連要件でも別々の capability name と Scenario ID prefix を使う。

@@ -44,7 +44,7 @@
 2. 右: `ThreadDetail`。
    - ヘッダ: Thread key, 状態, Section, 最終 Event/Run。
    - in-detail tabs: `概要`/`イベント`/`実行`/`メモリ`（`メモリ` = Memory & Compaction パネル = **Compactions 詳細の代替**）。
-3. `MemoryCompactionPanel`（`メモリ` tab）: Memory 版, 最新 Compaction（ID/時刻/Handoff/rebase/provenance/History 参照）, Compaction 履歴の展開リスト（latest Handoff, Memory 版遷移, provenance, rebase 状態を順序付きで）（CLIENT-MANAGEMENT-S005）。
+3. `MemoryCompactionPanel`（`メモリ` tab）: Memory 版, 最新 Compaction（ID/時刻/Handoff/rebase/provenance/History 参照）, Compaction 履歴の展開リスト（latest Handoff, Memory 版遷移, provenance, rebase 状態を順序付きで）（AGENT-MANAGEMENT-UI-S005）。
 
 ## Desktop layout — 一覧のみ (< 1280px or 詳細未選択)
 
@@ -75,7 +75,7 @@
 
 ## Data & state contract（server-only 境界）
 
-- Thread 一覧・詳細・Memory/Compaction 全て server-side Agent RPC。Agent-domain snapshot を Client D1 非保存（CLIENT-MANAGEMENT-S005）。
+- Thread 一覧・詳細・Memory/Compaction 全て server-side Agent RPC。Agent-domain snapshot を Client D1 非保存（AGENT-MANAGEMENT-UI-S005）。
 - paging/絞り込みは Thread scope を維持（`agent_id` 保持）。
 
 ## States

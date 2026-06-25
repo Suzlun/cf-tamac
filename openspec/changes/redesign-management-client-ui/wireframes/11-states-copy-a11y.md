@@ -82,16 +82,16 @@
 
 以下は design-only であるが、`unit/client/engineer` が守るべき境界を明文化する。
 
-1. **Browser bundle**: Agent credential・秘密鍵・生 token・Provider secret・raw 署名 material を含めない。`MANAGEMENT-CLIENT-S002`, `CLIENT-MANAGEMENT-S009`, `CLIENT-MANAGEMENT-S017` 準拠。
+1. **Browser bundle**: Agent credential・秘密鍵・生 token・Provider secret・raw 署名 material を含めない。`MANAGEMENT-CLIENT-SHELL-S002`, `AGENT-MANAGEMENT-UI-S009`, `AGENT-MANAGEMENT-UI-S017` 準拠。
 2. **Browser からの Agent RPC 直接呼出禁止**: 全 Agent RPC は Client server 側（Server Component / Server Action / server-only module）から生成済み Protobuf RPC client を用いて発生。Browser-visible module は `packages/client/src/generated/agent-rpc` / Connect runtime / server-only Agent RPC factory / credential 解決ロジックを import しない。
-3. **No Agent API proxy route**: `/api/client/*`, `/api/agent*`, Agent REST proxy, 任意 RPC forwarding route を公開しない。`MANAGEMENT-CLIENT-S008` 準拠。
-4. **Client D1 所有権**: managed Agent records・credential references のみ。Agent-domain snapshot 非保存。`MANAGEMENT-CLIENT-S003/S004` 準拠。全 Agent-owned 表示データは毎回 server 側 Agent RPC から取得。
-5. **credential / policy 表示の安全化**: credential は mask hint のみ。model policy は policy ref/digest/provider/model/安全な generation params/status/validation warning のみ。Provider credential・Agent credential・生 token・raw prompt/completion/reasoning は Browser payload/HTML/JS/storage に含めない。`CLIENT-MANAGEMENT-S017/S018` 準拠。
-6. **エラーの secret-safe 化**: 全 error/loading 状態で secret・生スタック・内部アドレスを漏らさない。`CLIENT-MANAGEMENT-S009` 準拠。
+3. **No Agent API proxy route**: `/api/client/*`, `/api/agent*`, Agent REST proxy, 任意 RPC forwarding route を公開しない。`MANAGEMENT-CLIENT-SHELL-S008` 準拠。
+4. **Client D1 所有権**: managed Agent records・credential references のみ。Agent-domain snapshot 非保存。`MANAGEMENT-CLIENT-SHELL-S003/S004` 準拠。全 Agent-owned 表示データは毎回 server 側 Agent RPC から取得。
+5. **credential / policy 表示の安全化**: credential は mask hint のみ。model policy は policy ref/digest/provider/model/安全な generation params/status/validation warning のみ。Provider credential・Agent credential・生 token・raw prompt/completion/reasoning は Browser payload/HTML/JS/storage に含めない。`AGENT-MANAGEMENT-UI-S017/S018` 準拠。
+6. **エラーの secret-safe 化**: 全 error/loading 状態で secret・生スタック・内部アドレスを漏らさない。`AGENT-MANAGEMENT-UI-S009` 準拠。
 
 ## 5. OpenSpec シナリオカバレッジへの指針（参考）
 
 本ワイヤーフレーム群は design-only であり、delta spec のシナリオ採番は別フェーズ。実装時は以下既存 ID を直接参照し、新規が必要な箇所は新規シナリオ候補として扱う:
 
-- 既存参照候補: `MANAGEMENT-CLIENT-S001/S002/S003/S004/S007/S008`, `CLIENT-MANAGEMENT-S001/S002/S003/S004/S005/S006/S007/S008/S009/S017/S018`
-- 新規候補（ナビゲーション IA・Agent 選択状態マシン・Tools/Compactions 統合）は、`management-client`/`client-management` delta spec で `MANAGEMENT-CLIENT-S###`/`CLIENT-MANAGEMENT-S###` として採番すること。本ワイヤーフレームは採番しない（design-only 境界遵守）。
+- 既存参照候補: `MANAGEMENT-CLIENT-SHELL-S001/S002/S003/S004/S007/S008`, `AGENT-MANAGEMENT-UI-S001/S002/S003/S004/S005/S006/S007/S008/S009/S017/S018`
+- 新規候補（ナビゲーション IA・Agent 選択状態マシン・Tools/Compactions 統合）は、`management-client-shell`/`agent-management-ui` delta spec で `MANAGEMENT-CLIENT-SHELL-S###`/`AGENT-MANAGEMENT-UI-S###` として採番すること。本ワイヤーフレームは採番しない（design-only 境界遵守）。

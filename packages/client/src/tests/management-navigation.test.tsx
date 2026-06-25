@@ -35,7 +35,7 @@ const expectedNavigationLabels = [
 ];
 
 describe('Management Client navigation', () => {
-  it('[MANAGEMENT-CLIENT-S007] Management navigation excludes demo routes', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S007] Management navigation excludes demo routes', () => {
     const sectionNav = readFileSync(fileURLToPath(sectionNavPath.href), 'utf8');
 
     for (const routeFile of expectedRouteFiles) {

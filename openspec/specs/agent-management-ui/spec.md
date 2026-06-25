@@ -1,4 +1,4 @@
-# client-management Specification
+# agent-management-ui Specification
 
 ## Purpose
 
@@ -20,14 +20,14 @@ Agent 管理者は、登録済み Agent を一覧し、表示名、pin、並び�
 - Client UI は Agent ID、RPC origin、表示名、credential 参照入力を検証する Agent 登録の追加/編集フォームを提供 MUST。
 - Client UI は台帳変更に Server Actions または Server Components を使用 MUST し、Agent credential を Client 側 JavaScript に露出して MUST NOT。
 
-#### Scenario: Agent list が registry 表示と並び順を支援する (CLIENT-MANAGEMENT-S001)
+#### Scenario: Agent list が registry 表示と並び順を支援する (AGENT-MANAGEMENT-UI-S001)
 
 - **GIVEN** Client D1 に pin と並び順メタデータを持つ複数の管理対象 Agent が含まれている
 - **WHEN** 運用者が Agent 一覧画面を開く
 - **THEN** pinned Agent と並び順が一覧に反映される
 - **AND** Agent を選択すると、サーバー側 action を通じて最終閲覧メタデータが更新される
 
-#### Scenario: Add Agent フォームが connection メタデータをアクセシブルに検証する (CLIENT-MANAGEMENT-S002)
+#### Scenario: Add Agent フォームが connection メタデータをアクセシブルに検証する (AGENT-MANAGEMENT-UI-S002)
 
 - **GIVEN** 運用者が Add Agent 画面を開いている
 - **WHEN** 必須 field が不足している、または RPC origin が不正である
@@ -48,14 +48,14 @@ Client UI はサーバー側 Agent RPC を通じて Agent overview と settings 
 - Client UI はサーバー側 Agent RPC call を通じて構成更新と credential rotation の settings action を提供 MUST。
 - Client UI は secret または生 internal stack trace を露出せず、対処可能な message 付きで Agent RPC error を表示 MUST。
 
-#### Scenario: Agent overview がサーバー側 profile と config を描画する (CLIENT-MANAGEMENT-S003)
+#### Scenario: Agent overview がサーバー側 profile と config を描画する (AGENT-MANAGEMENT-UI-S003)
 
 - **GIVEN** 運用者が登録済み Agent 詳細ページを開いている
 - **WHEN** Client server が `GetAgent` と関連 config RPC を照会する
 - **THEN** overview は profile、ライフサイクル、config 版、credential generation、capability 要約を表示する
 - **AND** Browser payload は credential secret material を含まない
 
-#### Scenario: Settings 画面が Agent RPC 経由で config 更新と credential rotation を行う (CLIENT-MANAGEMENT-S004)
+#### Scenario: Settings 画面が Agent RPC 経由で config 更新と credential rotation を行う (AGENT-MANAGEMENT-UI-S004)
 
 - **GIVEN** 運用者が Agent settings を管理する permission を持っている
 - **WHEN** 運用者が settings 画面から config update または credential rotation を送信する
@@ -77,7 +77,7 @@ Agent の自律判断を運用するには、Thread、Event、Run、Compaction�
 - Client UI は latest Handoff、History 参照、Memory 版、provenance、rebase 状態を公開する Compaction と Memory の view を提供 MUST。
 - これらの画面のすべてのデータは Agent RPC からサーバー側で取得 MUST し、Agent domain スナップショットを Client D1 に保存せずに描画 MUST。
 
-#### Scenario: Thread Event Run と Compaction tabs が Agent-owned history を表示する (CLIENT-MANAGEMENT-S005)
+#### Scenario: Thread Event Run と Compaction tabs が Agent-owned history を表示する (AGENT-MANAGEMENT-UI-S005)
 
 - **GIVEN** Agent が Event、Run、Compaction、Memory を持つ Thread を有している
 - **WHEN** 運用者が Thread、Event、Run、Compaction タブを移動する
@@ -98,14 +98,14 @@ Client UI はサーバー側 action を通じて Schedule と Tool 承認を管�
 - Client UI は Tool definition、Installation 所有関係、invocation 状態、承認状態、試行、結果 Event を表示する Tool catalog と ToolInvocation 画面を提供 MUST。
 - Client UI は Tool 承認/却下に明示的な user action を要求 MUST し、acting user context 付きで Agent RPC をサーバー側から呼ぶ MUST。
 
-#### Scenario: Schedule tab が schedules を作成し cancel する (CLIENT-MANAGEMENT-S006)
+#### Scenario: Schedule tab が schedules を作成し cancel する (AGENT-MANAGEMENT-UI-S006)
 
 - **GIVEN** 運用者が登録済み Agent の Schedule タブを開いている
 - **WHEN** 運用者が Thread 文脈付きで Schedule を作成し、後で cancel する
 - **THEN** Client server は `CreateSchedule` と `CancelSchedule` を呼ぶ
 - **AND** UI は Agent RPC から取得した Schedule 状態、次回 fire 時刻、overlap policy、取消結果を表示する
 
-#### Scenario: Tool 承認画面が明示 action を要求する (CLIENT-MANAGEMENT-S007)
+#### Scenario: Tool 承認画面が明示 action を要求する (AGENT-MANAGEMENT-UI-S007)
 
 - **GIVEN** Agent が `pending_approval` の ToolInvocation を持っている
 - **WHEN** 運用者が Tool 承認画面を開く
@@ -126,7 +126,7 @@ Client UI は汎用 Integration installation と cleanup flow を管理 SHALL。
 - Client UI はサーバー側 Agent RPC を通じて install/uninstall action を提供 MUST。
 - Client UI は Integration/Installation/Adapter/Tool/Delivery の状態、grant、setup 手順、cleanup 結果を見えるようにする MUST。
 
-#### Scenario: Integration 画面が汎用 Integration を install、list、uninstall する (CLIENT-MANAGEMENT-S008)
+#### Scenario: Integration 画面が汎用 Integration を install、list、uninstall する (AGENT-MANAGEMENT-UI-S008)
 
 - **GIVEN** 運用者が署名済み汎用 Integration manifest を持っている
 - **WHEN** 運用者が Integration 画面から Integration を install、inspect、uninstall する
@@ -147,7 +147,7 @@ Client UI は Browser で動くため、Agent credential や署名 material が�
 - Client UI は Browser 側コードから Agent RPC origin を直接呼び出して MUST NOT。
 - Error と loading 状態は secret メタデータまたは生 internal error stack を漏えいせずに表示 MUST。
 
-#### Scenario: Browser が Agent credentials を受け取らず Agent RPC を直接呼ばない (CLIENT-MANAGEMENT-S009)
+#### Scenario: Browser が Agent credentials を受け取らず Agent RPC を直接呼ばない (AGENT-MANAGEMENT-UI-S009)
 
 - **GIVEN** 運用者が Agent list、overview、Thread、Schedule、Tool、Integration、Settings 画面を移動している
 - **WHEN** Browser network 応答、描画済み HTML、JavaScript bundle、storage が検査される
@@ -170,14 +170,14 @@ Client server は Server Action または Server Component 経由で generated A
 
 UI は missing binding、invalid policy、unsupported provider/model、permission denied、validation warning を secret-safe な user-facing message として表示 MUST。Browser-visible modules は Agent RPC client、Connect runtime、server-only Agent RPC factory、credential resolution logic を import して MUST NOT。
 
-#### Scenario: Agent creation flow が initial model policy を server-side で送信する (CLIENT-MANAGEMENT-S017)
+#### Scenario: Agent creation flow が initial model policy を server-side で送信する (AGENT-MANAGEMENT-UI-S017)
 
 - **GIVEN** 運用者が Agent creation flow で policy ref、provider、model、generation parameters を入力している
 - **WHEN** form を送信する
 - **THEN** Client server は policy を検証し、Agent RPC を server-side で呼んで initial model policy と `initialConfig.modelPolicyRef` を送信する
 - **AND** Browser は Agent credential、Provider credential、direct Agent RPC request を受け取らない
 
-#### Scenario: Settings 画面が default model policy を安全に更新する (CLIENT-MANAGEMENT-S018)
+#### Scenario: Settings 画面が default model policy を安全に更新する (AGENT-MANAGEMENT-UI-S018)
 
 - **GIVEN** 運用者が Agent Settings で default model policy を変更している
 - **WHEN** policy upsert と config update が成功する

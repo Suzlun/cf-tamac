@@ -17,7 +17,7 @@ interface AgentCompactionsPageProps {
 }
 
 /**
- * Compaction, Memory, and History view page（CLIENT-MANAGEMENT-S005）。
+ * Compaction, Memory, and History view page（AGENT-MANAGEMENT-UI-S005）。
  *
  * Handoff / History / Memory provenance を Agent RPC から取得し、R2 参照は
  * metadata のみを Browser へ渡す。

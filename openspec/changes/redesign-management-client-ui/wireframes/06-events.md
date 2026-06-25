@@ -43,7 +43,7 @@
 
 ## Data & state contract（server-only 境界）
 
-- Event 一覧・詳細は server-side Agent RPC。Agent-domain snapshot を Client D1 非保存（CLIENT-MANAGEMENT-S005）。
+- Event 一覧・詳細は server-side Agent RPC。Agent-domain snapshot を Client D1 非保存（AGENT-MANAGEMENT-UI-S005）。
 - paging/filter は `agent_id`（必須）+ Thread/種別/状態/時間範囲を維持。
 
 ## States

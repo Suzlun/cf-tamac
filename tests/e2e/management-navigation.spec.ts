@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { createE2eAgentId, registerManagedAgentThroughUi } from './managed-agent-fixture';
 
-test('[MANAGEMENT-CLIENT-S007] Management navigation excludes demo routes', async ({
+test('[MANAGEMENT-CLIENT-SHELL-S007] Management navigation excludes demo routes', async ({
   page,
 }, testInfo) => {
   const agentId = createE2eAgentId(testInfo);

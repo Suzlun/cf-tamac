@@ -12,7 +12,7 @@ interface AgentRunsPageProps {
 }
 
 /**
- * AgentRun history page（CLIENT-MANAGEMENT-S005）。
+ * AgentRun history page（AGENT-MANAGEMENT-UI-S005）。
  *
  * Run status と Thread filter を Agent RPC の scoped request へ渡し、Run の
  * snapshot detail は Server Action から Browser-safe view として取得する。

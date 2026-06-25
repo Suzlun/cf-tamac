@@ -3,7 +3,7 @@
 ## Intent & Users
 
 - 顧客: 管理者。Agent の将来動作（Schedule）を作成・確認・取消し、次回発火や重複ポリシーを把握したい。
-- 目的: Schedule 管理を card-first で。各 Schedule の状態・次回発火・重複ポリシーを要約で見せ、作成/取消を安全に行う（CLIENT-MANAGEMENT-S006）。
+- 目的: Schedule 管理を card-first で。各 Schedule の状態・次回発火・重複ポリシーを要約で見せ、作成/取消を安全に行う（AGENT-MANAGEMENT-UI-S006）。
 
 ## Route & URL
 
@@ -41,8 +41,8 @@
 
 ## Data & state contract（server-only 境界）
 
-- Schedule 一覧/作成/取消/一時停止は全て server-side Agent RPC（`CreateSchedule`, `CancelSchedule`, 他）。Client D1 非使用（management-client spec S003/S004）。
-- 作成・取消は acting user context 必須（CLIENT-MANAGEMENT-S006）。
+- Schedule 一覧/作成/取消/一時停止は全て server-side Agent RPC（`CreateSchedule`, `CancelSchedule`, 他）。Client D1 非使用（management-client-shell spec S003/S004）。
+- 作成・取消は acting user context 必須（AGENT-MANAGEMENT-UI-S006）。
 
 ## States
 
@@ -69,7 +69,7 @@
 
 ## Integration notes for unit/client/engineer
 
-- `packages/client/app/agents/[agentId]/schedules/page.tsx`: card-first へ再設計。server action で `CreateSchedule`/`CancelSchedule` 等（CLIENT-MANAGEMENT-S006）。
+- `packages/client/app/agents/[agentId]/schedules/page.tsx`: card-first へ再設計。server action で `CreateSchedule`/`CancelSchedule` 等（AGENT-MANAGEMENT-UI-S006）。
 
 ## Open questions / assumptions
 

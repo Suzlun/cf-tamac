@@ -29,7 +29,7 @@ function relativePath(filePath: string): string {
 }
 
 describe('Management Client Agent RPC import graph', () => {
-  it('[MANAGEMENT-CLIENT-S006] Client imports generated Agent RPC code without Agent runtime source', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S006] Client imports generated Agent RPC code without Agent runtime source', () => {
     const serverAgentRpcSource = collectFiles(serverAgentRpcRoot)
       .map((filePath) => readFileSync(filePath, 'utf8'))
       .join('\n');

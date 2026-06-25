@@ -3,7 +3,7 @@
 ## Intent & Users
 
 - 顧客: 管理者。選択中 Agent の API/RPC 接続、credential 参照、model policy、一般設定を安全に管理・ローテーションしたい。
-- 目的: Agent 単位の全設定をここに集約。`/settings`（Global Settings）とは別物。credential・model policy を server-only で安全に扱い、Browser には secret を渡さない（CLIENT-MANAGEMENT-S003/S004/S017/S018）。
+- 目的: Agent 単位の全設定をここに集約。`/settings`（Global Settings）とは別物。credential・model policy を server-only で安全に扱い、Browser には secret を渡さない（AGENT-MANAGEMENT-UI-S003/S004/S017/S018）。
 
 ## Route & URL
 
@@ -32,7 +32,7 @@
 - in-content secondary nav（sidebar を増やさない）。セクション:
   - **API と接続**: Agent ID, RPC origin, 接続状態, `接続を再検証`。origin 編集は慎重操作（managed Agent record 更新 = Client D1）。
   - **認証情報（credential）**: credential 参照（mask hint・status・generation）。`ローテーション`（server-only, secret 非表示）。新規参照登録/切替も server-only。
-  - **モデルポリシー**: default model policy（policy ref, provider, model, digest, generation params, status, validation warning）。`検証`/`更新`。`UpdateConfig` に成功 policy ref のみ渡す（CLIENT-MANAGEMENT-S018）。
+  - **モデルポリシー**: default model policy（policy ref, provider, model, digest, generation params, status, validation warning）。`検証`/`更新`。`UpdateConfig` に成功 policy ref のみ渡す（AGENT-MANAGEMENT-UI-S018）。
   - **一般設定**: 表示名・説明・pin・並び順・無効化（Client D1 の managed Agent metadata）。
   - **危険な操作**: Agent の無効化・managed Agent からの除外等。明示的確認必須。
 
@@ -43,7 +43,7 @@
 ## Data & state contract（server-only 境界）
 
 - API/接続・credential は server-side Agent RPC + Client D1（managed Agent record）。credential 値は mask hint のみ Browser へ。
-- model policy は server-side Agent RPC（`UpsertModelPolicy`, `ValidateModelPolicy`, `UpdateConfig`）。Provider credential・生 token・raw prompt/completion/reasoning は Browser payload/HTML/JS/storage に含めない（CLIENT-MANAGEMENT-S017/S018）。
+- model policy は server-side Agent RPC（`UpsertModelPolicy`, `ValidateModelPolicy`, `UpdateConfig`）。Provider credential・生 token・raw prompt/completion/reasoning は Browser payload/HTML/JS/storage に含めない（AGENT-MANAGEMENT-UI-S017/S018）。
 - Browser-visible module は Agent RPC client / Connect runtime / server-only factory / credential 解決ロジックを import しない。
 
 ## States
@@ -76,7 +76,7 @@
 
 ## Integration notes for unit/client/engineer
 
-- `packages/client/app/agents/[agentId]/settings/page.tsx`: セクション構成へ再設計。server action で model policy/credential/config（CLIENT-MANAGEMENT-S003/S004/S017/S018）。
+- `packages/client/app/agents/[agentId]/settings/page.tsx`: セクション構成へ再設計。server action で model policy/credential/config（AGENT-MANAGEMENT-UI-S003/S004/S017/S018）。
 - managed Agent metadata（表示名等）更新は既存 server action 群（`packages/client/src/server/actions/managed-agents.ts`）を再利用。新規操作も同所に集約（重複禁止: credo 4）。
 
 ## Open questions / assumptions

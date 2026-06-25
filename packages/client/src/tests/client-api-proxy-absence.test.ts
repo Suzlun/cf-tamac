@@ -45,7 +45,7 @@ function appRoutePath(filePath: string): string {
 }
 
 describe('Management Client Agent API proxy absence', () => {
-  it('[MANAGEMENT-CLIENT-S008] [CLIENT-REGISTRY-S005] Client has no public Agent proxy route', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S008] [CLIENT-REGISTRY-S005] Client has no public Agent proxy route', () => {
     const appFiles = collectFiles(appRoot);
     const pageRouteManifest = appFiles
       .filter((filePath) => filePath.endsWith('/page.tsx'))

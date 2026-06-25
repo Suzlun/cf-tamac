@@ -1,6 +1,6 @@
 ## Purpose
 
-Management Client は、Cloudflare Workers 上の Next.js App Router UI と Client-owned D1 ledger を通じて Agent を管理し、Agent credential と Agent RPC invocation を server-side boundary の内側に保つことを定義する。
+Management Client shell は、Cloudflare Workers 上の Next.js App Router UI と Client-owned D1 ledger を通じて Agent 管理画面の外枠を提供し、Agent credential と Agent RPC invocation を server-side boundary の内側に保つことを定義する。
 
 ## Requirements
 
@@ -26,14 +26,14 @@ Server Actions と Server Components は internal UI execution boundaries のみ
 
 Client App Router は `/agents`、`/agents/new`、`/agents/[agentId]`、`/agents/[agentId]/threads`、`/agents/[agentId]/events`、`/agents/[agentId]/schedules`、`/agents/[agentId]/tools`、`/agents/[agentId]/integrations`、`/agents/[agentId]/settings` の shell routes を含む SHALL。
 
-#### Scenario: Agent registry shell renders for a browser user (MANAGEMENT-CLIENT-S001)
+#### Scenario: Agent registry shell renders for a browser user (MANAGEMENT-CLIENT-SHELL-S001)
 
 - **GIVEN** browser user が management Client を開く
 - **WHEN** `/agents` route が render される
 - **THEN** page は Agent registry shell、empty-state guidance、Agent registration と Agent detail section shells への links または navigation affordances を表示する
 - **AND** `hello` または `users` demonstration content を表示しない
 
-#### Scenario: Browser bundles do not call Agent RPC directly (MANAGEMENT-CLIENT-S002)
+#### Scenario: Browser bundles do not call Agent RPC directly (MANAGEMENT-CLIENT-SHELL-S002)
 
 - **GIVEN** Client production build が利用できる
 - **WHEN** browser-delivered chunks を検査する
@@ -58,7 +58,7 @@ Server Actions と Server Components は management Client の internal UI execu
 
 Client UI navigation と Browser network behavior は management pages と form/action interactions だけを公開 SHALL。Direct Agent REST proxy calls と Agent RPC credential forwarding は browser-visible routes から存在 MUST NOT。
 
-#### Scenario: Client exposes no Agent API proxy routes (MANAGEMENT-CLIENT-S008)
+#### Scenario: Client exposes no Agent API proxy routes (MANAGEMENT-CLIENT-SHELL-S008)
 
 - **GIVEN** Client route manifest、App Router route handlers、browser-visible network behavior を検査できる
 - **WHEN** `/api/client/*`、`/api/agent*`、Agent REST proxy paths、arbitrary Agent RPC forwarding handlers を列挙する
@@ -84,14 +84,14 @@ Client D1 は `agent_id`、`credential_ref`、key metadata、masked hints、stat
 
 Client D1 は AgentEvent、ThreadMemory、AgentState、Schedule、ToolInvocation、Integration Installation、Adapter Connection、Compaction bodies などの Agent-domain snapshots を保存 MUST NOT。
 
-#### Scenario: Client D1 exposes only management tables (MANAGEMENT-CLIENT-S003)
+#### Scenario: Client D1 exposes only management tables (MANAGEMENT-CLIENT-SHELL-S003)
 
 - **GIVEN** Client D1 schema を検査できる
 - **WHEN** table names と columns を列挙する
 - **THEN** managed Agent と credential reference tables は management metadata columns とともに存在する
 - **AND** Agent-domain snapshot tables は存在しない
 
-#### Scenario: Client repository rejects Agent-domain snapshot persistence (MANAGEMENT-CLIENT-S004)
+#### Scenario: Client repository rejects Agent-domain snapshot persistence (MANAGEMENT-CLIENT-SHELL-S004)
 
 - **GIVEN** Client server-side persistence modules が Agent events または Agent state snapshots に似た data を受け取る
 - **WHEN** その data を Client D1 repository APIs に渡す
@@ -120,14 +120,14 @@ Agent source は Client runtime source を import MUST NOT。
 
 Client 用 generated Agent RPC client code は `packages/client/src/generated/agent-rpc` に配置 SHALL し、Agent proto generation pipeline によって生成 SHALL。
 
-#### Scenario: Client Worker binding set is isolated from Agent runtime (MANAGEMENT-CLIENT-S005)
+#### Scenario: Client Worker binding set is isolated from Agent runtime (MANAGEMENT-CLIENT-SHELL-S005)
 
 - **GIVEN** Client Worker configuration を検査できる
 - **WHEN** bindings を列挙する
 - **THEN** `CLIENT_DB` と Client credential secret references は存在する
 - **AND** `AI_AGENT` Durable Object bindings と Agent-owned storage bindings は存在しない
 
-#### Scenario: Client imports generated Agent RPC code without Agent runtime source (MANAGEMENT-CLIENT-S006)
+#### Scenario: Client imports generated Agent RPC code without Agent runtime source (MANAGEMENT-CLIENT-SHELL-S006)
 
 - **GIVEN** Client source graph を検査できる
 - **WHEN** server-side Agent RPC modules を解決する
@@ -152,7 +152,7 @@ Active workspace は management Client UI と server-side execution を `package
 
 Initial empty states は users に `agent_id`、Agent RPC origin、credential reference の登録を案内 SHALL し、Agent detail section shells は Agent-domain snapshots を Client D1 に永続化せずに render SHALL。
 
-#### Scenario: Management routes contain no demo navigation (MANAGEMENT-CLIENT-S007)
+#### Scenario: Management routes contain no demo navigation (MANAGEMENT-CLIENT-SHELL-S007)
 
 - **GIVEN** Client route configuration と primary navigation を検査できる
 - **WHEN** available management routes を列挙する

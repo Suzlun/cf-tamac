@@ -19,7 +19,7 @@ interface AgentToolsPageProps {
 }
 
 /**
- * Tool catalog and approval queue page（CLIENT-MANAGEMENT-S007）。
+ * Tool catalog and approval queue page（AGENT-MANAGEMENT-UI-S007）。
  *
  * Tool catalog と ToolInvocation queue は Server Action 経由で取得し、
  * approve/reject は explicit confirmation 後だけ server-side RPC として送る。

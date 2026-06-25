@@ -2,7 +2,7 @@
 
 ### Requirement: 管理対象 Agent list と registration UI
 
-Client UI は管理対象 Agent 一覧、登録 flow、Agent selection flow を `Agents` 画面で提供 SHALL。
+Agent Management UI は管理対象 Agent 一覧、登録 flow、Agent selection flow を `Agents` 画面で提供 SHALL。
 
 **Customer Context**
 
@@ -16,14 +16,14 @@ Agent 管理者は、登録済み Agent を一覧し、表示名、pin、並び�
 - Client UI は Agent selection を `Agents` 画面内 action として提供 MUST。選択 action は Server Action で最終閲覧 metadata を更新し、selected-Agent area へ遷移 SHALL。
 - Client UI は台帳変更に Server Actions または Server Components を使用 MUST し、Agent credential を Client 側 JavaScript に露出して MUST NOT。
 
-#### Scenario: Agent list が registry 表示と並び順を支援する (CLIENT-MANAGEMENT-S001)
+#### Scenario: Agent list が registry 表示と並び順を支援する (AGENT-MANAGEMENT-UI-S001)
 
 - **GIVEN** Client D1 に pin と並び順メタデータを持つ複数の管理対象 Agent が含まれている
 - **WHEN** 運用者が Agent 一覧画面を開く
 - **THEN** pinned Agent と並び順が card / summary-first の一覧に反映される
 - **AND** Agent を選択すると、サーバー側 action を通じて最終閲覧メタデータが更新される
 
-#### Scenario: Add Agent フォームが connection メタデータをアクセシブルに検証する (CLIENT-MANAGEMENT-S002)
+#### Scenario: Add Agent フォームが connection メタデータをアクセシブルに検証する (AGENT-MANAGEMENT-UI-S002)
 
 - **GIVEN** 運用者が Agents 画面の Agent registration action を開いている
 - **WHEN** 必須 field が不足している、または RPC origin が不正である
@@ -31,7 +31,7 @@ Agent 管理者は、登録済み Agent を一覧し、表示名、pin、並び�
 - **AND** 検証がサーバー側で通過するまで台帳記録は作成されない
 - **AND** Agent credential 値、Provider credential、生 token は Browser payload に含まれない
 
-#### Scenario: Agents screen owns Agent registration and selection (CLIENT-MANAGEMENT-S010)
+#### Scenario: Agents screen owns Agent registration and selection (AGENT-MANAGEMENT-UI-S010)
 
 - **GIVEN** 運用者が Management Client の Global area を利用している
 - **WHEN** `/agents` 画面を開く
@@ -53,7 +53,7 @@ Agent の自律判断を運用するには、Thread、Event、Run、Compaction�
 - Client UI は latest Handoff、History 参照、Memory 版、provenance、rebase 状態を公開する Compaction と Memory の view を、Overview または Threads detail の metadata として提供 MUST。
 - これらの画面のすべてのデータは Agent RPC からサーバー側で取得 MUST し、Agent domain スナップショットを Client D1 に保存せずに描画 MUST。
 
-#### Scenario: Thread Event Run と Compaction views が Agent-owned history を表示する (CLIENT-MANAGEMENT-S005)
+#### Scenario: Thread Event Run と Compaction views が Agent-owned history を表示する (AGENT-MANAGEMENT-UI-S005)
 
 - **GIVEN** Agent が Event、Run、Compaction、Memory を持つ Thread を有している
 - **WHEN** 運用者が Threads、Events、Runs、Overview の Agent-scoped views を移動する
@@ -81,7 +81,7 @@ Agent 未選択時は selected-Agent navigation area に `Agents` 画面への g
 
 Topbar は selected Agent display と `Agents` 画面への導線を提供 SHALL。
 
-#### Scenario: Selected-Agent screens activate only for selected Agent (CLIENT-MANAGEMENT-S011)
+#### Scenario: Selected-Agent screens activate only for selected Agent (AGENT-MANAGEMENT-UI-S011)
 
 - **GIVEN** 運用者が registered Agent を選択している
 - **WHEN** selected-Agent area の navigation を表示する
@@ -107,7 +107,7 @@ Compaction、Handoff、History、Memory metadata は Overview summary または 
 
 All Tool and Compaction data SHALL be fetched server-side through generated Agent RPC usage and SHALL NOT be persisted as Client D1 Agent-domain snapshots.
 
-#### Scenario: Tools and Compactions are shown inside Agent-scoped context (CLIENT-MANAGEMENT-S012)
+#### Scenario: Tools and Compactions are shown inside Agent-scoped context (AGENT-MANAGEMENT-UI-S012)
 
 - **GIVEN** 選択中 Agent が ToolInvocation と Compaction を持っている
 - **WHEN** 運用者が Overview、Threads detail、Events detail、Runs detail、Integrations detail、Settings を確認する
@@ -132,7 +132,7 @@ Global Settings は Agent-specific configuration、Agent credential secret、Age
 
 Global Settings は Client D1 に Agent-domain snapshot table を追加 MUST NOT。
 
-#### Scenario: Global Settings handles only Client-wide settings (CLIENT-MANAGEMENT-S013)
+#### Scenario: Global Settings handles only Client-wide settings (AGENT-MANAGEMENT-UI-S013)
 
 - **GIVEN** 運用者が Global area を利用している
 - **WHEN** `/settings` を開く
@@ -162,7 +162,7 @@ Status indicators SHALL use label plus icon plus visual tone and MUST NOT rely o
 
 Keyboard navigation、focus visible、skip-to-content、`aria-current`、dialog focus trap、`prefers-reduced-motion` support SHALL be provided where applicable.
 
-#### Scenario: Screens expose actionable states without leaking secrets (CLIENT-MANAGEMENT-S014)
+#### Scenario: Screens expose actionable states without leaking secrets (AGENT-MANAGEMENT-UI-S014)
 
 - **GIVEN** 運用者が Agents、Global Settings、Overview、Threads、Events、Runs、Schedules、Integrations、Settings を利用している
 - **WHEN** loading、empty、error、permission-denied、disabled、pending、filter-empty、selected-agent-required states が発生する

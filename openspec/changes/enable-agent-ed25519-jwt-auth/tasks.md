@@ -87,13 +87,13 @@
 - [ ] 9.4 `packages/client/src/tests/client-signing-key-store.test.ts` に `[CLIENT-REGISTRY-S006] サーバー側 key generation は private JWK をブラウザーに返さない` を追加する。
 - [ ] 9.5 `packages/client/src/tests/client-signing-key-store.test.ts` に `[CLIENT-REGISTRY-S007] disabled または deleted signing key は JWT signing に使われない` を追加する。
 - [ ] 9.6 `packages/client/src/tests/client-agent-rpc-factory.test.ts` に `[CLIENT-REGISTRY-S008] 署名鍵 fingerprint が Agent registry metadata と照合される` を追加する。
-- [ ] 9.7 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[CLIENT-MANAGEMENT-S010] 署名鍵管理画面が key lifecycle を扱う` を追加する。
-- [ ] 9.8 `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts` と `tests/e2e/management-agent-rpc-secrecy.spec.ts` に `[CLIENT-MANAGEMENT-S011] ブラウザーが signing material を受け取らない` を追加する。
-- [ ] 9.9 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[CLIENT-MANAGEMENT-S012] 詳細画面が issuer kid fingerprint と verification result を表示する` を追加する。
-- [ ] 9.10 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[CLIENT-MANAGEMENT-S013] 信頼設定 export が公開情報だけの JSON を生成する` を追加する。
-- [ ] 9.11 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[CLIENT-MANAGEMENT-S014] 広い scope selection が警告と schema validation を表示する` を追加する。
-- [ ] 9.12 `packages/client/src/tests/agent-management-ui.test.tsx` に `[CLIENT-MANAGEMENT-S015] 鍵交代 guidance が trust config と Agent verification を結び付ける` を追加する。
-- [ ] 9.13 `packages/client/src/tests/agent-management-ui.test.tsx` に `[CLIENT-MANAGEMENT-S016] 緊急失効と break-glass recovery guidance が表示される` を追加する。
+- [ ] 9.7 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[AGENT-MANAGEMENT-UI-S010] 署名鍵管理画面が key lifecycle を扱う` を追加する。
+- [ ] 9.8 `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts` と `tests/e2e/management-agent-rpc-secrecy.spec.ts` に `[AGENT-MANAGEMENT-UI-S011] ブラウザーが signing material を受け取らない` を追加する。
+- [ ] 9.9 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[AGENT-MANAGEMENT-UI-S012] 詳細画面が issuer kid fingerprint と verification result を表示する` を追加する。
+- [ ] 9.10 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[AGENT-MANAGEMENT-UI-S013] 信頼設定 export が公開情報だけの JSON を生成する` を追加する。
+- [ ] 9.11 `packages/client/src/tests/agent-management-ui.test.tsx` と `tests/e2e/management-agent-registry.spec.ts` に `[AGENT-MANAGEMENT-UI-S014] 広い scope selection が警告と schema validation を表示する` を追加する。
+- [ ] 9.12 `packages/client/src/tests/agent-management-ui.test.tsx` に `[AGENT-MANAGEMENT-UI-S015] 鍵交代 guidance が trust config と Agent verification を結び付ける` を追加する。
+- [ ] 9.13 `packages/client/src/tests/agent-management-ui.test.tsx` に `[AGENT-MANAGEMENT-UI-S016] 緊急失効と break-glass recovery guidance が表示される` を追加する。
 
 ## 10. Governance Scenario Tests
 

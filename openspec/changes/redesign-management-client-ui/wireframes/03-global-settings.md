@@ -83,5 +83,5 @@
 
 ## Open questions / assumptions
 
-- Q: 管理者認証・Role モデルの具体は別 spec。→ 本ワイヤーフレームでは「概要表示 + 権限依存の disable」のみ仕様化。詳細は `client-management` / 認証 spec に委ねる。
+- Q: 管理者認証・Role モデルの具体は別 spec。→ 本ワイヤーフレームでは「概要表示 + 権限依存の disable」のみ仕様化。詳細は `agent-management-ui` / 認証 spec に委ねる。
 - A: `通知` セクションは将来拡張のプレースホルダ。初期実装では「近日対応」empty state を許容しない（クレド6）→ 初期は該当セクションを出さず、必要になってから追加。

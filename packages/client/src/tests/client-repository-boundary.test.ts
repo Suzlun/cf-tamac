@@ -28,7 +28,7 @@ const forbiddenRepositoryTerms = [
 ];
 
 describe('Management Client repository boundary', () => {
-  it('[MANAGEMENT-CLIENT-S004] Client repository rejects Agent-domain snapshot persistence', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S004] Client repository rejects Agent-domain snapshot persistence', () => {
     expect(Object.keys(createManagedAgentRepository({} as D1Database))).toEqual([
       'createManagedAgent',
       'upsertManagedAgent',

@@ -18,10 +18,9 @@ const config = {
         panel: PANEL_TOKEN,
         paper: PAPER_TOKEN,
         signal: 'var(--signal)',
-        // shadcn/ui semantic slots mapped to the control-room palette
-        // per client-management-ui-wireframe.md §4.7. The control-room
-        // `--muted` token is a text color (rgba paper 0.68) and maps to
-        // `muted-foreground`; `muted` (background) maps to `--panel`.
+        // shadcn/ui semantic slots mapped to the Management Client control-room palette.
+        // The control-room `--muted` token is a text color (rgba paper 0.68)
+        // and maps to `muted-foreground`; `muted` (background) maps to `--panel`.
         background: 'var(--coal)',
         foreground: PAPER_TOKEN,
         card: PANEL_TOKEN,

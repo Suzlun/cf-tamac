@@ -42,7 +42,7 @@ describe('Default model policy save Server Action', () => {
     mocks.upsertModelPolicyForManagedAgent.mockReset();
   });
 
-  it('[CLIENT-MANAGEMENT-S018] returns permission_denied when UpdateConfig rejects after policy upsert', async () => {
+  it('[AGENT-MANAGEMENT-UI-S018] returns permission_denied when UpdateConfig rejects after policy upsert', async () => {
     const { saveDefaultModelPolicy } = await import('../server/actions/agent-operations');
     const permissionError = { category: 'permission_denied' };
     const updateConfig = vi.fn().mockRejectedValue(permissionError);
@@ -82,7 +82,7 @@ describe('Default model policy save Server Action', () => {
     expect(result.configVersion).toBeUndefined();
   });
 
-  it('[CLIENT-MANAGEMENT-S018] builds Agent-compatible v1 model policy payload', async () => {
+  it('[AGENT-MANAGEMENT-UI-S018] builds Agent-compatible v1 model policy payload', async () => {
     const { buildAgentModelPolicyInput, toBrowserSafeModelPolicyMetadata } =
       await import('../server/actions/model-policy-view-models');
 

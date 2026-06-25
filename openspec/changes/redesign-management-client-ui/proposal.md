@@ -23,22 +23,22 @@ None.
 
 ### Modified Spec Units
 
-- `management-client`: Management Client の route shell、navigation IA、browser secrecy、no-proxy 境界、global/selected-Agent sidebar behavior を更新し、旧 surface 不在目的の demo-free requirement を archive sync で削除する。Security concern: Browser bundle に Agent credential、direct Agent RPC invocation、Agent proxy route を入れない。
-- `client-management`: Agent list/registration/selection、Agent-scoped Overview/Threads/Events/Runs/Schedules/Integrations/Settings の UX contract、card/summary-first presentation、states/accessibility/test coverage を更新する。Security concern: Agent domain snapshots は Client D1 に保存せず、必要な Agent-owned data は server-side Agent RPC から取得する。
+- `management-client-shell`: Management Client の route shell、navigation IA、browser secrecy、no-proxy 境界、global/selected-Agent sidebar behavior を更新し、旧 surface 不在目的の demo-free requirement を archive sync で削除する。Security concern: Browser bundle に Agent credential、direct Agent RPC invocation、Agent proxy route を入れない。
+- `agent-management-ui`: Agent list/registration/selection、Agent-scoped Overview/Threads/Events/Runs/Schedules/Integrations/Settings の UX contract、card/summary-first presentation、states/accessibility/test coverage を更新する。Security concern: Agent domain snapshots は Client D1 に保存せず、必要な Agent-owned data は server-side Agent RPC から取得する。
 
 ## Naming
 
 Scenario ID prefixes:
 
-- `management-client` uses `MANAGEMENT-CLIENT-S###`.
-- `client-management` uses `CLIENT-MANAGEMENT-S###`.
+- `management-client-shell` uses `MANAGEMENT-CLIENT-SHELL-S###`.
+- `agent-management-ui` uses `AGENT-MANAGEMENT-UI-S###`.
 
-Related responsibilities stay split: `management-client` covers the shell, navigation, route/public boundary, and browser secrecy; `client-management` covers the management workflows and Agent-scoped screen behavior.
+Related responsibilities stay split: `management-client-shell` covers the shell, navigation, route/public boundary, and browser secrecy; `agent-management-ui` covers the management workflows and Agent-scoped screen behavior.
 
 ## Impact
 
 - Impacted package after approval: `packages/client/**` Management Client route shells, Server Components, Server Actions, server-only Client D1 repositories, and server-only generated Agent RPC usage.
-- OpenSpec contract impact: modified delta specs under `management-client` and `client-management`, plus implementation-ready tasks and wireframe/design artifacts.
+- OpenSpec contract impact: modified delta specs under `management-client-shell` and `agent-management-ui`, plus implementation-ready tasks and wireframe/design artifacts.
 - Agent API impact: no REST/OpenAPI/Orval Agent surface is introduced; Agent Worker remains Protobuf RPC-only.
 - Data impact: Client D1 remains limited to managed Agent records, credential references, and safe Client-owned UI metadata; Agent domain snapshots stay Agent-owned.
 - Security impact: Browser secrecy, no direct Agent RPC, no Client Agent proxy route, and secret-safe UI copy become explicit acceptance criteria.

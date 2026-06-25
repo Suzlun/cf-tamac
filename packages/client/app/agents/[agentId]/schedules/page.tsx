@@ -18,7 +18,7 @@ interface AgentSchedulesPageProps {
 }
 
 /**
- * Agent Schedule management page（CLIENT-MANAGEMENT-S006）。
+ * Agent Schedule management page（AGENT-MANAGEMENT-UI-S006）。
  *
  * Schedule 一覧は Thread/status filter と scoped cursor を Agent RPC に渡し、
  * 作成/取消は Server Action の mutation 境界に閉じる。

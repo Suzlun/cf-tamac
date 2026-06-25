@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { createE2eAgentId, registerManagedAgentThroughUi } from './managed-agent-fixture';
 
-test('[MANAGEMENT-CLIENT-S001] Agent registry shell renders without demo content', async ({
+test('[MANAGEMENT-CLIENT-SHELL-S001] Agent registry shell renders without demo content', async ({
   page,
 }, testInfo) => {
   const agentId = createE2eAgentId(testInfo);
@@ -24,7 +24,7 @@ test('[MANAGEMENT-CLIENT-S001] Agent registry shell renders without demo content
   await expect(page.getByText(`agent_id: ${agentId}`)).toBeVisible();
 });
 
-test('[MANAGEMENT-CLIENT-S001] Registry shell keeps registration calls to action', async ({
+test('[MANAGEMENT-CLIENT-SHELL-S001] Registry shell keeps registration calls to action', async ({
   page,
 }) => {
   await page.goto('/agents');

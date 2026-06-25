@@ -12,7 +12,7 @@ const migrationPath = new URL(
 );
 
 describe('Management Client D1 schema', () => {
-  it('[MANAGEMENT-CLIENT-S003] Client D1 exposes only management tables', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S003] Client D1 exposes only management tables', () => {
     const migration = readFileSync(fileURLToPath(migrationPath.href), 'utf8');
     const tableNames = clientD1Tables.map((table) => table.tableName);
 

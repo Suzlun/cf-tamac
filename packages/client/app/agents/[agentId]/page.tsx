@@ -103,7 +103,7 @@ function formatStatus(status: string | undefined): string {
 }
 
 /**
- * Agent overview page (CLIENT-MANAGEMENT-S003).
+ * Agent overview page (AGENT-MANAGEMENT-UI-S003).
  *
  * Fetches Agent profile, lifecycle, config version, credential status, and
  * capability summary from Agent RPC via server-side actions.

@@ -70,7 +70,7 @@ function safeSettingsErrorMessage(error: unknown): string {
 }
 
 /**
- * Agent settings page (CLIENT-MANAGEMENT-S004).
+ * Agent settings page (AGENT-MANAGEMENT-UI-S004).
  *
  * Supports config update, credential rotation, and Agent destruction through
  * Server Actions that carry acting user context.
