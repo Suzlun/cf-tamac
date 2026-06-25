@@ -2,6 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 
+import {
+  toRegistrationModelPolicyFieldErrors,
+  type RegistrationPolicyValidationResult,
+} from '../../components/schemas/agent-registration';
 import { deriveActingUserContext } from '../agent-rpc/acting-user';
 import {
   toBrowserSafeCredentialReference,
@@ -14,6 +18,7 @@ import {
 } from '../db';
 import { getClientWorkerEnv } from '../env';
 
+import { initializeAgentWithDefaultModelPolicy } from './agent-lifecycle';
 import {
   persistManagedAgentRegistration,
   validateManagedAgentRegistrationInput,
@@ -21,6 +26,8 @@ import {
   type ManagedAgentRegistrationOptions,
   type ManagedAgentRegistrationResult,
 } from './managed-agent-registration';
+import { validateModelPolicyForRegistration } from './model-policies';
+import { safeModelPolicyErrorMessage } from './model-policy-view-models';
 
 const INTEGRATION_MANAGEMENT_DENIED_REASON = 'You do not have permission to manage Integrations.';
 
@@ -194,6 +201,21 @@ export async function submitManagedAgentRegistration(
     };
   }
 
+  const policyValidation = await validateModelPolicyForRegistration({
+    agentId: validation.value.agentId,
+    agentRpcOrigin: validation.value.agentRpcOrigin,
+    credentialReference: validation.value.referenceValue,
+    keyId: validation.value.keyId,
+    modelPolicy: validation.value.modelPolicy,
+  });
+  if (!policyValidation.ok) {
+    return {
+      ok: false,
+      fieldErrors: toRegistrationModelPolicyFieldErrors(policyValidation.fieldErrors),
+      formError: policyValidation.formError ?? 'The default model policy could not be validated.',
+    };
+  }
+
   const env = getClientWorkerEnv();
   const result = await persistManagedAgentRegistration(
     validation.value,
@@ -205,11 +227,76 @@ export async function submitManagedAgentRegistration(
   );
 
   if (result.ok) {
-    revalidatePath('/agents');
-    revalidatePath(`/agents/${result.agentId}`);
-    revalidatePath(`/agents/${result.agentId}/settings`);
+    try {
+      await initializeAgentWithDefaultModelPolicy(
+        result.agentId,
+        buildRegistrationIdempotencyKey(result.agentId),
+        validation.value.displayName,
+        validation.value.modelPolicy
+      );
+      revalidatePath('/agents');
+      revalidatePath(`/agents/${result.agentId}`);
+      revalidatePath(`/agents/${result.agentId}/settings`);
+    } catch (error) {
+      await rollbackFailedAgentInitialization(env.CLIENT_DB, result.agentId);
+      return {
+        ok: false,
+        fieldErrors: {},
+        formError: safeModelPolicyErrorMessage(error),
+      };
+    }
   }
   return result;
+}
+
+/**
+ * Registration form の Validate policy button から Agent RPC validation を実行します。
+ *
+ * @param input - Registration form 全体の browser-safe 入力です。
+ * @returns policy draft の validation 結果を registration field 名で返します。
+ * @remarks
+ * Client D1 へは書き込まず、Agent RPC validation だけを server-only credential 解決で実行します。
+ * Browser には safe warning/error だけを返し、credential secret や generated RPC payload は返しません。
+ */
+export async function validateManagedAgentRegistrationModelPolicy(
+  input: ManagedAgentRegistrationInput
+): Promise<RegistrationPolicyValidationResult> {
+  const validation = validateManagedAgentRegistrationInput(input);
+  if (!validation.ok) {
+    return {
+      ok: false,
+      fieldErrors: validation.fieldErrors,
+      formError: 'Correct the highlighted fields before validating the policy.',
+    };
+  }
+  const result = await validateModelPolicyForRegistration({
+    agentId: validation.value.agentId,
+    agentRpcOrigin: validation.value.agentRpcOrigin,
+    credentialReference: validation.value.referenceValue,
+    keyId: validation.value.keyId,
+    modelPolicy: validation.value.modelPolicy,
+  });
+  if (result.ok) {
+    return { ok: true, warnings: result.warnings };
+  }
+  return {
+    ok: false,
+    fieldErrors: toRegistrationModelPolicyFieldErrors(result.fieldErrors),
+    formError: result.formError,
+    warnings: result.warnings,
+  };
+}
+
+function buildRegistrationIdempotencyKey(agentId: string): string {
+  return `registration:${agentId}:${Date.now().toString(36)}`;
+}
+
+async function rollbackFailedAgentInitialization(d1: D1Database, agentId: string): Promise<void> {
+  try {
+    await createManagedAgentRepository(d1).deleteManagedAgent(agentId);
+  } catch {
+    // 初期化失敗の safe error を優先して返す。cleanup 失敗の詳細は Browser へ出さない。
+  }
 }
 
 /**

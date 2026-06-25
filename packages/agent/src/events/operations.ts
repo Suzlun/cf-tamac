@@ -10,6 +10,11 @@ import {
 } from '../domain/agent-operation-utils';
 import { createAgentDomainError } from '../domain/errors';
 import {
+  mapAgentModelPolicySummaryRow,
+  mapValidationRecord,
+  requireActiveAgentModelPolicy,
+} from '../domain/model-policy-operations';
+import {
   recordAgentImmutableBlobReference,
   writeAgentImmutableBlob,
   type AgentImmutableBlobWriter,
@@ -37,6 +42,12 @@ import type { AgentEventRow, AgentStorageRepositories } from '../storage';
  * Event operations が large payload bytes を Agent-owned blob storage へ保存する callback です。
  */
 export type AgentEventBlobWriter = AgentImmutableBlobWriter;
+
+interface RequestedModelPolicyContext {
+  readonly source: 'client_override' | 'integration_override';
+  readonly summary: NonNullable<AgentEventView['modelPolicy']>;
+  readonly validation: NonNullable<AgentEventView['modelPolicyValidation']>;
+}
 
 /**
  * Run PublishEvent against Agent-owned storage and blob storage.
@@ -126,6 +137,7 @@ async function appendEvent(input: {
   const now = input.command.context.requestedAtMs;
   const identity = createThreadKeyIdentity(input.agentId, input.command.threadKey);
   const eventId = crypto.randomUUID();
+  const requestedModelPolicy = resolveRequestedModelPolicy(input);
   const payload = await createEventPayload(input, eventId);
   const persisted = appendAgentEventToThread({
     afterEventAppended: ({ repositories, thread }) => {
@@ -155,8 +167,13 @@ async function appendEvent(input: {
     payloadRef: payload?.ref,
     payloadSha256: payload?.sha256,
     payloadStorageClass: payload?.storageClass,
+    policyOverrideSource: requestedModelPolicy?.source,
     repositories: input.repositories,
     requestDigest: input.command.context.bodyDigest.digestHex,
+    requestedModelPolicyDigest: requestedModelPolicy?.summary.policyDigest,
+    requestedModelPolicyRef: requestedModelPolicy?.summary.policyRef,
+    requestedModelPolicyValidationStatus: requestedModelPolicy?.validation.status,
+    requestedModelPolicyVersion: requestedModelPolicy?.summary.version,
     source: input.command.source,
     target: {
       mode: 'thread_key',
@@ -166,7 +183,10 @@ async function appendEvent(input: {
   });
   return {
     accepted: true,
-    event: mapAgentEventRow(input.agentId, persisted.event),
+    event: attachRequestedPolicyToEvent(
+      mapAgentEventRow(input.agentId, persisted.event),
+      requestedModelPolicy
+    ),
     pendingRun: mapAgentRunRow(input.agentId, persisted.run),
     replayed: false,
     thread: {
@@ -275,6 +295,91 @@ function authorizeEventOperation(
   });
 }
 
+function resolveRequestedModelPolicy(input: {
+  readonly agentId: string;
+  readonly command: PublishAgentEventCommand;
+  readonly repositories: AgentStorageRepositories;
+}): RequestedModelPolicyContext | undefined {
+  const policyRef = input.command.modelPolicyRef?.trim();
+  if (policyRef === undefined || policyRef === '') return undefined;
+  authorizePolicyOverride(input.repositories, input.command.context, policyRef);
+  const policy = requireActiveAgentModelPolicy({
+    agentId: input.agentId,
+    policyRef,
+    repositories: input.repositories,
+  });
+  const validation = input.repositories.modelPolicies.validatePolicy(
+    {
+      decisionSchemaVersion: policy.decisionSchemaVersion,
+      modelId: policy.modelId,
+      policyRef: policy.policyRef,
+      provider: policy.provider,
+      safeMetadataRef:
+        policy.safeMetadataRef === null
+          ? undefined
+          : { ref: policy.safeMetadataRef, sha256: policy.safeMetadataSha256 ?? undefined },
+      status: policy.status,
+    },
+    input.command.context.requestedAtMs
+  );
+  return {
+    source:
+      input.command.context.principal.principalType === 'INTEGRATION_INSTALLATION'
+        ? 'integration_override'
+        : 'client_override',
+    summary: mapAgentModelPolicySummaryRow(input.agentId, policy),
+    validation: mapValidationRecord(validation),
+  };
+}
+
+function authorizePolicyOverride(
+  repositories: AgentStorageRepositories,
+  context: AgentCoreRequestContext,
+  policyRef: string
+): void {
+  try {
+    authorizeAgentOperation({
+      action: 'event.model_policy.override',
+      capability: {
+        adapterConnectionId: context.principal.connectionId,
+        capabilityKind: 'integration',
+        installationId: context.principal.installationId,
+        modelPolicyRef: policyRef,
+        ownerAgentId: context.agentId,
+      },
+      context,
+      method: context.method,
+      repositories,
+      requiredGrants: [
+        'agent.model_policy.override',
+        `agent.model_policy.override:${policyRef}`,
+        `model_policy:${policyRef}`,
+      ],
+      requiredPrincipalTypes: [
+        'CLIENT_SERVICE',
+        'INTEGRATION_INSTALLATION',
+        'INTERNAL_SERVICE',
+        'ADMIN_OPERATOR',
+      ],
+      requiredScopes: [
+        'agent.model_policy.override',
+        `agent.model_policy.override:${policyRef}`,
+        `model_policy:${policyRef}`,
+      ],
+      service: context.service,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw createAgentDomainError({
+        kind: 'authorization',
+        message: 'Principal lacks a model policy override grant for this Event.',
+        target: 'model_policy_ref',
+      });
+    }
+    throw error;
+  }
+}
+
 function assertPublicThreadKey(threadKey: string): void {
   if (threadKey.normalize('NFC') === '__system__') {
     throw createAgentDomainError({ kind: 'authorization', message: 'System Thread is reserved.' });
@@ -292,7 +397,7 @@ function withInlinePayload(
   event: AgentEventRow,
   includePayload: boolean
 ): AgentEventView {
-  const view = mapAgentEventRow(agentId, event);
+  const view = attachStoredPolicyToEvent(agentId, mapAgentEventRow(agentId, event), event);
   if (!includePayload || event.payloadInlineBase64 === null || view.payloadMetadata === undefined) {
     return view;
   }
@@ -302,6 +407,50 @@ function withInlinePayload(
       ...view.payloadMetadata,
       inlineBytes: decodeBase64Bytes(event.payloadInlineBase64),
     },
+  };
+}
+
+function attachRequestedPolicyToEvent(
+  event: AgentEventView,
+  requestedModelPolicy: RequestedModelPolicyContext | undefined
+): AgentEventView {
+  if (requestedModelPolicy === undefined) return event;
+  return {
+    ...event,
+    modelPolicy: requestedModelPolicy.summary,
+    modelPolicyValidation: requestedModelPolicy.validation,
+    policyOverrideSource: requestedModelPolicy.source,
+    requestedModelPolicyRef: requestedModelPolicy.summary.policyRef,
+  };
+}
+
+function attachStoredPolicyToEvent(
+  agentId: string,
+  event: AgentEventView,
+  row: AgentEventRow
+): AgentEventView {
+  if (row.requestedModelPolicyRef === undefined || row.requestedModelPolicyRef === null) {
+    return event;
+  }
+  const digest = row.requestedModelPolicyDigest;
+  const version = row.requestedModelPolicyVersion;
+  return {
+    ...event,
+    modelPolicy:
+      digest === undefined || digest === null || version === undefined || version === null
+        ? undefined
+        : {
+            agentId,
+            decisionSchemaVersion: 'v1',
+            modelId: '',
+            policyDigest: digest,
+            policyRef: row.requestedModelPolicyRef,
+            provider: '',
+            status: row.requestedModelPolicyValidationStatus ?? 'active',
+            version,
+          },
+    policyOverrideSource: row.policyOverrideSource ?? undefined,
+    requestedModelPolicyRef: row.requestedModelPolicyRef,
   };
 }
 

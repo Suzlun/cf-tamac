@@ -26,8 +26,19 @@ export interface AgentRunInputSnapshotRow {
   readonly configVersion: number;
   readonly createdAtMs: number;
   readonly integrationVersion: number;
+  readonly decisionSchemaVersion?: string | null;
+  readonly generationMaxOutputTokens?: number | null;
+  readonly generationTemperature?: string | null;
+  readonly generationTopP?: string | null;
   readonly latestReadyCompactionRef: string | null;
+  readonly modelId?: string | null;
+  readonly modelPolicySource?: string | null;
+  readonly modelPolicyVersion?: number | null;
+  readonly modelProvider?: string | null;
   readonly runId: string;
+  readonly requestedModelPolicyRef?: string | null;
+  readonly resolvedModelPolicyDigest?: string | null;
+  readonly resolvedModelPolicyRef?: string | null;
   readonly snapshotRef: string;
   readonly threadId: string;
   readonly threadMemoryRef: string | null;
@@ -58,8 +69,19 @@ export interface CreateAgentRunInputSnapshotInput {
   readonly configVersion: number;
   readonly createdAtMs: number;
   readonly integrationVersion: number;
+  readonly decisionSchemaVersion?: string;
+  readonly generationMaxOutputTokens?: number;
+  readonly generationTemperature?: string;
+  readonly generationTopP?: string;
   readonly latestReadyCompactionRef: string | null;
+  readonly modelId?: string;
+  readonly modelPolicySource?: string;
+  readonly modelPolicyVersion?: number;
+  readonly modelProvider?: string;
   readonly runId: string;
+  readonly requestedModelPolicyRef?: string;
+  readonly resolvedModelPolicyDigest?: string;
+  readonly resolvedModelPolicyRef?: string;
   readonly snapshotRef: string;
   readonly threadId: string;
   readonly threadMemoryRef: string | null;
@@ -171,7 +193,34 @@ function createRunInputSnapshot(
   if (existing !== undefined) return existing;
   database
     .insert(inputs)
-    .values({ agentId, ...input })
+    .values({
+      agentId,
+      configVersion: input.configVersion,
+      createdAtMs: input.createdAtMs,
+      decisionSchemaVersion: input.decisionSchemaVersion ?? null,
+      generationMaxOutputTokens: input.generationMaxOutputTokens ?? null,
+      generationTemperature: input.generationTemperature ?? null,
+      generationTopP: input.generationTopP ?? null,
+      integrationVersion: input.integrationVersion,
+      latestReadyCompactionRef: input.latestReadyCompactionRef,
+      modelId: input.modelId ?? null,
+      modelPolicySource: input.modelPolicySource ?? null,
+      modelPolicyVersion: input.modelPolicyVersion ?? null,
+      modelProvider: input.modelProvider ?? null,
+      requestedModelPolicyRef: input.requestedModelPolicyRef ?? null,
+      resolvedModelPolicyDigest: input.resolvedModelPolicyDigest ?? null,
+      resolvedModelPolicyRef: input.resolvedModelPolicyRef ?? null,
+      runId: input.runId,
+      snapshotRef: input.snapshotRef,
+      threadId: input.threadId,
+      threadMemoryRef: input.threadMemoryRef,
+      threadMemoryVersion: input.threadMemoryVersion,
+      toolSetVersion: input.toolSetVersion,
+      triggerEventEndSequence: input.triggerEventEndSequence,
+      triggerEventId: input.triggerEventId,
+      triggerEventStartSequence: input.triggerEventStartSequence,
+      uncompactedUpperSequence: input.uncompactedUpperSequence,
+    })
     .run();
   const created = findRunInputSnapshot(agentId, database, input.runId);
   if (created === undefined) {

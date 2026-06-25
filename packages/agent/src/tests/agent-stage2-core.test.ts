@@ -3,6 +3,11 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { authorizeAgentOperation } from '../domain/agent-operation-utils';
+
+import type { AgentCoreRequestContext } from '../domain';
+import type { AgentStorageRepositories } from '../storage';
+
 const aiAgentPath = new URL('../AIAgent.ts', import.meta.url);
 const foundationEventsPath = new URL('../AIAgent.foundation-events.ts', import.meta.url);
 const tableInitializerPath = new URL('../storage/table-initializer.ts', import.meta.url);
@@ -52,6 +57,38 @@ describe('Agent Stage 2 core implementation', () => {
     expect(lifecycle).toContain('profile.configVersion + 1');
     expect(authorization).toContain("state === 'active' || state === 'overlap'");
     expect(utils).toContain("return credential.status === 'revoked' ? 'revoked' : 'disabled'");
+  });
+
+  it('[AGENT-MODEL-POLICY-S005] [AGENT-LIFECYCLE-S008] InitializeAgent stores default model policy ref and digest', () => {
+    const lifecycle = readSource(lifecycleOperationsPath);
+    const modelPolicy = readSource(
+      new URL('../domain/model-policy-operations.ts', import.meta.url)
+    );
+    const mapper = readSource(messageMappersPath);
+
+    expect(lifecycle).toContain('seedInitialAgentModelPolicy({');
+    expect(lifecycle).toContain('createInitialConfigWithPolicyRef(');
+    expect(lifecycle).toContain('requireActiveAgentModelPolicy({');
+    expect(lifecycle).toContain('defaultModelPolicy');
+    expect(modelPolicy).toContain('policyRef: defaultPolicyRef');
+    expect(modelPolicy).toContain('policyDigest');
+    expect(mapper).toContain('defaultModelPolicy');
+    expect(`${lifecycle}\n${modelPolicy}\n${mapper}`).not.toMatch(
+      /secretValue|providerToken|rawPrompt|rawCompletion/
+    );
+  });
+
+  it('[AGENT-LIFECYCLE-S009] UpdateConfig accepts only active model policy refs', () => {
+    const lifecycle = readSource(lifecycleOperationsPath);
+
+    expect(lifecycle).toContain('mergeConfigWithLatest(');
+    expect(lifecycle).toContain(
+      'mergeConfigWithLatest(input.agentId, input.repositories, input.command.config)'
+    );
+    expect(lifecycle).toContain(
+      'modelPolicyRef: config.modelPolicyRef ?? latest?.modelPolicyRef ?? undefined'
+    );
+    expect(lifecycle).toContain('requireActiveAgentModelPolicy({');
   });
 
   it('[AGENT-EVENTING-S001] [AGENT-EVENTING-S002] [AGENT-EVENTING-S004] [AGENT-EVENTING-S005] appends Events after Thread and Section resolution', () => {
@@ -108,5 +145,64 @@ describe('Agent Stage 2 core implementation', () => {
     expect(utils).toContain('repositories.idempotency.findRecord(');
     expect(utils).toContain('listGrantsForPrincipal(');
     expect(mapper).not.toContain('secretReference');
+  });
+
+  it('[AGENT-INTEGRATION-S009] Integration ingress final authorization treats trust key ID separately from Agent credentials', () => {
+    const repositories = {
+      credentials: { findCredential: () => undefined },
+      grants: {
+        listGrantsForPrincipal: () => [
+          {
+            capability: 'agent.event',
+            createdAtMs: 1,
+            grantId: 'grant-integration-event',
+            principalId: 'inst-1',
+            scopeRef: 'installation:inst-1',
+            status: 'active',
+            updatedAtMs: 1,
+          },
+        ],
+      },
+      profile: {
+        getProfile: () => ({
+          configVersion: 1,
+          credentialGeneration: 1,
+          lifecycleStatus: 'active',
+        }),
+      },
+    } as unknown as AgentStorageRepositories;
+    const context = {
+      agentId: 'agent-alpha',
+      bodyDigest: { algorithm: 'sha-256', byteLength: 32, digestHex: 'a'.repeat(64) },
+      method: 'PublishEvent',
+      principal: {
+        agentId: 'agent-alpha',
+        installationId: 'inst-1',
+        keyId: 'provider-trust-key-1',
+        principalId: 'inst-1',
+        principalType: 'INTEGRATION_INSTALLATION',
+        scopes: [],
+      },
+      requestedAtMs: 2,
+      service: 'cftamac.agent.v1.IntegrationIngressService',
+    } satisfies AgentCoreRequestContext;
+
+    expect(() =>
+      authorizeAgentOperation({
+        action: 'integration.ingress.event',
+        capability: {
+          capabilityKind: 'integration',
+          installationId: 'inst-1',
+          ownerAgentId: 'agent-alpha',
+        },
+        context,
+        method: 'PublishEvent',
+        repositories,
+        requiredGrants: ['agent.event'],
+        requiredPrincipalTypes: ['INTEGRATION_INSTALLATION'],
+        requiredScopes: ['agent.rpc', 'agent.integration'],
+        service: 'cftamac.agent.v1.IntegrationIngressService',
+      })
+    ).not.toThrow();
   });
 });

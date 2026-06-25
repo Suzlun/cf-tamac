@@ -19,6 +19,8 @@ import type {
   AgentGrantRow,
   AgentIdempotencyRecordRow,
   AgentProviderOperationRow,
+  AgentRunInputSnapshotRow,
+  AgentRunRow,
   AgentStorageRepositories,
   AgentToolDefinitionRow,
   AgentToolInvocationRow,
@@ -119,6 +121,18 @@ describe('Agent Stage 6 Tool implementation', () => {
     expect(operations).toContain('toolInvocationFailedEventType');
     expect(operations).toContain("source: 'agent.tool'");
     expect(aiAgent).toContain('requestWakeAfterToolResult(result, command.context.requestedAtMs)');
+  });
+
+  it('[AGENT-TOOL-S010] Tool result resumes waiting Run and rejects stale generations', () => {
+    const guards = readSource(guardsPath);
+    const operations = readSource(operationsPath);
+
+    expect(operations).toContain('assertToolResultCanResumeRun(repositories, invocation)');
+    expect(operations).toContain("fromStatus: 'waiting'");
+    expect(operations).toContain("toStatus: 'pending'");
+    expect(guards).toContain('Tool result catalog generation is stale.');
+    expect(guards).toContain('Tool result is stale for the waiting Run.');
+    expect(operations).toContain('findResultEventByInvocation(invocation.invocationId)');
   });
 
   it('[AGENT-TOOL-S007] outcome_unknown invocations reconcile through GetOperation without duplicate results', () => {
@@ -512,6 +526,41 @@ class Stage6ToolHarness {
   readonly providerOperations = new Map<string, AgentProviderOperationRow>();
   readonly resultEvents: AgentToolResultEventRow[] = [];
   readonly repositories: AgentStorageRepositories;
+  private run: AgentRunRow = {
+    createdAtMs: 1,
+    lastServedAtMs: null,
+    pendingSinceMs: 1,
+    priority: 0,
+    runId: 'run-stage6',
+    status: 'waiting',
+    threadId: this.threadId,
+    triggerEventId: 'event-stage6-trigger',
+    updatedAtMs: 1,
+  };
+  private readonly snapshot: AgentRunInputSnapshotRow = {
+    configVersion: 1,
+    createdAtMs: 1,
+    decisionSchemaVersion: 'v1',
+    integrationVersion: 1,
+    latestReadyCompactionRef: null,
+    modelId: '@cf/meta/llama-3.1-8b-instruct',
+    modelPolicySource: 'agent_default',
+    modelPolicyVersion: 1,
+    modelProvider: 'workers-ai',
+    requestedModelPolicyRef: null,
+    resolvedModelPolicyDigest: 'd'.repeat(64),
+    resolvedModelPolicyRef: 'workers-ai-default',
+    runId: 'run-stage6',
+    snapshotRef: 'snapshot://run-stage6',
+    threadId: this.threadId,
+    threadMemoryRef: null,
+    threadMemoryVersion: 0,
+    toolSetVersion: 1,
+    triggerEventEndSequence: 1,
+    triggerEventId: 'event-stage6-trigger',
+    triggerEventStartSequence: 1,
+    uncompactedUpperSequence: 1,
+  };
   private readonly idempotencyRecords = new Map<string, AgentIdempotencyRecordRow>();
   private readonly nonces = new Set<string>();
   private section = createSectionRow(this.threadId, 'section-stage6');
@@ -657,20 +706,36 @@ class Stage6ToolHarness {
         },
       },
       pendingRuns: {
-        findPendingRunForThread: () => undefined,
+        findPendingRunForThread: (threadId: string) =>
+          this.run.threadId === threadId && this.run.status === 'pending' ? this.run : undefined,
+        findRunById: (runId: string) => (this.run.runId === runId ? this.run : undefined),
+        findRunInputSnapshot: (runId: string) =>
+          this.snapshot.runId === runId ? this.snapshot : undefined,
+        transitionRunStatus: (input: {
+          readonly fromStatus?: string;
+          readonly nowMs: number;
+          readonly runId: string;
+          readonly toStatus: string;
+        }) => {
+          if (this.run.runId !== input.runId) return;
+          if (input.fromStatus !== undefined && this.run.status !== input.fromStatus) return;
+          this.run = { ...this.run, status: input.toStatus, updatedAtMs: input.nowMs };
+        },
         upsertPendingRunForThread: (
           input: Parameters<AgentStorageRepositories['pendingRuns']['upsertPendingRunForThread']>[0]
-        ) => ({
-          createdAtMs: input.nowMs,
-          lastServedAtMs: input.lastServedAtMs ?? null,
-          pendingSinceMs: input.nowMs,
-          priority: input.priority,
-          runId: input.runId,
-          status: 'pending',
-          threadId: input.threadId,
-          triggerEventId: input.triggerEventId,
-          updatedAtMs: input.nowMs,
-        }),
+        ) => {
+          this.run = {
+            ...this.run,
+            lastServedAtMs: input.lastServedAtMs ?? this.run.lastServedAtMs,
+            priority: input.priority,
+            runId: input.runId,
+            status: 'pending',
+            threadId: input.threadId,
+            triggerEventId: input.triggerEventId,
+            updatedAtMs: input.nowMs,
+          };
+          return this.run;
+        },
       },
       profile: { getProfile: () => ({ lifecycleStatus: 'active' }) },
       requestNonces: {

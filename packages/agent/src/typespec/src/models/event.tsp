@@ -22,6 +22,10 @@ model AgentEvent {
   @field(16) causation_id?: string;
   @field(17) run_id?: string;
   @field(18) delivery_context_id?: string;
+  @field(19) requested_model_policy_ref?: string;
+  @field(20) model_policy?: AgentModelPolicySummary;
+  @field(21) model_policy_validation?: AgentModelPolicyValidationResult;
+  @field(22) policy_override_source?: string;
 }
 
 @message
@@ -36,4 +40,5 @@ model AgentEventInput {
   @field(8) correlation_id?: string;
   @field(9) causation_id?: string;
   @field(10) delivery_context?: DeliveryContext;
+  @field(11) model_policy_ref?: string;
 }

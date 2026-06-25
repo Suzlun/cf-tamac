@@ -12,6 +12,7 @@ export const harnessRunInterruptTypes = [
   'permission_revoked',
   'integration_uninstalled',
   'generation_mismatch',
+  'model_policy_mismatch',
   'lifecycle_mismatch',
   'capability_version_mismatch',
 ] as const;
@@ -199,6 +200,8 @@ function findGenerationIssue(
       type: 'generation_mismatch',
     };
   }
+  const policyIssue = findModelPolicyIssue(snapshot, repositories);
+  if (policyIssue !== undefined) return policyIssue;
   if (
     snapshot.integrationVersion !== expected.integrationVersion ||
     snapshot.toolSetVersion !== expected.toolSetVersion ||
@@ -217,6 +220,36 @@ function findGenerationIssue(
     };
   }
   return undefined;
+}
+
+function findModelPolicyIssue(
+  snapshot: AgentRunInputSnapshotRow,
+  repositories: AgentStorageRepositories
+): { readonly reason: string; readonly type: HarnessRunInterruptType } | undefined {
+  if (
+    snapshot.resolvedModelPolicyRef === undefined ||
+    snapshot.resolvedModelPolicyRef === null ||
+    snapshot.resolvedModelPolicyDigest === undefined ||
+    snapshot.resolvedModelPolicyDigest === null
+  ) {
+    return undefined;
+  }
+  const policy = repositories.modelPolicies.getActivePolicy(snapshot.resolvedModelPolicyRef);
+  if (policy === undefined) return createModelPolicyMismatchIssue();
+  if (policy.policyDigest !== snapshot.resolvedModelPolicyDigest)
+    return createModelPolicyMismatchIssue();
+  if (policy.version !== snapshot.modelPolicyVersion) return createModelPolicyMismatchIssue();
+  return undefined;
+}
+
+function createModelPolicyMismatchIssue(): {
+  readonly reason: string;
+  readonly type: HarnessRunInterruptType;
+} {
+  return {
+    reason: 'Model policy generation changed before result commit.',
+    type: 'model_policy_mismatch',
+  };
 }
 
 function normalizeTerminalInterruptStatus(

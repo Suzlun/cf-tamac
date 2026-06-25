@@ -4,7 +4,22 @@ import { revalidatePath } from 'next/cache';
 
 import { loadAgentRpcClients } from '../agent-rpc/agent-loader';
 
-import { toOptionalString, toSafeNumber, toSafeString } from './browser-safe-helpers';
+import {
+  toBrowserSafeAgentConfigPreview,
+  toOptionalString,
+  toSafeNumber,
+  toSafeString,
+} from './browser-safe-helpers';
+import {
+  buildAgentModelPolicyInput,
+  toBrowserSafeModelPolicyMetadata,
+} from './model-policy-view-models';
+
+import type { BrowserSafeAgentConfigPreview } from './browser-safe-helpers';
+import type {
+  BrowserSafeModelPolicyMetadata,
+  ModelPolicyDraftValues,
+} from '../../components/schemas/model-policy';
 
 /**
  * Browser-safe Agent credential view that excludes secret lookup material.
@@ -58,7 +73,8 @@ export interface BrowserSafeAgentOverview {
 export interface BrowserSafeAgentConfig {
   readonly agentId: string;
   readonly configVersion: string;
-  readonly config?: Record<string, unknown>;
+  readonly config: BrowserSafeAgentConfigPreview;
+  readonly defaultModelPolicy?: BrowserSafeModelPolicyMetadata;
 }
 
 /**
@@ -169,10 +185,69 @@ export async function getAgentConfig(agentId: string): Promise<BrowserSafeAgentC
   const response = await clients.withErrorNormalization(() => clients.state.getConfig({ agentId }));
 
   const config = response.config as Record<string, unknown> | undefined;
+  const configVersion = toSafeString(config?.configVersion);
   return {
     agentId,
-    configVersion: toSafeString(config?.configVersion),
-    config,
+    configVersion,
+    config: toBrowserSafeAgentConfigPreview(config),
+    defaultModelPolicy: toBrowserSafeModelPolicyMetadata(
+      response.defaultModelPolicy ?? config?.defaultModelPolicy,
+      { configVersion }
+    ),
+  };
+}
+
+/**
+ * Agent 作成 flow で initial default model policy と `modelPolicyRef` を同時に送信します。
+ *
+ * @param agentId - 初期化する Agent ID です。
+ * @param idempotencyKey - `InitializeAgent` command 用の冪等性 key です。
+ * @param displayName - Agent profile と initial config に渡す表示名です。
+ * @param modelPolicy - Browser-safe default model policy draft です。
+ * @returns 初期化後の Browser-safe config と default model policy metadata を返します。
+ * @remarks
+ * Client D1 へ registry/credential reference を保存した後、server-only Agent RPC client を読み込みます。
+ * policy body は Agent Service へ initial seed として送り、Client D1 には正本として保存しません。
+ */
+export async function initializeAgentWithDefaultModelPolicy(
+  agentId: string,
+  idempotencyKey: string,
+  displayName: string,
+  modelPolicy: ModelPolicyDraftValues
+): Promise<BrowserSafeAgentConfig> {
+  const { clients } = await loadAgentRpcClients(agentId);
+  const initialModelPolicy = await buildAgentModelPolicyInput(modelPolicy);
+  const response = await clients.withErrorNormalization(() =>
+    clients.lifecycle.initializeAgent({
+      agentId,
+      idempotencyKey,
+      displayName,
+      initialConfig: {
+        agentId,
+        displayName,
+        modelPolicyRef: modelPolicy.policyRef,
+      } as never,
+      initialModelPolicy: initialModelPolicy as never,
+    })
+  );
+
+  const config = response.config as Record<string, unknown> | undefined;
+  const configVersion = toSafeString(config?.configVersion);
+  revalidatePath('/agents');
+  revalidatePath(`/agents/${agentId}`);
+  revalidatePath(`/agents/${agentId}/settings`);
+  return {
+    agentId,
+    configVersion,
+    config: toBrowserSafeAgentConfigPreview(config),
+    defaultModelPolicy: toBrowserSafeModelPolicyMetadata(response.defaultModelPolicy, {
+      configVersion,
+      fallbackGenerationParameters: {
+        temperature: modelPolicy.temperature,
+        topP: modelPolicy.topP,
+        maxOutputTokens: modelPolicy.maxOutputTokens,
+      },
+    }),
   };
 }
 
@@ -211,7 +286,13 @@ export async function updateAgentConfig(
   config: Record<string, unknown>
 ): Promise<BrowserSafeAgentConfig> {
   const { clients } = await loadAgentRpcClients(agentId);
-  const configPayload = { ...config, agentId };
+  const configPayload: Record<string, unknown> = { ...config, agentId };
+  // Default model policy は専用 action が upsert 後に添付するため、汎用 JSON editor からは上書きさせない。
+  delete configPayload.configVersion;
+  delete configPayload.modelPolicyRef;
+  delete configPayload.defaultModelPolicy;
+  delete configPayload.modelPolicyValidation;
+  delete configPayload.configBodyRef;
   const response = await clients.withErrorNormalization(() =>
     clients.state.updateConfig({
       agentId,
@@ -221,12 +302,16 @@ export async function updateAgentConfig(
   );
 
   const updatedConfig = response.config as Record<string, unknown> | undefined;
+  const configVersion = toSafeString(updatedConfig?.configVersion);
   revalidatePath(`/agents/${agentId}`);
   revalidatePath(`/agents/${agentId}/settings`);
   return {
     agentId,
-    configVersion: toSafeString(updatedConfig?.configVersion),
-    config: updatedConfig,
+    configVersion,
+    config: toBrowserSafeAgentConfigPreview(updatedConfig),
+    defaultModelPolicy: toBrowserSafeModelPolicyMetadata(response.defaultModelPolicy, {
+      configVersion,
+    }),
   };
 }
 

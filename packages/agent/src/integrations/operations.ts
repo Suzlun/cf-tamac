@@ -121,11 +121,13 @@ function persistInstallIntegrationTransaction(
     const nowMs = input.command.context.requestedAtMs;
     const finalStatus = manifest.setupRequired ? 'pending_external_setup' : 'active';
     repositories.integrations.insertInstallation({
+      allowedModelPolicyRefs: manifest.allowedModelPolicyRefs,
       grantSummaryRef: createGrantSummaryRef(installationId),
       installationId,
       integrationId: manifest.integrationId,
       manifestDigestSha256: manifest.manifestDigestSha256,
       manifestRef: manifest.manifestRef,
+      modelPolicyGrantRef: createGrantSummaryRef(installationId),
       providerBaseUrl: manifest.providerBaseUrl,
       providerId: manifest.providerId,
       publicKeyRef: manifest.trustKey.publicKeyRef,
@@ -203,13 +205,19 @@ function persistIntegrationAdapters(
   manifest: VerifiedIntegrationManifest
 ): void {
   for (const adapter of manifest.adapters) {
+    const allowedModelPolicyRefs =
+      adapter.allowedModelPolicyRefs.length === 0
+        ? manifest.allowedModelPolicyRefs
+        : adapter.allowedModelPolicyRefs;
     repositories.integrations.upsertAdapterDefinition({
+      allowedModelPolicyRefs,
       adapterId: adapter.adapterId,
       deliveryCapabilityId: adapter.deliveryCapabilityId,
       displayName: adapter.displayName,
       ingressGrant: adapter.ingressGrant,
       installationId,
       integrationId: manifest.integrationId,
+      modelPolicyGrantRef: adapter.modelPolicyGrantRef ?? createGrantSummaryRef(installationId),
       schemaRef: adapter.schemaRef,
       status: 'active',
     });
@@ -419,6 +427,7 @@ export function createAdapterConnectionInStore(input: {
   const result = input.repositories.transaction((repositories) => {
     const row = repositories.integrations.createAdapterConnection({
       adapterId: adapter.adapterId,
+      allowedModelPolicyRefs: deserializePolicyRefList(adapter.allowedModelPolicyRefs),
       connectionId: crypto.randomUUID(),
       connectionKey: normalized.connectionKey,
       createdAtMs: input.command.context.requestedAtMs,
@@ -427,6 +436,8 @@ export function createAdapterConnectionInStore(input: {
       grantSummaryRef: createGrantSummaryRef(installation.installationId),
       installationId: installation.installationId,
       metadataRef: normalized.metadataRef,
+      modelPolicyGrantRef:
+        adapter.modelPolicyGrantRef ?? createGrantSummaryRef(installation.installationId),
       status: 'active',
     });
     const audit = recordLifecycleAudit(
@@ -443,6 +454,18 @@ export function createAdapterConnectionInStore(input: {
     response: result,
   });
   return result;
+}
+
+function deserializePolicyRefList(value: string | null): readonly string[] {
+  // Adapter row には JSON 文字列で保存されるため、Connection 作成時に policy ref 配列へ戻す。
+  if (value === null || value === '') return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is string => typeof entry === 'string' && entry !== '');
+  } catch {
+    return [];
+  }
 }
 
 /** Adapter Connection を無効化します。 */

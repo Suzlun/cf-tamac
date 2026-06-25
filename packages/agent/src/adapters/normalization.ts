@@ -19,11 +19,13 @@ import type { AgentPayloadMetadataView } from '../domain';
  * ```
  */
 export interface NormalizedAdapterDefinition {
+  readonly allowedModelPolicyRefs: readonly string[];
   readonly adapterId: string;
   readonly deliveryCapabilityId?: string;
   readonly displayName: string;
   readonly ingressGrant: string;
   readonly integrationId: string;
+  readonly modelPolicyGrantRef?: string;
   readonly schemaRef?: string;
 }
 
@@ -75,11 +77,17 @@ export function normalizeAdapterDefinition(
   ]);
   const schemaRef = normalizeReference(record.schema_ref ?? record.schemaRef);
   return {
+    allowedModelPolicyRefs: readStringArray(
+      record.allowed_model_policy_refs ?? record.allowedModelPolicyRefs
+    ),
     adapterId,
     deliveryCapabilityId,
     displayName,
     ingressGrant,
     integrationId,
+    modelPolicyGrantRef: normalizeReference(
+      record.model_policy_grant_ref ?? record.modelPolicyGrantRef
+    ),
     schemaRef,
   };
 }
@@ -196,6 +204,16 @@ function normalizeReference(value: unknown): string | undefined {
   if (typeof value === 'string') return normalizeOptionalText(value);
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
   return normalizeOptionalText((value as { readonly ref?: unknown }).ref);
+}
+
+function readStringArray(value: unknown): readonly string[] {
+  // 外部 manifest 由来配列は NFC 正規化した非空文字列だけに縮約します。
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value.map(normalizeOptionalText).filter((entry): entry is string => entry !== undefined)
+    ),
+  ];
 }
 
 function normalizeIdentity(value: string, target: string): string {

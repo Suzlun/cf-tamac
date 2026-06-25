@@ -32,6 +32,7 @@ import type {
   AgentEventRow,
   AgentGrantRow,
   AgentHistoryIndexRow,
+  AgentModelPolicyRow,
   AgentProfileRow,
   AgentRunInputSnapshotRow,
   AgentRunRow,
@@ -272,6 +273,10 @@ class Stage4QueryRuntime {
       grants: { listGrantsForPrincipal: () => createGrantRows(), tableName: 'agent_grants' },
       history: this.createHistoryRepository(),
       memory: this.createMemoryRepository(),
+      modelPolicies: {
+        getActivePolicy: (policyRef: string) => createModelPolicy(policyRef),
+        tableName: 'agent_model_policies',
+      },
       pendingRuns: this.createPendingRunsRepository(),
       profile: {
         getProfile: () => createProfile(this.lifecycleStatus),
@@ -547,6 +552,36 @@ function createConfig(): AgentConfigRow {
     toolPolicyRef: 'tool-policy-safe',
     updatedAtMs: 2,
     updatedByPrincipalId: principalId,
+  };
+}
+
+function createModelPolicy(policyRef: string): AgentModelPolicyRow {
+  return {
+    archivedAtMs: null,
+    budgetMetadataRef: null,
+    budgetMetadataSha256: null,
+    createdAtMs: 2,
+    createdByPrincipalId: principalId,
+    credentialRef: null,
+    decisionSchemaVersion: 'agent-decision-v1',
+    generationMaxOutputTokens: null,
+    generationParametersRef: null,
+    generationParametersSha256: null,
+    generationTemperature: null,
+    generationTopP: null,
+    modelId: '@cf/meta/llama-3.1-8b-instruct',
+    policyDigest: 'f'.repeat(64),
+    policyRef,
+    provider: 'workers-ai',
+    safeMetadataRef: null,
+    safeMetadataSha256: null,
+    safetyMetadataRef: null,
+    safetyMetadataSha256: null,
+    status: 'active',
+    updatedAtMs: 3,
+    updatedByPrincipalId: principalId,
+    validatedAtMs: 3,
+    version: 1,
   };
 }
 

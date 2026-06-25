@@ -28,12 +28,14 @@ export function mapInstallationRow(
 ): IntegrationInstallationView {
   return {
     agentId: row.agentId,
+    allowedModelPolicyRefs: parsePolicyRefList(row.allowedModelPolicyRefs),
     grantSummaryRef: row.grantSummaryRef ?? undefined,
     installedAtMs: row.installedAtMs ?? undefined,
     installationId: row.installationId,
     integrationId: row.integrationId,
     manifestDigestSha256: row.manifestDigestSha256 ?? undefined,
     manifestRef: row.manifestRef ?? undefined,
+    modelPolicyGrantRef: row.modelPolicyGrantRef ?? undefined,
     providerBaseUrl: row.providerBaseUrl ?? undefined,
     providerId: row.providerId ?? undefined,
     publicKeyRef: row.publicKeyRef ?? undefined,
@@ -93,6 +95,7 @@ export function mapConnectionRow(row: AgentAdapterConnectionRow): AdapterConnect
   return {
     adapterId: row.adapterId,
     agentId: row.agentId,
+    allowedModelPolicyRefs: parsePolicyRefList(row.allowedModelPolicyRefs),
     connectionId: row.connectionId,
     connectionKey: row.connectionKey ?? undefined,
     createdAtMs: row.createdAtMs,
@@ -102,6 +105,7 @@ export function mapConnectionRow(row: AgentAdapterConnectionRow): AdapterConnect
     grantSummaryRef: row.grantSummaryRef ?? undefined,
     installationId: row.installationId,
     metadataRef: row.metadataRef ?? undefined,
+    modelPolicyGrantRef: row.modelPolicyGrantRef ?? undefined,
     status: row.status,
   };
 }
@@ -118,9 +122,23 @@ export function mapDeliveryContextRow(row: AgentDeliveryContextRow): DeliveryCon
     expiresAtMs: row.expiresAtMs ?? undefined,
     installationId: row.installationId,
     metadataRef: row.metadataRef ?? undefined,
+    modelPolicyDigest: row.modelPolicyDigest ?? undefined,
+    modelPolicyRef: row.modelPolicyRef ?? undefined,
     status: row.status,
     threadId: row.threadId,
   };
+}
+
+function parsePolicyRefList(value: string | null): readonly string[] {
+  // allowlist は policy ref の JSON 配列だけを採用し、破損値は安全側で空配列へ落とす。
+  if (value === null || value === '') return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is string => typeof entry === 'string' && entry !== '');
+  } catch {
+    return [];
+  }
 }
 
 /** AdapterDelivery row を view へ変換します。 */

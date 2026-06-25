@@ -61,6 +61,7 @@ function appendScheduleTriggeredEvent(
   const persisted = input.repositories.transaction((repositories) => {
     const eventId = crypto.randomUUID();
     const event = appendAgentEventToThreadInRepositories({
+      causationId: readScheduleCausationEventId(schedule.scheduleSpec) ?? schedule.scheduleId,
       createdAtMs: input.command.fireAtMs,
       eventId,
       eventType: scheduleTriggeredEventType,
@@ -109,6 +110,18 @@ function appendScheduleTriggeredEvent(
     schedule: mapScheduleRow(input.agentId, persisted.schedule),
     tickId: tick.tickId,
   };
+}
+
+function readScheduleCausationEventId(scheduleSpec: string): string | undefined {
+  // Run decision が作成した JSON spec から source Event だけを取り出し、解析不能な spec は安全に schedule ID へ fallback させる。
+  try {
+    const parsed = JSON.parse(scheduleSpec) as { readonly causationEventId?: unknown };
+    return typeof parsed.causationEventId === 'string' && parsed.causationEventId !== ''
+      ? parsed.causationEventId
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function recordSuppressedFire(

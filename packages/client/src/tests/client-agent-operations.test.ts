@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   toOptionalString,
+  toBrowserSafeAgentConfigPreview,
   toSafeNumber,
   toSafeString,
   toSafeStringFromInt64,
@@ -46,6 +47,52 @@ describe('Browser-safe helper type conversions', () => {
     expect(toOptionalString('')).toBeUndefined();
     expect(toOptionalString(42)).toBeUndefined();
     expect(toOptionalString(undefined)).toBeUndefined();
+  });
+
+  it('[CLIENT-REGISTRY-S010] Agent config preview strips raw model policy and payload refs', () => {
+    const rawConfig = {
+      agentId: 'agent-alpha',
+      configVersion: '7',
+      displayName: 'Alpha Agent',
+      modelPolicyRef: 'workers-ai-default',
+      budgetPolicyRef: 'budget-default',
+      memoryPolicyRef: 'memory-default',
+      toolPolicyRef: 'tool-default',
+      schedulePolicyRef: 'schedule-default',
+      updatedAtUnixMs: BigInt(42),
+      configBodyRef: {
+        ref: 'inline:config',
+        inlineBytes: new Uint8Array([1, 2, 3]),
+      },
+      defaultModelPolicy: {
+        policyRef: 'workers-ai-default',
+        version: BigInt(3),
+        safeMetadataRef: {
+          ref: 'inline:policy-metadata',
+          inlineBytes: new Uint8Array([4, 5, 6]),
+        },
+      },
+      modelPolicyValidation: {
+        ok: true,
+        checkedAtUnixMs: BigInt(43),
+      },
+    };
+
+    const safePreview = toBrowserSafeAgentConfigPreview(rawConfig);
+    const serialized = JSON.stringify(safePreview);
+
+    expect(safePreview.displayName).toBe('Alpha Agent');
+    expect(safePreview.budgetPolicyRef).toBe('budget-default');
+    expect(safePreview.memoryPolicyRef).toBe('memory-default');
+    expect(safePreview.toolPolicyRef).toBe('tool-default');
+    expect(safePreview.schedulePolicyRef).toBe('schedule-default');
+    expect(Object.keys(safePreview)).not.toContain('modelPolicyRef');
+    expect(Object.keys(safePreview)).not.toContain('defaultModelPolicy');
+    expect(Object.keys(safePreview)).not.toContain('modelPolicyValidation');
+    expect(Object.keys(safePreview)).not.toContain('configBodyRef');
+    expect(Object.keys(safePreview)).not.toContain('updatedAtUnixMs');
+    expect(serialized).not.toContain('inlineBytes');
+    expect(serialized).not.toContain('safeMetadataRef');
   });
 });
 
@@ -229,6 +276,27 @@ describe('Server Action field mapping with generated Protobuf types', () => {
 
     expect(summary.displayName).toBe('Search Web');
     expect(summary.toolId).toBe('tool-001');
+  });
+
+  it('[CLIENT-REGISTRY-S010] Client server reads default policy truth from Agent RPC safely', () => {
+    const modelPoliciesSource = readSource(
+      new URL('../server/actions/model-policies.ts', import.meta.url)
+    );
+    const viewModelSource = readSource(
+      new URL('../server/actions/model-policy-view-models.ts', import.meta.url)
+    );
+    const settingsPageSource = readSource(
+      new URL('../../app/agents/[agentId]/settings/page.tsx', import.meta.url)
+    );
+
+    expect(modelPoliciesSource).toContain('clients.state.getConfig({ agentId })');
+    expect(modelPoliciesSource).toContain('clients.modelPolicies.getModelPolicy');
+    expect(modelPoliciesSource).toContain('getDefaultModelPolicyForManagedAgent');
+    expect(settingsPageSource).toContain('getDefaultModelPolicyForManagedAgent');
+    expect(viewModelSource).toContain('toBrowserSafeModelPolicyMetadata');
+    expect(viewModelSource).not.toContain('raw prompt');
+    expect(viewModelSource).not.toContain('raw completion');
+    expect(viewModelSource).not.toContain('raw reasoning');
   });
 });
 

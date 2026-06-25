@@ -50,8 +50,13 @@ export interface AppendAgentEventToThreadInput {
   readonly payloadRef?: string;
   readonly payloadSha256?: string;
   readonly payloadStorageClass?: string;
+  readonly policyOverrideSource?: string;
   readonly repositories: AgentStorageRepositories;
   readonly requestDigest?: string;
+  readonly requestedModelPolicyDigest?: string;
+  readonly requestedModelPolicyRef?: string;
+  readonly requestedModelPolicyValidationStatus?: string;
+  readonly requestedModelPolicyVersion?: number;
   readonly runId?: string;
   readonly source: string;
   readonly target: AgentEventThreadTarget;
@@ -114,6 +119,11 @@ export function appendAgentEventToThreadInRepositories(
     payloadRef: input.payloadRef,
     payloadSha256: input.payloadSha256,
     payloadStorageClass: input.payloadStorageClass,
+    policyOverrideSource: input.policyOverrideSource,
+    requestedModelPolicyDigest: input.requestedModelPolicyDigest,
+    requestedModelPolicyRef: input.requestedModelPolicyRef,
+    requestedModelPolicyValidationStatus: input.requestedModelPolicyValidationStatus,
+    requestedModelPolicyVersion: input.requestedModelPolicyVersion,
     requestDigest: input.requestDigest,
     runId,
     sectionId: section.sectionId,

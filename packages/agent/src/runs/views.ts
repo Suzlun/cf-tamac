@@ -32,6 +32,8 @@ export interface AgentRunDetailView extends AgentRunView {
   readonly finishedAtMs?: number;
   readonly integrationVersion?: number;
   readonly interruptReason?: string;
+  readonly invocationSummary?: AgentModelInvocationSummaryView;
+  readonly modelPolicySnapshot?: AgentRunModelPolicySnapshotView;
   readonly runInputId?: string;
   readonly safeError?: AgentRunSafeErrorView;
   readonly sectionId?: string;
@@ -48,6 +50,7 @@ export interface AgentRunInputView {
   readonly configVersion: number;
   readonly integrationInstallationVersion?: number;
   readonly latestReadyCompactionId?: string;
+  readonly modelPolicySnapshot?: AgentRunModelPolicySnapshotView;
   readonly runId: string;
   readonly runInputId: string;
   readonly snapshotRef?: string;
@@ -59,6 +62,56 @@ export interface AgentRunInputView {
   readonly triggerEventId: string;
   readonly triggerStartThreadSequence: number;
   readonly uncompactedUpperThreadSequence?: number;
+}
+
+/**
+ * Run snapshot に固定された model policy identity の安全な view です。
+ */
+export interface AgentRunModelPolicySnapshotView {
+  readonly configVersion: string;
+  readonly decisionSchemaVersion: string;
+  readonly integrationCapabilityGeneration?: string;
+  readonly modelId: string;
+  readonly policySource: string;
+  readonly policyVersion: number;
+  readonly provider: string;
+  readonly requestedPolicyRef?: string;
+  readonly resolvedPolicyDigest: string;
+  readonly resolvedPolicyRef: string;
+  readonly threadMemoryVersion?: string;
+  readonly toolCatalogGeneration?: string;
+  readonly triggerEndThreadSequence?: number;
+  readonly triggerStartThreadSequence?: number;
+}
+
+/**
+ * Model invocation ledger の安全な summary view です。
+ */
+export interface AgentModelInvocationSummaryView {
+  readonly attempt: number;
+  readonly decisionSchemaVersion: string;
+  readonly inputTokenCount?: number;
+  readonly invocationId: string;
+  readonly latencyMs?: number;
+  readonly modelId: string;
+  readonly outputTokenCount?: number;
+  readonly policyDigest: string;
+  readonly policyRef: string;
+  readonly provider: string;
+  readonly providerErrorCategory?: string;
+  readonly requestDigest?: AgentRunDigestView;
+  readonly responseDigest?: AgentRunDigestView;
+  readonly runId: string;
+  readonly status: string;
+}
+
+/**
+ * Run query が返す raw body を含まない digest view です。
+ */
+export interface AgentRunDigestView {
+  readonly algorithm: 'sha-256';
+  readonly byteLength: number;
+  readonly digestHex: string;
 }
 
 /**
@@ -135,6 +188,8 @@ export function mapAgentRunDetailRow(
     finishedAtMs: isTerminalRunStatus(row.status) ? row.updatedAtMs : undefined,
     integrationVersion: snapshot?.integrationVersion,
     interruptReason: interrupt?.reason,
+    invocationSummary: mapInvocationSummary(repositories, row.runId),
+    modelPolicySnapshot: snapshot === undefined ? undefined : mapModelPolicySnapshot(snapshot),
     runInputId: snapshot === undefined ? undefined : createRunInputId(row.runId),
     safeError: createRunSafeError(row, interrupt, budget),
     sectionId: event?.sectionId,
@@ -150,6 +205,7 @@ function mapRunInput(agentId: string, snapshot: AgentRunInputSnapshotRow): Agent
     configVersion: snapshot.configVersion,
     integrationInstallationVersion: snapshot.integrationVersion,
     latestReadyCompactionId: snapshot.latestReadyCompactionRef ?? undefined,
+    modelPolicySnapshot: mapModelPolicySnapshot(snapshot),
     runId: snapshot.runId,
     runInputId: createRunInputId(snapshot.runId),
     snapshotRef: snapshot.snapshotRef,
@@ -162,6 +218,75 @@ function mapRunInput(agentId: string, snapshot: AgentRunInputSnapshotRow): Agent
     triggerStartThreadSequence: snapshot.triggerEventStartSequence,
     uncompactedUpperThreadSequence: snapshot.uncompactedUpperSequence,
   };
+}
+
+function mapModelPolicySnapshot(
+  snapshot: AgentRunInputSnapshotRow
+): AgentRunModelPolicySnapshotView | undefined {
+  if (
+    snapshot.resolvedModelPolicyRef === undefined ||
+    snapshot.resolvedModelPolicyRef === null ||
+    snapshot.resolvedModelPolicyDigest === undefined ||
+    snapshot.resolvedModelPolicyDigest === null ||
+    snapshot.modelProvider === undefined ||
+    snapshot.modelProvider === null ||
+    snapshot.modelId === undefined ||
+    snapshot.modelId === null ||
+    snapshot.modelPolicyVersion === undefined ||
+    snapshot.modelPolicyVersion === null ||
+    snapshot.modelPolicySource === undefined ||
+    snapshot.modelPolicySource === null ||
+    snapshot.decisionSchemaVersion === undefined ||
+    snapshot.decisionSchemaVersion === null
+  ) {
+    return undefined;
+  }
+  return {
+    configVersion: String(snapshot.configVersion),
+    decisionSchemaVersion: snapshot.decisionSchemaVersion,
+    integrationCapabilityGeneration: String(snapshot.integrationVersion),
+    modelId: snapshot.modelId,
+    policySource: snapshot.modelPolicySource,
+    policyVersion: snapshot.modelPolicyVersion,
+    provider: snapshot.modelProvider,
+    requestedPolicyRef: snapshot.requestedModelPolicyRef ?? undefined,
+    resolvedPolicyDigest: snapshot.resolvedModelPolicyDigest,
+    resolvedPolicyRef: snapshot.resolvedModelPolicyRef,
+    threadMemoryVersion: String(snapshot.threadMemoryVersion),
+    toolCatalogGeneration: String(snapshot.toolSetVersion),
+    triggerEndThreadSequence: snapshot.triggerEventEndSequence,
+    triggerStartThreadSequence: snapshot.triggerEventStartSequence,
+  };
+}
+
+function mapInvocationSummary(
+  repositories: AgentStorageRepositories,
+  runId: string
+): AgentModelInvocationSummaryView | undefined {
+  const invocation = repositories.modelInvocations.findLatestForRun(runId);
+  if (invocation === undefined) return undefined;
+  return {
+    attempt: invocation.attempt,
+    decisionSchemaVersion: invocation.decisionSchemaVersion,
+    inputTokenCount: invocation.inputTokenCount ?? undefined,
+    invocationId: invocation.invocationId,
+    latencyMs: invocation.latencyMs ?? undefined,
+    modelId: invocation.modelId,
+    outputTokenCount: invocation.outputTokenCount ?? undefined,
+    policyDigest: invocation.policyDigest,
+    policyRef: invocation.policyRef,
+    provider: invocation.provider,
+    providerErrorCategory: invocation.providerErrorCategory ?? undefined,
+    requestDigest: mapDigest(invocation.requestDigest),
+    responseDigest: mapDigest(invocation.responseDigest),
+    runId: invocation.runId,
+    status: invocation.status,
+  };
+}
+
+function mapDigest(digestHex: string | null): AgentRunDigestView | undefined {
+  if (digestHex === null) return undefined;
+  return { algorithm: 'sha-256', byteLength: 0, digestHex };
 }
 
 async function mapSnapshotReference(

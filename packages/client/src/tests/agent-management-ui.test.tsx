@@ -7,10 +7,21 @@ import { buildDestroyConfirmSchema } from '../components/schemas/agent-settings'
 
 const agentListPath = new URL('../components/agent-list.tsx', import.meta.url);
 const registrationFormPath = new URL('../components/agent-registration-form.tsx', import.meta.url);
+const registrationActionsPath = new URL(
+  '../components/agent-registration-actions.tsx',
+  import.meta.url
+);
+const modelPolicyFieldsPath = new URL('../components/model-policy-fields.tsx', import.meta.url);
+const modelPolicySummaryPath = new URL('../components/model-policy-summary.tsx', import.meta.url);
+const modelPolicySettingsSectionPath = new URL(
+  '../components/model-policy-settings-section.tsx',
+  import.meta.url
+);
 const registrationSchemaPath = new URL(
   '../components/schemas/agent-registration.ts',
   import.meta.url
 );
+const modelPolicySchemaPath = new URL('../components/schemas/model-policy.ts', import.meta.url);
 const dataTablePath = new URL('../components/data-table.tsx', import.meta.url);
 const formFieldPath = new URL('../components/ui/form.tsx', import.meta.url);
 const errorAlertPath = new URL('../components/error-alert.tsx', import.meta.url);
@@ -31,8 +42,14 @@ const agentSettingsPagePath = new URL(
   import.meta.url
 );
 const agentLifecycleActionPath = new URL('../server/actions/agent-lifecycle.ts', import.meta.url);
+const modelPolicyActionPath = new URL('../server/actions/model-policies.ts', import.meta.url);
+const modelPolicyViewModelsPath = new URL(
+  '../server/actions/model-policy-view-models.ts',
+  import.meta.url
+);
 const settingsFormPath = new URL('../components/agent-settings-form.tsx', import.meta.url);
 const configSectionPath = new URL('../components/agent-config-section.tsx', import.meta.url);
+const settingsDangerZonePath = new URL('../components/settings-danger-zone.tsx', import.meta.url);
 const credentialRotationPath = new URL(
   '../components/credential-rotation-section.tsx',
   import.meta.url
@@ -186,8 +203,10 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     const formField = read(formFieldPath);
     const registrationForm = read(registrationFormPath);
     const registrationSchema = read(registrationSchemaPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+    const modelPolicySchema = read(modelPolicySchemaPath);
     const newAgentPage = read(newAgentPagePath);
-    const registrationSources = `${registrationForm}\n${registrationSchema}`;
+    const registrationSources = `${registrationForm}\n${registrationSchema}\n${modelPolicyFields}\n${modelPolicySchema}`;
 
     // FormField uses aria-describedby to link errors to inputs.
     expect(formField).toContain('aria-describedby');
@@ -206,22 +225,30 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(registrationSources).toContain('Key ID is required');
     expect(registrationSources).toContain('Public fingerprint is required');
     expect(registrationSources).toContain('Masked hint is required');
+    expect(registrationSources).toContain('Policy ref is required');
+    expect(registrationSources).toContain('Only workers-ai provider is available');
+    expect(registrationSources).toContain('Max output tokens must be between 1 and 8192');
+
+    const registrationActions = read(registrationActionsPath);
 
     // The form uses shadcn-style components.
     expect(registrationForm).toContain('ControlRoomFrame');
     expect(registrationForm).toContain('RhfFormField');
     expect(registrationForm).toContain('FormErrorSummary');
-    expect(registrationForm).toContain('Button');
+    expect(registrationActions).toContain('Button');
 
     // The form page uses one server-side submit action to avoid partial writes.
     expect(newAgentPage).toContain('submitManagedAgentRegistration');
+    expect(newAgentPage).toContain('validateManagedAgentRegistrationModelPolicy');
     expect(newAgentPage).toContain("'use server'");
   });
 
   it('[CLIENT-MANAGEMENT-S002] Server validation runs before writes and rolls back partial registration', () => {
     const registrationAction = read(registrationActionPath);
+    const managedAgents = read(managedAgentsPath);
 
     expect(registrationAction).toContain('validateManagedAgentRegistrationInput');
+    expect(registrationAction).toContain('validateRegistrationModelPolicyValues');
     expect(registrationAction).toContain('isValidHttpsUrl');
     expect(registrationAction).toContain('Agent ID is already registered.');
     expect(registrationAction).toContain('writeRegistrationRecords');
@@ -229,14 +256,17 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(registrationAction).toContain('upsertCredentialReference');
     expect(registrationAction).toContain('rollbackRegistrationWrite');
     expect(registrationAction).toContain('deleteManagedAgent');
+    expect(managedAgents).toContain('validateModelPolicyForRegistration');
+    expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
   });
 
   it('[CLIENT-MANAGEMENT-S002] Form has pending, success, and error states', () => {
     const registrationForm = read(registrationFormPath);
+    const registrationActions = read(registrationActionsPath);
 
     // Pending state.
     expect(registrationForm).toContain('pending');
-    expect(registrationForm).toContain('Registering');
+    expect(registrationActions).toContain('Registering Agent and seeding policy');
 
     // Error state.
     expect(registrationForm).toContain('formError');
@@ -432,6 +462,70 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     // type-to-confirm は前後空白も許容せず、UI copy の「完全一致」を validation でも守る。
     expect(schema.safeParse({ confirmAgentId: 'agent-alpha' }).success).toBe(true);
     expect(schema.safeParse({ confirmAgentId: ' agent-alpha ' }).success).toBe(false);
+  });
+});
+
+describe('Default model policy management UI (CLIENT-MANAGEMENT-S017, CLIENT-MANAGEMENT-S018)', () => {
+  it('[CLIENT-MANAGEMENT-S017] Agent creation flow sends initial model policy through server-side RPC', () => {
+    const registrationForm = read(registrationFormPath);
+    const newAgentPage = read(newAgentPagePath);
+    const managedAgents = read(managedAgentsPath);
+    const lifecycleActions = read(agentLifecycleActionPath);
+    const modelPolicyActions = read(modelPolicyActionPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+
+    expect(registrationForm).toContain('ModelPolicyFields');
+    expect(registrationForm).toContain('onValidateModelPolicy');
+    expect(modelPolicyFields).toContain('Default model policy');
+    expect(modelPolicyFields).toContain('Validate policy');
+    expect(newAgentPage).toContain('validateManagedAgentRegistrationModelPolicy');
+    expect(managedAgents).toContain('validateModelPolicyForRegistration');
+    expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
+    expect(lifecycleActions).toContain('clients.lifecycle.initializeAgent');
+    expect(lifecycleActions).toContain('initialModelPolicy');
+    expect(lifecycleActions).toContain('modelPolicyRef: modelPolicy.policyRef');
+    expect(modelPolicyActions).toContain('clients.modelPolicies.validateModelPolicy');
+    expect(modelPolicyActions).not.toContain('localStorage');
+    expect(modelPolicyActions).not.toContain('sessionStorage');
+  });
+
+  it('[CLIENT-MANAGEMENT-S018] Settings safely updates policy before config and renders safe metadata', () => {
+    const settingsPage = read(agentSettingsPagePath);
+    const settingsForm = read(settingsFormPath);
+    const settingsSection = read(modelPolicySettingsSectionPath);
+    const summary = read(modelPolicySummaryPath);
+    const operations = read(agentOperationsPath);
+    const viewModels = read(modelPolicyViewModelsPath);
+    const dangerZone = read(settingsDangerZonePath);
+
+    expect(settingsPage).toContain('getDefaultModelPolicyForManagedAgent');
+    expect(settingsPage).toContain('validateModelPolicyForManagedAgent');
+    expect(settingsPage).toContain('saveDefaultModelPolicy');
+    expect(settingsForm).toContain('ModelPolicySettingsSection');
+    expect(settingsSection).toContain('Save default policy');
+    expect(settingsSection).toContain('Upsert the Agent-owned policy first');
+    expect(settingsSection).toContain("result.errorCategory === 'permission_denied'");
+    expect(settingsSection).toContain('disabled={pending || permissionDenied}');
+    expect(summary).toContain('Policy ref');
+    expect(summary).toContain('Digest');
+    expect(summary).toContain('Provider');
+    expect(summary).toContain('Model');
+    expect(summary).toContain('Config version');
+    expect(operations).toContain('upsertModelPolicyForManagedAgent');
+    expect(operations).toContain('clients.state.updateConfig');
+    expect(operations.indexOf('upsertModelPolicyForManagedAgent')).toBeLessThan(
+      operations.indexOf('clients.state.updateConfig')
+    );
+    expect(viewModels).toContain('toBrowserSafeModelPolicyMetadata');
+    expect(viewModels).toContain('safeModelPolicyErrorMessage');
+    expect(dangerZone).toContain('Destroy Agent');
+    for (const source of [settingsSection, summary]) {
+      expect(source).not.toContain('@connectrpc/connect');
+      expect(source).not.toContain('@cf-tamac/client-agent-rpc');
+      expect(source).not.toContain('secretMaterial');
+      expect(source).not.toContain('Authorization');
+      expect(source).not.toContain('Bearer');
+    }
   });
 });
 
@@ -642,6 +736,11 @@ describe('Browser secrecy boundaries (CLIENT-MANAGEMENT-S009)', () => {
   it('[CLIENT-MANAGEMENT-S009] Browser-visible components do not import server-only modules', () => {
     const agentList = read(agentListPath);
     const registrationForm = read(registrationFormPath);
+    const registrationActions = read(registrationActionsPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+    const modelPolicySummary = read(modelPolicySummaryPath);
+    const modelPolicySettingsSection = read(modelPolicySettingsSectionPath);
+    const settingsDangerZone = read(settingsDangerZonePath);
     const errorAlert = read(errorAlertPath);
     const signalBadge = read(signalBadgePath);
     const emptyState = read(emptyStatePath);
@@ -665,6 +764,11 @@ describe('Browser secrecy boundaries (CLIENT-MANAGEMENT-S009)', () => {
     const browserVisibleSources = [
       agentList,
       registrationForm,
+      registrationActions,
+      modelPolicyFields,
+      modelPolicySummary,
+      modelPolicySettingsSection,
+      settingsDangerZone,
       errorAlert,
       signalBadge,
       emptyState,

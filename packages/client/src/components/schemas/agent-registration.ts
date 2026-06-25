@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+import {
+  buildDefaultModelPolicyDraftValues,
+  MODEL_POLICY_FIELD_ORDER,
+  modelPolicyDraftSchema,
+  normalizeModelPolicyDraftValues,
+  validateModelPolicyDraftValues,
+  type ModelPolicyDraftValues,
+  type ModelPolicyFieldName,
+} from './model-policy';
+
 const AGENT_ID_RE = /^[\da-z][\da-z-]{0,62}$/;
 const VALID_STATUSES = ['active', 'pending', 'rotating'] as const;
 
@@ -15,6 +25,12 @@ export const REGISTRATION_FIELD_ORDER = [
   'agentRpcOrigin',
   'displayName',
   'displayOrder',
+  'modelPolicy.policyRef',
+  'modelPolicy.provider',
+  'modelPolicy.model',
+  'modelPolicy.temperature',
+  'modelPolicy.topP',
+  'modelPolicy.maxOutputTokens',
   'referenceValue',
   'keyId',
   'publicFingerprint',
@@ -41,6 +57,12 @@ export const FIELD_LABELS: Record<RegistrationFieldName, string> = {
   agentRpcOrigin: 'Agent RPC origin',
   displayName: 'Display name',
   displayOrder: 'Sort order',
+  'modelPolicy.policyRef': 'Policy ref',
+  'modelPolicy.provider': 'Provider',
+  'modelPolicy.model': 'Model ID',
+  'modelPolicy.temperature': 'Temperature',
+  'modelPolicy.topP': 'Top P',
+  'modelPolicy.maxOutputTokens': 'Max output tokens',
   referenceValue: 'Credential reference',
   keyId: 'Key ID',
   publicFingerprint: 'Public fingerprint',
@@ -83,6 +105,7 @@ export const registrationSchema = z.object({
     .refine((value) => value === '' || /^\d+$/.test(value), {
       message: 'Sort order must be a non-negative integer.',
     }),
+  modelPolicy: modelPolicyDraftSchema,
   referenceValue: z
     .string()
     .trim()
@@ -112,6 +135,26 @@ export const registrationSchema = z.object({
  * secret 本体ではなく credential reference metadata だけを含みます。
  */
 export type RegistrationValues = z.infer<typeof registrationSchema>;
+
+/**
+ * Registration flow の policy 検証 button が受け取る browser-safe result です。
+ *
+ * @remarks
+ * Agent 作成前の draft validation は Server Action 経由で Agent RPC に閉じます。成功時は
+ * safe warning だけ、失敗時は registration field 名に変換済みの error だけを返し、credential secret や
+ * direct RPC payload は Browser に渡しません。
+ */
+export type RegistrationPolicyValidationResult =
+  | {
+      readonly ok: true;
+      readonly warnings: readonly { readonly code: string; readonly message: string }[];
+    }
+  | {
+      readonly ok: false;
+      readonly fieldErrors: Partial<Record<RegistrationFieldName, string>>;
+      readonly formError?: string;
+      readonly warnings?: readonly { readonly code: string; readonly message: string }[];
+    };
 
 /**
  * Agent registration form が受け取る Server Action result です。
@@ -146,6 +189,53 @@ export function validateRegistrationValues(
   return zodErrorToFieldErrors(result.error);
 }
 
+/**
+ * Registration form 用の default 値に入れる model policy draft を作ります。
+ *
+ * @returns 新規 Agent 作成時に使う browser-safe default policy draft です。
+ * @remarks
+ * 既存編集時も policy input は Agent-owned policy の正本ではなく draft なので、Agent RPC から取得した
+ * safe metadata がない場合はこの default から開始します。
+ */
+export function buildRegistrationModelPolicyDefaults(): ModelPolicyDraftValues {
+  return buildDefaultModelPolicyDraftValues();
+}
+
+/**
+ * Registration Server Action が受け取った model policy draft を正規化します。
+ *
+ * @param values - registration form 内の `modelPolicy` field 値です。
+ * @returns trim と schema validation を通過した draft 値です。
+ * @throws 不正な値の場合は `TypeError` を投げます。通常は `validateRegistrationValues` で事前に field error へ変換します。
+ */
+export function normalizeRegistrationModelPolicyValues(
+  values: ModelPolicyDraftValues
+): ModelPolicyDraftValues {
+  return normalizeModelPolicyDraftValues(values);
+}
+
+/**
+ * Model policy field error を registration field 名へ変換します。
+ *
+ * @param fieldErrors - policy field 名を key にした error map です。
+ * @returns `modelPolicy.*` 形式へ変換した registration error map です。
+ * @remarks
+ * Server Action は Agent RPC validation の target をこの helper で form field へ戻し、
+ * focus と error summary を既存 registration form の順序へ揃えます。
+ */
+export function toRegistrationModelPolicyFieldErrors(
+  fieldErrors: Partial<Record<ModelPolicyFieldName, string>>
+): Partial<Record<RegistrationFieldName, string>> {
+  const errors: Partial<Record<RegistrationFieldName, string>> = {};
+  for (const fieldName of MODEL_POLICY_FIELD_ORDER) {
+    const message = getModelPolicyFieldError(fieldErrors, fieldName);
+    if (message !== undefined) {
+      setRegistrationFieldError(errors, `modelPolicy.${fieldName}`, message);
+    }
+  }
+  return errors;
+}
+
 function isHttpsUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -162,7 +252,7 @@ function isAllowedStatus(status: string): boolean {
 function zodErrorToFieldErrors(error: z.ZodError): Partial<Record<RegistrationFieldName, string>> {
   const errors: Partial<Record<RegistrationFieldName, string>> = {};
   for (const issue of error.issues) {
-    const fieldName = issue.path[0];
+    const fieldName = pathToRegistrationFieldName(issue.path);
     if (isRegistrationFieldName(fieldName)) {
       setRegistrationFieldError(errors, fieldName, issue.message);
     }
@@ -185,6 +275,27 @@ function setRegistrationFieldError(
   if (fieldName === 'displayOrder' && errors.displayOrder === undefined) {
     errors.displayOrder = message;
   }
+  if (fieldName === 'modelPolicy.policyRef' && errors['modelPolicy.policyRef'] === undefined) {
+    errors['modelPolicy.policyRef'] = message;
+  }
+  if (fieldName === 'modelPolicy.provider' && errors['modelPolicy.provider'] === undefined) {
+    errors['modelPolicy.provider'] = message;
+  }
+  if (fieldName === 'modelPolicy.model' && errors['modelPolicy.model'] === undefined) {
+    errors['modelPolicy.model'] = message;
+  }
+  if (fieldName === 'modelPolicy.temperature' && errors['modelPolicy.temperature'] === undefined) {
+    errors['modelPolicy.temperature'] = message;
+  }
+  if (fieldName === 'modelPolicy.topP' && errors['modelPolicy.topP'] === undefined) {
+    errors['modelPolicy.topP'] = message;
+  }
+  if (
+    fieldName === 'modelPolicy.maxOutputTokens' &&
+    errors['modelPolicy.maxOutputTokens'] === undefined
+  ) {
+    errors['modelPolicy.maxOutputTokens'] = message;
+  }
   if (fieldName === 'referenceValue' && errors.referenceValue === undefined) {
     errors.referenceValue = message;
   }
@@ -203,4 +314,37 @@ function isRegistrationFieldName(fieldName: unknown): fieldName is RegistrationF
     typeof fieldName === 'string' &&
     REGISTRATION_FIELD_ORDER.includes(fieldName as RegistrationFieldName)
   );
+}
+
+function pathToRegistrationFieldName(path: readonly (string | number | symbol)[]): unknown {
+  const first = path[0];
+  const second = path[1];
+  if (first === 'modelPolicy' && typeof second === 'string') {
+    return `modelPolicy.${second}`;
+  }
+  return first;
+}
+
+function getModelPolicyFieldError(
+  fieldErrors: Partial<Record<ModelPolicyFieldName, string>>,
+  fieldName: ModelPolicyFieldName
+): string | undefined {
+  if (fieldName === 'policyRef') return fieldErrors.policyRef;
+  if (fieldName === 'provider') return fieldErrors.provider;
+  if (fieldName === 'model') return fieldErrors.model;
+  if (fieldName === 'temperature') return fieldErrors.temperature;
+  if (fieldName === 'topP') return fieldErrors.topP;
+  return fieldErrors.maxOutputTokens;
+}
+
+/**
+ * Registration model policy draft だけを検査し、registration field 名の error map へ変換します。
+ *
+ * @param values - `modelPolicy` object の draft 値です。
+ * @returns registration form にそのまま適用できる field error map です。
+ */
+export function validateRegistrationModelPolicyValues(
+  values: ModelPolicyDraftValues
+): Partial<Record<RegistrationFieldName, string>> {
+  return toRegistrationModelPolicyFieldErrors(validateModelPolicyDraftValues(values));
 }

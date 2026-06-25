@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+import {
+  MODEL_POLICY_FIELD_ORDER,
+  modelPolicyDraftSchema,
+  type ModelPolicyDraftValues,
+} from './model-policy';
+
 const CONFIG_JSON_REQUIRED_MESSAGE = 'Config JSON is required.';
 const CONFIG_JSON_PARSE_MESSAGE = 'Config must be valid JSON.';
 const CONFIG_JSON_OBJECT_MESSAGE = 'Config must be a JSON object.';
@@ -32,6 +38,33 @@ export const AGENT_CONFIG_FIELD_ORDER = ['configJson'] as const;
  * 値は `configJson` のみで、Agent RPC client や credential material は含みません。
  */
 export type AgentConfigFieldName = (typeof AGENT_CONFIG_FIELD_ORDER)[number];
+
+/**
+ * Settings の default model policy editor が validation summary と focus 制御に使う field 順序です。
+ *
+ * @remarks
+ * `ModelPolicyFields` と Server Action result の field 名を同じ順序へ揃え、policy ref から
+ * max output tokens までを keyboard user が predictable に修正できるようにします。
+ */
+export const SETTINGS_MODEL_POLICY_FIELD_ORDER = MODEL_POLICY_FIELD_ORDER;
+
+/**
+ * Settings 画面の default model policy editor が扱う draft 値です。
+ *
+ * @remarks
+ * Browser には provider/model/generation parameter の安全な draft だけを保持し、Agent RPC
+ * client や credential material は含めません。
+ */
+export type SettingsModelPolicyValues = ModelPolicyDraftValues;
+
+/**
+ * Settings 画面の default model policy editor 用 Zod schema です。
+ *
+ * @remarks
+ * 実体は shared model policy schema で、Settings と Registration の validation rule を同じ
+ * browser-safe contract に揃えます。最終保存可否は server-side Agent RPC が判定します。
+ */
+export const settingsModelPolicySchema = modelPolicyDraftSchema;
 
 /**
  * credential reference 保存 form が validation summary と focus 制御に使う field 順序です。

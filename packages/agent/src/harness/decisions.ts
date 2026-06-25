@@ -275,9 +275,12 @@ function createDecisionRecordForDecision(
       `state_update:${decision.statePatchRef}`
     );
   }
-  if (decision.type === 'emit_event') {
-    return createDecisionRecord(input, decision, 'pending', `event_emit:${decision.eventType}`);
-  }
+  if (decision.type === 'emit_event')
+    return createDecisionRecord(input, decision, 'applied', `event_emit:${decision.eventType}`);
+  if (decision.type === 'write_memory')
+    return createDecisionRecord(input, decision, 'applied', createDownstreamSeam(decision));
+  if (decision.type === 'create_schedule')
+    return createDecisionRecord(input, decision, 'applied', createDownstreamSeam(decision));
   return createDecisionRecord(input, decision, 'pending', createDownstreamSeam(decision));
 }
 

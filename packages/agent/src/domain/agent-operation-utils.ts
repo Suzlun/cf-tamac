@@ -347,6 +347,8 @@ export function mapAgentEventRow(agentId: string, row: AgentEventRow): AgentEven
     occurredAtMs: row.occurredAtMs,
     payloadMetadata: mapPayloadMetadata(row),
     payloadRef: row.payloadRef ?? undefined,
+    policyOverrideSource: row.policyOverrideSource ?? undefined,
+    requestedModelPolicyRef: row.requestedModelPolicyRef ?? undefined,
     runId: row.runId ?? undefined,
     sectionId: row.sectionId,
     source: row.source,
@@ -398,6 +400,10 @@ function resolveCredentialState(
   repositories: AgentStorageRepositories,
   context: AgentCoreRequestContext
 ): AgentAuthorizationCredentialState {
+  if (context.principal.principalType === 'INTEGRATION_INSTALLATION') {
+    // Integration の keyId は Agent access credential ではなく Provider trust key ID なので、署名検証 seam に委譲する。
+    return 'active';
+  }
   if (context.principal.keyId === undefined) {
     return 'active';
   }

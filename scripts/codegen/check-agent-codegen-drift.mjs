@@ -15,7 +15,20 @@ const forbiddenOpenApiRoots = [
 ];
 
 export const rpcServiceInventory = new Map([
-  ['AgentLifecycleService', ['InitializeAgent', 'GetAgent', 'DestroyAgent', 'RotateAgentCredential']],
+  [
+    'AgentLifecycleService',
+    ['InitializeAgent', 'GetAgent', 'DestroyAgent', 'RotateAgentCredential'],
+  ],
+  [
+    'AgentModelPolicyService',
+    [
+      'UpsertModelPolicy',
+      'GetModelPolicy',
+      'ListModelPolicies',
+      'ArchiveModelPolicy',
+      'ValidateModelPolicy',
+    ],
+  ],
   ['AgentEventService', ['PublishEvent', 'GetEvent', 'ListEvents']],
   [
     'AgentThreadService',
@@ -31,7 +44,10 @@ export const rpcServiceInventory = new Map([
   ['AgentRunService', ['GetRun', 'ListRuns', 'CancelRun']],
   ['AgentStateService', ['GetState', 'GetConfig', 'UpdateConfig']],
   ['AgentScheduleService', ['CreateSchedule', 'GetSchedule', 'ListSchedules', 'CancelSchedule']],
-  ['AgentToolService', ['ListTools', 'GetInvocation', 'ListInvocations', 'ApproveInvocation', 'RejectInvocation']],
+  [
+    'AgentToolService',
+    ['ListTools', 'GetInvocation', 'ListInvocations', 'ApproveInvocation', 'RejectInvocation'],
+  ],
   [
     'AgentIntegrationService',
     [
@@ -61,6 +77,8 @@ const commandMethods = new Set([
   'AgentLifecycleService.InitializeAgent',
   'AgentLifecycleService.DestroyAgent',
   'AgentLifecycleService.RotateAgentCredential',
+  'AgentModelPolicyService.UpsertModelPolicy',
+  'AgentModelPolicyService.ArchiveModelPolicy',
   'AgentEventService.PublishEvent',
   'AgentRunService.CancelRun',
   'AgentStateService.UpdateConfig',
@@ -85,6 +103,63 @@ const eventPublishMethods = new Set([
   'IntegrationIngressService.PublishEvent',
 ]);
 
+const modelPolicyFieldStability = new Map([
+  [
+    'AgentModelPolicy',
+    new Map([
+      ['agent_id', 1],
+      ['policy_ref', 2],
+      ['version', 3],
+      ['status', 4],
+      ['provider', 5],
+      ['model_id', 6],
+      ['decision_schema_version', 7],
+      ['policy_digest', 8],
+    ]),
+  ],
+  [
+    'AgentModelPolicySummary',
+    new Map([
+      ['agent_id', 1],
+      ['policy_ref', 2],
+      ['version', 3],
+      ['status', 4],
+      ['provider', 5],
+      ['model_id', 6],
+      ['policy_digest', 7],
+      ['decision_schema_version', 8],
+    ]),
+  ],
+  [
+    'RunModelPolicySnapshot',
+    new Map([
+      ['requested_policy_ref', 1],
+      ['resolved_policy_ref', 2],
+      ['resolved_policy_digest', 3],
+      ['provider', 4],
+      ['model_id', 5],
+      ['policy_version', 6],
+      ['policy_source', 7],
+      ['decision_schema_version', 8],
+    ]),
+  ],
+]);
+
+const modelPolicyResponseMessages = new Set([
+  'AgentModelPolicy',
+  'AgentModelPolicySummary',
+  'AgentModelPolicyValidationResult',
+  'ModelPolicyValidationIssue',
+  'UpsertModelPolicyResponse',
+  'GetModelPolicyResponse',
+  'ListModelPoliciesResponse',
+  'ArchiveModelPolicyResponse',
+  'ValidateModelPolicyResponse',
+]);
+
+const forbiddenModelPolicyResponseFieldPattern =
+  /credential|secret|raw_?prompt|raw_?completion|raw_?reasoning|reasoning/i;
+
 function listFiles(root, suffix) {
   if (!existsSync(root)) return [];
   const entries = readdirSync(root, { recursive: true, withFileTypes: true });
@@ -106,7 +181,11 @@ function normalizeFileMap(files) {
   return files instanceof Map ? files : new Map(Object.entries(files));
 }
 
-export function collectGeneratedTreeDriftIssues(expectedFiles, actualFiles, label = 'generated output') {
+export function collectGeneratedTreeDriftIssues(
+  expectedFiles,
+  actualFiles,
+  label = 'generated output'
+) {
   const expected = normalizeFileMap(expectedFiles);
   const actual = normalizeFileMap(actualFiles);
   const issues = [];
@@ -136,18 +215,22 @@ export function parseProtoServices(protoFiles) {
 
   for (const file of protoFiles) {
     const text = readFileSync(file, 'utf8');
-    const serviceMatches = text.matchAll(/service\s+(?<service>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g);
+    const serviceMatches = text.matchAll(
+      /service\s+(?<service>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g
+    );
 
     for (const match of serviceMatches) {
       const service = match.groups.service;
       const body = match.groups.body;
-      const methods = [...body.matchAll(/rpc\s+(?<method>[A-Za-z]\w*)\s*\(\s*(?<input>[A-Za-z]\w*)\s*\)\s*returns\s*\(\s*(?<output>[A-Za-z]\w*)\s*\)/g)].map(
-        (methodMatch) => ({
-          input: methodMatch.groups.input,
-          method: methodMatch.groups.method,
-          output: methodMatch.groups.output,
-        })
-      );
+      const methods = [
+        ...body.matchAll(
+          /rpc\s+(?<method>[A-Za-z]\w*)\s*\(\s*(?<input>[A-Za-z]\w*)\s*\)\s*returns\s*\(\s*(?<output>[A-Za-z]\w*)\s*\)/g
+        ),
+      ].map((methodMatch) => ({
+        input: methodMatch.groups.input,
+        method: methodMatch.groups.method,
+        output: methodMatch.groups.output,
+      }));
       if (services.has(service)) {
         duplicateServices.push({ service, file });
       }
@@ -163,12 +246,16 @@ export function parseProtoMessages(protoFiles) {
 
   for (const file of protoFiles) {
     const text = readFileSync(file, 'utf8');
-    const messageMatches = text.matchAll(/message\s+(?<message>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g);
+    const messageMatches = text.matchAll(
+      /message\s+(?<message>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g
+    );
 
     for (const match of messageMatches) {
       const message = match.groups.message;
       const fields = new Map();
-      const fieldMatches = match.groups.body.matchAll(/(?:optional\s+)?[A-Za-z][\w.<>]*\s+(?<field>[A-Z_a-z]\w*)\s*=\s*(?<number>\d+)\s*;/g);
+      const fieldMatches = match.groups.body.matchAll(
+        /(?:optional\s+)?[A-Za-z][\w.<>]*\s+(?<field>[A-Z_a-z]\w*)\s*=\s*(?<number>\d+)\s*;/g
+      );
       for (const fieldMatch of fieldMatches) {
         fields.set(fieldMatch.groups.field, Number.parseInt(fieldMatch.groups.number, 10));
       }
@@ -184,12 +271,16 @@ function parseProtoMessagesWithReserve(protoFiles) {
 
   for (const file of protoFiles) {
     const text = readFileSync(file, 'utf8');
-    const messageMatches = text.matchAll(/message\s+(?<message>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g);
+    const messageMatches = text.matchAll(
+      /message\s+(?<message>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g
+    );
 
     for (const match of messageMatches) {
       const fieldsByName = new Map();
       const fieldsByNumber = new Map();
-      const fieldMatches = match.groups.body.matchAll(/(?:optional\s+)?[A-Za-z][\w.<>]*\s+(?<field>[A-Z_a-z]\w*)\s*=\s*(?<number>\d+)\s*;/g);
+      const fieldMatches = match.groups.body.matchAll(
+        /(?:optional\s+)?[A-Za-z][\w.<>]*\s+(?<field>[A-Z_a-z]\w*)\s*=\s*(?<number>\d+)\s*;/g
+      );
       for (const fieldMatch of fieldMatches) {
         const field = {
           name: fieldMatch.groups.field,
@@ -226,7 +317,10 @@ export function collectProtoFieldStabilityIssues(previousProtoFiles, currentProt
     for (const previousField of previousDescriptor.fieldsByName.values()) {
       const currentByName = currentDescriptor.fieldsByName.get(previousField.name);
       const currentByNumber = currentDescriptor.fieldsByNumber.get(previousField.number);
-      const numberReserved = isReservedFieldNumber(previousField.number, currentDescriptor.reservedNumberRanges);
+      const numberReserved = isReservedFieldNumber(
+        previousField.number,
+        currentDescriptor.reservedNumberRanges
+      );
       const nameReserved = currentDescriptor.reservedNames.has(previousField.name);
 
       if (!currentByName && !currentByNumber && (!numberReserved || !nameReserved)) {
@@ -236,10 +330,14 @@ export function collectProtoFieldStabilityIssues(previousProtoFiles, currentProt
         continue;
       }
       if (currentByName && currentByName.number !== previousField.number) {
-        issues.push(`${message}: field ${previousField.name} moved from ${previousField.number} to ${currentByName.number}`);
+        issues.push(
+          `${message}: field ${previousField.name} moved from ${previousField.number} to ${currentByName.number}`
+        );
       }
       if (currentByNumber && currentByNumber.name !== previousField.name) {
-        issues.push(`${message}: field number ${previousField.number} reused for ${currentByNumber.name}`);
+        issues.push(
+          `${message}: field number ${previousField.number} reused for ${currentByNumber.name}`
+        );
       }
     }
   }
@@ -252,7 +350,9 @@ export function collectProtoServiceIssues(protoFiles) {
   const { services, duplicateServices } = parseProtoServices(protoFiles);
 
   for (const duplicate of duplicateServices) {
-    issues.push(`Duplicate RPC service ${duplicate.service} in ${relative(projectRoot, duplicate.file)}`);
+    issues.push(
+      `Duplicate RPC service ${duplicate.service} in ${relative(projectRoot, duplicate.file)}`
+    );
   }
 
   for (const [service, { methods }] of services) {
@@ -294,7 +394,9 @@ export function collectTypeSpecFieldIssues(typeSpecFiles) {
         if (!trimmed.includes(':') || !trimmed.endsWith(';')) continue;
         const fieldNumber = fieldMatch?.groups.number ?? pendingFieldNumber;
         if (!fieldNumber) {
-          issues.push(`${relative(projectRoot, file)}: ${model} field is missing @field(n): ${trimmed}`);
+          issues.push(
+            `${relative(projectRoot, file)}: ${model} field is missing @field(n): ${trimmed}`
+          );
         } else if (fieldNumbers.has(fieldNumber)) {
           issues.push(
             `${relative(projectRoot, file)}: ${model} reuses @field(${fieldNumber}) for ${fieldNumbers.get(fieldNumber)} and ${trimmed}`
@@ -323,7 +425,10 @@ function parseReservedFieldNumberRanges(messageBody) {
       const rangeMatch = trimmed.match(/^(?<start>\d+)\s+to\s+(?<end>\d+|max)$/);
       if (rangeMatch) {
         ranges.push({
-          end: rangeMatch.groups.end === 'max' ? Number.POSITIVE_INFINITY : Number.parseInt(rangeMatch.groups.end, 10),
+          end:
+            rangeMatch.groups.end === 'max'
+              ? Number.POSITIVE_INFINITY
+              : Number.parseInt(rangeMatch.groups.end, 10),
           start: Number.parseInt(rangeMatch.groups.start, 10),
         });
         continue;
@@ -361,7 +466,9 @@ export function collectProtoFieldIssues(protoFiles) {
 
   for (const file of protoFiles) {
     const text = readFileSync(file, 'utf8');
-    const messageMatches = text.matchAll(/message\s+(?<message>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g);
+    const messageMatches = text.matchAll(
+      /message\s+(?<message>[A-Za-z]\w*)\s*{(?<body>[\S\s]*?)\n}/g
+    );
 
     for (const match of messageMatches) {
       const message = match.groups.message;
@@ -369,7 +476,9 @@ export function collectProtoFieldIssues(protoFiles) {
       const fieldNames = new Set();
       const reservedNumberRanges = parseReservedFieldNumberRanges(match.groups.body);
       const reservedNames = parseReservedFieldNames(match.groups.body);
-      const fieldMatches = match.groups.body.matchAll(/(?:optional\s+)?[A-Za-z][\w.<>]*\s+(?<field>[A-Z_a-z]\w*)\s*=\s*(?<number>\d+)\s*;/g);
+      const fieldMatches = match.groups.body.matchAll(
+        /(?:optional\s+)?[A-Za-z][\w.<>]*\s+(?<field>[A-Z_a-z]\w*)\s*=\s*(?<number>\d+)\s*;/g
+      );
       for (const fieldMatch of fieldMatches) {
         const field = fieldMatch.groups.field;
         const number = fieldMatch.groups.number;
@@ -383,10 +492,14 @@ export function collectProtoFieldIssues(protoFiles) {
           issues.push(`${relative(projectRoot, file)}: ${message} reuses field name ${field}`);
         }
         if (isReservedFieldNumber(numericNumber, reservedNumberRanges)) {
-          issues.push(`${relative(projectRoot, file)}: ${message} field ${field} reuses reserved field number ${number}`);
+          issues.push(
+            `${relative(projectRoot, file)}: ${message} field ${field} reuses reserved field number ${number}`
+          );
         }
         if (reservedNames.has(field)) {
-          issues.push(`${relative(projectRoot, file)}: ${message} field ${field} reuses reserved field name`);
+          issues.push(
+            `${relative(projectRoot, file)}: ${message} field ${field} reuses reserved field name`
+          );
         }
         fieldNumbers.set(number, field);
         fieldNames.add(field);
@@ -409,13 +522,19 @@ export function collectRpcSchemaInvariantIssues(services, messages) {
         continue;
       }
       if (!inputMessage.fields.has('agent_id')) {
-        issues.push(`${methodDescriptor.input}: public Agent RPC request is missing agent_id for ${fullMethodName}`);
+        issues.push(
+          `${methodDescriptor.input}: public Agent RPC request is missing agent_id for ${fullMethodName}`
+        );
       }
       if (commandMethods.has(fullMethodName) && !inputMessage.fields.has('idempotency_key')) {
-        issues.push(`${methodDescriptor.input}: command request is missing idempotency_key for ${fullMethodName}`);
+        issues.push(
+          `${methodDescriptor.input}: command request is missing idempotency_key for ${fullMethodName}`
+        );
       }
       if (eventPublishMethods.has(fullMethodName) && !inputMessage.fields.has('thread_key')) {
-        issues.push(`${methodDescriptor.input}: event publish request is missing thread_key for ${fullMethodName}`);
+        issues.push(
+          `${methodDescriptor.input}: event publish request is missing thread_key for ${fullMethodName}`
+        );
       }
     }
   }
@@ -439,6 +558,61 @@ export function collectThreadKeyValidationIssues(typeSpecFiles) {
     .map((term) => `Thread key validation metadata is missing ${term}`);
 }
 
+function collectModelPolicySchemaIssues(services, messages) {
+  const issues = [];
+  const service = services.get('AgentModelPolicyService');
+
+  // Agent model policy contract は下流 runtime/client の合流点なので、
+  // service/method/request/response の基本形を codegen guard でも固定します。
+  if (service !== undefined) {
+    const requestMessages = new Map(service.methods.map((method) => [method.method, method.input]));
+    for (const [method, requestMessage] of requestMessages) {
+      const requestFields = messages.get(requestMessage)?.fields;
+      if (requestFields === undefined) {
+        issues.push(
+          `${requestMessage}: missing AgentModelPolicyService request message for ${method}`
+        );
+        continue;
+      }
+      if (!requestFields.has('agent_id')) {
+        issues.push(`${requestMessage}: model policy request is missing agent_id for ${method}`);
+      }
+    }
+  }
+
+  for (const [messageName, requiredFields] of modelPolicyFieldStability) {
+    const message = messages.get(messageName);
+    if (message === undefined) {
+      issues.push(`${messageName}: required model policy message is missing`);
+      continue;
+    }
+    for (const [fieldName, fieldNumber] of requiredFields) {
+      if (message.fields.get(fieldName) !== fieldNumber) {
+        issues.push(
+          `${messageName}: required field ${fieldName} must stay at number ${fieldNumber}`
+        );
+      }
+    }
+  }
+
+  for (const responseMessage of modelPolicyResponseMessages) {
+    const message = messages.get(responseMessage);
+    if (message === undefined) {
+      issues.push(`${responseMessage}: model policy response schema is missing`);
+      continue;
+    }
+    for (const fieldName of message.fields.keys()) {
+      if (forbiddenModelPolicyResponseFieldPattern.test(fieldName)) {
+        issues.push(
+          `${responseMessage}: secret-bearing field is forbidden in model policy response schema: ${fieldName}`
+        );
+      }
+    }
+  }
+
+  return issues;
+}
+
 export function collectAgentCodegenIssues() {
   const issues = [];
 
@@ -457,10 +631,14 @@ export function collectAgentCodegenIssues() {
     issues.push(`Missing generated Agent proto output under ${relative(projectRoot, protoRoot)}`);
   }
   if (agentGeneratedFiles.length === 0) {
-    issues.push(`Missing generated Agent RPC output under ${relative(projectRoot, agentGeneratedRoot)}`);
+    issues.push(
+      `Missing generated Agent RPC output under ${relative(projectRoot, agentGeneratedRoot)}`
+    );
   }
   if (clientGeneratedFiles.length === 0) {
-    issues.push(`Missing generated Client Agent RPC output under ${relative(projectRoot, clientGeneratedRoot)}`);
+    issues.push(
+      `Missing generated Client Agent RPC output under ${relative(projectRoot, clientGeneratedRoot)}`
+    );
   }
 
   issues.push(...collectTypeSpecFieldIssues(typeSpecFiles));
@@ -473,7 +651,9 @@ export function collectAgentCodegenIssues() {
   const { services, duplicateServices } = parseProtoServices(protoFiles);
   const messages = parseProtoMessages(protoFiles);
   for (const duplicate of duplicateServices) {
-    issues.push(`Duplicate RPC service ${duplicate.service} in ${relative(projectRoot, duplicate.file)}`);
+    issues.push(
+      `Duplicate RPC service ${duplicate.service} in ${relative(projectRoot, duplicate.file)}`
+    );
   }
   for (const [service, methods] of rpcServiceInventory) {
     const found = services.get(service);
@@ -502,17 +682,21 @@ export function collectAgentCodegenIssues() {
   }
 
   issues.push(...collectRpcSchemaInvariantIssues(services, messages));
+  issues.push(...collectModelPolicySchemaIssues(services, messages));
 
   return issues;
 }
 
-const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isDirectExecution =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isDirectExecution) {
   const issues = collectAgentCodegenIssues();
 
   if (issues.length > 0) {
-    process.stderr.write(`Agent codegen guard failed:\n${issues.map((issue) => `- ${issue}`).join('\n')}\n`);
+    process.stderr.write(
+      `Agent codegen guard failed:\n${issues.map((issue) => `- ${issue}`).join('\n')}\n`
+    );
     process.exitCode = 1;
   }
 }
