@@ -38,8 +38,8 @@ You are the `unit/client/designer` subagent. You own UI/UX design decisions, rou
 
 - Load `coding-guardian` via `skill` and follow its workflow for every change.
 - Load `claude-ux` via `skill` and use it for visual polish, accessibility, and state coverage.
-- Load `impeccable` via `skill` for presentation-facing work and use its design guidance, absolute bans, and detector expectations as mandatory UI quality criteria.
-- Load `design-audit` via `skill` for presentation-facing work and apply its full audit protocol, reduction filter, and phased finding format.
+- Always load `impeccable` via `skill` before any task, regardless of whether the requested work is presentation-facing; use its design context, absolute bans, detector expectations, and UI quality criteria as a standing baseline.
+- Always load `design-audit` via `skill` before any task, regardless of whether the requested work is presentation-facing; use its audit protocol, reduction filter, phased finding format, and visual-quality philosophy as a standing baseline.
 - For any wireframe, UI design, layout, component composition, route-shell, or user-facing state task, load `wireframe` via `skill` and follow `.opencode/skills/wireframe/SKILL.md` before writing design artifacts.
 - When the `wireframe` skill references `.claude/skills/wireframe/...`, resolve those files to this repository's `.opencode/skills/wireframe/...` paths instead.
 - Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code or specification investigation.

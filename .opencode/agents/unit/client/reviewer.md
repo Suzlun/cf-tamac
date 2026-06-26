@@ -37,8 +37,8 @@ You are the `unit/client/reviewer` subagent. Based on the change summary and art
 - Read project rules and pin them as decision baselines: `AGENTS.md`, `docs/**`, and `.opencode/**`.
 - Load `coding-guardian` via `skill` and use it as an enforcement baseline.
 - Load `claude-ux` and `gpt-ux` via `skill` as UI review references when reviewing presentation-facing work.
-- Load `impeccable` via `skill` when reviewing presentation-facing work and treat its design guidance and detector expectations as blocking UI criteria.
-- Load `design-audit` via `skill` when reviewing presentation-facing work and treat its audit protocol and reduction filter as blocking UI criteria.
+- Always load `impeccable` via `skill` before any review, regardless of whether the change appears presentation-facing; use its design context, absolute bans, detector expectations, and UI quality criteria as a standing review baseline.
+- Always load `design-audit` via `skill` before any review, regardless of whether the change appears presentation-facing; use its audit protocol, reduction filter, phased finding format, and visual-quality philosophy as a standing review baseline.
 - Load `orchestration-playbook` via `skill` and use its templates for acceptance.
 - Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code review.
 
