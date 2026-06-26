@@ -1,0 +1,154 @@
+{
+  "name": "Selected-Agent Integrations",
+  "viewport": { "width": 1280, "height": 800 },
+  "root": {
+    "name": "App shell",
+    "direction": "vertical",
+    "children": [
+      { "name": "Skip link", "type": "link", "height": 32 },
+      {
+        "name": "Body",
+        "direction": "horizontal",
+        "grow": true,
+        "children": [
+          {
+            "name": "Side menu (agent-selected, Integrations active)",
+            "direction": "vertical",
+            "width": 256,
+            "padding": 16,
+            "gap": 12,
+            "children": [
+              {
+                "name": "Brand mark + product name",
+                "direction": "horizontal",
+                "gap": 8,
+                "align": "center",
+                "height": 32,
+                "children": [
+                  { "name": "Logo", "type": "icon", "width": 28, "height": 28 },
+                  { "name": "Product title", "type": "text", "variant": "heading", "height": 24 }
+                ]
+              },
+              {
+                "name": "Global nav group",
+                "direction": "vertical",
+                "gap": 4,
+                "children": [
+                  { "name": "Agents", "type": "link", "height": 36 },
+                  { "name": "Global Settings", "type": "link", "height": 36 }
+                ]
+              },
+              { "name": "Separator", "type": "divider" },
+              {
+                "name": "Agent identity header",
+                "direction": "horizontal",
+                "gap": 8,
+                "align": "center",
+                "children": [
+                  { "name": "Agent avatar", "type": "icon", "width": 32, "height": 32 },
+                  {
+                    "name": "Display name + Agent ID",
+                    "direction": "vertical",
+                    "gap": 2,
+                    "children": [
+                      { "name": "Display name", "type": "text", "height": 18 },
+                      {
+                        "name": "Agent ID (mono)",
+                        "type": "text",
+                        "variant": "caption",
+                        "height": 14
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Agent-scoped navigation",
+                "direction": "vertical",
+                "gap": 2,
+                "children": [
+                  { "name": "Overview", "type": "link", "height": 34 },
+                  { "name": "Threads", "type": "link", "height": 34 },
+                  { "name": "Events", "type": "link", "height": 34 },
+                  { "name": "Runs", "type": "link", "height": 34 },
+                  { "name": "Schedules", "type": "link", "height": 34 },
+                  { "name": "Integrations (active)", "type": "link", "height": 34 },
+                  { "name": "Settings", "type": "link", "height": 34 }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Main content (list/detail composition)",
+            "direction": "vertical",
+            "grow": true,
+            "padding": 32,
+            "gap": 20,
+            "children": [
+              {
+                "name": "Page header",
+                "direction": "horizontal",
+                "justify": "space-between",
+                "align": "center",
+                "children": [
+                  {
+                    "name": "Breadcrumb: Agents / [Agent] / Integrations",
+                    "type": "link",
+                    "height": 20
+                  },
+                  { "name": "Install Integration (primary action)", "type": "button", "height": 40 }
+                ]
+              },
+              {
+                "name": "List/detail split",
+                "direction": "horizontal",
+                "gap": 20,
+                "grow": true,
+                "children": [
+                  {
+                    "name": "Integration list (left)",
+                    "direction": "vertical",
+                    "gap": 10,
+                    "width": 340,
+                    "children": [
+                      {
+                        "name": "Installation card 1 (manifest id, provider, state)",
+                        "type": "card",
+                        "height": 92
+                      },
+                      { "name": "Installation card 2 (selected)", "type": "card", "height": 92 },
+                      { "name": "Installation card 3", "type": "card", "height": 92 }
+                    ]
+                  },
+                  {
+                    "name": "Integration detail (right)",
+                    "direction": "vertical",
+                    "gap": 14,
+                    "grow": true,
+                    "children": [
+                      {
+                        "name": "Installation state + grant + setup steps",
+                        "type": "card",
+                        "height": 140
+                      },
+                      {
+                        "name": "Adapter Connection + Tool + Delivery capability",
+                        "type": "card",
+                        "height": 120
+                      },
+                      {
+                        "name": "Cleanup/uninstall (explicit action, acting user context)",
+                        "type": "button",
+                        "height": 40
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

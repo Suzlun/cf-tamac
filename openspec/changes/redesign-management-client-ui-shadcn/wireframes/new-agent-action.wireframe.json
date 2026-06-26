@@ -1,0 +1,87 @@
+{
+  "name": "New Agent action (inside Agents scope)",
+  "viewport": { "width": 1280, "height": 800 },
+  "root": {
+    "name": "App shell (Agents scope, New Agent dialog/route open)",
+    "direction": "vertical",
+    "children": [
+      {
+        "name": "Agents page (dimmed behind)",
+        "direction": "vertical",
+        "gap": 8,
+        "padding": 32,
+        "children": [
+          { "name": "Agents header (dimmed)", "type": "text", "variant": "display", "height": 32 },
+          { "name": "Agent list (dimmed)", "type": "card", "height": 96 },
+          { "name": "Agent list (dimmed)", "type": "card", "height": 96 }
+        ]
+      },
+      {
+        "name": "New Agent dialog (centered, focus-trapped) or /agents/new route panel",
+        "direction": "vertical",
+        "gap": 16,
+        "padding": 24,
+        "children": [
+          {
+            "name": "Dialog header",
+            "direction": "horizontal",
+            "justify": "space-between",
+            "align": "center",
+            "children": [
+              {
+                "name": "Register a managed Agent",
+                "type": "text",
+                "variant": "heading",
+                "height": 24
+              },
+              { "name": "Close", "type": "button", "height": 32 }
+            ]
+          },
+          {
+            "name": "Form fields (Server Action validated)",
+            "direction": "vertical",
+            "gap": 14,
+            "children": [
+              { "name": "Display name", "type": "input", "height": 40 },
+              { "name": "Agent ID", "type": "input", "height": 40 },
+              { "name": "RPC origin", "type": "input", "height": 40 },
+              { "name": "Credential reference (masked)", "type": "input", "height": 40 },
+              {
+                "name": "Initial model policy (provider, model, generation params)",
+                "type": "card",
+                "height": 140
+              }
+            ]
+          },
+          {
+            "name": "Inline validation errors (accessible, per field)",
+            "direction": "vertical",
+            "gap": 6,
+            "children": [
+              {
+                "name": "Field-level error alert",
+                "type": "text",
+                "variant": "caption",
+                "height": 16
+              }
+            ]
+          },
+          {
+            "name": "Action row",
+            "direction": "horizontal",
+            "gap": 8,
+            "justify": "flex-end",
+            "children": [
+              { "name": "Cancel", "type": "button", "height": 40 },
+              {
+                "name": "Register Agent (pending state while server-side RPC runs)",
+                "type": "button",
+                "height": 40
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

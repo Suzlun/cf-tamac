@@ -1,0 +1,163 @@
+{
+  "name": "Selected-Agent Runs",
+  "viewport": { "width": 1280, "height": 800 },
+  "root": {
+    "name": "App shell",
+    "direction": "vertical",
+    "children": [
+      { "name": "Skip link", "type": "link", "height": 32 },
+      {
+        "name": "Body",
+        "direction": "horizontal",
+        "grow": true,
+        "children": [
+          {
+            "name": "Side menu (agent-selected, Runs active)",
+            "direction": "vertical",
+            "width": 256,
+            "padding": 16,
+            "gap": 12,
+            "children": [
+              {
+                "name": "Brand mark + product name",
+                "direction": "horizontal",
+                "gap": 8,
+                "align": "center",
+                "height": 32,
+                "children": [
+                  { "name": "Logo", "type": "icon", "width": 28, "height": 28 },
+                  { "name": "Product title", "type": "text", "variant": "heading", "height": 24 }
+                ]
+              },
+              {
+                "name": "Global nav group",
+                "direction": "vertical",
+                "gap": 4,
+                "children": [
+                  { "name": "Agents", "type": "link", "height": 36 },
+                  { "name": "Global Settings", "type": "link", "height": 36 }
+                ]
+              },
+              { "name": "Separator", "type": "divider" },
+              {
+                "name": "Agent identity header",
+                "direction": "horizontal",
+                "gap": 8,
+                "align": "center",
+                "children": [
+                  { "name": "Agent avatar", "type": "icon", "width": 32, "height": 32 },
+                  {
+                    "name": "Display name + Agent ID",
+                    "direction": "vertical",
+                    "gap": 2,
+                    "children": [
+                      { "name": "Display name", "type": "text", "height": 18 },
+                      {
+                        "name": "Agent ID (mono)",
+                        "type": "text",
+                        "variant": "caption",
+                        "height": 14
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Agent-scoped navigation",
+                "direction": "vertical",
+                "gap": 2,
+                "children": [
+                  { "name": "Overview", "type": "link", "height": 34 },
+                  { "name": "Threads", "type": "link", "height": 34 },
+                  { "name": "Events", "type": "link", "height": 34 },
+                  { "name": "Runs (active)", "type": "link", "height": 34 },
+                  { "name": "Schedules", "type": "link", "height": 34 },
+                  { "name": "Integrations", "type": "link", "height": 34 },
+                  { "name": "Settings", "type": "link", "height": 34 }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Main content",
+            "direction": "vertical",
+            "grow": true,
+            "padding": 32,
+            "gap": 20,
+            "children": [
+              {
+                "name": "Page header",
+                "direction": "horizontal",
+                "justify": "space-between",
+                "align": "center",
+                "children": [
+                  { "name": "Breadcrumb: Agents / [Agent] / Runs", "type": "link", "height": 20 },
+                  {
+                    "name": "Run filters (state, thread scope)",
+                    "direction": "horizontal",
+                    "gap": 8,
+                    "children": [
+                      { "name": "State select", "type": "input", "height": 36 },
+                      { "name": "Thread scope select", "type": "input", "height": 36 }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Runs list (card composition)",
+                "direction": "vertical",
+                "gap": 10,
+                "grow": true,
+                "children": [
+                  {
+                    "name": "Run item 1 (state, thread, started, duration)",
+                    "type": "card",
+                    "height": 84
+                  },
+                  { "name": "Run item 2 (selected)", "type": "card", "height": 84 },
+                  { "name": "Run item 3", "type": "card", "height": 84 }
+                ]
+              },
+              {
+                "name": "Run detail panel",
+                "direction": "vertical",
+                "gap": 14,
+                "children": [
+                  {
+                    "name": "Run summary (judgement output, causal links)",
+                    "type": "card",
+                    "height": 120
+                  },
+                  {
+                    "name": "Contextual ToolInvocation list (folded-in, no top-level Tools nav)",
+                    "direction": "vertical",
+                    "gap": 10,
+                    "children": [
+                      {
+                        "name": "Section label: Tool invocations in this Run",
+                        "type": "text",
+                        "variant": "heading",
+                        "height": 22
+                      },
+                      {
+                        "name": "ToolInvocation row 1 (tool, state, approval, result Event)",
+                        "type": "card",
+                        "height": 76
+                      },
+                      { "name": "ToolInvocation row 2", "type": "card", "height": 76 },
+                      {
+                        "name": "Approve/Reject controls (explicit action, acting user context)",
+                        "type": "button",
+                        "height": 40
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
