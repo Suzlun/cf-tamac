@@ -1,6 +1,6 @@
 ## Primary Rules
 
-- Think in **English**; MUST respond in **Japanese**.
+- **MUST Think in English**; **MUST respond in Japanese**; **NEVER NOT use in Other Langages**
 - Before calling `task` for any subagent, you MUST read the target agent definition and verify both `permission.task` and any self-call prohibition such as `Do not self-call.`.
 - You MUST doubt your assumptions, verify factual claims against available evidence, and MUST NOT present unsupported statements as facts.
 
