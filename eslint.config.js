@@ -224,6 +224,9 @@ export default tseslint.config(
       '**/test-results/**',
       '**/.next/**',
       '**/next-env.d.ts',
+      // OpenCode 配布スキルの実行スクリプトは外部ツールの同梱物であり、
+      // 本リポジトリの TypeScript project service や境界ルールでは解析しない。
+      '**/.opencode/skills/impeccable/scripts/**',
     ],
   },
   js.configs.recommended,
