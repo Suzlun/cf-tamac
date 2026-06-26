@@ -6,7 +6,7 @@ Management Client の現行 UI は、Agent を本番運用する管理者が状�
 
 ## 変更内容
 
-- Management Client のナビゲーションを、全体領域と選択中 Agent 領域に分離する。
+- Management Client のナビゲーションを、全体領域と選択中 Agent 領域に分離し、shadcn/ui の `Sidebar` / `Sheet` / `Breadcrumb` / `Button` / `Card` を合成した明快な route shell にする。
 - 全体領域は `Agents` と `Global Settings` だけを表示し、Agent 横断 UI はこの 2 画面に限定する。
 - 選択中 Agent 領域は、選択中 Agent に対する `Overview`、`Threads`、`Events`、`Runs`、`Schedules`、`Integrations`、`Settings` を左サイドバーで表示する。
 - Agent 未選択時は Agent 選択ガイダンスを表示する。
@@ -15,6 +15,7 @@ Management Client の現行 UI は、Agent を本番運用する管理者が状�
 - デスクトップとモバイルのレスポンシブなシェル、空・読み込み・エラー・権限状態、キーボードとフォーカスの挙動、秘匿情報を漏らさないエラー文言を UI 契約に含める。
 - 公式 shadcn/ui の core、docs-only entries、Blocks、Charts を丸ごとローカルソースへコピーし、すべての可視 UI プリミティブをコピー済み shadcn ソースまたはその合成コンポーネントで実装する。
 - 余計な独自 CSS、control-room パレット、グラデーション、発光表現、独自タイポグラフィ、独自視覚クラスを削除し、`components.json` の `new-york` / `neutral` / CSS variables に基づく shadcn/ui 標準のシンプルなデザインを利用する。
+- 状態トーンは shadcn/ui default tokens と lucide icon と日本語ラベルの組み合わせで表し、`--warning` / `--success` / `.state-*` のような独自トークンを追加しない。
 - Management Client のサーバー・ブラウザ境界、Client 所有 D1、サーバー側限定 Agent RPC、Agent API proxy を置かない境界、Protobuf RPC のみの Agent surface は維持する。
 
 ## 仕様単位
@@ -25,7 +26,7 @@ Management Client の現行 UI は、Agent を本番運用する管理者が状�
 
 ### 変更する仕様単位
 
-- `management-client-shell`: Management Client の route shell、ナビゲーション情報設計、ブラウザ秘匿境界、Agent API proxy を置かない境界、全体領域と選択中 Agent 領域のサイドバー挙動、コピー済み shadcn/ui シェルソースの利用、独自 CSS の削除を更新する。旧 surface 不在を目的にした demo-free requirement は archive sync で削除する。セキュリティ上、ブラウザ bundle に Agent credential、直接 Agent RPC 呼び出し、Agent proxy route を入れない。
+- `management-client-shell`: Management Client の route shell、ナビゲーション情報設計、ブラウザ秘匿境界、Agent API proxy を置かない境界、全体領域と選択中 Agent 領域のサイドバー挙動、コピー済み shadcn/ui シェルソースの利用、独自 CSS の削除を更新する。仕様は supported management shell と永続的な security boundary を契約の中心に置く。セキュリティ上、ブラウザ bundle に Agent credential、直接 Agent RPC 呼び出し、Agent proxy route を入れない。
 - `agent-management-ui`: Agent 一覧・登録・選択、Agent 文脈の Overview/Threads/Events/Runs/Schedules/Integrations/Settings の UX 契約、公式 shadcn/ui 全コピー、標準 shadcn 表現、状態・アクセシビリティ・テスト範囲を更新する。セキュリティ上、Agent domain snapshots は Client D1 に保存せず、必要な Agent-owned data はサーバー側 Agent RPC から取得する。
 
 ## 命名
