@@ -2,7 +2,8 @@
 description: Management Client implementation specialist for packages/client, Next.js App Router, Server Actions, Client D1, server-only Agent RPC, and browser boundary work.
 mode: subagent
 hidden: true
-model: zai-coding-plan/glm-5.2
+model: openai/gpt-5.5
+reasoningEffort: 'xhigh'
 temperature: 0.1
 permission:
   edit:

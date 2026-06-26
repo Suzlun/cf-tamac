@@ -18,6 +18,8 @@
 | `selected-agent-required` | （selected-Agent area のみ）未選択時の専用 state + `エージェント一覧へ` CTA。 | hidden のみで案内ゼロ。                                       |
 | `filter-empty`            | 検索/フィルタ結果ゼロ時の `フィルタを解除`。                                  | 空一覧と同じ表現で紛らわしい。                                |
 
+すべての状態表現は shadcn/ui component で実装する。`loading` は `Skeleton`、`error` / `permission-denied` は `Alert`、`disabled` reason は `Tooltip` + visible label、destructive confirmation は `AlertDialog`、mobile drawer は `Sheet` を使う。
+
 ### 1.1 ローディング表現の規範
 
 - 一覧: card/tile の skeleton を grid に並べる（実際の layout を保つ）。
@@ -88,6 +90,13 @@
 4. **Client D1 所有権**: managed Agent records・credential references のみ。Agent-domain snapshot 非保存。`MANAGEMENT-CLIENT-SHELL-S003/S004` 準拠。全 Agent-owned 表示データは毎回 server 側 Agent RPC から取得。
 5. **credential / policy 表示の安全化**: credential は mask hint のみ。model policy は policy ref/digest/provider/model/安全な generation params/status/validation warning のみ。Provider credential・Agent credential・生 token・raw prompt/completion/reasoning は Browser payload/HTML/JS/storage に含めない。`AGENT-MANAGEMENT-UI-S017/S018` 準拠。
 6. **エラーの secret-safe 化**: 全 error/loading 状態で secret・生スタック・内部アドレスを漏らさない。`AGENT-MANAGEMENT-UI-S009` 準拠。
+
+## 4.1 shadcn/ui と CSS 境界（実装不変量・全画面）
+
+1. **All shadcn primitives**: visible UI primitive は `packages/client/src/components/ui/**` の shadcn/ui component から組み立てる。domain component は shadcn component を合成するだけにする。
+2. **No bespoke visual CSS**: `control-room`、`hero-grid`、`instrument-panel`、`route-card`、`data-table`、`state-*`、custom gradient、glow shadow、custom palette token は削除する。
+3. **Default simple design**: shadcn/ui `new-york` + `neutral` + CSS variables を使い、独自 typography / palette / radius / shadow system を作らない。
+4. **Full shadcn copy**: 公式 core、docs-only entries、Blocks、Charts を local source として丸ごとコピーし、copy manifest を実装前に生成する。追加時は必要 dependency を ask-first で扱う。
 
 ## 5. OpenSpec シナリオカバレッジへの指針（参考）
 

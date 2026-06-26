@@ -1,15 +1,15 @@
 # 10 — Selected-Agent: Settings（API・credential・model policy・一般設定）
 
-## Intent & Users
+## 目的と利用者
 
 - 顧客: 管理者。選択中 Agent の API/RPC 接続、credential 参照、model policy、一般設定を安全に管理・ローテーションしたい。
 - 目的: Agent 単位の全設定をここに集約。`/settings`（Global Settings）とは別物。credential・model policy を server-only で安全に扱い、Browser には secret を渡さない（AGENT-MANAGEMENT-UI-S003/S004/S017/S018）。
 
-## Route & URL
+## Route と URL
 
 - `GET /agents/[agentId]/settings`
 
-## Desktop layout (>= 1024px)
+## デスクトップ layout (>= 1024px)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -36,17 +36,17 @@
   - **一般設定**: 表示名・説明・pin・並び順・無効化（Client D1 の managed Agent metadata）。
   - **危険な操作**: Agent の無効化・managed Agent からの除外等。明示的確認必須。
 
-## Mobile layout (< 1024px)
+## モバイル layout (< 1024px)
 
 - in-content nav は dropdown。各セクションは縦 panel。
 
-## Data & state contract（server-only 境界）
+## データと状態の契約（server-only 境界）
 
 - API/接続・credential は server-side Agent RPC + Client D1（managed Agent record）。credential 値は mask hint のみ Browser へ。
 - model policy は server-side Agent RPC（`UpsertModelPolicy`, `ValidateModelPolicy`, `UpdateConfig`）。Provider credential・生 token・raw prompt/completion/reasoning は Browser payload/HTML/JS/storage に含めない（AGENT-MANAGEMENT-UI-S017/S018）。
 - Browser-visible module は Agent RPC client / Connect runtime / server-only factory / credential 解決ロジックを import しない。
 
-## States
+## 状態
 
 - **loading**: panel skeleton。
 - **error（RPC 失敗）**: secret-safe。`設定の取得に失敗しました / 再試行`。
@@ -57,7 +57,7 @@
 - **missing binding**: `ポリシーの参照に失敗しました（バインディング不足）` 等、secret-safe な原因。
 - **dangerous 操作確認**: 確認 dialog（type "critical"）。影響範囲明示。
 
-## Copy slots（日本語）
+## 文言 slot（日本語）
 
 - h1: `<Agent名> — エージェント設定`。
 - セクション: `API と接続`, `認証情報`, `モデルポリシー`, `一般設定`, `危険な操作`。
@@ -67,19 +67,19 @@
 - 一般: `表示名`, `説明`, `ピン留め`, `並び順`, `無効化`。
 - アクション: `保存`, `保存中…`, `再試行`, `キャンセル`。
 
-## Accessibility
+## アクセシビリティ
 
 - in-content nav: `role="tablist"`/`tab`/`tabpanel` + arrow-key。`aria-current`。
 - credential mask hint は `aria-label` で「マスク済み参照」を明示（secret を読み上げない）。
 - 検証/更新エラーは `aria-describedby` で field 紐付け。
 - dangerous dialog: focus-trap、破壊的ラベル明示。
 
-## Integration notes for unit/client/engineer
+## unit/client/engineer 向け実装メモ
 
 - `packages/client/app/agents/[agentId]/settings/page.tsx`: セクション構成へ再設計。server action で model policy/credential/config（AGENT-MANAGEMENT-UI-S003/S004/S017/S018）。
 - managed Agent metadata（表示名等）更新は既存 server action 群（`packages/client/src/server/actions/managed-agents.ts`）を再利用。新規操作も同所に集約（重複禁止: credo 4）。
 
-## Open questions / assumptions
+## 未解決事項と前提
 
 - A: model policy の「生成パラメータ」編集は安全な範囲の UI（temperature/max tokens 等）。Provider 固有の秘匿パラメータは server 側でのみ取り扱い、UI には抽象化された安全字段のみ。
 - Q: credential ローテーションの具象（Agent 側 RPC）は別途。UI は server action の結果（新 generation）のみ反映する想定。

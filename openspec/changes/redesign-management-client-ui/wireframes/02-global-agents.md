@@ -1,17 +1,17 @@
 # 02 — Global: Agents（一覧・New Agent 登録・選択）
 
-## Intent & Users
+## 目的と利用者
 
 - 顧客: 管理者。管理対象 Agent を一覧し、新規 Agent を登録し、Agent を選択して selected-Agent area へ入る入口。
 - 目的: cross-Agent 操作はこの画面と Global Settings だけに限定。`New Agent` はこの画面内のアクション（サイドバー項目ではない）。
 
-## Route & URL
+## Route と URL
 
 - 一覧: `GET /agents`
 - 新規登録: `/agents` の「エージェントを追加」ボタンから同一画面内の登録 panel / dialog を起動する。
 - 選択: 一覧 card の「開く」で Server Action `selectManagedAgent` → selected-Agent area へ遷移。
 
-## Desktop layout — 一覧 (>= 1024px)
+## デスクトップ layout — 一覧 (>= 1024px)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -41,20 +41,20 @@
 
 コンポーネント階層:
 
-1. `PageHeader`: `h1 エージェント`。右に toolbar。
-2. Toolbar: `検索`（表示名/Agent ID の前方・部分一致、client-side または server 検索）, `エージェントを追加`（primary button → 同一画面内の登録 panel / dialog）。
-3. `AgentList`（card-first。既存 `packages/client/src/components/agent-list.tsx` を card 化へ再設計）。
+1. `PageHeader`: `h1 エージェント`。右に shadcn `Button` toolbar。
+2. Toolbar: shadcn `Input` による `検索`（表示名/Agent ID の前方・部分一致、client-side または server 検索）, shadcn `Button` の `エージェントを追加`（primary button → shadcn `Dialog` または `Sheet`）。
+3. `AgentList`（shadcn `Card` composition。既存 `packages/client/src/components/agent-list.tsx` を card 化へ再設計）。
    - グループ: `ピン留め` / `その他`（既存 pin/並び順メタデータを使用。AGENT-MANAGEMENT-UI-S001）。
-   - `AgentCard`（各 Agent）:
-     - 行1: アバターシード + 表示名（`/agents/[id]` link）。
-     - 行2: status pill（アイコン+色+ラベル）+ config version。
-     - 行3: RPC origin（等幅・mask 済み表示可）。
-     - 行4: 最終閲覧時刻 + pin toggle（既存 `setManagedAgentPinned`）。
-     - 行5: credential status pill（有効/無効/参照切れ）。
-     - actions: `開く`（primary → 選択＋遷移）, `[…]`（メニュー: 編集/ピン留め切替/詳細/無効化）。
+   - `AgentCard`（各 Agent。shadcn `Card`, `Badge`, `Button`, `DropdownMenu`, `Avatar` を合成）:
+   - 行1: アバターシード + 表示名（`/agents/[id]` link）。
+   - 行2: status pill（アイコン+色+ラベル）+ config version。
+   - 行3: RPC origin（等幅・mask 済み表示可）。
+   - 行4: 最終閲覧時刻 + pin toggle（既存 `setManagedAgentPinned`）。
+   - 行5: credential status pill（有効/無効/参照切れ）。
+   - actions: `開く`（primary → 選択＋遷移）, `[…]`（メニュー: 編集/ピン留め切替/詳細/無効化）。
 4. **table は既定で使わない**。高密度比較が必要な場合は card 内の `詳細` 展開で table を出す（オプショナル）。
 
-## Mobile layout — 一覧 (< 1024px)
+## モバイル layout — 一覧 (< 1024px)
 
 ```
 ┌──────────────────────────┐
@@ -76,7 +76,7 @@
 - card は1列。toolbar は折り返し。`追加` は FAB または header 右。
 - pin/アクションは card 内 `[…]` メニューに集約し、横幅を確保。
 
-## Desktop layout — New Agent 登録（Agents 画面内 panel / dialog）
+## デスクトップ layout — New Agent 登録（Agents 画面内 shadcn panel / dialog）
 
 Agent registration を「Agents 画面内アクションから開く登録フロー」として再設計。
 
@@ -107,22 +107,31 @@ Agent registration を「Agents 画面内アクションから開く登録フロ
 ```
 
 - ステップ: `1.接続情報` → `2.表示情報` → `3.初期モデルポリシー` → `4.確認`。
+- 登録 UI は shadcn `Dialog` または `Sheet`、`Form`、`Input`、`Textarea`、`Select`、`Checkbox`、`Progress`、`Alert`、`Button` を使う。stepper を独自 CSS で作らない。
 - `接続を検証`: server-side で RPC origin 到達性と credential 参照の有効性を検証（credential 値は browser に渡さず、参照キーのみ送信）。AGENT-MANAGEMENT-UI-S002。
 - `ポリシーを検証`: server-side で `ValidateModelPolicy` RPC（AGENT-MANAGEMENT-UI-S017）。Provider credential・生 token は非表示。
 - 最終 `登録して選択`: server-side で `InitializeAgent` + initial model policy + `initialConfig.modelPolicyRef` を同一フローで送信（AGENT-MANAGEMENT-UI-S017）。成功後、自動的に選択状態にして `/agents/[id]`（Overview）へ遷移。
 
-## Mobile layout — New Agent
+## モバイル layout — New Agent
 
 - ステップは1画面1ステップの縦移動。`戻る` / `次へ`。進捗は上部 stepper（ドット）。
 - 検証ボタンは sticky footer に。
 
-## Data & state contract（server-only 境界）
+## データと状態の契約（server-only 境界）
 
 - 一覧: `listManagedAgentsWithCredentialStatus`（既存 server action）から managed Agent records + credential status（masked hint のみ）を取得。Browser に credential 値は渡さない。
 - 選択: `selectManagedAgent`（新規 server action）→ cookie 書換 + `markManagedAgentOpened` 更新。
 - 登録: server-only モジュールが generated Agent RPC client を使用。Browser-visible module は RPC client / Connect runtime / credential 解決ロジックを import しない（AGENT-MANAGEMENT-UI-S017）。
 
-## States
+## shadcn/ui 対応
+
+- Agents page shell: `Card`, `Button`, `Input`, `Separator`, `Skeleton`, `Alert`。
+- Agent card: `Card`, `Badge`, `Button`, `DropdownMenu`, `Avatar`, `Tooltip`。
+- Registration: `Dialog` or `Sheet`, `Form`, `Label`, `Input`, `Textarea`, `Select`, `Checkbox`, `Progress`, `Alert`, `Button`。
+- Destructive / risky action: `AlertDialog`。
+- 独自 `.route-card`, `.readout`, `.data-table`, `.state-*`, `.primary-action` class を使わない。
+
+## 状態
 
 - **loading（一覧）**: `AgentCard` の skeleton 行を grid に並べる。
 - **empty（一覧）**: 中央に「まだエージェントが登録されていません」+ `エージェントを追加` CTA + 「Agent ID・RPC origin・credential 参照を用意してください」ガイダンス。
@@ -135,7 +144,7 @@ Agent registration を「Agents 画面内アクションから開く登録フロ
 - **optimistic（登録送信）**: `登録して選択` disabled + progress。成功時自動遷移。
 - **permission-denied（登録権限なし）**: フォーム全体を read-only or 専用 state「エージェントの登録権限がありません」。
 
-## Copy slots（日本語）
+## 文言 slot（日本語）
 
 - h1: `エージェント`。toolbar: `エージェントを追加`, `検索...`。
 - グループラベル: `ピン留め`, `その他`。
@@ -148,21 +157,21 @@ Agent registration を「Agents 画面内アクションから開く登録フロ
 - 登録フィールドラベル: `Agent ID`, `RPC origin`, `Credential 参照`, `表示名`, `説明`, `Provider`, `Model`, `Policy ref`, `Generation parameters`。
 - 登録アクション: `接続を検証`, `ポリシーを検証`, `登録して選択`, `戻る`, `次へ`。
 
-## Accessibility
+## アクセシビリティ
 
 - 一覧 card は `article` 相当。`開く` が primary CTA。card 全体クリック可能にする場合は、内側の個別リンクと重複しないよう `aria-labelledby`/`aria-describedby` で関係付け。
 - 検索: `role="search"`、`label` 必須。
 - 登録 stepper: `role="group" aria-label="登録ステップ"`、各ステップ `aria-current="step"`。エラーは `aria-describedby` で field に紐付け。
 - pin toggle: `aria-pressed` で ON/OFF。状態ラベル必須。
 
-## Integration notes for unit/client/engineer
+## unit/client/engineer 向け実装メモ
 
-- `packages/client/app/agents/page.tsx`: 既存 `AgentList` を card-first 仕様へ更新（client component は props 受けのまま、内部 render を card 化）。`listManagedAgentsWithCredentialStatus` 再利用。
+- `packages/client/app/agents/page.tsx`: 既存 `AgentList` を shadcn `Card` / `Badge` / `Button` / `Input` composition へ更新（client component は props 受けのまま）。`listManagedAgentsWithCredentialStatus` 再利用。
 - Agent registration stepper は `/agents` 画面内の panel / dialog へ統合する。server action で `InitializeAgent` + model policy フローを構成（AGENT-MANAGEMENT-UI-S017/S002）。
 - 新規 server-only: `selectManagedAgent`。`packages/client/src/server/actions/managed-agents.ts` に集約（既存 `setManagedAgentPinned`/`markManagedAgentOpened` と同所。重複禁止）。
-- `packages/client/src/components/agent-list.tsx` を card grid へ。新規 `agent-card.tsx`。
+- `packages/client/src/components/agent-list.tsx` を shadcn card grid へ。新規 `agent-card.tsx` は shadcn component 合成だけを行う。
 
-## Open questions / assumptions
+## 未解決事項と前提
 
 - A: 検索は client-side フィルタ（Browser に一覧メタデータを渡す想定、credential 無し）。数千 Agent 規模なら server 検索へ昇格。本ワイヤーフレームは client-side を既定。
 - Q: 登録フローで credential 参照は「既存参照の選択」と「新規参照の登録」のどちらも必要か。→ A: 両方サポート。新規参照登録も server-only で行い、Browser に生値を渡さない。

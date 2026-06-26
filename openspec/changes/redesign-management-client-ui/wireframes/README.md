@@ -74,30 +74,27 @@
 - `/` は server-side で `/agents` へリダイレクトする。
 - `/agents/[agentId]` 配下の selected-Agent route は、`[agentId]` が Client D1 の managed Agent record に存在しない場合 `notFound()` とする（Agent-owned データ有無とは分離）。
 
-## 美的方向・デザインシステム（全画面共通）
+## shadcn/ui デザインシステム（全画面共通）
 
-「Operational Console」を方向性とする。遊心ではなく、運用者が長時間迷わず使える高精細・高信頼のコンソール美。generic な AI UI（紫グラデ+Inter+真っ白カード羅列）を明確に回避する。
+全画面は `00-shadcn-full-copy-contract.md` を必須入力とし、公式 shadcn/ui を丸ごとコピーした local source を合成して実装する。
 
-### タイポグラフィ
+### UI component 原則
 
-- 本文・UI: ヒューマニストサンス（推奨: IBM Plex Sans）。Inter / Roboto / Arial / system-ui の既定使用は禁止。
-- 構造化値（Agent ID, Thread key, Timestamp, policy ref, digest）: 等幅（推奨: IBM Plex Mono）。構造化値は常に等幅で「データであること」を視覚化する。
-- 見出し: 本文ファミリーの太字 + tracking 調整。装飾ディスプレイフォントは使わない。
-- 日本語: 本文ファミリーの CJK ウェイト（または Noto Sans JP の同士）でフォールバック。
+- すべての Button / Card / Badge / Form / Dialog / Sheet / Dropdown / Tooltip / Tabs / Table / Skeleton / Alert などの visible primitive は `packages/client/src/components/ui/**` の shadcn/ui component を使う。
+- `00-shadcn-full-copy-contract.md` に従い、公式 core、docs-only entries、Blocks、Charts を local source として丸ごとコピーする。domain component で独自に再実装しない。
+- Domain component は business data と layout composition だけを担当し、visual primitive を bespoke CSS class で作らない。
 
-### 色
+### 見た目
 
-- ベース: neutral graphite/zinc（light: 背景 `#FBFBFA` 系、surface `#FFFFFF` 系。dark: 背景 `#0E0F11` 系、surface `#17181B` 系）。
-- アクセント: 選択中 Agent コンテキストと主要 action に使う単一アクセント（推奨: deep teal `#0E7C7B` 系、または operational blue）。紫グラデ・虹色は禁止。
-- ステータス意味色: success(緑)/warning(amber)/danger(赤)/info(blue)。**色単独では伝えない**。必ずアイコン+テキストラベルを併用（accessibility）。
-- selected-Agent area はアクセントの淡い tint で「今この Agent を見ている」ことを示す。
+- `components.json` の `style: new-york`、`baseColor: neutral`、`cssVariables: true` を正とする。
+- shadcn/ui default の simple neutral design を利用する。Control-room palette、radial gradient、glow shadow、custom serif typography、独自 color token は使わない。
+- `app/globals.css` は Tailwind directives と shadcn/ui default CSS variables / base layer に限定する。
 
 ### レイアウト原則
 
-- 8px spacing grid。
-- summary/card-first。一覧は既定で card/tile。table は「詳細を展開した時」や「高密度比較が真に必要な時」のみ。
-- 高密度でも余白を殺さない。情報グループは card で区切る。
-- 全ステータスは「アイコン+色+ラベル」の3点セット。
+- shadcn/ui `Card` / `Separator` / `ScrollArea` / `Sheet` / `Tabs` / `Accordion` を使って余白と情報グループを作る。
+- 一覧は既定で shadcn `Card` composition。table は shadcn `Table` を detail expansion または高密度比較に限定して使う。
+- 全ステータスは shadcn `Badge` + lucide icon + text label の3点セットにする。
 
 ### モーション
 
@@ -125,20 +122,21 @@
 
 ## ファイル構成
 
-| ファイル                 | 内容                                                        |
-| ------------------------ | ----------------------------------------------------------- |
-| `README.md`              | 本ファイル。IA・不変量・共通規約。                          |
-| `01-navigation-shell.md` | Topbar + 左サイドバー・responsive・Agent 選択状態マシン。   |
-| `02-global-agents.md`    | Agents 一覧・New Agent 登録・選択。                         |
-| `03-global-settings.md`  | Global Settings（cross-Agent）。                            |
-| `04-agent-overview.md`   | Overview（健全性・承認キュー・最近活動・Compaction 集約）。 |
-| `05-threads.md`          | Threads 一覧＋詳細（Memory & Compaction パネル含む）。      |
-| `06-events.md`           | Events ストリーム（ToolInvocation 由来含む）。              |
-| `07-runs.md`             | Runs 一覧＋詳細（Tool 実行・承認含む）。                    |
-| `08-schedules.md`        | Schedules 作成・確認・取消。                                |
-| `09-integrations.md`     | Integrations install/list/uninstall（Tool カタログ含む）。  |
-| `10-agent-settings.md`   | API・credential・model policy・一般設定。                   |
-| `11-states-copy-a11y.md` | 状態・コピースロット・アクセシビリティの一元定義。          |
+| ファイル                          | 内容                                                        |
+| --------------------------------- | ----------------------------------------------------------- |
+| `00-shadcn-full-copy-contract.md` | shadcn/ui full copy、copy manifest、CSS 削除契約。          |
+| `README.md`                       | 本ファイル。IA・不変量・共通規約。                          |
+| `01-navigation-shell.md`          | Topbar + 左サイドバー・responsive・Agent 選択状態マシン。   |
+| `02-global-agents.md`             | Agents 一覧・New Agent 登録・選択。                         |
+| `03-global-settings.md`           | Global Settings（cross-Agent）。                            |
+| `04-agent-overview.md`            | Overview（健全性・承認キュー・最近活動・Compaction 集約）。 |
+| `05-threads.md`                   | Threads 一覧＋詳細（Memory & Compaction パネル含む）。      |
+| `06-events.md`                    | Events ストリーム（ToolInvocation 由来含む）。              |
+| `07-runs.md`                      | Runs 一覧＋詳細（Tool 実行・承認含む）。                    |
+| `08-schedules.md`                 | Schedules 作成・確認・取消。                                |
+| `09-integrations.md`              | Integrations install/list/uninstall（Tool カタログ含む）。  |
+| `10-agent-settings.md`            | API・credential・model policy・一般設定。                   |
+| `11-states-copy-a11y.md`          | 状態・コピースロット・アクセシビリティの一元定義。          |
 
 ## OpenSpec シナリオ ID 命名（参考）
 

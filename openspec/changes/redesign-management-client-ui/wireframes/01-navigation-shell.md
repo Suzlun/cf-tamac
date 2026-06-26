@@ -1,17 +1,17 @@
 # 01 — Navigation Shell（Topbar + 左サイドバー）
 
-## Intent & Users
+## 目的と利用者
 
 - 顧客: 全管理者。あらゆる画面で「今どの Agent を見ているか」「全体設定か Agent 設定か」を1秒で把握したい。
 - 目的: 水平タブを廃止し、Global area と Selected-Agent area を分離した左サイドバーで、Agent 選択状態と現在地を常に明示する。
 
-## Route & URL
+## Route と URL
 
 - Shell は全 route で共通（root layout 由来）。
 - `/` → server redirect → `/agents`。
 - Topbar はすべての route で描画。
 
-## Desktop layout (>= 1024px)
+## デスクトップ layout (>= 1024px)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -40,18 +40,18 @@
 
 コンポーネント階層:
 
-1. `Topbar`（sticky top）
+1. `Topbar`（sticky top。shadcn `Button`, `Avatar`, `DropdownMenu`, `Breadcrumb` を合成）
    - 左: ブランド `cf-tamac`（h1 相当、`/agents` への link）。
    - 右: 「選択 Agent 表示 chip（現在の選択 Agent 名 + `エージェント一覧へ` link）」「User menu（表示名 + ▾）」。
    - **Topbar は Agent selection 操作を直接提供しない**。Agent 選択は `Agents` 画面の責務とし、Topbar は現在選択の表示と `/agents` への導線だけを持つ。
-2. `Sidebar`（sticky left, scrollable 縦）
+2. `Sidebar`（sticky left, shadcn `ScrollArea`, `Separator`, `Button`, `Tooltip`, `Badge` を合成）
    - セクションラベル `GLOBAL`（小文字 caps, mute）。
    - Global items: `Agents`(`/agents`), `Settings`(`/settings`)。
    - セクションラベル `AGENT`（選択中 Agent 名を status chip で表示）。
    - Selected-Agent items（`aria-current` で現在地）。未選択時はこのセクション全体が hidden または disabled+tooltip。
-3. `Content`（`<main id="main-content">`）。先頭に `Breadcrumb` を描画。
+3. `Content`（`<main id="main-content">`）。先頭に shadcn `Breadcrumb` を描画。
 
-## Mobile layout (< 1024px)
+## モバイル layout (< 1024px)
 
 ```
 ┌──────────────────────────────────────┐
@@ -74,7 +74,7 @@
 └──────────────┘
 ```
 
-- サイドバーは drawer 化。Topbar の `≡`（hamburger）で開閉。`aria-expanded` 必須。
+- サイドバーは shadcn `Sheet` で drawer 化。Topbar の `≡`（hamburger）は shadcn `Button` で、`aria-expanded` 必須。
 - drawer オープン時: focus を最初の menuitem に移動。Esc で閉じ、focus を `≡` に戻す。
 - リンク選択時は drawer を自動 close。
 - Topbar の Agent 表示 chip はモバイルでも利用（小画面では名前省略+アバターのみ）。切替操作は chip の直接 dropdown ではなく `/agents` への導線で行う。
@@ -92,13 +92,13 @@
 - 選択状態の保持: Client D1 の managed Agent record の `last-opened` メタデータを server action で更新（既存 `markManagedAgentOpened`）。Browser には cookie/session 表現で選択 ID を持たせるが、**credential は含めない**。
 - Topbar chip は選択 Agent の表示と `Agents 全一覧へ` link のみを持つ。最近開いた Agent の一覧や cross-Agent quick switcher は提供しない。
 
-## Data & state contract（server-only 境界）
+## データと状態の契約（server-only 境界）
 
 - `getCurrentSelection()`（server-only）: cookie/session から選択 Agent ID を読み、Client D1 の managed Agent record から display metadata（表示名, アバターシード, status サマリ）のみ取得。credential は取得しない。
 - Sidebar/Topbar はこの server-resolved 値を props で受ける Server Component として描画。Client component 化する場合も Agent RPC / credential import 禁止。
 - 選択切替は Server Action（`selectManagedAgent` 相当）。楽観的更新は「選択中表示」のみ。失敗時は前選択へ復元 + secret-safe トースト。
 
-## States
+## 状態
 
 - **loading**: sidebar 項目・Agent 表示 chip は skeleton chip。Topbar ブランドは即時表示。
 - **error（選択メタデータ取得失敗）**: AGENT セクションを「Agent 情報の取得に失敗しました / 再試行」に差替。credential 非表示維持。
@@ -106,7 +106,7 @@
 - **selected-agent-required**: 上記状態マシン表参照。
 - **optimistic（選択切替中）**: Agents 画面の選択 action と sidebar に進行表示。他操作は抑制。
 
-## Copy slots（日本語）
+## 文言 slot（日本語）
 
 - ブランド: `cf-tamac`（固定）。
 - セクションラベル: `グローバル` / `エージェント`（または `GLOBAL` / `AGENT`。小文字 caps 表現で統一）。
@@ -118,7 +118,7 @@
 - hamburger `aria-label`: `ナビゲーションを開く` / `ナビゲーションを閉じる`。
 - skip link: `メインコンテンツへスキップ`。
 
-## Accessibility
+## アクセシビリティ
 
 - skip-to-content リンクを Topbar の最初に配置（Tab 1 回で到達）。
 - Sidebar は `role="navigation" aria-label="主要ナビゲーション"`。`menubar`/`menuitem` で arrow-key 対応。
@@ -127,17 +127,26 @@
 - 色/アイコン単独の状態表現禁止。selected は背景 tint + 左アクセントバー + ラベル。
 - `prefers-reduced-motion`: drawer スライド・進行表示のアニメを無効化。
 
-## Integration notes for unit/client/engineer
+## shadcn/ui 対応
+
+- Topbar: `Button`, `Avatar`, `DropdownMenu`, `Breadcrumb`, `Tooltip`。
+- Desktop Sidebar: `ScrollArea`, `Separator`, `Button`, `Badge`, `Tooltip`。
+- Mobile Sidebar: `Sheet`, `ScrollArea`, `Separator`, `Button`。
+- Selected Agent display: `Avatar`, `Badge`, `Button`。
+- Loading and error states: `Skeleton`, `Alert`。
+- 画面実装前に `00-shadcn-full-copy-contract.md` の official shadcn/ui full copy を完了し、独自 `.control-room` / `.topline` / `.nav-link` class を使わない。
+
+## unit/client/engineer 向け実装メモ
 
 編集不可（設計指示のみ）。以下は実装ターゲットの目安:
 
-- `packages/client/app/layout.tsx`: 現状 `<main className="app-shell">` のみ。Topbar + Sidebar を含む `AppShell` Server Component を新設し、children を Content slot に。
+- `packages/client/app/layout.tsx`: 現状 `<main className="app-shell">` のみ。`app-shell` custom class を削除し、Topbar + Sidebar を含む `AppShell` Server Component を shadcn/ui composition で新設し、children を Content slot に。
 - 新規: `packages/client/app/(shell)/layout.tsx` 等 route group で shell を適用、または root layout に組込み。`/` は redirect を `next.config` or `app/page.tsx` で `redirect('/agents')`。
 - 新規 component（`packages/client/src/components/shell/` 想定）: `AppShell`, `Topbar`, `Sidebar`, `AgentSwitcher`, `Breadcrumb`。これらは Browser-visible だが **Agent RPC / credential import 禁止**。server-only モジュール（`packages/client/src/server/`）から display metadata のみ受ける。
 - 新規 server-only: `packages/client/src/server/navigation/`（例）に `getCurrentSelection`, `selectManagedAgent`, `getRecentAgents`。既存 `markManagedAgentOpened` を再利用（重複実装禁止: credo 4）。
 - 全 Agent-scoped route（`/agents/[agentId]/*`）は layout または各 page で「選択 Agent 存在チェック → `notFound()` or 未選択ガイダンス」。
 
-## Open questions / assumptions
+## 未解決事項と前提
 
 - Q: 選択状態の永続化は cookie で十分か、session（D1）が必要か。→ A: 基本は cookie（httpOnly, credential 無し）。`last-opened` 更新は server action。要件次第で session 表現に拡張可能だが、本ワイヤーフレームでは cookie + server action を想定。
 - A: dark theme を既定で提供するか。→ 提供する（token 双方定義）。既定は light、User menu で切替。

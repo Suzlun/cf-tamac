@@ -1,16 +1,16 @@
 # 09 — Selected-Agent: Integrations（+ Tool カタログ）
 
-## Intent & Users
+## 目的と利用者
 
 - 顧客: 管理者。汎用 Integration manifest で install/list/uninstall し、Adapter Connection・Tool・Delivery capability・setup 状態を確認したい。
 - 目的: Integration の install/list/uninstall と、それが提供する **Tool カタログ（Tool definition/Installation 所有関係）をここに集約**し、Tools トップレベルを廃止する根拠とする（AGENT-MANAGEMENT-UI-S008）。
 
-## Route & URL
+## Route と URL
 
 - `GET /agents/[agentId]/integrations`
 - 詳細: master-detail または `?installation=...`。
 
-## Desktop layout (>= 1024px)
+## デスクトップ layout (>= 1024px)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -45,16 +45,16 @@
      - `権限付与` = grant 一覧・状態。
 3. `+ インテグレーションを追加`: manifest 入力/選択 → server 側で署名検証 → install（AGENT-MANAGEMENT-UI-S008）。
 
-## Mobile layout (< 1024px)
+## モバイル layout (< 1024px)
 
 - card 縦スタック。詳細 push 画面。`アンインストール` は確認 sheet。
 
-## Data & state contract（server-only 境界）
+## データと状態の契約（server-only 境界）
 
 - 全て server-side Agent RPC。Integration manifest の署名検証も server 側。manifest/署名 material を Browser に渡さない（AGENT-MANAGEMENT-UI-S008/S009）。
 - install/uninstall は acting user context 必須。
 
-## States
+## 状態
 
 - **loading**: card/panel skeleton。
 - **empty（一覧）**: `このエージェントにインストールされたインテグレーションはありません` + `インテグレーションを追加` CTA。
@@ -66,7 +66,7 @@
 - **Adapter 未接続**: card に `アダプタ未接続` + `接続状態を確認`。
 - **install 検証失敗**: manifest 不正・署名無効・既存 Integration 競合を inline で表示（secret-safe）。
 
-## Copy slots（日本語）
+## 文言 slot（日本語）
 
 - h1: `インテグレーション`。toolbar: `インテグレーションを追加`, `状態`, `検索...`。
 - card: `アダプタ`, `ツール`, `配信`, `setup`, `詳細`, `アンインストール`。
@@ -74,17 +74,17 @@
 - 追加フォーム: `マニフェスト`, `検証`, `インストール`, `キャンセル`。
 - 状態: `インストール済み`, `setup 未完了`, `エラー`, `アンインストール済み`。
 
-## Accessibility
+## アクセシビリティ
 
 - master-detail roles（`listbox`/`option`/`region`）。tabs roles。
 - `アンインストール` は破壊的確認 dialog。影響範囲（Tool が使えなくなる等）を明示。
 - status は色+アイコン+ラベル。
 
-## Integration notes for unit/client/engineer
+## unit/client/engineer 向け実装メモ
 
 - `packages/client/app/agents/[agentId]/integrations/page.tsx`: master-detail + tabs へ再設計。server action で Integration install/uninstall/list（AGENT-MANAGEMENT-UI-S008）。
 - Tool catalog は本画面の `ツール` tab に配置し、Integration context から確認できるようにする。
 
-## Open questions / assumptions
+## 未解決事項と前提
 
 - A: Tool カタログ（本画面）は Tool 定義と所有関係の表示。実行履歴は Runs/Events、承認は Runs/Overview と役割分担（重複なし: credo 4）。
