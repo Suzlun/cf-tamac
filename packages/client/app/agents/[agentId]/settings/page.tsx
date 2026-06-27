@@ -147,12 +147,7 @@ function SettingsErrorFrame({
   readonly message: string;
 }) {
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="settings unavailable"
-      agentId={agentId}
-      currentSection="settings"
-    >
+    <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="settings unavailable">
       <ErrorAlert message={message} />
     </ControlRoomFrame>
   );

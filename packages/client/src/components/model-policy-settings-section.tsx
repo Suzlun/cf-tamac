@@ -133,19 +133,19 @@ export function ModelPolicySettingsSection({
         loading={false}
         permissionDenied={permissionDenied}
       />
-      <div className="readout">
+      <div className="rounded-md border bg-card p-4 text-sm space-y-1">
         <strong id="model-policy-editor-heading">Edit default model policy</strong>
-        <p className="form-helper">
+        <p className="text-xs text-muted-foreground">
           Upsert the Agent-owned policy first, then attach the saved ref to
           AgentConfig.modelPolicyRef. The browser receives only the safe result metadata.
         </p>
         {formError !== undefined ? (
-          <p className="state-error" role="alert">
+          <p className="text-destructive" role="alert">
             {formError}
           </p>
         ) : null}
         {success !== undefined ? (
-          <p className="state-success" role="status">
+          <p className="text-primary" role="status">
             {success}
           </p>
         ) : null}
@@ -169,7 +169,7 @@ export function ModelPolicySettingsSection({
                 void handleValidate();
               }}
             />
-            <div className="action-row">
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="submit"
                 variant="default"
@@ -182,7 +182,7 @@ export function ModelPolicySettingsSection({
           </form>
         </Form>
       </div>
-      <p className="form-helper">Policy editor for Agent ID: {agentId}</p>
+      <p className="text-xs text-muted-foreground">Policy editor for Agent ID: {agentId}</p>
     </section>
   );
 }

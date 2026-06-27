@@ -5,46 +5,63 @@ import { describe, expect, it } from 'vitest';
 
 const registryPagePath = new URL('../../app/agents/page.tsx', import.meta.url);
 const detailPagePath = new URL('../../app/agents/[agentId]/page.tsx', import.meta.url);
-const sectionNavPath = new URL('../../src/components/section-nav.tsx', import.meta.url);
+const shellPath = new URL('../../src/components/management-shell.tsx', import.meta.url);
+const shellNavPath = new URL('../../src/components/management-shell-nav.tsx', import.meta.url);
+const agentScopeNavPath = new URL('../../src/components/agent-scope-nav.tsx', import.meta.url);
+const navConfigPath = new URL('../../src/components/management-nav-config.ts', import.meta.url);
+const globalSettingsPagePath = new URL('../../app/global-settings/page.tsx', import.meta.url);
 
-const expectedRouteFiles = [
-  'agents/page.tsx',
-  'agents/new/page.tsx',
-  'agents/[agentId]/page.tsx',
-  'agents/[agentId]/threads/page.tsx',
-  'agents/[agentId]/events/page.tsx',
-  'agents/[agentId]/runs/page.tsx',
-  'agents/[agentId]/compactions/page.tsx',
-  'agents/[agentId]/schedules/page.tsx',
-  'agents/[agentId]/tools/page.tsx',
-  'agents/[agentId]/integrations/page.tsx',
-  'agents/[agentId]/settings/page.tsx',
-];
+function read(filePath: URL): string {
+  return readFileSync(fileURLToPath(filePath.href), 'utf8');
+}
 
+/**
+ * タスク 4.1: Agent registry shell が sidebar shell と Agents entry を描画することを positive に検証する。
+ * 旧 demo content の absence ではなく、supported registry shell / global nav / registration action /
+ * detail affordances の存在を確認する。
+ */
 describe('Management Client Agent registry shell', () => {
-  it('[MANAGEMENT-CLIENT-SHELL-S001] Agent registry shell renders without demo content', () => {
-    const registryPage = readFileSync(fileURLToPath(registryPagePath.href), 'utf8');
-    const detailPage = readFileSync(fileURLToPath(detailPagePath.href), 'utf8');
-    const sectionNav = readFileSync(fileURLToPath(sectionNavPath.href), 'utf8');
+  it('[MANAGEMENT-CLIENT-SHELL-S001] Agent registry shell が sidebar shell と Agents entry を描画する', () => {
+    const registryPage = read(registryPagePath);
+    const detailPage = read(detailPagePath);
+    const shell = read(shellPath);
+    const shellNav = read(shellNavPath);
+    const agentScopeNav = read(agentScopeNavPath);
+    const navConfig = read(navConfigPath);
 
-    const appRoot = new URL('../../app/', import.meta.url);
-    for (const routeFile of expectedRouteFiles) {
-      expect(existsSync(fileURLToPath(new URL(routeFile, appRoot).href))).toBe(true);
-    }
-
+    // Agents entry page は registry list component を描画する。
     expect(registryPage).toContain('AgentList');
-    expect(detailPage).toContain('AgentToken');
-    expect(sectionNav).toContain('Registry');
-    expect(sectionNav).toContain('Overview');
-    expect(sectionNav).toContain('Threads');
-    expect(sectionNav).toContain('Events');
-    expect(sectionNav).toContain('Runs');
-    expect(sectionNav).toContain('Compactions');
-    expect(sectionNav).toContain('Schedules');
-    expect(sectionNav).toContain('Tools');
-    expect(sectionNav).toContain('Integrations');
-    expect(sectionNav).toContain('Settings');
 
-    expect(`${registryPage}\n${detailPage}\n${sectionNav}`).not.toMatch(/hello|users/i);
+    // selected-Agent overview は Agent scope と detail affordance を描画する。
+    expect(detailPage).toContain('AgentToken');
+    expect(detailPage).toContain('Overview');
+
+    // root layout shell は skip link・Shadcn persistent sidebar・mobile trigger を提供する。
+    expect(shell).toContain('Skip to main content');
+    expect(shell).toContain('management-main');
+    expect(shell).toContain('SidebarProvider');
+    expect(shell).toContain('SidebarTrigger');
+    expect(shellNav).toContain('ManagementSidebarContent');
+    expect(shellNav).toContain('SidebarHeader');
+    expect(shellNav).toContain('SidebarFooter');
+
+    // global navigation は Agents と Global Settings のみ。
+    expect(navConfig).toContain("label: 'Agents'");
+    expect(navConfig).toContain("label: 'Global Settings'");
+    // selected-Agent navigation の項目は nav config に定義される（label は config 側）。
+    expect(agentScopeNav).toContain('AGENT_SECTION_NAV_ITEMS');
+    expect(navConfig).toContain('Overview');
+    expect(navConfig).toContain('Threads');
+    expect(navConfig).toContain('Events');
+    expect(navConfig).toContain('Runs');
+    expect(navConfig).toContain('Schedules');
+    expect(navConfig).toContain('Integrations');
+    expect(navConfig).toContain('Settings');
+
+    // Global Settings page が存在する。
+    expect(existsSync(fileURLToPath(globalSettingsPagePath.href))).toBe(true);
+
+    // demo content が混入していない。
+    expect(`${registryPage}\n${detailPage}\n${shell}\n${shellNav}`).not.toMatch(/hello|users/i);
   });
 });

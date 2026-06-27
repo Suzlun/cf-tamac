@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { SUPPORTED_MANAGEMENT_ROUTES } from '../components/management-nav-config';
+
 const packageRoot = new URL('../..', import.meta.url);
 const appRoot = new URL('../../app/', import.meta.url);
 
@@ -39,13 +41,14 @@ function appRoutePath(filePath: string): string {
     .replace(/\/route\.ts$/u, '')
     .replace(/^page\.tsx$/u, '')
     .replace(/^route\.ts$/u, '')
-    .replace(/\[[^\]]+\]/gu, ':param');
+    // 動的 segment は param 名を保持して `:agentId` のように表現する。
+    .replace(/\[([^\]]+)\]/gu, ':$1');
   const normalizedRoute = `/${route}`.replace(/\/$/u, '');
   return normalizedRoute === '' ? '/' : normalizedRoute;
 }
 
 describe('Management Client Agent API proxy absence', () => {
-  it('[MANAGEMENT-CLIENT-SHELL-S008] [CLIENT-REGISTRY-S005] Client has no public Agent proxy route', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S008] Client exposes no Agent API proxy routes', () => {
     const appFiles = collectFiles(appRoot);
     const pageRouteManifest = appFiles
       .filter((filePath) => filePath.endsWith('/page.tsx'))
@@ -56,23 +59,13 @@ describe('Management Client Agent API proxy absence', () => {
       .map(appRoutePath)
       .sort();
 
-    expect(pageRouteManifest).toEqual([
-      '/',
-      '/agents',
-      '/agents/:param',
-      '/agents/:param/compactions',
-      '/agents/:param/events',
-      '/agents/:param/integrations',
-      '/agents/:param/runs',
-      '/agents/:param/schedules',
-      '/agents/:param/settings',
-      '/agents/:param/threads',
-      '/agents/:param/tools',
-      '/agents/new',
-    ]);
+    // supported management route graph（positive 期待値）。section-nav の source-of-truth と一致する。
+    expect(pageRouteManifest).toEqual([...SUPPORTED_MANAGEMENT_ROUTES].sort());
+    // public route handler（API proxy 等）は一つも存在しない。
     expect(routeHandlerInventory).toEqual([]);
     expect(existsSync(fileURLToPath(new URL('api/', appRoot).href))).toBe(false);
 
+    // browser-visible module は Agent API proxy path を公開しない。
     const proxyIssues = appFiles.flatMap((filePath) => {
       const content = readFileSync(filePath, 'utf8');
       return forbiddenBrowserPaths

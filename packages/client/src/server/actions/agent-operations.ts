@@ -266,7 +266,9 @@ export async function approveInvocation(
     })
   );
 
-  revalidatePath(`/agents/${agentId}/tools`);
+  // Tool approval context は Runs 画面の文脈 detail に移動したため、/tools ではなく /runs を revalidate する。
+  revalidatePath(`/agents/${agentId}/runs`);
+  revalidatePath(`/agents/${agentId}`);
   return toBrowserSafeInvocationSummary(response.invocation, invocationId, 'approved');
 }
 
@@ -287,7 +289,9 @@ export async function rejectInvocation(
     })
   );
 
-  revalidatePath(`/agents/${agentId}/tools`);
+  // Tool approval context は Runs 画面の文脈 detail に移動したため、/tools ではなく /runs を revalidate する。
+  revalidatePath(`/agents/${agentId}/runs`);
+  revalidatePath(`/agents/${agentId}`);
   return toBrowserSafeInvocationSummary(response.invocation, invocationId, 'rejected');
 }
 

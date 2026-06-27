@@ -3,6 +3,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useId, useRef, type ReactNode } from 'react';
 
+import { Button } from './ui/button';
+
 interface ConfirmDialogProps {
   readonly open: boolean;
   readonly heading: string;
@@ -71,9 +73,10 @@ export function ConfirmDialog({
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="detail-drawer-backdrop" aria-disabled={pending} />
+        {/* Radix Dialog 派生の overlay/portal で focus trap と focus return を提供する。 */}
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/80" aria-disabled={pending} />
         <Dialog.Content
-          className="control-room"
+          className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg"
           role="alertdialog"
           aria-labelledby={headingId}
           aria-describedby={bodyId}
@@ -81,30 +84,32 @@ export function ConfirmDialog({
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
           onInteractOutside={handleInteractOutside}
-          style={{ maxWidth: '28rem', margin: 'auto' }}
         >
-          <div className="topline">
-            <Dialog.Title asChild>
-              <span id={headingId} ref={headingRef} tabIndex={-1}>
-                {heading}
-              </span>
-            </Dialog.Title>
-          </div>
-          <div id={bodyId} className="page-band">
+          <Dialog.Title asChild>
+            <span
+              id={headingId}
+              ref={headingRef}
+              tabIndex={-1}
+              className="block text-lg font-semibold"
+            >
+              {heading}
+            </span>
+          </Dialog.Title>
+          <div id={bodyId} className="mt-3 space-y-4 text-sm">
             {children}
-            <div className="action-row">
-              <button
+            <div className="flex justify-end gap-2">
+              <Button
                 type="button"
-                className="nav-link"
+                variant="outline"
                 onClick={onCancel}
                 disabled={pending}
                 aria-disabled={pending}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="primary-action"
+                variant="default"
                 onClick={() => {
                   void onConfirm();
                 }}
@@ -112,7 +117,7 @@ export function ConfirmDialog({
                 aria-disabled={pending || confirmDisabled}
               >
                 {pending ? 'Processing…' : confirmLabel}
-              </button>
+              </Button>
             </div>
           </div>
         </Dialog.Content>

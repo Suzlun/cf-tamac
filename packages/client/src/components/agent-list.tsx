@@ -1,14 +1,19 @@
 'use client';
 
+import { Pin, PinOff, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition, type ReactNode } from 'react';
+import { useState, useTransition } from 'react';
+
+import { cn } from '@cf-tamac/client/lib/utils';
 
 import { ControlRoomFrame } from './control-room-frame';
-import { DataTable } from './data-table';
 import { EmptyState } from './empty-state';
 import { SignalBadge } from './signal-badge';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface AgentListItem {
   readonly agentId: string;
@@ -27,12 +32,6 @@ interface AgentListProps {
 }
 
 type SortKey = 'displayName' | 'displayOrder' | 'lastOpenedAtMs';
-type SortDirection = 'ascending' | 'descending';
-
-interface SortState {
-  readonly key: SortKey;
-  readonly direction: SortDirection;
-}
 
 function formatTimestamp(ms: number | undefined): string {
   if (ms === undefined || ms === 0) {
@@ -41,56 +40,51 @@ function formatTimestamp(ms: number | undefined): string {
   return new Date(ms).toLocaleString();
 }
 
+/**
+ * credential status 文字列を SignalBadge variant へ割り当てる。
+ * 色（variant）だけではなく label でも状態を伝える。
+ */
 function credentialStatusVariant(status: string): 'signal' | 'muted' | 'error' {
   if (status === 'active') return 'signal';
   if (status === 'rotating') return 'error';
   return 'muted';
 }
 
-function compareAgents(a: AgentListItem, b: AgentListItem, sort: SortState): number {
+/**
+ * pinned → displayOrder/displayName の優先順位で Agent を並び替える。
+ */
+function compareAgents(a: AgentListItem, b: AgentListItem, key: SortKey): number {
   if (a.pinned !== b.pinned) {
     return a.pinned ? -1 : 1;
   }
-  const directional = compareSortValue(a, b, sort.key);
-  if (directional !== 0) {
-    return sort.direction === 'ascending' ? directional : -directional;
-  }
-  return a.displayName.localeCompare(b.displayName);
-}
-
-function compareSortValue(a: AgentListItem, b: AgentListItem, key: SortKey): number {
   if (key === 'displayName') {
     return a.displayName.localeCompare(b.displayName);
   }
   if (key === 'lastOpenedAtMs') {
-    return (a.lastOpenedAtMs ?? 0) - (b.lastOpenedAtMs ?? 0);
+    return (b.lastOpenedAtMs ?? 0) - (a.lastOpenedAtMs ?? 0);
   }
   return a.displayOrder - b.displayOrder;
 }
 
-function nextSort(current: SortState, key: SortKey): SortState {
-  if (current.key !== key) {
-    return { key, direction: key === 'lastOpenedAtMs' ? 'descending' : 'ascending' };
-  }
-  return {
-    key,
-    direction: current.direction === 'ascending' ? 'descending' : 'ascending',
-  };
-}
-
 /**
- * Client-side Agent registry list with pin toggle and last-opened updates.
+ * Client-side Agent registry list（AGENT-MANAGEMENT-UI-S001 / S019）。
  *
- * Built on shadcn-style `ControlRoomFrame`, `DataTable`, `EmptyState`,
- * `SignalBadge`, and `Button` primitives per the wireframe §6.1.
+ * タスク 3.1: table 偏重を廃止し、card/list composition で pin/sort/last-opened/
+ * credential status/selection を表示する。並び順は Select で制御し、
+ * 選択で server-side markManagedAgentOpened action を呼ぶ。表示専用の browser-safe props のみ扱い、
+ * Agent credential/RPC seam には触れない。
+ *
+ * 各 card は displayName, agentId, agentRpcOrigin, pinned, displayOrder, lastOpenedAtMs,
+ * credentialStatus, "Connection" の "Registry only" 注記を含む。
  */
 export function AgentList({ agents, onPin, onOpen }: AgentListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [sort, setSort] = useState<SortState>({ key: 'displayOrder', direction: 'ascending' });
-  const sortedAgents = [...agents].sort((a, b) => compareAgents(a, b, sort));
+  const [sortKey, setSortKey] = useState<SortKey>('displayOrder');
+  const sortedAgents = [...agents].sort((a, b) => compareAgents(a, b, sortKey));
 
   const handleOpen = (agentId: string) => {
+    // Agent 選択で server-side の last-opened 更新 action を呼び、選択中 Agent workspace へ遷移する。
     startTransition(async () => {
       await onOpen(agentId);
       router.push(`/agents/${agentId}`);
@@ -107,134 +101,152 @@ export function AgentList({ agents, onPin, onOpen }: AgentListProps) {
     <ControlRoomFrame
       title="Agent registry"
       signalLabel="management ledger"
-      currentSection="registry"
-    >
-      <p className="eyebrow">Client-owned management ledger</p>
-      <h2>Managed Agents</h2>
-      <p className="lead">
-        Agents registered in this Client. Agent domain state lives in the Agent Worker.
-      </p>
-      <div className="action-row">
+      description="Agents registered in this Client. Agent domain state lives in the Agent Worker."
+      actions={
+        // タスク 2.5: New Agent は Agents screen の primary action として registration flow を開く。
         <Button asChild variant="default">
-          <Link href="/agents/new">New Agent record</Link>
+          <Link href="/agents/new">New Agent</Link>
         </Button>
-      </div>
+      }
+    >
+      <section aria-label="Managed Agents" className="space-y-4">
+        {/* 並び順の操作。card/list composition なので column sort ではなく select で制御する。 */}
+        <div className="flex flex-wrap items-center gap-4">
+          <label htmlFor="agent-sort" className="text-sm text-muted-foreground">
+            Sort by
+          </label>
+          <Select
+            value={sortKey}
+            onValueChange={(value) => {
+              setSortKey(value as SortKey);
+            }}
+          >
+            <SelectTrigger id="agent-sort" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="displayOrder">Display order</SelectItem>
+              <SelectItem value="displayName">Display name</SelectItem>
+              <SelectItem value="lastOpenedAtMs">Last opened</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-      {agents.length === 0 ? (
-        <EmptyState
-          eyebrow="EMPTY LEDGER"
-          heading="Register the first managed Agent."
-          lead="Add an Agent ID, RPC origin, and credential reference; Agent domain state remains inside the Agent Worker."
-          action={
-            <Button asChild variant="default">
-              <Link href="/agents/new">New Agent record</Link>
-            </Button>
-          }
-        />
-      ) : (
-        <DataTable
-          ariaLabel="Managed Agents"
-          headers={buildHeaders(sort, (key) => {
-            setSort((current) => nextSort(current, key));
-          })}
-          rows={sortedAgents.map((agent) => [
-            <button
-              key={`pin-${agent.agentId}`}
-              type="button"
-              aria-label={`${agent.pinned ? 'Unpin' : 'Pin'} ${agent.displayName}`}
-              aria-pressed={agent.pinned}
-              className="font-mono text-sm text-foreground hover:text-signal disabled:opacity-50"
-              disabled={isPending}
-              onClick={() => {
-                handlePin(agent.agentId, agent.pinned);
-              }}
-            >
-              {agent.pinned ? '▲' : '▽'}
-            </button>,
-            <button
-              key={`name-${agent.agentId}`}
-              type="button"
-              className="font-mono text-sm text-cyan hover:underline disabled:opacity-50"
-              onClick={() => {
-                handleOpen(agent.agentId);
-              }}
-              disabled={isPending}
-            >
-              {agent.displayName}
-            </button>,
-            <span key={`id-${agent.agentId}`} className="font-mono">
-              {agent.agentId}
-            </span>,
-            <span
-              key={`origin-${agent.agentId}`}
-              title={agent.agentRpcOrigin}
-              className="font-mono truncate block max-w-xs"
-            >
-              {agent.agentRpcOrigin}
-            </span>,
-            <span key={`order-${agent.agentId}`} className="font-mono">
-              {agent.displayOrder}
-            </span>,
-            <span key={`opened-${agent.agentId}`} className="font-mono">
-              {formatTimestamp(agent.lastOpenedAtMs)}
-            </span>,
-            <SignalBadge
-              key={`cred-${agent.agentId}`}
-              label={agent.credentialStatus.toUpperCase()}
-              variant={credentialStatusVariant(agent.credentialStatus)}
-            />,
-            <span
-              key={`connection-${agent.agentId}`}
-              className="font-mono text-muted-foreground"
-              title="Registry route does not perform live Agent RPC checks; open overview for live status."
-            >
-              Registry only
-            </span>,
-          ])}
-        />
-      )}
+        {agents.length === 0 ? (
+          <EmptyState
+            eyebrow="EMPTY LEDGER"
+            heading="Register the first managed Agent."
+            lead="Add an Agent ID, RPC origin, and credential reference; Agent domain state remains inside the Agent Worker."
+            action={
+              <Button asChild variant="default">
+                <Link href="/agents/new">New Agent</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <ul className="space-y-4">
+            {sortedAgents.map((agent) => (
+              <li key={agent.agentId}>
+                <AgentRegistryCard
+                  agent={agent}
+                  pending={isPending}
+                  onPin={handlePin}
+                  onOpen={handleOpen}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </ControlRoomFrame>
   );
 }
 
-function buildHeaders(sort: SortState, onSort: (key: SortKey) => void) {
-  return [
-    'Pin',
-    sortableHeader('Display name', 'displayName', sort, onSort),
-    'Agent ID',
-    'RPC origin',
-    sortableHeader('Display order', 'displayOrder', sort, onSort),
-    sortableHeader('Last opened', 'lastOpenedAtMs', sort, onSort),
-    'Credential',
-    'Connection',
-  ];
+interface AgentRegistryCardProps {
+  readonly agent: AgentListItem;
+  readonly pending: boolean;
+  readonly onPin: (agentId: string, pinned: boolean) => void;
+  readonly onOpen: (agentId: string) => void;
 }
 
-function sortableHeader(
-  label: string,
-  key: SortKey,
-  sort: SortState,
-  onSort: (key: SortKey) => void
-): {
-  readonly label: string;
-  readonly content: ReactNode;
-  readonly ariaSort: 'ascending' | 'descending' | 'none';
-} {
-  const active = sort.key === key;
-  const ariaSort = active ? sort.direction : 'none';
-  return {
-    label,
-    ariaSort,
-    content: (
-      <button
-        type="button"
-        className="font-mono uppercase tracking-wider text-primary hover:text-signal"
-        onClick={() => {
-          onSort(key);
-        }}
-      >
-        {label}
-      </button>
-    ),
-  };
+/**
+ * 単一 Agent の registry card。pin toggle・credential status・選択 action を含む。
+ * nested card を避けるため、単一の Card に summary をまとめる。
+ */
+function AgentRegistryCard({ agent, pending, onPin, onOpen }: AgentRegistryCardProps) {
+  return (
+    <Card className={cn('shadow-sm', agent.pinned && 'border-primary/60')}>
+      <CardHeader className="space-y-5 p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            {/* pin toggle: aria-pressed と aria-label で状態を通知する。 */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`${agent.pinned ? 'Unpin' : 'Pin'} ${agent.displayName}`}
+              aria-pressed={agent.pinned}
+              disabled={pending}
+              onClick={() => {
+                onPin(agent.agentId, agent.pinned);
+              }}
+              className="mt-1 shrink-0 text-muted-foreground"
+            >
+              {agent.pinned ? <Pin className="size-4" /> : <PinOff className="size-4" />}
+            </Button>
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="truncate text-base leading-6">{agent.displayName}</CardTitle>
+              <CardDescription className="truncate font-mono text-xs leading-5">
+                {agent.agentId}
+              </CardDescription>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+            <SignalBadge
+              label={agent.credentialStatus.toUpperCase()}
+              variant={credentialStatusVariant(agent.credentialStatus)}
+            />
+            <Badge
+              variant="outline"
+              className="px-3 py-1 font-mono font-normal text-muted-foreground"
+              title="Registry route does not perform live Agent RPC checks; open overview for live status."
+            >
+              Connection: Registry only
+            </Badge>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => {
+                onOpen(agent.agentId);
+              }}
+              aria-label={`Open ${agent.displayName} overview`}
+            >
+              Open
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-6 pb-6 pt-0 text-sm text-muted-foreground">
+        <dl className="grid gap-4 rounded-lg bg-muted/40 p-4 sm:grid-cols-3">
+          <div className="space-y-1">
+            <dt className="text-xs font-medium uppercase tracking-wide">RPC origin</dt>
+            <dd className="truncate font-mono leading-6 text-foreground">{agent.agentRpcOrigin}</dd>
+          </div>
+          <div className="space-y-1">
+            <dt className="text-xs font-medium uppercase tracking-wide">Display order</dt>
+            <dd className="font-mono leading-6 text-foreground">{agent.displayOrder}</dd>
+          </div>
+          <div className="space-y-1">
+            <dt className="text-xs font-medium uppercase tracking-wide">Last opened</dt>
+            <dd className="font-mono leading-6 text-foreground">
+              {formatTimestamp(agent.lastOpenedAtMs)}
+            </dd>
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
+  );
 }

@@ -99,15 +99,17 @@ const agentThreadsPagePath = new URL(
 );
 const agentEventsPagePath = new URL('../../app/agents/[agentId]/events/page.tsx', import.meta.url);
 const agentRunsPagePath = new URL('../../app/agents/[agentId]/runs/page.tsx', import.meta.url);
+// タスク 2.6/3.5: standalone compactions route は廃止。Compaction context は threads 画面の文脈 detail。
 const agentCompactionsPagePath = new URL(
-  '../../app/agents/[agentId]/compactions/page.tsx',
+  '../../app/agents/[agentId]/threads/page.tsx',
   import.meta.url
 );
 const agentSchedulesPagePath = new URL(
   '../../app/agents/[agentId]/schedules/page.tsx',
   import.meta.url
 );
-const agentToolsPagePath = new URL('../../app/agents/[agentId]/tools/page.tsx', import.meta.url);
+// タスク 2.6/3.7: standalone tools route は廃止。Tool approval context は runs 画面の文脈 detail。
+const agentToolsPagePath = new URL('../../app/agents/[agentId]/runs/page.tsx', import.meta.url);
 const agentIntegrationsPagePath = new URL(
   '../../app/agents/[agentId]/integrations/page.tsx',
   import.meta.url
@@ -121,7 +123,6 @@ describe('Agent list page (AGENT-MANAGEMENT-UI-S001)', () => {
   it('[AGENT-MANAGEMENT-UI-S001] Agent list displays registry fields from browser-safe data', () => {
     const agentList = read(agentListPath);
     const agentsPage = read(agentsPagePath);
-    const dataTable = read(dataTablePath);
     const managedAgents = read(managedAgentsPath);
 
     // The list page reads from the browser-safe registry action.
@@ -139,11 +140,13 @@ describe('Agent list page (AGENT-MANAGEMENT-UI-S001)', () => {
     expect(agentList).toContain('credentialStatus');
     expect(agentList).toContain('Connection');
     expect(agentList).toContain('Registry only');
-    expect(dataTable).toContain('aria-sort');
+
+    // タスク 3.1: list は table 偏重ではなく card/list composition を使う。
+    expect(agentList).toContain('Card');
+    expect(agentList).toContain('Sort by');
 
     // The list uses shadcn-style components, not bespoke low-level semantics.
     expect(agentList).toContain('ControlRoomFrame');
-    expect(agentList).toContain('DataTable');
     expect(agentList).toContain('EmptyState');
     expect(agentList).toContain('SignalBadge');
     expect(agentList).toContain('Button');
@@ -548,12 +551,14 @@ describe('Agent-owned history tabs (AGENT-MANAGEMENT-UI-S005)', () => {
     const runList = read(runListPath);
     const compactionView = read(compactionViewPath);
     const queries = read(agentQueriesPath);
+    // タスク 2.6/3.5: standalone compactions route は廃止し、threads/runs/events が文脈 detail を持つ。
     const routeSources = [
       read(agentThreadsPagePath),
       read(agentEventsPagePath),
       read(agentRunsPagePath),
-      read(agentCompactionsPagePath),
     ].join('\n');
+    // Compaction context は threads 画面の文脈 detail として描画される。
+    expect(read(agentCompactionsPagePath)).toContain('CompactionView');
 
     expect(routeSources).toContain('listThreads');
     expect(routeSources).toContain('listEvents');

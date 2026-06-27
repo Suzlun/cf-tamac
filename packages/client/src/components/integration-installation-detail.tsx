@@ -1,3 +1,5 @@
+import { Button } from './ui/button';
+
 interface PayloadReference {
   readonly ref: string;
   readonly contentType: string;
@@ -97,7 +99,9 @@ export function InstallationDetail({
   const uninstallDisabled = pending || terminal || !canUninstall;
   return (
     <>
-      <p className="eyebrow">INSTALLATION DETAIL</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        INSTALLATION DETAIL
+      </p>
       <p>installation_id: {installation.installationId}</p>
       <p>integration_id: {installation.integrationId ?? '—'}</p>
       <p>provider_identity: {installation.providerIdentity ?? '—'}</p>
@@ -112,23 +116,26 @@ export function InstallationDetail({
       <SetupInstructions reference={installation.setupInstructionsRef} />
       <CleanupResultView cleanup={installation.cleanupResult} />
 
-      <button
+      <Button
         type="button"
-        className={`nav-link state-error${canUninstall ? '' : ' state-disabled'}`}
+        variant={canUninstall ? 'destructive' : 'secondary'}
         onClick={onUninstall}
         disabled={uninstallDisabled}
         aria-disabled={uninstallDisabled}
         aria-describedby={!canUninstall ? permissionDescriptionId : undefined}
       >
         Uninstall
-      </button>
+      </Button>
     </>
   );
 }
 
 function GrantList({ grants }: { readonly grants: readonly IntegrationGrant[] }) {
   return (
-    <section className="readout" aria-labelledby="grants-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="grants-heading"
+    >
       <strong id="grants-heading">GRANTS</strong>
       <ul aria-label="Granted scopes">
         {grants.map((grant) => (
@@ -147,7 +154,10 @@ function AdapterConnectionList({
   readonly connections: readonly AdapterConnectionSummary[];
 }) {
   return (
-    <section className="readout" aria-labelledby="adapters-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="adapters-heading"
+    >
       <strong id="adapters-heading">ADAPTER CONNECTIONS</strong>
       {connections.length === 0 ? (
         <p>No Adapter Connections.</p>
@@ -167,7 +177,10 @@ function AdapterConnectionList({
 
 function ToolList({ tools }: { readonly tools: readonly ToolSummary[] }) {
   return (
-    <section className="readout" aria-labelledby="tools-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="tools-heading"
+    >
       <strong id="tools-heading">TOOLS</strong>
       {tools.length === 0 ? (
         <p>No Tools.</p>
@@ -187,7 +200,10 @@ function ToolList({ tools }: { readonly tools: readonly ToolSummary[] }) {
 
 function DeliveryCapability({ count }: { readonly count: number }) {
   return (
-    <section className="readout" aria-labelledby="delivery-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="delivery-heading"
+    >
       <strong id="delivery-heading">DELIVERY CAPABILITY</strong>
       <p>delivery_enabled: {count > 0 ? 'true' : 'false'}</p>
       <p>delivery_contexts: {count}</p>
@@ -197,7 +213,10 @@ function DeliveryCapability({ count }: { readonly count: number }) {
 
 function SetupInstructions({ reference }: { readonly reference?: PayloadReference }) {
   return (
-    <section className="readout" aria-labelledby="setup-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="setup-heading"
+    >
       <strong id="setup-heading">SETUP INSTRUCTIONS</strong>
       <PayloadReferenceLine
         label="setup instructions"
@@ -233,7 +252,11 @@ function CleanupResultView({ cleanup }: { readonly cleanup?: CleanupResult }) {
     return null;
   }
   return (
-    <section className="readout" aria-live="polite" aria-labelledby="cleanup-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-live="polite"
+      aria-labelledby="cleanup-heading"
+    >
       <strong id="cleanup-heading">CLEANUP RESULT</strong>
       <p>adapter connections disabled: {cleanup.disabledAdapterConnections ?? 0}</p>
       <p>tools disabled: {cleanup.toolsDisabledLabel ?? '—'}</p>

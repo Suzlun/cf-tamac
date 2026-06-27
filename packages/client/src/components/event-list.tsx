@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 
 import { AgentToken } from './agent-token';
 import { ControlRoomFrame } from './control-room-frame';
@@ -8,6 +9,8 @@ import { DataTable } from './data-table';
 import { EmptyState } from './empty-state';
 import { ErrorAlert } from './error-alert';
 import { PaginationBar } from './pagination-bar';
+import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface PageInfo {
   readonly nextPageToken?: string;
@@ -73,13 +76,8 @@ export function EventList({
   eventTypeFilter,
 }: EventListProps) {
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="events"
-      agentId={agentId}
-      currentSection="events"
-    >
-      <p className="eyebrow">Events</p>
+    <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="events">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Events</p>
       <h2>AgentEvent log</h2>
       <AgentToken agentId={agentId} />
       <EventFilterBar
@@ -151,40 +149,56 @@ function EventFilterBar({
   readonly threadId: string;
   readonly eventTypeFilter: string;
 }) {
+  const [selectedType, setSelectedType] = useState(eventTypeFilter);
+
   return (
-    <section className="readout" aria-label="Event filters">
-      <div className="action-row" aria-live="polite">
+    <section className="space-y-4 rounded-lg border bg-card p-5 text-sm" aria-label="Event filters">
+      <div className="flex flex-wrap gap-2" aria-live="polite">
         {threads.map((thread) => (
-          <Link
+          <Button
             key={thread.threadId}
-            className={`nav-link${thread.threadId === threadId ? ' state-pending' : ''}`}
-            href={`/agents/${agentId}/events?thread=${thread.threadId}&type=${eventTypeFilter}`}
+            asChild
+            variant={thread.threadId === threadId ? 'secondary' : 'outline'}
+            size="sm"
             aria-pressed={thread.threadId === threadId}
           >
-            {thread.threadKey}
-          </Link>
+            <Link
+              href={`/agents/${agentId}/events?thread=${thread.threadId}&type=${eventTypeFilter}`}
+            >
+              {thread.threadKey}
+            </Link>
+          </Button>
         ))}
       </div>
-      <form className="action-row" method="get">
+      <form
+        className="grid gap-3 sm:grid-cols-[minmax(12rem,20rem)_auto] sm:items-end"
+        method="get"
+      >
         <input type="hidden" name="thread" value={threadId} />
-        <label className="eyebrow" htmlFor="event-type-filter">
-          Type
-        </label>
-        <select
-          id="event-type-filter"
-          name="type"
-          className="form-control"
-          defaultValue={eventTypeFilter}
-        >
-          <option value="all">all</option>
-          <option value="user.message.received">user.message.received</option>
-          <option value="schedule.triggered">schedule.triggered</option>
-          <option value="tool.invocation.succeeded">tool.invocation.succeeded</option>
-          <option value="tool.invocation.failed">tool.invocation.failed</option>
-        </select>
-        <button type="submit" className="nav-link">
+        <input type="hidden" name="type" value={selectedType} />
+        <div className="space-y-2">
+          <label
+            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            htmlFor="event-type-filter"
+          >
+            Type
+          </label>
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger id="event-type-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">all</SelectItem>
+              <SelectItem value="user.message.received">user.message.received</SelectItem>
+              <SelectItem value="schedule.triggered">schedule.triggered</SelectItem>
+              <SelectItem value="tool.invocation.succeeded">tool.invocation.succeeded</SelectItem>
+              <SelectItem value="tool.invocation.failed">tool.invocation.failed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" variant="outline">
           Apply filter
-        </button>
+        </Button>
       </form>
     </section>
   );

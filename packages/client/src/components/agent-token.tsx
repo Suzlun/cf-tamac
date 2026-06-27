@@ -1,5 +1,6 @@
+import { cn } from '@cf-tamac/client/lib/utils';
+
 import { Badge } from './ui/badge';
-import { cn } from './ui/cn';
 
 interface AgentTokenProps {
   readonly agentId: string;

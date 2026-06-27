@@ -1,5 +1,6 @@
 import { DataTable } from './data-table';
 import { EmptyState } from './empty-state';
+import { Button } from './ui/button';
 
 import type { ReactNode } from 'react';
 
@@ -175,19 +176,21 @@ function InstallationActions({
   const terminal = terminalStatuses.has(installation.status);
   const disabled = pending || terminal || !canUninstall;
   return (
-    <div className="action-row">
-      <button
+    <div className="flex flex-wrap gap-2">
+      <Button
         type="button"
-        className="nav-link"
+        variant="outline"
+        size="sm"
         onClick={() => {
           onView(installation);
         }}
       >
         View
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
-        className={`nav-link state-error${canUninstall ? '' : ' state-disabled'}`}
+        variant={canUninstall ? 'destructive' : 'secondary'}
+        size="sm"
         onClick={() => {
           onUninstall(installation.installationId);
         }}
@@ -196,7 +199,7 @@ function InstallationActions({
         aria-describedby={!canUninstall ? permissionDescriptionId : undefined}
       >
         Uninstall
-      </button>
+      </Button>
     </div>
   );
 }

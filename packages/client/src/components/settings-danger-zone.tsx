@@ -91,7 +91,10 @@ export interface DangerZoneSectionProps {
  */
 export function DangerZoneSection({ pending, onOpenDestroyDialog }: DangerZoneSectionProps) {
   return (
-    <section className="readout" aria-labelledby="danger-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="danger-heading"
+    >
       <strong id="danger-heading">Danger zone</strong>
       <Button
         type="button"

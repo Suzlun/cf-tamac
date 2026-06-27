@@ -165,12 +165,7 @@ export function AgentSettingsForm(props: AgentSettingsFormProps) {
   };
 
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${props.agentId}`}
-      signalLabel="settings"
-      agentId={props.agentId}
-      currentSection="settings"
-    >
+    <ControlRoomFrame title={`Agent registry › ${props.agentId}`} signalLabel="settings">
       <SettingsContent
         {...props}
         state={state}
@@ -389,10 +384,10 @@ function SettingsContent({
 }: SettingsContentProps) {
   return (
     <>
-      <p className="eyebrow">Settings</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Settings</p>
       <h2>Agent configuration and credentials</h2>
       <AgentToken agentId={agentId} />
-      <p className="lead">
+      <p className="text-sm text-muted-foreground">
         Managing {displayName}. Changes are sent through server-side Agent RPC.
       </p>
 
@@ -401,7 +396,10 @@ function SettingsContent({
       ) : null}
       {state.error !== undefined ? <ErrorAlert message={state.error} /> : null}
       {state.success !== undefined ? (
-        <div className="state-success readout" role="status">
+        <div
+          className="rounded-md border border-primary/50 bg-primary/10 px-3 py-2 text-sm"
+          role="status"
+        >
           <strong>Success</strong>
           <span>{state.success}</span>
         </div>

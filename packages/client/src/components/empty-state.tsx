@@ -29,9 +29,11 @@ export function EmptyState({
   return (
     <Card className="text-center" role="status">
       <CardContent className="pt-6">
-        <p className="font-mono text-xs uppercase tracking-wider text-cyan mb-2">{eyebrow}</p>
-        <h3 className="font-serif text-2xl mb-2">{heading}</h3>
-        <p className="text-muted-foreground text-sm max-w-prose mx-auto mb-4">{lead}</p>
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {eyebrow}
+        </p>
+        <h3 className="mb-2 text-2xl font-semibold">{heading}</h3>
+        <p className="mx-auto mb-4 max-w-prose text-sm text-muted-foreground">{lead}</p>
         {action !== undefined ? (
           <div className="flex justify-center">{action}</div>
         ) : actionHref !== undefined && actionLabel !== undefined ? (

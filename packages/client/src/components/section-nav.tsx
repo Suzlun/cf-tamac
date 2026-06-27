@@ -1,65 +1,34 @@
 import Link from 'next/link';
 
-interface SectionLink {
-  readonly slug: string;
-  readonly label: string;
-  readonly href: string;
-}
+import { cn } from '@cf-tamac/client/lib/utils';
 
-interface SectionNavProps {
-  readonly agentId?: string;
-  readonly current?: string;
+import { SidebarMenuButton } from './ui/sidebar';
+
+// 純粋データ（JSX なし）は management-nav-config.ts に集約し、.ts テストからも import 可能にする。
+export {
+  AGENT_SECTION_NAV_ITEMS,
+  GLOBAL_NAV_ITEMS,
+  SUPPORTED_MANAGEMENT_ROUTES,
+  buildAgentSectionHref,
+} from './management-nav-config';
+
+interface NavLinkProps {
+  readonly href: string;
+  readonly label: string;
+  readonly active: boolean;
+  readonly className?: string;
 }
 
 /**
- * Horizontal section navigation for the Agent management chrome.
- *
- * Renders registry-level links when no `agentId` is provided, otherwise
- * renders the per-Agent section tabs required by the management wireframe.
+ * sidebar 用の単一 navigation link。Shadcn token のみで active状態を表現する。
+ * color alone ではなく `aria-current="page"` で現在位置を示す。
  */
-export function SectionNav({ agentId, current }: SectionNavProps) {
-  const registryLinks: readonly SectionLink[] = [
-    { slug: 'registry', label: 'Registry', href: '/agents' },
-    { slug: 'new', label: 'New', href: '/agents/new' },
-  ];
-
-  const renderLink = (link: SectionLink) => {
-    const isActive = current === link.slug;
-    return (
-      <Link
-        key={link.slug}
-        className={`nav-link${isActive ? ' state-pending' : ''}`}
-        href={link.href}
-        aria-current={isActive ? 'page' : undefined}
-      >
-        {link.label}
-      </Link>
-    );
-  };
-
-  if (agentId === undefined) {
-    return (
-      <nav aria-label="Agent management sections" className="section-nav">
-        {registryLinks.map(renderLink)}
-      </nav>
-    );
-  }
-
-  const agentLinks: readonly SectionLink[] = [
-    { slug: 'overview', label: 'Overview', href: `/agents/${agentId}` },
-    { slug: 'threads', label: 'Threads', href: `/agents/${agentId}/threads` },
-    { slug: 'events', label: 'Events', href: `/agents/${agentId}/events` },
-    { slug: 'runs', label: 'Runs', href: `/agents/${agentId}/runs` },
-    { slug: 'compactions', label: 'Compactions', href: `/agents/${agentId}/compactions` },
-    { slug: 'schedules', label: 'Schedules', href: `/agents/${agentId}/schedules` },
-    { slug: 'tools', label: 'Tools', href: `/agents/${agentId}/tools` },
-    { slug: 'integrations', label: 'Integrations', href: `/agents/${agentId}/integrations` },
-    { slug: 'settings', label: 'Settings', href: `/agents/${agentId}/settings` },
-  ];
-
+export function SidebarNavLink({ href, label, active, className }: NavLinkProps) {
   return (
-    <nav aria-label="Agent management sections" className="section-nav">
-      {agentLinks.map(renderLink)}
-    </nav>
+    <SidebarMenuButton asChild isActive={active} className={cn('h-9', className)}>
+      <Link href={href} aria-current={active ? 'page' : undefined}>
+        <span>{label}</span>
+      </Link>
+    </SidebarMenuButton>
   );
 }

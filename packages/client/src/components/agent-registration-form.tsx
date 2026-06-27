@@ -147,7 +147,6 @@ export function AgentRegistrationForm({
     <ControlRoomFrame
       title={isEdit ? 'Agent registry › edit' : 'Agent registry › new'}
       signalLabel="registration"
-      currentSection="new"
     >
       <RegistrationFormContent
         form={form}
@@ -242,9 +241,11 @@ function RegistrationFormContent({
 }: RegistrationFormContentProps) {
   return (
     <>
-      <p className="eyebrow">Registration</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Registration
+      </p>
       <h2>Capture references, not secrets.</h2>
-      <p className="lead">
+      <p className="text-sm text-muted-foreground">
         Register a managed Agent by its ID and RPC origin. Credential references are stored as
         masked hints — never plaintext secrets.
       </p>
@@ -354,8 +355,10 @@ interface CredentialReferenceSectionProps {
 function CredentialReferenceSection({ form, pending }: CredentialReferenceSectionProps) {
   return (
     <details open>
-      <summary className="eyebrow">Credential reference</summary>
-      <p className="form-helper">
+      <summary className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Credential reference
+      </summary>
+      <p className="text-xs text-muted-foreground">
         The Client stores a reference, key ID, masked hint, and status. The secret itself is
         resolved server-side only.
       </p>
