@@ -79,6 +79,7 @@ export function ToolReviewContent({
   onReject,
   onApprove,
 }: ToolReviewContentProps) {
+  // Tool catalog は Browser-safe summary のみを受け取り、toolId に対応する表示名と approval policy だけを補完する。
   const tool = tools.find((item) => item.toolId === invocation.toolId);
   return (
     <>
@@ -104,6 +105,7 @@ export function ToolReviewContent({
         {invocation.installationId ?? invocation.providerOperation?.installationId ?? '—'}
       </p>
 
+      {/* input は payload 本文ではなく safe projection と blob reference metadata だけを表示し、秘密値を drawer に載せない。 */}
       <section
         className="rounded-md border bg-card p-4 text-sm space-y-1"
         aria-live="polite"
@@ -114,6 +116,7 @@ export function ToolReviewContent({
         <PayloadReferenceView label="input ref" reference={invocation.inputRef} />
       </section>
 
+      {/* risk / approval は操作者が approve/reject 前に判断するための metadata で、Agent mutation はここでは実行しない。 */}
       <section
         className="rounded-md border bg-card p-4 text-sm space-y-1"
         aria-label="Risk and approval metadata"
@@ -131,6 +134,7 @@ export function ToolReviewContent({
         <p>approval_audit_event: {invocation.approval?.auditEventId ?? '—'}</p>
       </section>
 
+      {/* acting user は server-derived の操作者文脈を確認する欄で、Browser 入力から principal を作らない。 */}
       <section
         className="rounded-md border bg-card p-4 text-sm space-y-1"
         aria-label="Acting user context"
@@ -139,6 +143,7 @@ export function ToolReviewContent({
         <p>{invocation.approval?.principalId ?? actingOperatorId}</p>
       </section>
 
+      {/* result links は Event/provider operation の識別子だけを示し、output payload 本文は metadata projection に閉じる。 */}
       <section
         className="rounded-md border bg-card p-4 text-sm space-y-1"
         aria-label="Result links"
@@ -176,6 +181,7 @@ function ToolReviewActions({
 }) {
   return (
     <div className="flex flex-wrap gap-2">
+      {/* Reject は親 component の Server Action wrapper へ委譲し、この表示 component 自体は Agent RPC を直接呼ばない。 */}
       <Button
         type="button"
         variant="destructive"
@@ -186,6 +192,7 @@ function ToolReviewActions({
       >
         Reject
       </Button>
+      {/* Approve も同じく親へ通知するだけにし、pending/terminal 中は二重送信と完了済み変更を防ぐ。 */}
       <Button
         type="button"
         variant="default"
@@ -208,6 +215,7 @@ function PayloadReferenceView({
   readonly reference?: PayloadReference;
 }) {
   if (reference === undefined) {
+    // payload reference が無い場合も「本文が無い」のではなく metadata-only projection であることを明示する。
     return <p>{label}: metadata only</p>;
   }
   return (

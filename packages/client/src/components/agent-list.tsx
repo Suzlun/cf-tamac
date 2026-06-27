@@ -89,9 +89,13 @@ export function AgentList({ agents, onPin, onOpen }: AgentListProps) {
   const sortedAgents = [...agents].sort((a, b) => compareAgents(a, b, sortKey));
 
   const handleOpen = (agentId: string) => {
-    // Agent 選択で server-side の last-opened 更新 action を呼び、選択中 Agent workspace へ遷移する。
+    // Agent 選択時の last-opened 更新は台帳の補助情報なので、失敗しても利用者の Agent 遷移を止めない。
     startTransition(async () => {
-      await onOpen(agentId);
+      try {
+        await onOpen(agentId);
+      } catch {
+        // bookkeeping 失敗は server 側で記録される可能性があるため、Browser では secret-free に握りつぶして遷移を優先する。
+      }
       router.push(`/agents/${agentId}`);
     });
   };

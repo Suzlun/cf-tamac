@@ -113,6 +113,16 @@ describe('Management Client shell scope separation', () => {
     expect(agentList).not.toContain('toLocaleString()');
   });
 
+  it('[MANAGEMENT-CLIENT-SHELL-S011] Agent selection が last-opened 更新失敗でも遷移する', () => {
+    const agentList = read(agentListPath);
+
+    // last-opened 更新は補助的な台帳書き込みなので、失敗しても Agent overview への遷移を必ず実行する。
+    expect(agentList).toContain('try {');
+    expect(agentList).toContain('await onOpen(agentId);');
+    expect(agentList).toContain('catch {');
+    expect(agentList).toContain('router.push(`/agents/${agentId}`);');
+  });
+
   it('[MANAGEMENT-CLIENT-SHELL-S012] Tool と Compaction context が選択中 Agent 画面内で確認できる', () => {
     const runsPage = read(runsPagePath);
     const threadsPage = read(threadsPagePath);

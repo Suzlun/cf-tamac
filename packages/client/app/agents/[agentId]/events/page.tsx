@@ -14,10 +14,20 @@ interface AgentEventsPageProps {
 }
 
 /**
- * Agent Event log page（AGENT-MANAGEMENT-UI-S005）。
+ * Agent Event log page（AGENT-MANAGEMENT-UI-S005）を描画します。
  *
- * Thread 選択と Event type filter を Server Action へ渡し、Agent-owned Event
- * payload は metadata のみを Browser へ渡す。
+ * @param params - App Router から渡される route params です。`agentId` を解決し、Agent-scoped RPC の対象を決めます。
+ * @param searchParams - Event 一覧の thread/type/pageToken filter です。未指定時は先頭 Thread と全 Event type を使います。
+ * @returns Agent-owned Event metadata の一覧、または Agent RPC が利用できない場合の secret-free fallback alert を返します。
+ * @throws この page は Agent RPC / credential 解決失敗を内部で捕捉し、Next error page へ再送出しません。
+ *
+ * @example
+ * ```tsx
+ * <AgentEventsPage
+ *   params={Promise.resolve({ agentId: 'agent-alpha' })}
+ *   searchParams={Promise.resolve({ type: 'all' })}
+ * />
+ * ```
  */
 export default async function AgentEventsPage({ params, searchParams }: AgentEventsPageProps) {
   const { agentId } = await params;
