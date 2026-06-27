@@ -6,6 +6,7 @@ import {
   searchThreadHistory,
 } from '@cf-tamac/client/server/actions/agent-queries';
 
+import { AgentDataUnavailableAlert } from '../../../../src/components/agent-data-unavailable-alert';
 import { CompactionView } from '../../../../src/components/compaction-view';
 import { ControlRoomFrame } from '../../../../src/components/control-room-frame';
 import { ThreadList } from '../../../../src/components/thread-list';
@@ -32,23 +33,38 @@ export default async function AgentThreadsPage({ params, searchParams }: AgentTh
   const { agentId } = await params;
   const { status, q, thread, pageToken } = await searchParams;
 
-  const threads = await listThreads(agentId, {
-    status: status === 'all' ? undefined : status,
-    threadKeyPrefix: q,
-    page: { pageToken },
-  });
+  // Agent RPC / credential resolution の失敗を Next error boundary へ漏らさず、shell を保ったまま安全表示へ落とす。
+  let dataUnavailable = false;
+  let threads: Awaited<ReturnType<typeof listThreads>> = { items: [], page: { resultCount: 0 } };
+  let latestCompaction: Awaited<ReturnType<typeof getLatestCompaction>> | undefined;
+  let memory: Awaited<ReturnType<typeof getThreadMemory>> | undefined;
+  let history: Awaited<ReturnType<typeof searchThreadHistory>> | undefined;
 
-  // 選択中 Thread の Compaction/Memory/History を文脈 detail として取得する（未選択時は取得しない）。
+  try {
+    // Thread 一覧は selected-Agent scope の入口であり、filter と cursor は server-side RPC にだけ渡す。
+    threads = await listThreads(agentId, {
+      status: status === 'all' ? undefined : status,
+      threadKeyPrefix: q,
+      page: { pageToken },
+    });
+
+    // 選択中 Thread の Compaction/Memory/History を文脈 detail として取得する（未選択時は取得しない）。
+    const threadIdForDetail = thread ?? '';
+    if (threadIdForDetail !== '') {
+      [latestCompaction, memory, history] = await Promise.all([
+        getLatestCompaction(agentId, threadIdForDetail),
+        getThreadMemory(agentId, threadIdForDetail),
+        // ThreadCompaction/History を文脈 detail として取得する（safe metadata のみ）。
+        searchThreadHistory(agentId, threadIdForDetail, q ?? '', { page: { pageToken } }),
+      ]);
+    }
+  } catch {
+    // 例外詳細は Browser に出さず、画面構造と navigation を維持する。
+    dataUnavailable = true;
+  }
+
+  // 選択中 Thread がない場合は detail RPC を呼ばず、一覧からの選択を促す。
   const threadId = thread ?? '';
-  const [latestCompaction, memory, history] =
-    threadId === ''
-      ? [undefined, undefined, undefined]
-      : await Promise.all([
-          getLatestCompaction(agentId, threadId),
-          getThreadMemory(agentId, threadId),
-          // ThreadCompaction/History を文脈 detail として取得する（safe metadata のみ）。
-          searchThreadHistory(agentId, threadId, q ?? '', { page: { pageToken } }),
-        ]);
 
   return (
     // 単一 page-level frame の配下に Thread list と Compaction/Memory を sub-section として統合する（wireframe IA）。
@@ -57,6 +73,7 @@ export default async function AgentThreadsPage({ params, searchParams }: AgentTh
       signalLabel={`Agent ${agentId} › Threads`}
       description="Agent-owned threads with sequence, status, and contextual Compaction/Memory detail."
     >
+      {dataUnavailable ? <AgentDataUnavailableAlert screenName="Threads" /> : null}
       <ThreadList
         agentId={agentId}
         threads={threads.items}

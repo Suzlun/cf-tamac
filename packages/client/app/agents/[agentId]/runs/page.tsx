@@ -8,6 +8,7 @@ import {
 import { cancelRun, getRun, listRuns } from '@cf-tamac/client/server/actions/agent-queries';
 import { getActingOperatorId } from '@cf-tamac/client/server/actions/managed-agents';
 
+import { AgentDataUnavailableAlert } from '../../../../src/components/agent-data-unavailable-alert';
 import { ControlRoomFrame } from '../../../../src/components/control-room-frame';
 import { RunList } from '../../../../src/components/run-list';
 import { ToolView } from '../../../../src/components/tool-view';
@@ -34,17 +35,32 @@ export default async function AgentRunsPage({ params, searchParams }: AgentRunsP
   const { agentId } = await params;
   const { thread, status, pageToken } = await searchParams;
 
-  // Run 一覧と Tool 文脈データを並行取得する。両者とも server-side Agent RPC 経由。
-  const [runs, tools, invocations, actingOperatorId] = await Promise.all([
-    listRuns(agentId, {
-      threadId: thread,
-      status: status === 'all' ? undefined : status,
-      page: { pageToken },
-    }),
-    listTools(agentId, { includeUnavailable: false }),
-    listInvocations(agentId, { status: 'pending_approval', page: {} }),
-    getActingOperatorId(),
-  ]);
+  // Acting user は Client server-side metadata であり、Agent RPC data の可否と独立して取得する。
+  const actingOperatorId = await getActingOperatorId();
+  // Agent RPC / credential resolution の失敗時も Runs route 自体は落とさず、safe fallback を描画する。
+  let dataUnavailable = false;
+  let runs: Awaited<ReturnType<typeof listRuns>> = { items: [], page: { resultCount: 0 } };
+  let tools: Awaited<ReturnType<typeof listTools>> = { items: [], page: { resultCount: 0 } };
+  let invocations: Awaited<ReturnType<typeof listInvocations>> = {
+    items: [],
+    page: { resultCount: 0 },
+  };
+
+  try {
+    // Run 一覧と Tool 文脈データを並行取得する。両者とも server-side Agent RPC 経由。
+    [runs, tools, invocations] = await Promise.all([
+      listRuns(agentId, {
+        threadId: thread,
+        status: status === 'all' ? undefined : status,
+        page: { pageToken },
+      }),
+      listTools(agentId, { includeUnavailable: false }),
+      listInvocations(agentId, { status: 'pending_approval', page: {} }),
+    ]);
+  } catch {
+    // 例外詳細は secret-safe ではない可能性があるため Browser payload に含めない。
+    dataUnavailable = true;
+  }
 
   return (
     // 単一 page-level frame の配下に Run list と Tool catalog/approval を sub-section として統合する（wireframe IA）。
@@ -53,6 +69,7 @@ export default async function AgentRunsPage({ params, searchParams }: AgentRunsP
       signalLabel={`Agent ${agentId} › Runs`}
       description="Run history with sequence, status, causal links, and contextual Tool approval."
     >
+      {dataUnavailable ? <AgentDataUnavailableAlert screenName="Runs" /> : null}
       {/* 文脈 detail: Tool catalog と pending ToolInvocation を Runs context で扱う（タスク 2.6 / 3.7）。 */}
       <RunList
         agentId={agentId}

@@ -10,9 +10,19 @@ const navConfigPath = new URL('../components/management-nav-config.ts', import.m
 const agentListPath = new URL('../components/agent-list.tsx', import.meta.url);
 const overviewPagePath = new URL('../../app/agents/[agentId]/page.tsx', import.meta.url);
 const agentsPagePath = new URL('../../app/agents/page.tsx', import.meta.url);
+const eventsPagePath = new URL('../../app/agents/[agentId]/events/page.tsx', import.meta.url);
+const integrationsPagePath = new URL(
+  '../../app/agents/[agentId]/integrations/page.tsx',
+  import.meta.url
+);
 const runsPagePath = new URL('../../app/agents/[agentId]/runs/page.tsx', import.meta.url);
+const schedulesPagePath = new URL('../../app/agents/[agentId]/schedules/page.tsx', import.meta.url);
 const threadsPagePath = new URL('../../app/agents/[agentId]/threads/page.tsx', import.meta.url);
 const globalSettingsPagePath = new URL('../../app/global-settings/page.tsx', import.meta.url);
+const dataUnavailableAlertPath = new URL(
+  '../components/agent-data-unavailable-alert.tsx',
+  import.meta.url
+);
 const detailDrawerPath = new URL('../components/detail-drawer.tsx', import.meta.url);
 const confirmDialogPath = new URL('../components/confirm-dialog.tsx', import.meta.url);
 const controlRoomFramePath = new URL('../components/control-room-frame.tsx', import.meta.url);
@@ -88,6 +98,28 @@ describe('Management Client shell scope separation', () => {
     // ThreadCompaction/Memory は Threads context の文脈 detail として描画される。
     expect(threadsPage).toContain('CompactionView');
     expect(threadsPage).toContain('getLatestCompaction');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S009] selected-Agent routes が Agent RPC 失敗を secret-free fallback に閉じる', () => {
+    const dataUnavailableAlert = read(dataUnavailableAlertPath);
+    const selectedAgentPages = [
+      read(eventsPagePath),
+      read(integrationsPagePath),
+      read(runsPagePath),
+      read(schedulesPagePath),
+      read(threadsPagePath),
+    ];
+
+    // fallback component は原因詳細や stack trace を props として受け取らず、固定の安全な文言だけを表示する。
+    expect(dataUnavailableAlert).toContain('Agent RPC data is temporarily unavailable');
+    expect(dataUnavailableAlert).not.toContain('error.message');
+    expect(dataUnavailableAlert).not.toContain('stack');
+
+    // Agent RPC を読む selected-Agent routes は Next error boundary に例外を漏らさず、shell 内の alert に変換する。
+    for (const page of selectedAgentPages) {
+      expect(page).toContain('AgentDataUnavailableAlert');
+      expect(page).toContain('catch');
+    }
   });
 
   it('[MANAGEMENT-CLIENT-SHELL-S013] Global Settings が Client-wide 設定だけを表示する', () => {
