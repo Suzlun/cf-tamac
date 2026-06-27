@@ -37,7 +37,12 @@ function formatTimestamp(ms: number | undefined): string {
   if (ms === undefined || ms === 0) {
     return '—';
   }
-  return new Date(ms).toLocaleString();
+  const timestamp = new Date(ms);
+  if (Number.isNaN(timestamp.getTime())) {
+    return '—';
+  }
+  // SSR と browser hydration で同一文字列にするため、locale/timezone 依存の整形を避けて UTC を明示する。
+  return `${timestamp.toISOString().slice(0, 19).replace('T', ' ')} UTC`;
 }
 
 /**

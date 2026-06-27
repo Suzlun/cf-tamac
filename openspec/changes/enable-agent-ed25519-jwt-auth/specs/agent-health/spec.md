@@ -15,7 +15,8 @@ Agent Service は REST health エンドポイントではなく `AgentHealthServ
 - Check RPC は他の Client Service RPC と同じ Ed25519 JWT bearer authentication、scope validation、`agent_id` 照合、replay protection、audit context を通過 MUST。
 - Check 応答は `serving` 状態、service 版、契約 package、確認対象 Agent identity、依存状態要約、trust config version、trust config fingerprint、trust config loadedAt、認証 principal の issuer/kid/fingerprint summary など、安全な運用メタデータ項目だけを公開 MUST。
 - Check 応答は Agent credential、秘密鍵、生 token、Provider secret、Thread payload、Memory body、domain スナップショット、public key full value、private JWK、encrypted private JWK を返して MUST NOT。
-- Check 応答は request の issuer/kid/fingerprint が Agent trust config 上で有効かを判定できる診断結果を含める SHALL。
+- Check 応答は認証済み request の issuer/kid/fingerprint が Agent trust config 上で active または retiring として検証済みであることを判定できる診断結果を含める SHALL。
+- Unknown issuer、unknown kid、revoked key、fingerprint mismatch、署名不正、audience 不一致、scope 不足、replayed `jti` は通常の Check 応答ではなく、Connect error detail、audit record、metric の安全な failure reason として表現される MUST。
 - Agent Service は REST `/health`、ad-hoc JSON health、Browser 直接 health API を Agent 公開 API として公開して MUST NOT。
 
 #### Scenario: Check が Protobuf RPC 経由で安全な serving 状態を返す (AGENT-HEALTH-S001)
@@ -36,6 +37,14 @@ Agent Service は REST health エンドポイントではなく `AgentHealthServ
 
 - **GIVEN** Client Service が managed Agent record の issuer/kid/fingerprint で署名した JWT を使っている
 - **WHEN** Client Service が `AgentHealthService.Check` を呼ぶ
-- **THEN** 応答は提示された issuer/kid/fingerprint が trust config 上で active または retiring として検証されたかを返す
-- **AND** revoked、unknown issuer、unknown kid、fingerprint mismatch は safe diagnostic code として表現される
+- **THEN** 応答は提示された issuer/kid/fingerprint が trust config 上で active または retiring として検証済みであることを返す
+- **AND** revoked、unknown issuer、unknown kid、fingerprint mismatch は通常の Check 応答ではなく Connect error detail、audit record、metric の安全な failure reason として表現される
 - **AND** key material と token body は応答に含まれない
+
+#### Scenario: 認証失敗は Check 応答ではなく安全な Connect error として診断される (AGENT-HEALTH-S005)
+
+- **GIVEN** Client Service request が unknown issuer、unknown kid、revoked key、fingerprint mismatch、署名不正、audience 不一致、scope 不足、または replayed `jti` を持っている
+- **WHEN** Client Service が `AgentHealthService.Check` を呼ぶ
+- **THEN** Agent Service は通常の `CheckHealthResponse` を返さず、stable Connect error code と安全な error detail を返す
+- **AND** audit record と metric は failure reason、issuer/kid/fingerprint などの安全な識別子だけを含む
+- **AND** key material、token body、private JWK、encrypted private JWK は error detail、audit record、metric に含まれない

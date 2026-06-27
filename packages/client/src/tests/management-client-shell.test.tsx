@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 const shellPath = new URL('../components/management-shell.tsx', import.meta.url);
 const shellNavPath = new URL('../components/management-shell-nav.tsx', import.meta.url);
 const agentScopeNavPath = new URL('../components/agent-scope-nav.tsx', import.meta.url);
+const sidebarPrimitivePath = new URL('../components/ui/sidebar.tsx', import.meta.url);
 const navConfigPath = new URL('../components/management-nav-config.ts', import.meta.url);
 const agentListPath = new URL('../components/agent-list.tsx', import.meta.url);
 const overviewPagePath = new URL('../../app/agents/[agentId]/page.tsx', import.meta.url);
@@ -78,6 +79,21 @@ describe('Management Client shell scope separation', () => {
     expect(read(shellNavPath)).toContain('GLOBAL_NAV_ITEMS');
   });
 
+  it('[MANAGEMENT-CLIENT-SHELL-S010] desktop sidebar が全高固定で main scroll から分離される', () => {
+    const sidebarPrimitive = read(sidebarPrimitivePath);
+
+    // collapsible="none" でも desktop sidebar は fixed + h-svh に閉じ、main content の縦スクロールに巻き込まれない。
+    expect(sidebarPrimitive).toContain("if (collapsible === 'none')");
+    expect(sidebarPrimitive).toContain(
+      'fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] md:flex'
+    );
+    expect(sidebarPrimitive).toContain('relative w-[--sidebar-width] bg-transparent');
+    // mobile は同じ primitive の Sheet 経路を使い、狭幅で通常 div の sidebar を常時表示しない。
+    expect(sidebarPrimitive.indexOf('if (isMobile)')).toBeLessThan(
+      sidebarPrimitive.indexOf("if (collapsible === 'none')")
+    );
+  });
+
   it('[MANAGEMENT-CLIENT-SHELL-S011] New Agent action が Agents screen から registration flow を開く', () => {
     const agentList = read(agentListPath);
     const agentsPage = read(agentsPagePath);
@@ -86,6 +102,15 @@ describe('Management Client shell scope separation', () => {
     expect(agentList).toContain('New Agent');
     expect(agentList).toContain('/agents/new');
     expect(agentsPage).toContain('AgentList');
+  });
+
+  it('[MANAGEMENT-CLIENT-SHELL-S011] Agent list timestamp が hydration-safe な UTC 表示を使う', () => {
+    const agentList = read(agentListPath);
+
+    // SSR と browser で locale/timezone が異なっても一致するように、registry timestamp は UTC 文字列へ固定する。
+    expect(agentList).toContain('toISOString()');
+    expect(agentList).toContain('UTC');
+    expect(agentList).not.toContain('toLocaleString()');
   });
 
   it('[MANAGEMENT-CLIENT-SHELL-S012] Tool と Compaction context が選択中 Agent 画面内で確認できる', () => {

@@ -4,9 +4,12 @@
 
 - `agent-security`: Agent 本番 Client Service 認証を Ed25519 JWT と `AGENT_CONTROL_PLANE_TRUST` に統一し、trust config validation、issuer/kid lookup、key status、allowed Agent/scope、method scope matrix、`jti` replay protection、安全な audit/metrics を実装する。
 - `client-registry`: Client D1 に暗号化済み署名鍵ストアを追加し、managed Agent record に signing issuer/kid/public fingerprint/last verified metadata を保持し、server-only module で private JWK 復号と EdDSA JWT signing を行う。
-- `agent-management-ui`: 既存 Management Client route shell の中で署名鍵管理、Agent ごとの鍵選択、公開情報だけの trust config export、鍵交代/失効/復旧 guidance、health verification を提供する。
+- `agent-management-ui`: Global Settings route shell の中で Agent の有無に依存しない署名鍵管理、公開情報だけの trust config export、鍵交代/失効/復旧 guidance を提供し、Agent 個別 settings では既存 global signing key の選択と health verification だけを提供する。
 - `agent-health`: `AgentHealthService.Check` を trust config と issuer/kid/fingerprint diagnostic に拡張し、key material を返さない安全な health response にする。
 - `workspace-governance`: documentation、governance tests、browser secrecy checks、scenario coverage を本番 credential 境界に合わせる。
+- Agent RPC auth path から HS256 signing、`resolveCredentialSecret`、`AGENT_CREDENTIAL_*` Worker Secret、Provider credential reference を排除し、Provider/外部 credential reference は Agent RPC auth と分離する。
+- Global Settings で signing key 生成と trust config export を Agent 0 件でも実行でき、Agent 作成後に global signing key selection、Agent Worker trust 設定、Health Check 成功を経て selected-Agent routes が safe fallback ではなく server-only Agent RPC 由来の実データを表示できるようにする。
+- `openspec/changes/enable-agent-ed25519-jwt-auth/wireframes/` に署名鍵管理、trust config export、Agent key selection + health、rotation/revoke/recovery、connected happy path の `.wireframe.json` 正本と `.wireframe.html` preview を保持する。
 - Agent API contract は TypeSpec -> proto -> generated RPC のコマンド生成で更新し、生成済み output は手編集しない。
 
 ### Out of Scope
@@ -15,16 +18,16 @@
 - bootstrap token、bootstrap RPC、AgentTrustRegistry Durable Object、HS256 shared secret を本番 Client Service 認証として扱う経路。
 - Cloudflare Worker secrets を runtime から自動編集する仕組み。
 - Recovery key を Client-managed signing key store に保存する仕組み。Recovery key は break-glass 用の別管理として documentation と trust config contract で扱う。
-- Wireframe HTML 生成。UI は既存 Management Client の視覚言語に合わせるが、この proposal では wireframe artifact を生成しない。
 
 ## Assumptions / Dependencies
 
 - `packages/agent` と `packages/client` の foundation、Connect unary binary Protobuf facade、AIAgent Durable Object、Client D1、generated Agent RPC client は存在する。
 - Agent API source of truth は `packages/agent/src/typespec/main.tsp` と `packages/agent/src/typespec/src/services/*.tsp` であり、proto/RPC outputs は `pnpm gen:agent:proto && pnpm gen:agent:rpc` で生成する。
 - Cloudflare Workers Web Crypto は Ed25519 key generation/import/sign/verify を利用できる。利用できない環境差が検出された場合は dependency 追加前に実行環境で検証し、本番経路を Web Crypto 互換に閉じる。
-- `CLIENT_CREDENTIAL_ENCRYPTION_KEY` は Client Worker secret として事前に設定され、D1 に保存する private JWK 暗号化の root secret として扱う。
+- `CLIENT_CREDENTIAL_ENCRYPTION_KEY` は Client Worker の required secret binding として直接設定され、D1 に保存する private JWK 暗号化の root secret として扱う。`CLIENT_CREDENTIAL_SECRET_REF` のような間接参照 var は残さない。
 - Agent Worker は `AGENT_CONTROL_PLANE_TRUST` を required secret として受け取り、`AGENT_RPC_AUDIENCE` または trust config audiences を audience 検証に使う。
 - D1 schema migration は Client-owned management ledger だけを対象にし、Agent domain snapshots は追加しない。
+- `client_agent_credential_refs` は Provider、model provider、Integration など外部 credential references の管理境界として扱い、Agent RPC Client Service signing source には使わない。実装で prefix を明示する場合は Agent RPC auth と誤認しない `PROVIDER_CREDENTIAL_` 系へ再定義する。
 - 既存 `x-agent-test-*` seam は tests 専用に残せるが、本番 request path では credential として扱わない。
 
 ## Impacted Areas
@@ -33,13 +36,35 @@
 - Agent RPC facade: binary profile enforcement 後の authentication/authorization/replay interceptors、method required scope mapping、health service response mapping。
 - Agent TypeSpec/proto: health diagnostic fields、security/auth metadata models、generated proto/RPC outputs。
 - Client D1: managed Agent signing metadata columns、signing key store table、migration、repository tests。
-- Client server-only modules: credential encryption/decryption、Ed25519 key generation/signing、fingerprint calculation、Agent RPC interceptor、health verification action。
-- Client UI: signing key management panel、Agent settings key selection、trust config export panel、rotation/revoke/recovery guidance、安全な error 表示。
+- Client server-only modules: credential encryption/decryption、Ed25519 key generation/signing、fingerprint calculation、Agent RPC interceptor、health verification action、Provider credential reference と Agent RPC signing key store の分離。
+- Client UI: Global Settings signing key management panel、Global Settings trust config export panel、Global Settings rotation/revoke/recovery guidance、Agent settings の既存 global key selection、Health verification、安全な error 表示。
+- Client selected-Agent routes: Agent 作成後、global key selection、Agent Worker trust config 設定、Health verification 成功後の Overview、Threads、Events、Runs、Schedules、Integrations、Settings の実データ表示と fallback/error state の区別。
 - Documentation/governance: Agent/Client README、operations runbook、lint/governance scripts、scenario coverage tests、browser bundle secrecy checks。
 
 ## Directory Tree
 
 ```text
+openspec/changes/enable-agent-ed25519-jwt-auth
+├─ design.md
+├─ proposal.md
+├─ tasks.md
+├─ specs
+│  ├─ agent-health/spec.md
+│  ├─ agent-management-ui/spec.md
+│  ├─ agent-security/spec.md
+│  ├─ client-registry/spec.md
+│  └─ workspace-governance/spec.md
+└─ wireframes
+   ├─ signing-key-management.wireframe.json
+   ├─ signing-key-management.wireframe.html
+   ├─ trust-config-export.wireframe.json
+   ├─ trust-config-export.wireframe.html
+   ├─ agent-signing-key-select-health.wireframe.json
+   ├─ agent-signing-key-select-health.wireframe.html
+   ├─ key-rotation-revoke-recovery.wireframe.json
+   ├─ key-rotation-revoke-recovery.wireframe.html
+   ├─ connected-happy-path.wireframe.json
+   └─ connected-happy-path.wireframe.html
 packages
 ├─ agent
 │  ├─ README.md
@@ -80,8 +105,20 @@ packages
 │  ├─ README.md
 │  ├─ wrangler.toml
 │  ├─ app
-│  │  ├─ agents/page.tsx
-│  │  └─ agents/[agentId]/settings/page.tsx
+│  │  ├─ global-settings
+│  │  │  ├─ page.tsx
+│  │  │  ├─ signing-keys/page.tsx
+│  │  │  └─ trust-config-export/page.tsx
+│  │  └─ agents
+│  │     ├─ page.tsx
+│  │     └─ [agentId]
+│  │        ├─ page.tsx
+│  │        ├─ threads/page.tsx
+│  │        ├─ events/page.tsx
+│  │        ├─ runs/page.tsx
+│  │        ├─ schedules/page.tsx
+│  │        ├─ integrations/page.tsx
+│  │        └─ settings/page.tsx
 │  └─ src
 │     ├─ server
 │     │  ├─ env.ts
@@ -92,6 +129,7 @@ packages
 │     │  │  └─ migrations/0002_control_plane_signing_keys.sql
 │     │  ├─ credentials
 │     │  │  ├─ encryption.ts
+│     │  │  ├─ secret-resolution.ts
 │     │  │  └─ signing-keys.ts
 │     │  ├─ agent-rpc
 │     │  │  ├─ authentication.ts
@@ -102,6 +140,7 @@ packages
 │     │     ├─ trust-config.ts
 │     │     └─ agent-health.ts
 │     ├─ components
+│     │  ├─ management-nav-config.ts
 │     │  ├─ signing-key-management.tsx
 │     │  ├─ trust-config-export.tsx
 │     │  ├─ agent-signing-key-select.tsx
@@ -111,6 +150,7 @@ packages
 │        ├─ client-signing-key-store.test.ts
 │        ├─ client-agent-rpc-factory.test.ts
 │        ├─ browser-agent-rpc-secrecy.test.ts
+│        ├─ management-navigation.test.tsx
 │        └─ agent-management-ui.test.tsx
 ├─ docs
 │  └─ operations/agent-control-plane-auth.md
@@ -131,69 +171,87 @@ packages
 
 ## New / Changed Files
 
-| Type      | File                                                                           | Change                                                                                                                 |
-| --------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Update    | `packages/agent/README.md`                                                     | Agent trust config、required secrets、rotation/revoke smoke 手順を説明する。                                           |
-| Update    | `packages/agent/wrangler.toml`                                                 | `AGENT_CONTROL_PLANE_TRUST` と `AGENT_RPC_AUDIENCE` の運用前提を反映する。                                             |
-| Update    | `packages/agent/src/env.ts`                                                    | required secret を `AGENT_CONTROL_PLANE_TRUST` に更新し、`AGENT_CLIENT_JWT_PUBLIC_KEYS` production source を削除する。 |
-| Update    | `packages/agent/src/typespec/src/common/security.tsp`                          | Health diagnostic と auth summary に必要な security metadata model を追加する。                                        |
-| Update    | `packages/agent/src/typespec/src/services/agent-health.tsp`                    | trust config/version/fingerprint/issuer/kid diagnostic fields を追加する。                                             |
-| Generated | `packages/agent/proto/cftamac/agent/v1.proto`                                  | TypeSpec から生成される Agent proto。手編集しない。                                                                    |
-| Generated | `packages/agent/src/generated/rpc/cftamac/agent/v1_pb.ts`                      | Protobuf-ES generated Agent RPC descriptor。手編集しない。                                                             |
-| Add       | `packages/agent/src/domain/security/trust-config.ts`                           | `AGENT_CONTROL_PLANE_TRUST` schema validation、fingerprint、issuer/kid lookup、key status policy を実装する。          |
-| Update    | `packages/agent/src/domain/security/jwt.ts`                                    | EdDSA-only Client Service JWT verification、max TTL、allowed Agent/scope、trust policy failure reasons を実装する。    |
-| Update    | `packages/agent/src/domain/security/replay.ts`                                 | Client Service `jti` replay window を principal + Agent scope に接続する。                                             |
-| Update    | `packages/agent/src/domain/security/types.ts`                                  | Authenticated principal に issuer、kid、fingerprint、principalType、scope policy fields を追加する。                   |
-| Update    | `packages/agent/src/rpc/command-context.ts`                                    | AIAgent へ渡す auth/audit context を Ed25519 JWT principal に合わせる。                                                |
-| Update    | `packages/agent/src/rpc/interceptors/authentication.ts`                        | test seam と production Authorization bearer path を分離し、production では `x-agent-test-*` を認証に使わない。        |
-| Update    | `packages/agent/src/rpc/interceptors/authorization.ts`                         | method required scope matrix と allowedAgentIds validation を実装する。                                                |
-| Update    | `packages/agent/src/rpc/interceptors/audit.ts`                                 | issuer/subject/kid/principalType/actingUserId/scopes/jwtId を safe audit context に接続する。                          |
-| Update    | `packages/agent/src/rpc/interceptors/replay-protection.ts`                     | `jti` replay rejection を domain handling 前に実行する。                                                               |
-| Update    | `packages/agent/src/rpc/interceptors/types.ts`                                 | auth failure reason、safe diagnostic fields、principal metadata 型を追加する。                                         |
-| Update    | `packages/agent/src/rpc/services/health.ts`                                    | trust config diagnostic と current issuer/kid/fingerprint verification summary を返す。                                |
-| Update    | `packages/agent/src/observability/records.ts`                                  | Authentication success/reject/replay/scope denied records を safe field に限定する。                                   |
-| Update    | `packages/agent/src/observability/redaction.ts`                                | JWT、private JWK、public key full value、encrypted private JWK の redaction を強化する。                               |
-| Add       | `packages/agent/src/tests/control-plane-trust-config.test.ts`                  | Trust config schema/status/fingerprint/fail-closed tests を追加する。                                                  |
-| Add       | `packages/agent/src/tests/client-service-ed25519-auth.test.ts`                 | Ed25519 JWT happy/error/replay/scope tests を追加する。                                                                |
-| Update    | `packages/agent/src/tests/health-rpc.test.ts`                                  | trust diagnostic と key material 非露出を確認する。                                                                    |
-| Update    | `packages/agent/src/tests/rpc-interceptors.test.ts`                            | production Authorization path、binary profile、scope matrix、test seam 分離を確認する。                                |
-| Update    | `packages/agent/src/tests/security-foundation.test.ts`                         | Scenario ID coverage と observability redaction cases を追加する。                                                     |
-| Update    | `packages/client/README.md`                                                    | Signing key management、trust export、Agent health verification、secret setup を説明する。                             |
-| Update    | `packages/client/wrangler.toml`                                                | `CLIENT_CREDENTIAL_ENCRYPTION_KEY` secret 前提を明記する。                                                             |
-| Update    | `packages/client/app/agents/page.tsx`                                          | Registry page に signing key management/trust export entry を追加する。                                                |
-| Update    | `packages/client/app/agents/[agentId]/settings/page.tsx`                       | Agent ごとの signing key selection、health verification、rotation guidance を表示する。                                |
-| Update    | `packages/client/src/server/env.ts`                                            | `CLIENT_CREDENTIAL_ENCRYPTION_KEY` を required server-only secret として検証する。                                     |
-| Update    | `packages/client/src/server/db/schema.ts`                                      | managed Agent signing metadata と signing key store table metadata を追加する。                                        |
-| Update    | `packages/client/src/server/db/managed-agents.ts`                              | signing issuer/kid/fingerprint/last verified CRUD を追加する。                                                         |
-| Add       | `packages/client/src/server/db/signing-keys.ts`                                | Client signing key repository と status transitions を実装する。                                                       |
-| Add       | `packages/client/src/server/db/migrations/0002_control_plane_signing_keys.sql` | D1 schema に signing key store と managed Agent signing metadata を追加する。                                          |
-| Add       | `packages/client/src/server/credentials/encryption.ts`                         | `CLIENT_CREDENTIAL_ENCRYPTION_KEY` による private JWK 暗号化/復号を実装する。                                          |
-| Add       | `packages/client/src/server/credentials/signing-keys.ts`                       | Ed25519 key generation、JWK fingerprint、private JWK 解決を実装する。                                                  |
-| Update    | `packages/client/src/server/agent-rpc/authentication.ts`                       | HS256 signing を除去し、EdDSA JWT signing と bearer interceptor を実装する。                                           |
-| Update    | `packages/client/src/server/agent-rpc/agent-loader.ts`                         | managed Agent signing metadata と key fingerprint validation を読み込む。                                              |
-| Update    | `packages/client/src/server/agent-rpc/create-client.ts`                        | Agent RPC client factory が selected signing key を使うようにする。                                                    |
-| Add       | `packages/client/src/server/actions/signing-keys.ts`                           | Key generation/status/default selection actions を追加する。                                                           |
-| Add       | `packages/client/src/server/actions/trust-config.ts`                           | Public-only trust config export、merge/update JSON、schema validation actions を追加する。                             |
-| Add       | `packages/client/src/server/actions/agent-health.ts`                           | Selected signing key で Agent health verification を実行する。                                                         |
-| Add       | `packages/client/src/components/signing-key-management.tsx`                    | Signing key lifecycle UI を追加する。                                                                                  |
-| Add       | `packages/client/src/components/trust-config-export.tsx`                       | Trust config export/validation/warnings UI を追加する。                                                                |
-| Add       | `packages/client/src/components/agent-signing-key-select.tsx`                  | Agent ごとの issuer/kid/fingerprint selection UI を追加する。                                                          |
-| Add       | `packages/client/src/components/key-rotation-guide.tsx`                        | Rotation/revoke/recovery guidance UI を追加する。                                                                      |
-| Add       | `packages/client/src/components/schemas/signing-key.ts`                        | Signing key UI form validation schema を追加する。                                                                     |
-| Add       | `packages/client/src/tests/client-signing-key-store.test.ts`                   | D1 store/encryption/status/fingerprint tests を追加する。                                                              |
-| Update    | `packages/client/src/tests/client-agent-rpc-factory.test.ts`                   | EdDSA bearer token generation と key selection tests を追加する。                                                      |
-| Update    | `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`                  | Browser-visible signing material 不在を検査する。                                                                      |
-| Update    | `packages/client/src/tests/agent-management-ui.test.tsx`                       | Signing key/trust export/health verification component tests を追加する。                                              |
-| Add       | `docs/operations/agent-control-plane-auth.md`                                  | Trust config、key generation、rotation、revoke、break-glass recovery runbook を追加する。                              |
-| Update    | `scripts/governance/verify-agent-surface.mjs`                                  | Forbidden auth surfaces と Agent REST/JSON/bootstrap production trust path を検出する。                                |
-| Update    | `scripts/governance/verify-agent-surface.test.mjs`                             | Production auth guardrail fixtures を追加する。                                                                        |
-| Update    | `scripts/governance/verify-package-boundaries.mjs`                             | Browser-visible signing material/import boundary checks を追加する。                                                   |
-| Update    | `scripts/governance/verify-package-boundaries.test.mjs`                        | Client signing material boundary fixtures を追加する。                                                                 |
-| Update    | `scripts/openspec/verify-scenario-coverage.mjs`                                | Manual tag と auth Scenario ID coverage の検出を確認する。                                                             |
-| Update    | `scripts/openspec/verify-scenario-coverage.test.mjs`                           | Production auth scenario coverage cases を追加する。                                                                   |
-| Update    | `tests/e2e/management-agent-rpc-secrecy.spec.ts`                               | Signing key UI と browser bundle secrecy E2E を追加する。                                                              |
-| Update    | `tests/e2e/management-agent-registry.spec.ts`                                  | Agent signing key selection、trust export、health verification E2E を追加する。                                        |
-| Generated | `packages/client/src/generated/agent-rpc/cftamac/agent/v1_pb.ts`               | Agent health contract 変更に伴う generated client output。手編集しない。                                               |
+| Type      | File                                                                                                                 | Change                                                                                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Update    | `packages/agent/README.md`                                                                                           | Agent trust config、required secrets、rotation/revoke smoke 手順を説明する。                                                                                            |
+| Update    | `packages/agent/wrangler.toml`                                                                                       | `AGENT_CONTROL_PLANE_TRUST` と `AGENT_RPC_AUDIENCE` の運用前提を反映する。                                                                                              |
+| Update    | `packages/agent/src/env.ts`                                                                                          | required secret を `AGENT_CONTROL_PLANE_TRUST` に更新し、`AGENT_CLIENT_JWT_PUBLIC_KEYS` production source を削除する。                                                  |
+| Update    | `packages/agent/src/typespec/src/common/security.tsp`                                                                | Health diagnostic と auth summary に必要な security metadata model を追加する。                                                                                         |
+| Update    | `packages/agent/src/typespec/src/services/agent-health.tsp`                                                          | trust config/version/fingerprint/issuer/kid diagnostic fields を追加する。                                                                                              |
+| Generated | `packages/agent/proto/cftamac/agent/v1.proto`                                                                        | TypeSpec から生成される Agent proto。手編集しない。                                                                                                                     |
+| Generated | `packages/agent/src/generated/rpc/cftamac/agent/v1_pb.ts`                                                            | Protobuf-ES generated Agent RPC descriptor。手編集しない。                                                                                                              |
+| Add       | `packages/agent/src/domain/security/trust-config.ts`                                                                 | `AGENT_CONTROL_PLANE_TRUST` schema validation、fingerprint、issuer/kid lookup、key status policy を実装する。                                                           |
+| Update    | `packages/agent/src/domain/security/jwt.ts`                                                                          | EdDSA-only Client Service JWT verification、max TTL、allowed Agent/scope、trust policy failure reasons を実装する。                                                     |
+| Update    | `packages/agent/src/domain/security/replay.ts`                                                                       | Client Service `jti` replay window を principal + Agent scope に接続する。                                                                                              |
+| Update    | `packages/agent/src/domain/security/types.ts`                                                                        | Authenticated principal に issuer、kid、fingerprint、principalType、scope policy fields を追加する。                                                                    |
+| Update    | `packages/agent/src/rpc/command-context.ts`                                                                          | AIAgent へ渡す auth/audit context を Ed25519 JWT principal に合わせる。                                                                                                 |
+| Update    | `packages/agent/src/rpc/interceptors/authentication.ts`                                                              | test seam と production Authorization bearer path を分離し、production では `x-agent-test-*` を認証に使わない。                                                         |
+| Update    | `packages/agent/src/rpc/interceptors/authorization.ts`                                                               | method required scope matrix と allowedAgentIds validation を実装する。                                                                                                 |
+| Update    | `packages/agent/src/rpc/interceptors/audit.ts`                                                                       | issuer/subject/kid/principalType/actingUserId/scopes/jwtId を safe audit context に接続する。                                                                           |
+| Update    | `packages/agent/src/rpc/interceptors/replay-protection.ts`                                                           | `jti` replay rejection を domain handling 前に実行する。                                                                                                                |
+| Update    | `packages/agent/src/rpc/interceptors/types.ts`                                                                       | auth failure reason、safe diagnostic fields、principal metadata 型を追加する。                                                                                          |
+| Update    | `packages/agent/src/rpc/services/health.ts`                                                                          | trust config diagnostic と current issuer/kid/fingerprint verification summary を返す。                                                                                 |
+| Update    | `packages/agent/src/observability/records.ts`                                                                        | Authentication success/reject/replay/scope denied records を safe field に限定する。                                                                                    |
+| Update    | `packages/agent/src/observability/redaction.ts`                                                                      | JWT、private JWK、public key full value、encrypted private JWK の redaction を強化する。                                                                                |
+| Add       | `packages/agent/src/tests/control-plane-trust-config.test.ts`                                                        | Trust config schema/status/fingerprint/fail-closed tests を追加する。                                                                                                   |
+| Add       | `packages/agent/src/tests/client-service-ed25519-auth.test.ts`                                                       | Ed25519 JWT happy/error/replay/scope tests を追加する。                                                                                                                 |
+| Update    | `packages/agent/src/tests/health-rpc.test.ts`                                                                        | trust diagnostic と key material 非露出を確認する。                                                                                                                     |
+| Update    | `packages/agent/src/tests/rpc-interceptors.test.ts`                                                                  | production Authorization path、binary profile、scope matrix、test seam 分離を確認する。                                                                                 |
+| Update    | `packages/agent/src/tests/security-foundation.test.ts`                                                               | Scenario ID coverage と observability redaction cases を追加する。                                                                                                      |
+| Update    | `packages/client/README.md`                                                                                          | Signing key management、trust export、Agent health verification、secret setup を説明する。                                                                              |
+| Update    | `packages/client/wrangler.toml`                                                                                      | `CLIENT_CREDENTIAL_ENCRYPTION_KEY` secret 前提を明記する。                                                                                                              |
+| Update    | `packages/client/app/global-settings/page.tsx`                                                                       | Global Settings index から signing key management と trust config export へ到達できるようにする。                                                                       |
+| Add       | `packages/client/app/global-settings/signing-keys/page.tsx`                                                          | Agent 0 件でも利用できる Client-wide signing key lifecycle 画面を Global Settings 配下に追加する。                                                                      |
+| Add       | `packages/client/app/global-settings/trust-config-export/page.tsx`                                                   | Agent 0 件でも利用できる public-only trust config export 画面を Global Settings 配下に追加する。                                                                        |
+| Update    | `packages/client/src/components/management-nav-config.ts`                                                            | Global Settings 配下の supported route graph を追加し、top-level nav は Agents / Global Settings の責務分離を維持する。                                                 |
+| Update    | `packages/client/src/tests/management-navigation.test.tsx`                                                           | Global Settings signing/trust routes が正の管理 route として到達できることを検証する。                                                                                  |
+| Update    | `packages/client/app/agents/page.tsx`                                                                                | Agent registry は一覧責務に留め、必要に応じて Global Settings への補助導線だけを表示する。                                                                              |
+| Update    | `packages/client/app/agents/[agentId]/page.tsx`                                                                      | Trust 設定成功後に selected-Agent Overview が Agent RPC 由来の実データと verified trust 状態を表示する。                                                                |
+| Update    | `packages/client/app/agents/[agentId]/{threads,events,runs,schedules,integrations}/page.tsx`                         | Trust 設定成功後に各 selected-Agent page が safe fallback ではなく Agent RPC 由来の実データを表示する。                                                                 |
+| Update    | `packages/client/app/agents/[agentId]/settings/page.tsx`                                                             | Agent ごとの既存 global signing key selection、health verification、last verified at を表示する。                                                                       |
+| Update    | `packages/client/src/server/env.ts`                                                                                  | `CLIENT_CREDENTIAL_ENCRYPTION_KEY` を required server-only secret として検証する。                                                                                      |
+| Update    | `packages/client/src/server/db/schema.ts`                                                                            | managed Agent signing metadata と signing key store table metadata を追加する。                                                                                         |
+| Update    | `packages/client/src/server/db/managed-agents.ts`                                                                    | signing issuer/kid/fingerprint/last verified CRUD を追加する。                                                                                                          |
+| Add       | `packages/client/src/server/db/signing-keys.ts`                                                                      | Client signing key repository と status transitions を実装する。                                                                                                        |
+| Add       | `packages/client/src/server/db/migrations/0002_control_plane_signing_keys.sql`                                       | D1 schema に signing key store と managed Agent signing metadata を追加する。                                                                                           |
+| Add       | `packages/client/src/server/credentials/encryption.ts`                                                               | `CLIENT_CREDENTIAL_ENCRYPTION_KEY` による private JWK 暗号化/復号を実装する。                                                                                           |
+| Update    | `packages/client/src/server/credentials/secret-resolution.ts`                                                        | Agent RPC 認証経路から `AGENT_CREDENTIAL_*` 解決を除去し、Provider/外部 credential 参照解決専用に縮小する。                                                             |
+| Add       | `packages/client/src/server/credentials/signing-keys.ts`                                                             | Ed25519 key generation、JWK fingerprint、private JWK 解決を実装する。                                                                                                   |
+| Update    | `packages/client/src/server/agent-rpc/authentication.ts`                                                             | HS256 signing を除去し、EdDSA JWT signing と bearer interceptor を実装する。                                                                                            |
+| Update    | `packages/client/src/server/agent-rpc/agent-loader.ts`                                                               | managed Agent signing metadata と key fingerprint validation を読み込む。                                                                                               |
+| Update    | `packages/client/src/server/agent-rpc/create-client.ts`                                                              | Agent RPC client factory が selected signing key を使うようにする。                                                                                                     |
+| Add       | `packages/client/src/server/actions/signing-keys.ts`                                                                 | Key generation/status/default selection actions を追加する。                                                                                                            |
+| Add       | `packages/client/src/server/actions/trust-config.ts`                                                                 | Public-only trust config export、merge/update JSON、schema validation actions を追加する。                                                                              |
+| Add       | `packages/client/src/server/actions/agent-health.ts`                                                                 | Selected signing key で Agent health verification を実行する。                                                                                                          |
+| Add       | `packages/client/src/components/signing-key-management.tsx`                                                          | Signing key lifecycle UI を追加する。                                                                                                                                   |
+| Add       | `packages/client/src/components/trust-config-export.tsx`                                                             | Trust config export/validation/warnings UI を追加する。                                                                                                                 |
+| Add       | `packages/client/src/components/agent-signing-key-select.tsx`                                                        | Agent ごとの issuer/kid/fingerprint selection UI を追加する。                                                                                                           |
+| Add       | `packages/client/src/components/key-rotation-guide.tsx`                                                              | Global Settings 側の rotation/revoke/recovery guidance UI を追加し、Agent assignment と health sequencing を説明する。                                                  |
+| Add       | `packages/client/src/components/schemas/signing-key.ts`                                                              | Signing key UI form validation schema を追加する。                                                                                                                      |
+| Add       | `packages/client/src/tests/client-signing-key-store.test.ts`                                                         | D1 store/encryption/status/fingerprint tests を追加する。                                                                                                               |
+| Update    | `packages/client/src/tests/client-d1-schema.test.ts`                                                                 | Client D1 の許可データ集合に encrypted Client Service signing key store を含め、Agent domain snapshots と plaintext secret を拒否する。                                 |
+| Update    | `packages/client/src/tests/test-d1-helper.ts`                                                                        | Signing key store を含む Client D1 test helper を整備する。                                                                                                             |
+| Update    | `packages/client/src/tests/client-agent-rpc-factory.test.ts`                                                         | EdDSA bearer token generation と key selection tests を追加する。                                                                                                       |
+| Update    | `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`                                                        | Browser-visible signing material 不在を検査する。                                                                                                                       |
+| Update    | `packages/client/src/tests/agent-management-ui.test.tsx`                                                             | Signing key/trust export/health verification component tests を追加する。                                                                                               |
+| Add       | `docs/operations/agent-control-plane-auth.md`                                                                        | Trust config、key generation、rotation、revoke、break-glass recovery runbook を追加する。                                                                               |
+| Update    | `AGENTS.md`                                                                                                          | Client D1 が encrypted Client Service signing key store を持てる境界と generated 手編集禁止を反映する。                                                                 |
+| Update    | `CODING_STANDARDS.md`                                                                                                | Client D1 許可データ集合と encrypted signing key store、plaintext secret 禁止、browser secrecy guardrail を更新する。                                                   |
+| Update    | `CONTRIBUTING.md`                                                                                                    | Client D1 schema 変更時の signing key store と secret 非露出の運用ルールを更新する。                                                                                    |
+| Update    | `scripts/governance/verify-agent-surface.mjs`                                                                        | Forbidden auth surfaces と Agent REST/JSON/bootstrap production trust path を検出する。                                                                                 |
+| Update    | `scripts/governance/verify-agent-surface.test.mjs`                                                                   | Production auth guardrail fixtures を追加する。                                                                                                                         |
+| Update    | `scripts/governance/verify-package-boundaries.mjs`                                                                   | Browser-visible signing material/import boundary checks を追加する。                                                                                                    |
+| Update    | `scripts/governance/verify-package-boundaries.test.mjs`                                                              | Client signing material boundary fixtures を追加する。                                                                                                                  |
+| Update    | `scripts/openspec/verify-scenario-coverage.mjs`                                                                      | Manual tag と auth Scenario ID coverage の検出を確認する。                                                                                                              |
+| Update    | `scripts/openspec/verify-scenario-coverage.test.mjs`                                                                 | Production auth scenario coverage cases を追加する。                                                                                                                    |
+| Update    | `tests/e2e/management-agent-rpc-secrecy.spec.ts`                                                                     | Signing key UI と browser bundle secrecy E2E を追加する。                                                                                                               |
+| Update    | `tests/e2e/management-agent-registry.spec.ts`                                                                        | Global Settings signing key/trust export、Agent signing key selection、health verification E2E を追加する。                                                             |
+| Generated | `packages/client/src/generated/agent-rpc/cftamac/agent/v1_pb.ts`                                                     | Agent health contract 変更に伴う generated client output。手編集しない。                                                                                                |
+| Add       | `openspec/changes/enable-agent-ed25519-jwt-auth/wireframes/signing-key-management.wireframe.json` / `.html`          | Global Settings 配下で Agent 0 件でも使える signing key list/generate/default/disable/delete/public fingerprint 表示の JSON 正本と preview。                            |
+| Add       | `openspec/changes/enable-agent-ed25519-jwt-auth/wireframes/trust-config-export.wireframe.json` / `.html`             | Global Settings 配下で Agent 0 件でも使える public-only trust config export、allowedAgentIds/scopes、warning、schema validation、copyable JSON の JSON 正本と preview。 |
+| Add       | `openspec/changes/enable-agent-ed25519-jwt-auth/wireframes/agent-signing-key-select-health.wireframe.json` / `.html` | Agent settings/detail で既存 global key selection、issuer/kid/fingerprint/last verified/health result を確認する JSON 正本と preview。                                  |
+| Add       | `openspec/changes/enable-agent-ed25519-jwt-auth/wireframes/key-rotation-revoke-recovery.wireframe.json` / `.html`    | Global key lifecycle、rotation/revoke/recovery guidance、Agent assignment/health sequencing の JSON 正本と preview。                                                    |
+| Add       | `openspec/changes/enable-agent-ed25519-jwt-auth/wireframes/connected-happy-path.wireframe.json` / `.html`            | Global Settings signing key/trust export 前提後に selected-Agent pages が実データ表示へ進む状態の JSON 正本と preview。                                                 |
 
 ## System Diagram
 
@@ -258,7 +316,37 @@ sequenceDiagram
 
 ## UI Wireframes
 
-N/A。wireframe は未生成。
+署名鍵ライフサイクル、信頼設定 export、Agent ごとの署名鍵選択と health 検証、鍵交代/緊急失効/復旧 guidance、信頼設定完了後の selected-Agent 実データ表示の wireframe を `wireframes/` に保持する。Signing Keys と Trust Config Export と Rotation guidance は `Global Settings` 配下の Client-wide 機能として扱い、Agent が 0 件でも利用可能にする。Agent 個別画面は既存 global signing key の選択と Agent Worker trust config に対する Health Check に絞る。各画面は `.wireframe.json` を正本とし、`.wireframe.html` は同じ JSON を埋め込んだ preview として扱う。既存 Management Client shell の global nav、selected-Agent nav、card/list/detail 構成、no-proxy 境界、credential-secrecy 境界を継承する。
+
+### Signing Key Management
+
+JSON source: [`wireframes/signing-key-management.wireframe.json`](wireframes/signing-key-management.wireframe.json)
+
+<iframe src="wireframes/signing-key-management.wireframe.html" title="Signing Key Management" width="1200" height="760"></iframe>
+
+### Trust Config Export
+
+JSON source: [`wireframes/trust-config-export.wireframe.json`](wireframes/trust-config-export.wireframe.json)
+
+<iframe src="wireframes/trust-config-export.wireframe.html" title="Trust Config Export" width="1200" height="760"></iframe>
+
+### Agent Signing Key Selection And Health Verification
+
+JSON source: [`wireframes/agent-signing-key-select-health.wireframe.json`](wireframes/agent-signing-key-select-health.wireframe.json)
+
+<iframe src="wireframes/agent-signing-key-select-health.wireframe.html" title="Agent Signing Key Selection And Health Verification" width="1200" height="760"></iframe>
+
+### Key Rotation Revoke Recovery
+
+JSON source: [`wireframes/key-rotation-revoke-recovery.wireframe.json`](wireframes/key-rotation-revoke-recovery.wireframe.json)
+
+<iframe src="wireframes/key-rotation-revoke-recovery.wireframe.html" title="Key Rotation Revoke Recovery" width="1200" height="760"></iframe>
+
+### Connected Happy Path
+
+JSON source: [`wireframes/connected-happy-path.wireframe.json`](wireframes/connected-happy-path.wireframe.json)
+
+<iframe src="wireframes/connected-happy-path.wireframe.html" title="Connected Happy Path" width="1200" height="760"></iframe>
 
 ## Domain Model Diagram
 
@@ -364,7 +452,6 @@ erDiagram
     string agent_id FK
     string credential_ref PK
     string key_id
-    string public_fingerprint
     string masked_hint
     string status
     integer created_at_ms
@@ -423,33 +510,33 @@ erDiagram
 - Purpose / Responsibility: Client-owned D1 に暗号化済み signing key store と Agent signing metadata を保存し、private JWK を server-only で扱う。
 - Public API: signing key repository、managed Agent repository extensions、encryption/fingerprint/key generation helpers。
 - Key Data Structures: `ClientSigningKeyRecord`、`ManagedAgentRecord`、encrypted private JWK envelope、public JWK fingerprint。
-- Key Flows: key generation -> private JWK encrypt -> D1 save -> public trust export -> Agent selection -> private JWK decrypt -> JWT signing。
+- Key Flows: key generation -> private JWK encrypt -> D1 save -> Client status と trust status mapping -> public trust export -> Agent selection -> private JWK decrypt -> JWT signing。Provider/外部 credential reference は別用途の secret 参照として扱い、Agent RPC signing source には接続しない。
 - Dependencies: Drizzle D1、Cloudflare D1、Web Crypto、`CLIENT_CREDENTIAL_ENCRYPTION_KEY`。
-- Error Handling: missing encryption secret、decrypt failure、disabled/deleted key、fingerprint mismatch は server-side typed error と安全な UI message に変換する。
+- Error Handling: missing encryption secret、decrypt failure、disabled/deleted key、fingerprint mismatch、Agent RPC auth で Provider credential reference が選択された状態は server-side typed error と安全な UI message に変換する。
 - Testing Strategy: `CLIENT-REGISTRY-S001`、`S002`、`S006`、`S007`、`S008` を repository/unit tests で覆う。
 - Non-Functional: D1 migration は Client management ledger だけを拡張する。
 - Performance: Key lookup は issuer/kid primary key で行い、signing 後に lastUsedAtMs を必要な範囲で更新する。
-- Security: Private JWK plaintext は function scope 外へ出さず、log とブラウザー serialization を禁止する。
+- Security: Private JWK plaintext は function scope 外へ出さず、log とブラウザー serialization を禁止する。Client status `active` は trust export で `active` / `retiring` を選択可能、Client status `disabled` / `deleted` は `revoked` export のみに制限する。HS256 shared secret、`AGENT_CREDENTIAL_*` Worker Secret、`credentialRef`、Provider credential reference は Agent RPC bearer JWT signing に使わない。
 
 #### `packages/client/src/server/agent-rpc` and `actions`
 
 - Purpose / Responsibility: Agent ごとの selected signing key を解決し、EdDSA JWT bearer metadata を生成済み Connect client に付与する。
 - Public API: Agent RPC client factory、auth interceptor、signing key/trust config/health Server Actions。
-- Key Data Structures: `ResolvedAgentRpcCredential` を Ed25519 JWK ベースへ更新、trust export view model、health verification result。
-- Key Flows: Server Action -> Agent metadata load -> signing key validate -> JWT sign -> Agent RPC call -> safe result -> UI revalidation。
+- Key Data Structures: `ResolvedAgentRpcCredential` を Ed25519 JWK ベースへ更新、trust export view model、Client key status と Agent trust status の mapping result、health verification result。
+- Key Flows: Server Action -> Agent metadata load -> selected signing key validate -> private JWK decrypt -> EdDSA JWT sign -> Agent RPC call -> safe result -> UI revalidation。Health 成功後の selected-Agent pages は同じ server-only Agent RPC auth path で実データを取得する。
 - Dependencies: generated Agent RPC client、Client DB repositories、credentials helpers、acting user source。
-- Error Handling: Agent trust mismatch、scope denied、health failure は key material を含まない action result として返す。
+- Error Handling: Agent trust mismatch、unknown issuer/kid、revoked key、fingerprint mismatch、scope denied、health failure は key material を含まない action result として返す。未認証系は通常の health response として扱わず、Connect error 由来の安全 message に変換する。
 - Testing Strategy: `CLIENT-REGISTRY-S003` と `AGENT-HEALTH-S003` を server action/factory tests で覆う。
 - Non-Functional: Browser-visible modules は server-only imports に到達できない。
 - Performance: JWT TTL は 300 秒を基準とし、token は RPC 呼び出しごとに生成する。
-- Security: JWT payload は `iss`、`sub`、`aud`、`agent_id`、`scopes`、`acting_user_id`、`jti`、`nbf`、`exp` に限定する。
+- Security: JWT payload は `iss`、`sub`、`aud`、`agent_id`、`scopes`、`acting_user_id`、`jti`、`nbf`、`exp` に限定する。Browser-visible module は生 JWT、signing logic、Agent credential forwarding を持たない。
 
 #### `packages/client/app` and `components`
 
-- Purpose / Responsibility: 既存 Management Client routes の中で signing key lifecycle、trust config export、Agent key selection、rotation/revoke/recovery guidance を表示する。
+- Purpose / Responsibility: Global Settings routes で signing key lifecycle、trust config export、rotation/revoke/recovery guidance を表示し、Agent settings で既存 global signing key selection と health verification を表示する。
 - Public API: Server-rendered pages と form components。
 - Key Data Structures: Browser-safe signing key summary、trust config preview、verification status、rotation checklist view model。
-- Key Flows: registry page key management -> generate/disable/delete/default action -> trust export preview; Agent settings -> select key -> health verify -> last verified update。
+- Key Flows: Global Settings signing keys -> generate/disable/delete/default action -> Global Settings trust export preview; Agent settings -> select existing global key -> health verify -> last verified update; connected selected-Agent routes -> server-only Agent RPC -> real data view model。
 - Dependencies: Server Actions、UI primitives、schemas。
 - Error Handling: Form validation errors、Agent auth mismatch、schema validation errors を accessible field/message として表示する。
 - Testing Strategy: `AGENT-MANAGEMENT-UI-S010` から `S016` を component tests と Playwright E2E で覆う。
@@ -465,7 +552,7 @@ erDiagram
 - Key Flows: lint -> forbidden surface scan -> package boundary scan -> scenario coverage -> failure report。
 - Dependencies: repository file graph と既存 lint commands。
 - Error Handling: Failures は path、rule、安全な explanation を出す。
-- Testing Strategy: `WORKSPACE-GOVERNANCE-S010`、`S011`、`S012` を governance tests で覆う。
+- Testing Strategy: `WORKSPACE-GOVERNANCE-S010`、`S011`、`S012`、`S013` を governance tests で覆う。
 - Non-Functional: Guardrails は生成物手編集や secret bypass を許さない。
 - Performance: scan 対象は governance scripts が既に使う repository source/build artifact paths に限定する。
 - Security: Private signing material の browser-visible reachability を検出する。
@@ -495,50 +582,58 @@ flowchart TD
 
 ### User Acceptance Test (Manual)
 
-| UAT ID                           | Related Requirement                                                   | Spec Summary                                                               | Customer Problem Summary                                                          | Steps                                                                                      | Expected Behavior                                                                                               |
-| -------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| UAT-AGENT-MANAGEMENT-UI-HAP-001  | AGENT-MANAGEMENT-UI-R001 Signing key management UI と server actions  | Management Client で Ed25519 signing key を生成し lifecycle を管理できる。 | 運用者が private key を手貼りせずに Client Service credential を管理したい。      | Management Client を開く、signing key を生成する、既定鍵にする、`disabled` にする。        | issuer/kid/fingerprint/status が表示され、private JWK は画面と network に出ない。                               |
-| UAT-AGENT-MANAGEMENT-UI-SEC-002  | AGENT-MANAGEMENT-UI-R003 Agent trust config export UI                 | Agent Worker に貼る公開情報だけの trust config JSON を生成できる。         | 運用者が公開鍵と policy だけを安全に Agent trust config へ反映したい。            | Signing key を選択し、allowedAgentIds/scopes を選び、export JSON を確認する。              | JSON に `d`、private JWK、encrypted private JWK が含まれず、schema validation と warning が表示される。         |
-| UAT-AGENT-MANAGEMENT-UI-HAP-003  | AGENT-MANAGEMENT-UI-R004 Rotation revoke recovery guidance            | Rotation/revoke/recovery の操作順と health verification が UI で追える。   | Key rotation 中に Agent trust config と Client selection がずれることを避けたい。 | Rotation guidance を開き、Agent key selection を切り替え、health verification を実行する。 | issuer/kid/fingerprint と verification result が表示され、失敗時に secret なしの対処 message が出る。           |
-| UAT-WORKSPACE-GOVERNANCE-SEC-004 | WORKSPACE-GOVERNANCE-R001 Production credential operations governance | Operations runbook が本番 credential 境界を説明する。                      | 運用者と reviewer が同じ手順で trust config、revoke、recovery を扱いたい。        | `docs/operations/agent-control-plane-auth.md` と README を読む。                           | required secrets、trust config schema、rotation、revoke、break-glass recovery、private key 非露出が確認できる。 |
+| UAT ID                           | Related Requirement                                                   | Spec Summary                                                                                         | Customer Problem Summary                                                                     | Steps                                                                                                                                                                                                        | Expected Behavior                                                                                                                                                     |
+| -------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UAT-AGENT-MANAGEMENT-UI-HAP-001  | AGENT-MANAGEMENT-UI-R001 Signing key management UI と server actions  | Global Settings で Ed25519 signing key を生成し lifecycle を管理できる。                             | 運用者が private key を手貼りせず、Agent 登録前でも Client Service credential を準備したい。 | `Global Settings > Signing Keys` を開く、Agent 0 件状態で signing key を生成する、既定鍵にする、`disabled` にする。                                                                                          | issuer/kid/fingerprint/status が表示され、private JWK は画面と network に出ない。                                                                                     |
+| UAT-AGENT-MANAGEMENT-UI-SEC-002  | AGENT-MANAGEMENT-UI-R003 Global Settings trust config export UI       | Global Settings で Agent Worker に貼る公開情報だけの trust config JSON を生成できる。                | 運用者が Agent 登録前でも公開鍵と policy だけを安全に Agent trust config へ反映したい。      | `Global Settings > Trust Config Export` で signing key を選択し、allowedAgentIds/scopes を選び、export JSON を確認する。                                                                                     | JSON に `d`、private JWK、encrypted private JWK が含まれず、schema validation と warning が表示される。                                                               |
+| UAT-AGENT-MANAGEMENT-UI-HAP-003  | AGENT-MANAGEMENT-UI-R004 Rotation revoke recovery guidance            | Global key rotation/revoke/recovery の操作順と Agent assignment/health verification が UI で追える。 | Key rotation 中に Agent trust config と Client selection がずれることを避けたい。            | Global Settings の rotation guidance を開き、global key を生成し、trust export を確認し、Agent settings で key selection を切り替え、health verification を実行する。                                        | issuer/kid/fingerprint と verification result が表示され、失敗時に secret なしの対処 message が出る。                                                                 |
+| UAT-WORKSPACE-GOVERNANCE-SEC-004 | WORKSPACE-GOVERNANCE-R001 Production credential operations governance | Operations runbook が本番 credential 境界を説明する。                                                | 運用者と reviewer が同じ手順で trust config、revoke、recovery を扱いたい。                   | `docs/operations/agent-control-plane-auth.md` と README を読む。                                                                                                                                             | required secrets、trust config schema、rotation、revoke、break-glass recovery、private key 非露出が確認できる。                                                       |
+| UAT-WORKSPACE-GOVERNANCE-SMK-005 | WORKSPACE-GOVERNANCE-R002 Operational smoke                           | Management Client から Agent RPC 実データ表示までの一周を確認する。                                  | Safe fallback ではなく実 Agent data に到達する接続完成条件を運用者が確認したい。             | Agent 0 件状態で Global Settings signing key 生成と trust config export を行い、Agent 作成後に global key selection、Agent Worker trust config 設定、Health Check、selected-Agent pages 表示を順に実行する。 | Health Check が成功し、Overview/Threads/Events/Runs/Schedules/Integrations/Settings が実データを表示し、browser payload/storage/bundle に signing material が出ない。 |
 
 ### E2E Test (Playwright)
 
-| E2E ID                          | Playwright Test Name                                                      | Related Scenario         | Category | Summary                                                                    | Steps (Playwright)                                                       | Expected Behavior                                                                  |
-| ------------------------------- | ------------------------------------------------------------------------- | ------------------------ | -------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| E2E-AGENT-MANAGEMENT-UI-HAP-001 | `[AGENT-MANAGEMENT-UI-S010] 署名鍵 lifecycle を管理できる`                | AGENT-MANAGEMENT-UI-S010 | HAP      | UI から key generation/status/default selection を実行する。               | `/agents` を開く、key を生成、既定鍵を選択、`disabled` にする。          | UI と server action result が status を反映し、trust config warning が表示される。 |
-| E2E-AGENT-MANAGEMENT-UI-SEC-002 | `[AGENT-MANAGEMENT-UI-S011] ブラウザーが signing material を受け取らない` | AGENT-MANAGEMENT-UI-S011 | SEC      | ブラウザー payload と storage に signing material がないことを検査する。   | Key 管理 UI 操作後に responses、HTML、storage、bundles を走査する。      | private JWK、encrypted private JWK、生 JWT が見つからない。                        |
-| E2E-AGENT-MANAGEMENT-UI-HAP-003 | `[AGENT-MANAGEMENT-UI-S012] 設定画面が選択済み signing key を検証する`    | AGENT-MANAGEMENT-UI-S012 | HAP      | Agent settings で issuer/kid selection と health verification を実行する。 | `/agents/[agentId]/settings` を開く、signing key を選択、verify を押す。 | issuer/kid/fingerprint/last verified と verification result が表示される。         |
-| E2E-AGENT-MANAGEMENT-UI-SEC-004 | `[AGENT-MANAGEMENT-UI-S013] 信頼設定 export が公開情報だけを生成する`     | AGENT-MANAGEMENT-UI-S013 | SEC      | Trust config export に private material が入らない。                       | Export UI で scopes/agents を選択し JSON preview を読む。                | JSON に public JWK fields と policy があり、`d` と private fields がない。         |
-| E2E-AGENT-MANAGEMENT-UI-SEC-005 | `[AGENT-MANAGEMENT-UI-S014] 広い scope は export 前に警告する`            | AGENT-MANAGEMENT-UI-S014 | SEC      | Wildcard/high scope 選択時の warning を確認する。                          | `*` agent または `agent:admin` を選択する。                              | Broad permission warning と schema validation result が表示される。                |
+| E2E ID                          | Playwright Test Name                                                                       | Related Scenario         | Category | Summary                                                                                                                  | Steps (Playwright)                                                                                                                                                              | Expected Behavior                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| E2E-AGENT-MANAGEMENT-UI-HAP-001 | `[AGENT-MANAGEMENT-UI-S010] 署名鍵 lifecycle を管理できる`                                 | AGENT-MANAGEMENT-UI-S010 | HAP      | Global Settings から key generation/status/default selection を実行する。                                                | `/global-settings/signing-keys` を Agent 0 件状態で開く、key を生成、既定鍵を選択、`disabled` にする。                                                                          | UI と server action result が status を反映し、trust config warning が表示される。                                  |
+| E2E-AGENT-MANAGEMENT-UI-SEC-002 | `[AGENT-MANAGEMENT-UI-S011] ブラウザーが signing material を受け取らない`                  | AGENT-MANAGEMENT-UI-S011 | SEC      | ブラウザー payload と storage に signing material がないことを検査する。                                                 | Key 管理 UI 操作後に responses、HTML、storage、bundles を走査する。                                                                                                             | private JWK、encrypted private JWK、生 JWT が見つからない。                                                         |
+| E2E-AGENT-MANAGEMENT-UI-HAP-003 | `[AGENT-MANAGEMENT-UI-S012] 設定画面が選択済み signing key を検証する`                     | AGENT-MANAGEMENT-UI-S012 | HAP      | Agent settings で issuer/kid selection と health verification を実行する。                                               | `/agents/[agentId]/settings` を開く、signing key を選択、verify を押す。                                                                                                        | issuer/kid/fingerprint/last verified と verification result が表示される。                                          |
+| E2E-AGENT-MANAGEMENT-UI-SEC-004 | `[AGENT-MANAGEMENT-UI-S013] 信頼設定 export が公開情報だけを生成する`                      | AGENT-MANAGEMENT-UI-S013 | SEC      | Global Settings trust config export に private material が入らない。                                                     | `/global-settings/trust-config-export` で scopes/agents を選択し JSON preview を読む。                                                                                          | JSON に public JWK fields と policy があり、`d` と private fields がない。                                          |
+| E2E-AGENT-MANAGEMENT-UI-SEC-005 | `[AGENT-MANAGEMENT-UI-S014] 広い scope は export 前に警告する`                             | AGENT-MANAGEMENT-UI-S014 | SEC      | Wildcard/high scope 選択時の warning を確認する。                                                                        | `*` agent または `agent:admin` を選択する。                                                                                                                                     | Broad permission warning と schema validation result が表示される。                                                 |
+| E2E-AGENT-MANAGEMENT-UI-HAP-006 | `[AGENT-MANAGEMENT-UI-S019] 信頼設定後に selected-Agent pages が実 Agent データを描画する` | AGENT-MANAGEMENT-UI-S019 | HAP      | Global Settings signing key/trust export と Agent settings verification 後の selected-Agent pages が実データ表示へ進む。 | Global Settings key/trust fixture を設定し、Agent settings で key selection と Health Check を行い、Overview、Threads、Events、Runs、Schedules、Integrations、Settings を開く。 | 各 page が Agent RPC 由来の実データと verified status を表示し、signing material を含まない。                       |
+| E2E-AGENT-MANAGEMENT-UI-HAP-007 | `[AGENT-MANAGEMENT-UI-S020] Agent 0件でも Global Settings signing operations が利用できる` | AGENT-MANAGEMENT-UI-S020 | HAP      | Agent 未登録でも Global Settings signing key と trust export が利用できる。                                              | Agent registry を空にし、`/global-settings/signing-keys` と `/global-settings/trust-config-export` を開き、key generation と public-only JSON preview を確認する。              | Agent 個別画面に依存せず、Global Settings の signing operations が利用でき、signing material はブラウザーに出ない。 |
 
 ### Integration Test (Endpoint)
 
-| IT ID                      | Test Name                                                                         | Genre  | Category | Summary                                                      | Steps (Test)                                                                   | Expected Behavior                                                        |
-| -------------------------- | --------------------------------------------------------------------------------- | ------ | -------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| IT-AGENT-SECURITY-HAP-001  | `[AGENT-SECURITY-S001] 有効な Ed25519 Client Service JWT が Agent RPC を認証する` | agent  | HAP      | Valid JWT が principal と audit context へ正規化される。     | trust config fixture、Ed25519 key、JWT、binary request を作成して RPC を呼ぶ。 | RPC は認証され、issuer/kid/jwtId/scopes が DO context に渡る。           |
-| IT-AGENT-SECURITY-ERR-002  | `[AGENT-SECURITY-S011] 不正な trust config は安全側で拒否される`                  | agent  | ERR      | Parse/schema/revoked/unknown key を拒否する。                | 不正 trust config と revoked key config で RPC を呼ぶ。                        | `unauthenticated` / `permission_denied` で拒否され、state は変わらない。 |
-| IT-AGENT-SECURITY-PERM-003 | `[AGENT-SECURITY-S013] メソッド scope matrix が不足 scope を拒否する`             | agent  | PERM     | 不足 scope の mutating RPC を拒否する。                      | `agent:read` token で write/tool/admin RPC を呼ぶ。                            | `permission_denied` となり mutation は発生しない。                       |
-| IT-AGENT-SECURITY-SEC-004  | `[AGENT-SECURITY-S015] 再利用された jti は mutation 前に拒否される`               | agent  | SEC      | 同一 `jti` の replay を拒否する。                            | 同一 principal/jti で二度 RPC を呼ぶ。                                         | 一回目のみ処理され、二回目は replay denied。                             |
-| IT-AGENT-HEALTH-HAP-005    | `[AGENT-HEALTH-S003] Health が issuer kid fingerprint diagnostic を安全に返す`    | agent  | HAP      | Health RPC が trust diagnostic を返す。                      | Valid JWT で Check を呼び、response を検査する。                               | issuer/kid/fingerprint status が返り、key material は返らない。          |
-| IT-CLIENT-REGISTRY-HAP-006 | `[CLIENT-REGISTRY-S003] サーバー Action が選択済み key で Agent RPC に署名する`   | client | HAP      | Client server が D1 key selection で bearer JWT を生成する。 | D1 に managed Agent と signing key fixture を作り Server Action を実行する。   | Authorization header は EdDSA JWT で、Browser result は safe data のみ。 |
-| IT-CLIENT-REGISTRY-ERR-007 | `[CLIENT-REGISTRY-S007] disabled signing key は使用されない`                      | client | ERR      | disabled/deleted key で Agent RPC を送らない。               | disabled key を参照する managed Agent で RPC factory を実行する。              | signing 前に typed error となり outbound RPC は作られない。              |
+| IT ID                      | Test Name                                                                                | Genre  | Category | Summary                                                      | Steps (Test)                                                                                            | Expected Behavior                                                                               |
+| -------------------------- | ---------------------------------------------------------------------------------------- | ------ | -------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| IT-AGENT-SECURITY-HAP-001  | `[AGENT-SECURITY-S001] 有効な Ed25519 Client Service JWT が Agent RPC を認証する`        | agent  | HAP      | Valid JWT が principal と audit context へ正規化される。     | trust config fixture、Ed25519 key、JWT、binary request を作成して RPC を呼ぶ。                          | RPC は認証され、issuer/kid/jwtId/scopes が DO context に渡る。                                  |
+| IT-AGENT-SECURITY-ERR-002  | `[AGENT-SECURITY-S011] 不正な trust config は安全側で拒否される`                         | agent  | ERR      | Parse/schema/revoked/unknown key を拒否する。                | 不正 trust config と revoked key config で RPC を呼ぶ。                                                 | `unauthenticated` / `permission_denied` で拒否され、state は変わらない。                        |
+| IT-AGENT-SECURITY-PERM-003 | `[AGENT-SECURITY-S013] メソッド scope matrix が不足 scope を拒否する`                    | agent  | PERM     | 不足 scope の mutating RPC を拒否する。                      | `agent:read` token で write/tool/admin RPC を呼ぶ。                                                     | `permission_denied` となり mutation は発生しない。                                              |
+| IT-AGENT-SECURITY-SEC-004  | `[AGENT-SECURITY-S015] 再利用された jti は mutation 前に拒否される`                      | agent  | SEC      | 同一 `jti` の replay を拒否する。                            | 同一 principal/jti で二度 RPC を呼ぶ。                                                                  | 一回目のみ処理され、二回目は replay denied。                                                    |
+| IT-AGENT-HEALTH-HAP-005    | `[AGENT-HEALTH-S003] Health が issuer kid fingerprint diagnostic を安全に返す`           | agent  | HAP      | Health RPC が trust diagnostic を返す。                      | Valid JWT で Check を呼び、response を検査する。                                                        | issuer/kid/fingerprint status が返り、key material は返らない。                                 |
+| IT-CLIENT-REGISTRY-HAP-006 | `[CLIENT-REGISTRY-S003] サーバー Action が選択済み key で Agent RPC に署名する`          | client | HAP      | Client server が D1 key selection で bearer JWT を生成する。 | D1 に managed Agent と signing key fixture を作り Server Action を実行する。                            | Authorization header は EdDSA JWT で、Browser result は safe data のみ。                        |
+| IT-CLIENT-REGISTRY-ERR-007 | `[CLIENT-REGISTRY-S007] disabled signing key は使用されない`                             | client | ERR      | disabled/deleted key で Agent RPC を送らない。               | disabled key を参照する managed Agent で RPC factory を実行する。                                       | signing 前に typed error となり outbound RPC は作られない。                                     |
+| IT-AGENT-HEALTH-ERR-008    | `[AGENT-HEALTH-S005] 認証失敗は Check 応答ではなく安全な Connect error として診断される` | agent  | ERR      | unknown/revoked/mismatch は通常 Check response にならない。  | unknown issuer、unknown kid、revoked key、fingerprint mismatch、replayed `jti` の JWT で Check を呼ぶ。 | Connect error detail、audit、metric に安全な failure reason が残り、Check response は返らない。 |
+| IT-CLIENT-REGISTRY-SEC-009 | `[CLIENT-REGISTRY-S011] Agent RPC 認証が signing key store だけを署名 source にする`     | client | SEC      | Agent RPC signing source が Ed25519 store に限定される。     | `credentialRef` と Provider credential fixture がある状態で Agent RPC factory を実行する。              | factory は signing key store だけを使い、`AGENT_CREDENTIAL_*` と HS256 signing を使わない。     |
 
 ### Unit/Component Test (UT)
 
-| UT ID                           | Test Name                                                                                | Package            | Category | Summary                                                            | Steps (Test)                                                         | Expected Behavior                                                    |
-| ------------------------------- | ---------------------------------------------------------------------------------------- | ------------------ | -------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| UT-AGENT-SECURITY-BND-001       | `[AGENT-SECURITY-S010] 信頼設定 parser が active Ed25519 key policy を解決する`          | packages/agent     | BND      | Trust config parser と fingerprint を確認する。                    | valid config fixture を parse し issuer/kid lookup を実行する。      | public key policy と fingerprint が返る。                            |
-| UT-AGENT-SECURITY-ERR-002       | `[AGENT-SECURITY-S012] retiring key が bounded token window を強制する`                  | packages/agent     | ERR      | retiring key と max TTL の境界を確認する。                         | retiring key で valid/expired/overlong JWT を検証する。              | valid bounded token だけが受理される。                               |
-| UT-CLIENT-REGISTRY-SEC-003      | `[CLIENT-REGISTRY-S006] サーバー側 key generation は private JWK を返さない`             | packages/client    | SEC      | Key generation action result が public-only であることを確認する。 | key generation helper/action を実行し serialized result を検査する。 | private JWK plaintext と encrypted private JWK が含まれない。        |
-| UT-CLIENT-REGISTRY-SEC-004      | `[CLIENT-REGISTRY-S008] fingerprint 不一致は signing を止める`                           | packages/client    | SEC      | Registry と signing key fingerprint 不一致を拒否する。             | mismatched fixtures で Agent RPC credential resolution を実行する。  | signing は実行されず safe error が返る。                             |
-| UT-AGENT-MANAGEMENT-UI-A11Y-005 | `[AGENT-MANAGEMENT-UI-S014] 信頼設定 export warning は accessible である`                | packages/client    | A11Y     | Broad scope warning が accessible に表示される。                   | Component に wildcard/high scope state を渡す。                      | alert/description と validation status が関連付く。                  |
-| UT-WORKSPACE-GOVERNANCE-SEC-006 | `[WORKSPACE-GOVERNANCE-S011] ガードレールが browser-visible signing material を拒否する` | scripts/governance | SEC      | Forbidden import/material fixtures を検出する。                    | governance script fixtures を実行する。                              | private signing material の browser reachability が failure になる。 |
-| UT-WORKSPACE-GOVERNANCE-REG-007 | `[WORKSPACE-GOVERNANCE-S012] シナリオ coverage が本番 auth specs を検証する`             | scripts/openspec   | REG      | Scenario IDs と test title/manual tag coverage を確認する。        | coverage checker fixture を実行する。                                | missing/duplicate/orphan Scenario ID が報告される。                  |
+| UT ID                           | Test Name                                                                                               | Package            | Category | Summary                                                            | Steps (Test)                                                                                                             | Expected Behavior                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------ | -------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| UT-AGENT-SECURITY-BND-001       | `[AGENT-SECURITY-S010] 信頼設定 parser が active Ed25519 key policy を解決する`                         | packages/agent     | BND      | Trust config parser と fingerprint を確認する。                    | valid config fixture を parse し issuer/kid lookup を実行する。                                                          | public key policy と fingerprint が返る。                                               |
+| UT-AGENT-SECURITY-ERR-002       | `[AGENT-SECURITY-S012] retiring key が bounded token window を強制する`                                 | packages/agent     | ERR      | retiring key と max TTL の境界を確認する。                         | retiring key で valid/expired/overlong JWT を検証する。                                                                  | valid bounded token だけが受理される。                                                  |
+| UT-CLIENT-REGISTRY-SEC-003      | `[CLIENT-REGISTRY-S006] サーバー側 key generation は private JWK を返さない`                            | packages/client    | SEC      | Key generation action result が public-only であることを確認する。 | key generation helper/action を実行し serialized result を検査する。                                                     | private JWK plaintext と encrypted private JWK が含まれない。                           |
+| UT-CLIENT-REGISTRY-SEC-004      | `[CLIENT-REGISTRY-S008] fingerprint 不一致は signing を止める`                                          | packages/client    | SEC      | Registry と signing key fingerprint 不一致を拒否する。             | mismatched fixtures で Agent RPC credential resolution を実行する。                                                      | signing は実行されず safe error が返る。                                                |
+| UT-AGENT-MANAGEMENT-UI-A11Y-005 | `[AGENT-MANAGEMENT-UI-S014] 信頼設定 export warning は accessible である`                               | packages/client    | A11Y     | Broad scope warning が accessible に表示される。                   | Component に wildcard/high scope state を渡す。                                                                          | alert/description と validation status が関連付く。                                     |
+| UT-WORKSPACE-GOVERNANCE-SEC-006 | `[WORKSPACE-GOVERNANCE-S011] ガードレールが browser-visible signing material を拒否する`                | scripts/governance | SEC      | Forbidden import/material fixtures を検出する。                    | governance script fixtures を実行する。                                                                                  | private signing material の browser reachability が failure になる。                    |
+| UT-WORKSPACE-GOVERNANCE-REG-007 | `[WORKSPACE-GOVERNANCE-S012] シナリオ coverage が本番 auth specs を検証する`                            | scripts/openspec   | REG      | Scenario IDs と test title/manual tag coverage を確認する。        | coverage checker fixture を実行する。                                                                                    | missing/duplicate/orphan Scenario ID が報告される。                                     |
+| UT-WORKSPACE-GOVERNANCE-SMK-008 | `[WORKSPACE-GOVERNANCE-S013] 運用 smoke が Management Client から Agent RPC 実データ表示までを検証する` | tests/e2e          | SMK      | 実運用一周の smoke scenario を確認する。                           | smoke fixture で signing key 生成、trust export、Agent trust 設定、Health Check、selected-Agent 実データ表示を実行する。 | Health success と real data rendering が成立し、browser secrecy boundary が維持される。 |
 
 ## Rollback / Migration
 
 - Client D1 migration は `client_signing_keys` table 追加と `client_managed_agents` signing metadata columns 追加を行う。Data migration は既存 managed Agent records に default signing key が存在しない状態を許容し、Agent RPC 実行時に明示的な key selection を要求する。
+- `client_managed_agents` の signing issuer/kid/public fingerprint/last verified columns は既存行を壊さない nullable migration とし、key 未選択の Agent は一覧表示可能だが Agent RPC 呼び出し前に明示的な signing key selection を要求する。
+- `CLIENT_CREDENTIAL_SECRET_REF` の間接参照と Agent RPC 用 `AGENT_CREDENTIAL_*` 解決は残さない。Provider/外部 credential reference を保持する場合は Agent RPC auth と別 prefix/用途へ分離し、rollback でも Agent RPC signing source へ戻さない。
 - `AGENT_CLIENT_JWT_PUBLIC_KEYS` production auth source は残さない。リリースが中止される場合は Worker version と D1 backup をリリース前状態に戻し、compatibility alias は追加しない。
 - D1 rollback が必要な場合はリリース前 backup を復元する。Deleted signing key の private material は復旧不能として扱うため、復旧後に key generation と trust config 更新を実行する。
 - Agent trust config parse/validation が失敗する場合、Agent Worker は安全側で拒否する。運用復旧は Cloudflare Dashboard/API/Wrangler で valid `AGENT_CONTROL_PLANE_TRUST` を設定し、Client health verification で確認する。
@@ -553,7 +648,8 @@ flowchart TD
 - `pnpm test:agent`、`pnpm test:client`、`pnpm test:governance`、`pnpm test:e2e` を実行する。
 - `pnpm check:agent && pnpm check:client` を実行する。
 - `pnpm build` を実行する。
-- Management Client で signing key を生成し、public trust config を Agent Worker secret に設定し、Agent health verification を実行する。
+- Agent 0 件状態でも Management Client の Global Settings で signing key を生成し、public-only trust config を export できることを確認する。Agent 作成後に Agent Worker secret へ `AGENT_CONTROL_PLANE_TRUST` を設定し、managed Agent に global signing key の issuer/kid/fingerprint を選択し、Agent health verification を実行する。
+- Health verification 成功後、Overview、Threads、Events、Runs、Schedules、Integrations、Settings が server-only Agent RPC 由来の実データを表示し、browser payload/storage/bundle に signing material がないことを smoke/UAT で確認する。
 - Rotation、emergency revoke、break-glass recovery runbook を staging で確認し、本番適用前に public trust config fingerprint を記録する。
 
 ## Acceptance Criteria
@@ -561,9 +657,11 @@ flowchart TD
 - `AGENT_CONTROL_PLANE_TRUST` から複数 issuer/key/policy を検証でき、private key parameter `d`、parse error、unknown issuer/kid、revoked key は安全側で拒否する。
 - Client server-only modules が Ed25519 JWT を署名し、Agent RPC は valid token だけを受理する。
 - `alg` 不一致、不正署名、期限不正、audience 不一致、agent_id 不一致、allowedAgentIds 不一致、scope 不足、replayed `jti` が拒否される。
+- HS256 signing、`resolveCredentialSecret`、`AGENT_CREDENTIAL_*` Worker Secret、Provider credential reference は Agent RPC Client Service auth path で使用されない。
 - Client D1 は encrypted private JWK だけを保存し、Browser-visible code/payload/storage/logs に private signing material が出ない。
-- Management Client は signing key lifecycle、Agent key selection、trust config export、health verification、rotation/revoke/recovery guidance を提供する。
-- Agent health response は trust diagnostic を返し、key material と token body を返さない。
+- Management Client は Global Settings 配下で Agent 0 件でも signing key lifecycle、trust config export、rotation/revoke/recovery guidance を提供し、Agent 個別 settings では既存 global key selection と health verification を提供する。
+- Agent health response は認証済み request の trust diagnostic を返し、key material と token body を返さない。認証失敗は通常の Check response ではなく safe Connect error、audit、metric として扱う。
+- Agent 0 件状態の Global Settings signing key 生成、public-only trust export、Agent 作成、managed Agent global signing key selection、Agent Worker trust 設定、Health Check 成功、selected-Agent pages の実データ表示まで一周できる。
 - Docs、governance scripts、scenario-linked automated tests が production credential boundary を検証する。
 - `pnpm check:codegen`、`pnpm test:agent`、`pnpm test:client`、`pnpm test:governance`、`pnpm check:agent && pnpm check:client` が成功する。
 

@@ -31,6 +31,7 @@ const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+const ICON_COLLAPSIBLE_HIDDEN_CLASS = 'group-data-[collapsible=icon]:hidden';
 
 interface SidebarContextProps {
   state: 'expanded' | 'collapsed';
@@ -184,21 +185,6 @@ const Sidebar = React.forwardRef<
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
-    if (collapsible === 'none') {
-      return (
-        <div
-          className={cn(
-            'flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground',
-            className
-          )}
-          ref={ref}
-          {...props}
-        >
-          {children}
-        </div>
-      );
-    }
-
     if (isMobile) {
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
@@ -220,6 +206,39 @@ const Sidebar = React.forwardRef<
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
+      );
+    }
+
+    if (collapsible === 'none') {
+      return (
+        <div
+          ref={ref}
+          className={cn('group peer hidden text-sidebar-foreground md:block', className)}
+          data-state="expanded"
+          data-collapsible=""
+          data-variant={variant}
+          data-side={side}
+          {...props}
+        >
+          {/* desktop 固定 sidebar の幅を main content 側へ予約し、main の縦スクロールから sidebar を分離する。 */}
+          <div className="relative w-[--sidebar-width] bg-transparent" />
+          <div
+            className={cn(
+              'fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] md:flex',
+              side === 'left' ? 'left-0' : 'right-0',
+              variant === 'floating' || variant === 'inset'
+                ? 'p-2'
+                : 'group-data-[side=left]:border-r group-data-[side=right]:border-l'
+            )}
+          >
+            <div
+              data-sidebar="sidebar"
+              className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
+            >
+              {children}
+            </div>
+          </div>
+        </div>
       );
     }
 
@@ -468,7 +487,7 @@ const SidebarGroupAction = React.forwardRef<
         'absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:md:hidden',
-        'group-data-[collapsible=icon]:hidden',
+        ICON_COLLAPSIBLE_HIDDEN_CLASS,
         className
       )}
       {...props}
@@ -614,7 +633,7 @@ const SidebarMenuAction = React.forwardRef<
         'peer-data-[size=sm]/menu-button:top-1',
         'peer-data-[size=default]/menu-button:top-1.5',
         'peer-data-[size=lg]/menu-button:top-2.5',
-        'group-data-[collapsible=icon]:hidden',
+        ICON_COLLAPSIBLE_HIDDEN_CLASS,
         showOnHover &&
           'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0',
         className
@@ -636,7 +655,7 @@ const SidebarMenuBadge = React.forwardRef<HTMLDivElement, React.ComponentProps<'
         'peer-data-[size=sm]/menu-button:top-1',
         'peer-data-[size=default]/menu-button:top-1.5',
         'peer-data-[size=lg]/menu-button:top-2.5',
-        'group-data-[collapsible=icon]:hidden',
+        ICON_COLLAPSIBLE_HIDDEN_CLASS,
         className
       )}
       {...props}
@@ -685,7 +704,7 @@ const SidebarMenuSub = React.forwardRef<HTMLUListElement, React.ComponentProps<'
       data-sidebar="menu-sub"
       className={cn(
         'mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5',
-        'group-data-[collapsible=icon]:hidden',
+        ICON_COLLAPSIBLE_HIDDEN_CLASS,
         className
       )}
       {...props}
@@ -720,7 +739,7 @@ const SidebarMenuSubButton = React.forwardRef<
         'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground',
         size === 'sm' && 'text-xs',
         size === 'md' && 'text-sm',
-        'group-data-[collapsible=icon]:hidden',
+        ICON_COLLAPSIBLE_HIDDEN_CLASS,
         className
       )}
       {...props}
