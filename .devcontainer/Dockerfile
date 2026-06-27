@@ -82,6 +82,11 @@ RUN npm install -g wrangler@4
 RUN npm install -g opencode-ai@latest
 RUN opencode upgrade
 
+# Agent Browser CLI を固定バージョンでインストール
+# OpenCode から MCP stdio server として呼び出すため、Devcontainer 内の PATH に配置する
+RUN npm install -g agent-browser@0.31.1 && \
+    agent-browser install
+
 # Serena MCP CLI をインストール
 RUN uv tool install -p 3.13 serena-agent
 
