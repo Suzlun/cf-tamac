@@ -3,6 +3,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useId, useRef, type ReactNode } from 'react';
 
+import { Button } from './ui/button';
+
 interface DetailDrawerProps {
   readonly open: boolean;
   readonly title: string;
@@ -60,27 +62,28 @@ export function DetailDrawer({
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="detail-drawer-backdrop" />
+        {/* Radix Dialog 派生の overlay/portal で focus trap・Esc close・focus return を提供する。 */}
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/80" />
         <Dialog.Content
           ref={contentRef}
-          className="detail-drawer"
+          className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col overflow-y-auto border-l bg-background p-6 shadow-lg"
           aria-labelledby={titleId}
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
         >
-          <div className="topline">
+          <div className="flex items-center justify-between border-b pb-3">
             <Dialog.Title asChild>
-              <span id={titleId} ref={titleRef} tabIndex={-1}>
+              <span id={titleId} ref={titleRef} tabIndex={-1} className="text-lg font-semibold">
                 {title}
               </span>
             </Dialog.Title>
             <Dialog.Close asChild>
-              <button type="button" className="nav-link">
+              <Button type="button" variant="outline" size="sm">
                 Close
-              </button>
+              </Button>
             </Dialog.Close>
           </div>
-          <div className="page-band">{children}</div>
+          <div className="mt-4 space-y-4">{children}</div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

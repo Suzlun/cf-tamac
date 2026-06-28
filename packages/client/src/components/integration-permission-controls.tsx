@@ -74,12 +74,15 @@ function IntegrationFilterBar({
 }) {
   const statuses = ['all', 'active', 'pending_external_setup', 'disabled', 'uninstalled', 'failed'];
   return (
-    <section className="readout" aria-label="Integration filters">
-      <div className="action-row" aria-live="polite">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-label="Integration filters"
+    >
+      <div className="flex flex-wrap gap-2" aria-live="polite">
         {statuses.map((status) => (
           <Link
             key={status}
-            className={`nav-link${statusFilter === status ? ' state-pending' : ''}`}
+            className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent ${statusFilter === status ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}`}
             href={`/agents/${agentId}/integrations?status=${status}`}
             aria-pressed={statusFilter === status}
           >
@@ -102,7 +105,11 @@ function IntegrationPermissionNotice({
     return null;
   }
   return (
-    <div id={INTEGRATION_PERMISSION_COPY_ID} className="state-disabled readout" role="note">
+    <div
+      id={INTEGRATION_PERMISSION_COPY_ID}
+      className="rounded-md border bg-muted p-4 text-sm opacity-70"
+      role="note"
+    >
       {managementDisabledReason ?? INTEGRATION_PERMISSION_DENIED_COPY}
     </div>
   );
@@ -121,11 +128,11 @@ function IntegrationActions({
 }) {
   const disabled = pending || !canManageIntegrations;
   return (
-    <div className="action-row">
+    <div className="flex flex-wrap gap-2">
       <Button
         type="button"
         variant="default"
-        className={canManageIntegrations ? undefined : 'state-disabled'}
+        className={canManageIntegrations ? undefined : 'opacity-50'}
         onClick={onToggle}
         disabled={disabled}
         aria-disabled={disabled}

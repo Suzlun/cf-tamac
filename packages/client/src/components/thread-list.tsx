@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { AgentToken } from './agent-token';
-import { ControlRoomFrame } from './control-room-frame';
 import { DataTable } from './data-table';
 import { DetailDrawer } from './detail-drawer';
 import { EmptyState } from './empty-state';
 import { PaginationBar } from './pagination-bar';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface PageInfo {
   readonly nextPageToken?: string;
@@ -103,14 +104,8 @@ export function ThreadList({
   };
 
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="threads"
-      agentId={agentId}
-      currentSection="threads"
-    >
-      <p className="eyebrow">Threads</p>
-      <h2>Agent-owned Thread history</h2>
+    // page-level ControlRoomFrame は親 page が1つだけ提供するため、ここでは frame を持たず内容のみ描画する。
+    <div className="space-y-4">
       <AgentToken agentId={agentId} />
       <ThreadFilterBar
         agentId={agentId}
@@ -145,7 +140,7 @@ export function ThreadList({
           <ThreadDetailContent agentId={agentId} detail={selected} />
         )}
       </DetailDrawer>
-    </ControlRoomFrame>
+    </div>
   );
 }
 
@@ -160,34 +155,39 @@ function ThreadFilterBar({
 }) {
   const statuses = ['all', 'active', 'compacted', 'system'];
   return (
-    <section className="readout" aria-label="Thread filters">
-      <div className="action-row" aria-live="polite">
+    <section className="space-y-4 rounded-lg border bg-card p-5" aria-label="Thread filters">
+      <div className="flex flex-wrap gap-2" aria-live="polite">
         {statuses.map((status) => (
-          <Link
+          <Button
             key={status}
-            className={`nav-link${statusFilter === status ? ' state-pending' : ''}`}
-            href={buildThreadsHref(agentId, status, threadKeyPrefix)}
+            asChild
+            variant={statusFilter === status ? 'secondary' : 'outline'}
+            size="sm"
             aria-pressed={statusFilter === status}
           >
-            {status}
-          </Link>
+            <Link href={buildThreadsHref(agentId, status, threadKeyPrefix)}>{status}</Link>
+          </Button>
         ))}
       </div>
-      <form className="action-row" method="get">
+      <form
+        className="grid gap-3 sm:grid-cols-[minmax(14rem,24rem)_auto] sm:items-end"
+        method="get"
+      >
         <input type="hidden" name="status" value={statusFilter} />
-        <label className="eyebrow" htmlFor="thread-key-prefix">
-          Search thread_key
-        </label>
-        <input
-          id="thread-key-prefix"
-          name="q"
-          className="form-control"
-          defaultValue={threadKeyPrefix}
-          placeholder="thread_key…"
-        />
-        <button className="nav-link" type="submit">
+        <div className="space-y-2">
+          <label className="text-xs text-muted-foreground" htmlFor="thread-key-prefix">
+            Search thread_key
+          </label>
+          <Input
+            id="thread-key-prefix"
+            name="q"
+            defaultValue={threadKeyPrefix}
+            placeholder="thread_key…"
+          />
+        </div>
+        <Button variant="outline" type="submit">
           Apply filter
-        </button>
+        </Button>
       </form>
     </section>
   );
@@ -207,10 +207,11 @@ function ThreadTable({
       ariaLabel="Threads"
       headers={['Thread key', 'Status', 'Sections', 'Latest event', 'Latest run', 'Snapshot']}
       rows={threads.map((thread) => [
-        <button
+        <Button
           key={`key-${thread.threadId}`}
           type="button"
-          className="nav-link"
+          variant="outline"
+          size="sm"
           onClick={() => {
             void onOpen(thread.threadId);
           }}
@@ -218,7 +219,7 @@ function ThreadTable({
           aria-label={`Open Thread ${thread.threadKey}`}
         >
           {thread.threadKey}
-        </button>,
+        </Button>,
         thread.status,
         thread.currentSectionId ?? '—',
         thread.latestEventId ?? '—',
@@ -238,7 +239,9 @@ function ThreadDetailContent({
 }) {
   return (
     <>
-      <p className="eyebrow">THREAD DETAIL</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        THREAD DETAIL
+      </p>
       <p>thread_id: {detail.threadId}</p>
       <p>thread_key: {detail.threadKey}</p>
       <p>status: {detail.status}</p>
@@ -248,7 +251,10 @@ function ThreadDetailContent({
         section range: {detail.currentSection?.startThreadSequence ?? '—'} →{' '}
         {detail.currentSection?.endThreadSequence ?? 'open'}
       </p>
-      <section className="readout" aria-label="Latest Event">
+      <section
+        className="rounded-md border bg-card p-4 text-sm space-y-1"
+        aria-label="Latest Event"
+      >
         <strong>LATEST EVENT</strong>
         <p>event_id: {detail.latestEvent?.eventId ?? '—'}</p>
         <p>type: {detail.latestEvent?.eventType ?? '—'}</p>
@@ -259,21 +265,27 @@ function ThreadDetailContent({
           thread_sequence: {detail.latestEvent?.threadSequence ?? '—'}
         </p>
       </section>
-      <section className="readout" aria-label="Latest Run">
+      <section className="rounded-md border bg-card p-4 text-sm space-y-1" aria-label="Latest Run">
         <strong>LATEST RUN</strong>
         <p>run_id: {detail.latestRun?.runId ?? '—'}</p>
         <p>status: {detail.latestRun?.status ?? '—'}</p>
       </section>
-      <div className="action-row">
-        <Link className="nav-link" href={`/agents/${agentId}/events?thread=${detail.threadId}`}>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+          href={`/agents/${agentId}/events?thread=${detail.threadId}`}
+        >
           Open Events for this Thread
         </Link>
-        <Link className="nav-link" href={`/agents/${agentId}/runs?thread=${detail.threadId}`}>
+        <Link
+          className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+          href={`/agents/${agentId}/runs?thread=${detail.threadId}`}
+        >
           Open Runs for this Thread
         </Link>
         <Link
-          className="nav-link"
-          href={`/agents/${agentId}/compactions?thread=${detail.threadId}`}
+          className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+          href={`/agents/${agentId}/threads?thread=${detail.threadId}`}
         >
           Open Compactions
         </Link>

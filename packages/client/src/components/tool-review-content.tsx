@@ -1,4 +1,5 @@
 import { SignalBadge } from './signal-badge';
+import { Button } from './ui/button';
 
 interface PayloadReference {
   readonly ref: string;
@@ -78,10 +79,14 @@ export function ToolReviewContent({
   onReject,
   onApprove,
 }: ToolReviewContentProps) {
+  // Tool catalog は Browser-safe summary のみを受け取り、toolId に対応する表示名と approval policy だけを補完する。
   const tool = tools.find((item) => item.toolId === invocation.toolId);
   return (
     <>
-      <p className="eyebrow" tabIndex={-1}>
+      <p
+        className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+        tabIndex={-1}
+      >
         TOOL INVOCATION REVIEW
       </p>
       <p tabIndex={-1} data-drawer-initial-focus="true">
@@ -100,13 +105,22 @@ export function ToolReviewContent({
         {invocation.installationId ?? invocation.providerOperation?.installationId ?? '—'}
       </p>
 
-      <section className="readout" aria-live="polite" aria-label="Input summary">
+      {/* input は payload 本文ではなく safe projection と blob reference metadata だけを表示し、秘密値を drawer に載せない。 */}
+      <section
+        className="rounded-md border bg-card p-4 text-sm space-y-1"
+        aria-live="polite"
+        aria-label="Input summary"
+      >
         <strong>INPUT SUMMARY (safe projection)</strong>
         <p>{invocation.inputSummary ?? 'No input summary available.'}</p>
         <PayloadReferenceView label="input ref" reference={invocation.inputRef} />
       </section>
 
-      <section className="readout" aria-label="Risk and approval metadata">
+      {/* risk / approval は操作者が approve/reject 前に判断するための metadata で、Agent mutation はここでは実行しない。 */}
+      <section
+        className="rounded-md border bg-card p-4 text-sm space-y-1"
+        aria-label="Risk and approval metadata"
+      >
         <strong>RISK / APPROVAL METADATA</strong>
         <p>
           <SignalBadge
@@ -120,12 +134,20 @@ export function ToolReviewContent({
         <p>approval_audit_event: {invocation.approval?.auditEventId ?? '—'}</p>
       </section>
 
-      <section className="readout" aria-label="Acting user context">
+      {/* acting user は server-derived の操作者文脈を確認する欄で、Browser 入力から principal を作らない。 */}
+      <section
+        className="rounded-md border bg-card p-4 text-sm space-y-1"
+        aria-label="Acting user context"
+      >
         <strong>ACTING USER</strong>
         <p>{invocation.approval?.principalId ?? actingOperatorId}</p>
       </section>
 
-      <section className="readout" aria-label="Result links">
+      {/* result links は Event/provider operation の識別子だけを示し、output payload 本文は metadata projection に閉じる。 */}
+      <section
+        className="rounded-md border bg-card p-4 text-sm space-y-1"
+        aria-label="Result links"
+      >
         <strong>RESULT LINKS</strong>
         <p>result Event: {invocation.resultEventId ?? '—'}</p>
         <p>
@@ -158,27 +180,29 @@ function ToolReviewActions({
   readonly onApprove: () => void;
 }) {
   return (
-    <div className="action-row">
-      <button
+    <div className="flex flex-wrap gap-2">
+      {/* Reject は親 component の Server Action wrapper へ委譲し、この表示 component 自体は Agent RPC を直接呼ばない。 */}
+      <Button
         type="button"
-        className="nav-link state-error"
+        variant="destructive"
         onClick={onReject}
         disabled={pending || terminal}
         aria-disabled={pending || terminal}
         title={terminal ? 'Invocation is already terminal.' : undefined}
       >
         Reject
-      </button>
-      <button
+      </Button>
+      {/* Approve も同じく親へ通知するだけにし、pending/terminal 中は二重送信と完了済み変更を防ぐ。 */}
+      <Button
         type="button"
-        className="primary-action"
+        variant="default"
         onClick={onApprove}
         disabled={pending || terminal}
         aria-disabled={pending || terminal}
         title={terminal ? 'Invocation is already terminal.' : undefined}
       >
         Approve
-      </button>
+      </Button>
     </div>
   );
 }
@@ -191,6 +215,7 @@ function PayloadReferenceView({
   readonly reference?: PayloadReference;
 }) {
   if (reference === undefined) {
+    // payload reference が無い場合も「本文が無い」のではなく metadata-only projection であることを明示する。
     return <p>{label}: metadata only</p>;
   }
   return (

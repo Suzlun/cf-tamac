@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { Button } from './ui/button';
+
 interface PageInfo {
   readonly nextPageToken?: string;
   readonly resultCount: number;
@@ -42,25 +44,27 @@ export function PaginationBar({
     pageSize: String(pageSize),
   });
   return (
-    <nav aria-label="Pagination" className="pagination-bar action-row">
-      <button type="button" className="nav-link" disabled aria-disabled="true">
+    <nav aria-label="Pagination" className="flex flex-wrap items-center gap-3">
+      <Button type="button" variant="outline" size="sm" disabled aria-disabled="true">
         Previous
-      </button>
-      <span className="eyebrow" aria-live="polite">
+      </Button>
+      <span className="text-xs text-muted-foreground" aria-live="polite">
         Page size: {pageSize} · result count: {page.resultCount} · cursor scope:{' '}
         {page.cursorScope ?? 'agent scoped'}
       </span>
       {page.nextPageToken === undefined ? (
-        <button type="button" className="nav-link" disabled aria-disabled="true">
+        <Button type="button" variant="outline" size="sm" disabled aria-disabled="true">
           Next
-        </button>
+        </Button>
       ) : (
-        <Link className="nav-link" href={nextHref} aria-label="Next page">
-          Next
-        </Link>
+        <Button asChild variant="outline" size="sm">
+          <Link href={nextHref} aria-label="Next page">
+            Next
+          </Link>
+        </Button>
       )}
       {currentPageToken === undefined ? null : (
-        <span className="eyebrow">current cursor: {currentPageToken}</span>
+        <span className="text-xs text-muted-foreground">current cursor: {currentPageToken}</span>
       )}
     </nav>
   );

@@ -1,417 +1,96 @@
-:root {
-  color-scheme: dark;
-  --paper: #efe7d0;
-  --ink: #15120d;
-  --coal: #0c1014;
-  --panel: rgba(239, 231, 208, 0.08);
-  --line: rgba(239, 231, 208, 0.22);
-  --signal: #ffb000;
-  --cyan: #79e2cf;
-  --muted: rgba(239, 231, 208, 0.68);
-  --error: #d96b6b;
-}
+/**
+ * Shadcn UI 既定（new-york / neutral / cssVariables）の token block と Tailwind directives のみを保持する。
+ *
+ * タスク 1.5: 旧 management shell 独自 palette（独自の色/強調/背景 token）、
+ * radial gradient 背景、route 固有 visual shim class、custom font override、table-only responsive shim は
+ * 全て styling source から除外した。color token は Shadcn 既定の neutral（HSL）light/dark block のみを使用する。
+ */
 
-* {
-  box-sizing: border-box;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-html,
-body {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(121, 226, 207, 0.18), transparent 30rem),
-    radial-gradient(circle at 84% 12%, rgba(255, 176, 0, 0.16), transparent 28rem),
-    linear-gradient(135deg, #07090c 0%, #101820 48%, #1b140b 100%);
-  color: var(--paper);
-  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, serif;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.app-shell {
-  min-height: 100vh;
-  padding: clamp(1rem, 2vw, 2rem);
-}
-
-.control-room {
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  background: linear-gradient(145deg, rgba(239, 231, 208, 0.1), rgba(239, 231, 208, 0.03));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
-  overflow: hidden;
-}
-
-.topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem clamp(1rem, 3vw, 2rem);
-  border-bottom: 1px solid var(--line);
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.signal {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.signal::before {
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 999px;
-  background: var(--signal);
-  box-shadow: 0 0 18px var(--signal);
-  content: '';
-}
-
-.hero-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.9fr);
-  gap: clamp(1.5rem, 4vw, 4rem);
-  padding: clamp(1.5rem, 5vw, 5rem);
-}
-
-.kicker,
-.eyebrow {
-  margin: 0 0 0.75rem;
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.78rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--cyan);
-}
-
-h1,
-h2 {
-  margin: 0;
-  line-height: 0.95;
-  letter-spacing: -0.04em;
-}
-
-h1 {
-  max-width: 11ch;
-  font-size: clamp(3.5rem, 12vw, 10rem);
-}
-
-h2 {
-  font-size: clamp(2.25rem, 6vw, 5.5rem);
-}
-
-.lead {
-  max-width: 46rem;
-  margin: 1.35rem 0 0;
-  color: var(--muted);
-  font-size: clamp(1rem, 2vw, 1.35rem);
-  line-height: 1.6;
-}
-
-.action-row,
-.section-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 2rem;
-}
-
-.nav-link,
-.primary-action {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.8rem 1rem;
-  background: rgba(0, 0, 0, 0.18);
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.primary-action {
-  border-color: rgba(255, 176, 0, 0.7);
-  background: var(--signal);
-  color: var(--ink);
-}
-
-.instrument-panel {
-  display: grid;
-  gap: 1rem;
-}
-
-.readout,
-.route-card {
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 1.1rem;
-  background: var(--panel);
-}
-
-.readout strong,
-.route-card strong {
-  display: block;
-  margin-bottom: 0.45rem;
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  color: var(--signal);
-  font-size: 0.82rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.readout span,
-.route-card span {
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.page-band {
-  padding: clamp(1.5rem, 4vw, 4rem);
-}
-
-.route-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.agent-token {
-  display: inline-block;
-  margin-top: 1rem;
-  border: 1px dashed rgba(121, 226, 207, 0.65);
-  border-radius: 999px;
-  padding: 0.55rem 0.85rem;
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  color: var(--cyan);
-}
-
-.state-loading {
-  animation: skeleton-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes skeleton-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
+@layer base {
+  /* Shadcn 既定 neutral light theme。色以外の product 固有変数は持たない。 */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 0 0% 9%;
+    --chart-2: 0 0% 30%;
+    --chart-3: 0 0% 50%;
+    --chart-4: 0 0% 70%;
+    --chart-5: 0 0% 90%;
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  50% {
-    opacity: 0.65;
+  /* Shadcn 既定 neutral dark theme（class-based dark mode）。 */
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 0 0% 98%;
+    --chart-2: 0 0% 70%;
+    --chart-3: 0 0% 50%;
+    --chart-4: 0 0% 30%;
+    --chart-5: 0 0% 10%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
-.state-error {
-  color: var(--error);
-}
-
-.state-success {
-  color: var(--cyan);
-}
-
-.state-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.state-pending {
-  color: var(--signal);
-}
-
-.storage-meter {
-  height: 0.65rem;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.28);
-}
-
-.storage-meter span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--cyan), var(--signal));
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th,
-.data-table td {
-  padding: 0.75rem 0.5rem;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.82rem;
-}
-
-.data-table th {
-  color: var(--signal);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.data-table td {
-  color: var(--paper);
-}
-
-.data-table tbody tr:hover {
-  background: rgba(239, 231, 208, 0.05);
-}
-
-/* shadcn-style DataTable mobile stacking (wireframe §4.4). */
-.data-table-wrapper table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table-wrapper th,
-.data-table-wrapper td {
-  padding: 0.75rem 0.5rem;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.82rem;
-}
-
-.data-table-wrapper th {
-  color: var(--signal);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.data-table-wrapper td {
-  color: var(--paper);
-}
-
-.data-table-wrapper tbody tr:hover {
-  background: rgba(239, 231, 208, 0.05);
-}
-
-@media (max-width: 820px) {
-  .hero-grid,
-  .route-grid {
-    grid-template-columns: 1fr;
+@layer base {
+  /* Shadcn 既定の base layer のみ。border と body の色は token 経由で統一する。 */
+  * {
+    @apply border-border;
   }
-
-  .topline {
-    align-items: flex-start;
-    flex-direction: column;
+  body {
+    @apply bg-background text-foreground;
   }
-
-  .section-nav {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-  }
-
-  .data-table thead,
-  .data-table-wrapper thead {
-    display: none;
-  }
-
-  .data-table tr,
-  .data-table-wrapper tr {
-    display: block;
-    margin-bottom: 1rem;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 0.75rem;
-  }
-
-  .data-table td,
-  .data-table-wrapper td {
-    display: block;
-    border-bottom: none;
-    padding: 0.35rem 0;
-  }
-
-  .data-table td::before,
-  .data-table-wrapper td::before {
-    content: attr(data-label);
-    display: block;
-    color: var(--muted);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-}
-
-.form-field {
-  margin-bottom: 1.25rem;
-}
-
-.form-field label {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
-.form-control {
-  width: 100%;
-  padding: 0.7rem 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.22);
-  color: var(--paper);
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.9rem;
-}
-
-.form-control:focus {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
-}
-
-.form-helper {
-  margin: 0.35rem 0 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.detail-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.72);
-  z-index: 50;
-}
-
-.detail-drawer {
-  width: min(40rem, 100%);
-  max-height: 100%;
-  overflow-y: auto;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .state-loading {
-    animation: none;
-    opacity: 0.5;
-  }
-}
-
-/* shadcn-style SignalBadge dot glyph (wireframe §5.1). */
-.signal-badge-dot::before {
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 18px currentColor;
-  content: '';
 }

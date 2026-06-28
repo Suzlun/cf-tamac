@@ -1,13 +1,7 @@
+'use client';
+
 import { Slot } from '@radix-ui/react-slot';
-import {
-  createContext,
-  forwardRef,
-  useContext,
-  useId,
-  type ComponentPropsWithoutRef,
-  type ComponentRef,
-  type HTMLAttributes,
-} from 'react';
+import * as React from 'react';
 import {
   Controller,
   FormProvider,
@@ -17,67 +11,72 @@ import {
   type FieldValues,
 } from 'react-hook-form';
 
-import { cn } from './cn';
-import { Label } from './label';
+import { Label } from '@cf-tamac/client/components/ui/label';
+import { cn } from '@cf-tamac/client/lib/utils';
 
-const FormFieldContext = createContext<FormFieldContextValue | null>(null);
+import type * as LabelPrimitive from '@radix-ui/react-label';
 
-interface FormFieldContextValue {
-  readonly name: string;
+// react-hook-form の provider を Shadcn form primitive の公開名として再公開し、既存 form state を下位 field へ流す。
+const Form = FormProvider;
+
+interface FormFieldContextValue<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+> {
+  name: TName;
 }
 
+const FormFieldContext = React.createContext<FormFieldContextValue | null>(null);
+
 /**
- * `react-hook-form` の `Controller` を shadcn/ui 形式で包む field component です。
+ * react-hook-form の Controller と field name context を結び付けます。
  *
- * @param props - `Controller` に渡す `control`、`name`、`render` などの props です。
- * @returns field 名を context に載せ、子の `FormItem`/`FormLabel`/`FormControl`/`FormMessage` が同じ field を参照できる要素です。
- * @remarks
- * この component 自体は validation を実行せず、`react-hook-form` の resolver と field state を橋渡しします。
- * `FormItem` の外で使うと子の `useFormField` が error を投げるため、必ず shadcn Form composition 内で使います。
- *
- * @example
- * ```tsx
- * <FormField control={form.control} name="displayName" render={({ field }) => <Input {...field} />} />
- * ```
+ * @param props - Controller に渡す field name、control、render などの設定です。
+ * @returns FormFieldContext を伴う Controller を返します。
  */
-export function FormField<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
+const FormField = <
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+>({
   ...props
-}: ControllerProps<TFieldValues, TName>) {
+}: ControllerProps<TFieldValues, TName>) => {
   return (
+    // field name を context 化し、Label/Control/Message が同じ field state と aria ID を参照できるようにする。
     <FormFieldContext.Provider value={{ name: props.name }}>
       <Controller {...props} />
     </FormFieldContext.Provider>
   );
-}
+};
 
 /**
- * shadcn Form の field context と item context から accessibility ID と field state を取得します。
+ * 現在の FormField/FormItem から field state と ARIA ID を導出します。
  *
- * @returns input の `id`、description/message ID、field 名、`react-hook-form` の error/touched state を含む object です。
- * @throws `FormField` の外で呼ばれた場合、または `FormItem` の外で呼ばれた場合に error を投げます。
- * @remarks
- * `FormLabel`、`FormControl`、`FormDescription`、`FormMessage` が同じ ID 群を共有するための内部 hook です。
- * 直接 DOM を探さず、React context だけで関連付けを行います。
+ * @returns field name、item/control/description/message ID、react-hook-form の field state を返します。
+ * @throws `FormField` または `FormItem` の外で呼ばれた場合は、ARIA 関連付けが作れないため例外を投げます。
  */
 const useFormField = () => {
-  const fieldContext = useContext(FormFieldContext);
-  const itemContext = useContext(FormItemContext);
-  const formContext = useFormContext();
+  const fieldContext = React.useContext(FormFieldContext);
+  const itemContext = React.useContext(FormItemContext);
+  const { getFieldState, formState } = useFormContext();
+
   if (fieldContext === null) {
-    throw new Error('useFormField must be used within <FormField>');
+    // field name が無いと getFieldState の対象を特定できないため、誤った構成を即時に失敗させる。
+    throw new Error('useFormField should be used within <FormField>');
   }
+
   if (itemContext === null) {
-    throw new Error('useFormField must be used within <FormItem>');
+    // FormItem の id が無いと label/control/message の ARIA 関連付けが壊れるため、誤った構成を即時に失敗させる。
+    throw new Error('useFormField should be used within <FormItem>');
   }
-  const { getFieldState, formState } = formContext;
+
+  // react-hook-form の現在 state から、この field だけの error/touched/dirty などを切り出す。
   const fieldState = getFieldState(fieldContext.name, formState);
 
-  const { name } = fieldContext;
   const { id } = itemContext;
 
   return {
     id,
-    name,
+    name: fieldContext.name,
     formItemId: `${id}-form-item`,
     formDescriptionId: `${id}-form-item-description`,
     formMessageId: `${id}-form-item-message`,
@@ -85,148 +84,125 @@ const useFormField = () => {
   };
 };
 
-const FormItemContext = createContext<FormItemContextValue | null>(null);
-
 interface FormItemContextValue {
-  readonly id: string;
+  id: string;
 }
 
+const FormItemContext = React.createContext<FormItemContextValue | null>(null);
+
 /**
- * shadcn/ui 形式の form item container です。
+ * 1つの form field block を表す wrapper です。
  *
- * @param props - `div` に渡す className、children、HTML 属性です。
- * @param ref - container の `HTMLDivElement` ref です。
- * @returns 一意な ID を context に載せた field container を描画します。
- * @remarks
- * `useId` で生成した ID を `FormLabel`、`FormControl`、`FormDescription`、`FormMessage` が共有し、
- * `aria-describedby` と `htmlFor` の関連付けを保ちます。副作用は React の ID 生成だけです。
+ * @returns 子要素へ安定した React ID を提供し、label/control/message の関連付け単位を作ります。
  */
-export const FormItem = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => {
-    const id = useId();
+    // useId は SSR/Client で一致する ID を生成し、hydration 後も ARIA 参照を安定させる。
+    const id = React.useId();
+
     return (
+      // item id を context 化し、子の Label/Control/Description/Message が同じ ID prefix を共有する。
       <FormItemContext.Provider value={{ id }}>
-        <div ref={ref} className={cn('space-y-2 mb-5', className)} {...props} />
+        <div ref={ref} className={cn('space-y-2', className)} {...props} />
       </FormItemContext.Provider>
     );
   }
 );
 FormItem.displayName = 'FormItem';
 
-/**
- * shadcn/ui 形式の form label です。
- *
- * @param props - label に渡す children、className、HTML 属性です。
- * @param ref - label の `HTMLLabelElement` ref です。
- * @returns `FormControl` の ID に紐づく label を描画します。
- * @throws `FormField` または `FormItem` の外で使うと context error が発生します。
- * @remarks
- * field に error がある場合は `data-error` と error color class を付け、視覚状態と支援技術向け関連付けを一致させます。
- */
-export const FormLabel = forwardRef<HTMLLabelElement, HTMLAttributes<HTMLLabelElement>>(
-  ({ className, ...props }, ref) => {
-    const { error, formItemId } = useFormField();
-    return (
-      <Label
-        ref={ref}
-        htmlFor={formItemId}
-        data-error={error !== undefined}
-        className={cn(error !== undefined && 'text-error', className)}
-        {...props}
-      />
-    );
-  }
-);
+const FormLabel = React.forwardRef<
+  React.ComponentRef<typeof LabelPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
+>(({ className, ...props }, ref) => {
+  // error 状態と control ID を取得し、label の色と htmlFor を field state に同期する。
+  const { error, formItemId } = useFormField();
+
+  return (
+    <Label
+      ref={ref}
+      className={cn(error != null && 'text-destructive', className)}
+      htmlFor={formItemId}
+      {...props}
+    />
+  );
+});
 FormLabel.displayName = 'FormLabel';
 
-/**
- * shadcn/ui 形式の form control slot です。
- *
- * @param props - 子 input/select/textarea に合成する Slot props です。追加の `aria-describedby` も受け付けます。
- * @param ref - 合成先 control の ref です。
- * @returns 子 control へ `id`、`aria-describedby`、`aria-invalid` を注入した Slot を描画します。
- * @throws `FormField` または `FormItem` の外で使うと context error が発生します。
- * @remarks
- * default の description/message ID と caller が渡した追加説明 ID を結合します。これにより requested grants preview のような
- * field 外の補助 readout も、error message の読み上げを壊さず同じ control に関連付けられます。
- */
-export const FormControl = forwardRef<
-  ComponentRef<typeof Slot>,
-  ComponentPropsWithoutRef<typeof Slot>
->(({ 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
+const FormControl = React.forwardRef<
+  React.ComponentRef<typeof Slot>,
+  React.ComponentPropsWithoutRef<typeof Slot>
+>(({ ...props }, ref) => {
+  // control は field の説明文とエラー文の ID を受け取り、screen reader が入力状態を追えるようにする。
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
-  const defaultDescribedBy =
-    error !== undefined ? `${formDescriptionId} ${formMessageId}` : formDescriptionId;
-  const describedBy = [defaultDescribedBy, ariaDescribedBy]
-    .filter((value): value is string => typeof value === 'string' && value.length > 0)
-    .join(' ');
+
+  // aria-describedby 用の参照先を組み立てる。error 時は description と message の両方を参照する。
+  const describedBy = error == null ? formDescriptionId : `${formDescriptionId} ${formMessageId}`;
+
   return (
     <Slot
       ref={ref}
       id={formItemId}
       aria-describedby={describedBy}
-      aria-invalid={error !== undefined}
+      aria-invalid={error != null}
       {...props}
     />
   );
 });
 FormControl.displayName = 'FormControl';
 
-/**
- * shadcn/ui 形式の helper text です。
- *
- * @param props - helper text に渡す children、className、HTML 属性です。
- * @param ref - paragraph の `HTMLParagraphElement` ref です。
- * @returns `FormControl` の `aria-describedby` から参照される説明文を描画します。
- * @throws `FormField` または `FormItem` の外で使うと context error が発生します。
- * @remarks
- * validation を行わず、field の意図や入力例を説明するための静的/動的 copy を置く場所です。
- */
-export const FormDescription = forwardRef<
+const FormDescription = React.forwardRef<
   HTMLParagraphElement,
-  HTMLAttributes<HTMLParagraphElement>
+  React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => {
+  // description は control の aria-describedby から常に参照される補助説明として ID を固定する。
   const { formDescriptionId } = useFormField();
+
   return (
     <p
       ref={ref}
       id={formDescriptionId}
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-[0.8rem] text-muted-foreground', className)}
       {...props}
     />
   );
 });
 FormDescription.displayName = 'FormDescription';
 
-/**
- * shadcn/ui 形式の field-level error message です。
- *
- * @param props - error text に渡す children、className、HTML 属性です。field error がある場合は error message を優先します。
- * @param ref - paragraph の `HTMLParagraphElement` ref です。
- * @returns error がある場合だけ `role="alert"` 付き message を描画し、error がない場合は `null` を返します。
- * @throws `FormField` または `FormItem` の外で使うと context error が発生します。
- * @remarks
- * wireframe §6.2 の accessibility 要件に合わせ、field-level error を即時に読み上げます。副作用はなく、表示内容は
- * `react-hook-form` の field state から取得します。
- */
-export const FormMessage = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, children, ...props }, ref) => {
-    const { error, formMessageId } = useFormField();
-    const body = error !== undefined ? error.message : children;
-    if (body === undefined || body === '') return null;
-    return (
-      <p
-        ref={ref}
-        id={formMessageId}
-        role="alert"
-        className={cn('text-sm text-error font-mono', className)}
-        {...props}
-      >
-        {body}
-      </p>
-    );
+const FormMessage = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, children, ...props }, ref) => {
+  // error がある場合は react-hook-form の message を優先し、無い場合だけ明示 children を表示する。
+  const { error, formMessageId } = useFormField();
+  const body = error != null ? (error.message ?? '') : children;
+
+  if (body == null || body === '') {
+    // 表示すべき message が無い場合は空要素を残さず、screen reader に不要な alert を出さない。
+    return null;
   }
-);
+
+  return (
+    <p
+      ref={ref}
+      id={formMessageId}
+      role="alert"
+      aria-live="assertive"
+      className={cn('text-[0.8rem] font-medium text-destructive', className)}
+      {...props}
+    >
+      {body}
+    </p>
+  );
+});
 FormMessage.displayName = 'FormMessage';
 
-export { FormProvider as Form, FormProvider, useFormContext, useFormField };
+export {
+  useFormField,
+  Form,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+  FormField,
+};

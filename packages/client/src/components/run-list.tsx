@@ -5,12 +5,12 @@ import { useState } from 'react';
 
 import { AgentToken } from './agent-token';
 import { ConfirmDialog } from './confirm-dialog';
-import { ControlRoomFrame } from './control-room-frame';
 import { DataTable } from './data-table';
 import { DetailDrawer } from './detail-drawer';
 import { EmptyState } from './empty-state';
 import { generateIdempotencyKey } from './generate-idempotency-key';
 import { PaginationBar } from './pagination-bar';
+import { Button } from './ui/button';
 
 interface PageInfo {
   readonly nextPageToken?: string;
@@ -129,17 +129,18 @@ export function RunList({
   };
 
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="runs"
-      agentId={agentId}
-      currentSection="runs"
-    >
-      <p className="eyebrow">Runs</p>
-      <h2>AgentRun history and scheduler</h2>
+    // page-level ControlRoomFrame は親 page が1つだけ提供するため、ここでは frame を持たず内容のみ描画する。
+    <div className="space-y-4">
       <AgentToken agentId={agentId} />
       <RunFilterBar agentId={agentId} threadFilter={threadFilter} statusFilter={statusFilter} />
-      {success === undefined ? null : <div className="state-success readout">{success}</div>}
+      {success === undefined ? null : (
+        <p
+          role="status"
+          className="rounded-md border border-primary/50 bg-primary/10 px-3 py-2 text-sm"
+        >
+          {success}
+        </p>
+      )}
       <RunTable runs={runs} pending={pending} onOpen={openRun} />
       <PaginationBar
         basePath={`/agents/${agentId}/runs`}
@@ -180,7 +181,7 @@ export function RunList({
           replayed as a no-op. Acting user: server-derived operator.
         </p>
       </ConfirmDialog>
-    </ControlRoomFrame>
+    </div>
   );
 }
 
@@ -205,12 +206,14 @@ function RunFilterBar({
     'interrupted',
   ];
   return (
-    <section className="readout" aria-label="Run filters">
-      <div className="action-row" aria-live="polite">
+    <section className="rounded-md border bg-card p-4" aria-label="Run filters">
+      <div className="flex flex-wrap gap-2" aria-live="polite">
         {statuses.map((status) => (
           <Link
             key={status}
-            className={`nav-link${statusFilter === status ? ' state-pending' : ''}`}
+            className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent ${
+              statusFilter === status ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
+            }`}
             href={`/agents/${agentId}/runs?status=${status}&thread=${threadFilter}`}
             aria-pressed={statusFilter === status}
           >
@@ -218,7 +221,9 @@ function RunFilterBar({
           </Link>
         ))}
       </div>
-      <p className="eyebrow">Thread filter: {threadFilter === '' ? 'all' : threadFilter}</p>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Thread filter: {threadFilter === '' ? 'all' : threadFilter}
+      </p>
     </section>
   );
 }
@@ -247,17 +252,18 @@ function RunTable({
       ariaLabel="Runs"
       headers={['Run ID', 'Status', 'Thread', 'Started', 'Snapshot ref', 'Causal trigger']}
       rows={runs.map((run) => [
-        <button
+        <Button
           key={`run-${run.runId}`}
           type="button"
-          className="nav-link"
+          variant="outline"
+          size="sm"
           onClick={() => {
             void onOpen(run.runId);
           }}
           disabled={pending}
         >
           {run.runId}
-        </button>,
+        </Button>,
         run.status,
         run.threadId ?? '—',
         run.startedAtUnixMs ?? '—',
@@ -279,11 +285,16 @@ function RunDetailContent({
 }) {
   return (
     <>
-      <p className="eyebrow">RUN DETAIL</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        RUN DETAIL
+      </p>
       <p>run_id: {detail.runId}</p>
       <p>status: {detail.status}</p>
       <p>thread_id: {detail.threadId ?? '—'}</p>
-      <section className="readout" aria-label="Immutable Run snapshot">
+      <section
+        className="space-y-2 rounded-lg border bg-card p-5 text-sm leading-6"
+        aria-label="Immutable Run snapshot"
+      >
         <strong>SNAPSHOT (immutable)</strong>
         <p>
           trigger event range: {detail.input?.triggerStartThreadSequence ?? '—'} →{' '}
@@ -301,21 +312,19 @@ function RunDetailContent({
         <p>snapshot_ref: {detail.snapshot?.snapshotRef ?? detail.snapshotRef ?? 'metadata only'}</p>
         <p>snapshot digest: {detail.snapshot?.digestSha256 ?? '—'}</p>
       </section>
-      <section className="readout" aria-label="Run causal links">
+      <section
+        className="space-y-2 rounded-lg border bg-card p-5 text-sm leading-6"
+        aria-label="Run causal links"
+      >
         <strong>CAUSAL LINKS</strong>
         <p>trigger_event_id: {detail.triggerEventId ?? detail.input?.triggerEventId ?? '—'}</p>
         <p>section_id: {detail.sectionId ?? '—'}</p>
         <p>safe error detail: {detail.safeErrorMessage ?? '—'}</p>
       </section>
       {CANCELLABLE_STATUSES.includes(detail.status) ? (
-        <button
-          type="button"
-          className="nav-link state-error"
-          onClick={onCancel}
-          disabled={pending}
-        >
+        <Button type="button" variant="destructive" onClick={onCancel} disabled={pending}>
           Cancel Run
-        </button>
+        </Button>
       ) : null}
     </>
   );

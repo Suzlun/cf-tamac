@@ -91,24 +91,26 @@ export function ModelPolicyFields<TValues extends FieldValues>({
     <fieldset
       aria-labelledby="model-policy-heading"
       aria-describedby="model-policy-helper model-policy-boundary-helper"
-      className="readout"
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
     >
-      <div className="topline">
-        <span className="eyebrow">Model execution</span>
-        <span className="state-success">
+      <div className="flex items-center justify-between border-b pb-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Model execution
+        </span>
+        <span className="text-primary">
           {mode === 'create' ? 'active on create' : 'server-side only'}
         </span>
       </div>
       <legend id="model-policy-heading">Default model policy</legend>
-      <p id="model-policy-helper" className="form-helper">
+      <p id="model-policy-helper" className="text-xs text-muted-foreground">
         Seed the Agent-owned policy that future Runs resolve by reference. The browser sees only
         ref, provider, model, parameters, status, warnings, and digest.
       </p>
-      <p id="model-policy-boundary-helper" className="form-helper">
+      <p id="model-policy-boundary-helper" className="text-xs text-muted-foreground">
         Validation and save happen through server-side Agent RPC. No Provider credential or Agent
         RPC credential is sent to the browser.
       </p>
-      <p aria-live="polite" className="form-helper">
+      <p aria-live="polite" className="text-xs text-muted-foreground">
         {statusCopy}
       </p>
       <div className="grid gap-4 md:grid-cols-2">
@@ -162,7 +164,7 @@ export function ModelPolicyFields<TValues extends FieldValues>({
       </div>
       <WarningList warnings={warnings} />
       {onValidate !== undefined ? (
-        <div className="action-row">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
@@ -264,7 +266,11 @@ function WarningList({
     return null;
   }
   return (
-    <div className="readout" role="status" aria-live="polite">
+    <div
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      role="status"
+      aria-live="polite"
+    >
       <strong>Policy validation warnings</strong>
       <ul className="mt-2 list-disc pl-5 font-mono text-xs">
         {warnings.map((warning) => (

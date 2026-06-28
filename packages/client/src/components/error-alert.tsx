@@ -1,4 +1,5 @@
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Button } from './ui/button';
 
 interface ErrorAlertProps {
   readonly message: string;
@@ -20,13 +21,15 @@ export function ErrorAlert({ message, title = 'Error', retryLabel, onRetry }: Er
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
       {onRetry !== undefined ? (
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="mt-2 font-mono text-xs uppercase tracking-wider text-error underline"
+          variant="link"
+          size="sm"
+          className="mt-2 h-auto p-0 text-destructive"
         >
           {retryLabel ?? 'Retry'}
-        </button>
+        </Button>
       ) : null}
     </Alert>
   );

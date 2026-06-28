@@ -16,6 +16,7 @@ Agent API は Client Service、Integration Installation、Internal Service、Adm
 - Agent Service は JWT header の `alg` が `EdDSA` であり、`kid` が存在することを検証 MUST。
 - Agent Service は JWT payload の `iss` と header の `kid` を使い、`AGENT_CONTROL_PLANE_TRUST` の issuer/key policy を解決 MUST。
 - Agent Service は Ed25519 signature、audience、`exp`、`nbf`、最大 token TTL、`jti` replay、JWT `agent_id` と request body `agent_id` の一致、allowed Agent、allowed scope、RPC method scope を検証 MUST。
+- Agent Service は Client Service 認証で HS256 shared secret、`AGENT_CREDENTIAL_*` Worker Secret、Agent-cross registry、または public Durable Object fetch route を trust source として使用して MUST NOT。
 - Agent Service は `x-agent-test-*` headers を production Client Service credential として扱って MUST NOT。
 - Agent Service は、より狭い internal trust profile が明示的に構成されていない限り、detached signature を使用して Integration Provider リクエストを Integration Installation principal として認証 MUST。
 - ブラウザー session は direct Agent principals として受理して MUST NOT。
@@ -30,7 +31,7 @@ Agent API は Client Service、Integration Installation、Internal Service、Adm
 
 #### Scenario: 不正な Client JWT は変更前に拒否される (AGENT-SECURITY-S002)
 
-- **GIVEN** リクエストが JWT 不在、`alg` 不一致、未知の issuer、未知の kid、期限切れ token、未有効 token、不正 audience、不正 `agent_id`、欠落 scope、allowed Agent 不一致、失効 key ID、署名不正、または再利用された `jti` を持っている
+- **GIVEN** リクエストが JWT 不在、`alg` 不一致、未知の issuer、未知の kid、期限切れ token、未有効 token、不正 audience、不正 `agent_id`、欠落 scope、allowed Agent 不一致、失効 key ID、fingerprint 不一致、署名不正、または再利用された `jti` を持っている
 - **WHEN** Client Service が Agent RPC を呼ぶ
 - **THEN** Agent Service はエラー分類に従って `unauthenticated` または `permission_denied` としてリクエストを拒否する
 - **AND** Agent-owned 状態は変更されない

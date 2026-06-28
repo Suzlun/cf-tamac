@@ -23,7 +23,7 @@ export interface RegistrationActionsProps {
  */
 export function RegistrationActions({ isEdit, pending, onCancel }: RegistrationActionsProps) {
   return (
-    <div className="action-row">
+    <div className="flex flex-wrap gap-2">
       <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
         Cancel
       </Button>

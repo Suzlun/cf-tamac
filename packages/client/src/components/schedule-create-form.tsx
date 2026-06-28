@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from './ui/form';
 import { Input } from './ui/input';
-import { Select } from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface ThreadSummary {
   readonly threadId: string;
@@ -103,7 +103,7 @@ export function ScheduleCreateForm({
   };
 
   return (
-    <div className="readout">
+    <div className="rounded-md border bg-card p-4 text-sm space-y-1">
       <Form {...form}>
         <form
           onSubmit={(event) => {
@@ -117,7 +117,7 @@ export function ScheduleCreateForm({
             pending={pending}
             triggerType={triggerType}
           />
-          <div className="action-row">
+          <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
               Cancel
             </Button>
@@ -192,16 +192,25 @@ function ScheduleTypeField({ form, pending }: Pick<ScheduleFormFieldsProps, 'for
           <FormLabel>Trigger type</FormLabel>
           <FormControl>
             <Select
-              {...field}
               disabled={pending}
-              onChange={(event) => {
+              value={field.value}
+              onValueChange={(value) => {
+                // Radix Select は onValueChange で string を返す。RHF の field に反映する。
                 // trigger type 変更時は非表示 field の古い error を消し、表示中 field の修正に集中させる。
-                field.onChange(event);
+                field.onChange(value);
                 form.clearErrors(['fireAt', 'intervalSeconds']);
               }}
             >
-              <option value="one-shot">one-shot</option>
-              <option value="interval">interval</option>
+              {/* Radix Select は trigger/content/item の構造を要求するため、native <option> は使わない。 */}
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="one-shot">one-shot</SelectItem>
+                <SelectItem value="interval">interval</SelectItem>
+              </SelectContent>
             </Select>
           </FormControl>
           <FormMessage />

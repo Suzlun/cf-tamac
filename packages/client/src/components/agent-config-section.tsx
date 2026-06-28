@@ -96,14 +96,17 @@ export function AgentConfigSection({
   };
 
   return (
-    <section className="readout" aria-labelledby="config-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="config-heading"
+    >
       <strong id="config-heading">Config</strong>
       <p>Current config version: v{configVersion}</p>
-      <p className="form-helper">
+      <p className="text-xs text-muted-foreground">
         Changes are sent to AgentStateService.UpdateConfig. Default model policy is managed above;
         config JSON updates cannot override modelPolicyRef.
       </p>
-      <p aria-live="polite" className="form-helper">
+      <p aria-live="polite" className="text-xs text-muted-foreground">
         {isEditing ? 'Config editor active.' : 'Config editor read-only.'}
       </p>
       {isEditing ? (
@@ -188,7 +191,7 @@ function ConfigEditor({
               </FormItem>
             )}
           />
-          <div className="action-row">
+          <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={onCancelEdit} disabled={pending}>
               Cancel edit
             </Button>
@@ -224,13 +227,13 @@ function ConfigPreview({
   return (
     <>
       <pre
-        className="form-control"
+        className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
         aria-label="Agent config JSON"
         style={{ whiteSpace: 'pre-wrap' }}
       >
         {configJson}
       </pre>
-      <div className="action-row">
+      <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" onClick={onEdit} disabled={pending}>
           Edit config
         </Button>

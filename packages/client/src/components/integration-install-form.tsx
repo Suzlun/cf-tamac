@@ -133,7 +133,7 @@ export function IntegrationInstallForm({
   };
 
   return (
-    <div className="readout">
+    <div className="rounded-md border bg-card p-4 text-sm space-y-1">
       <Form {...form}>
         <form
           onSubmit={(event) => {
@@ -154,7 +154,7 @@ export function IntegrationInstallForm({
             pending={controlsDisabled}
             requestedGrantPreview={requestedGrantPreview}
           />
-          <div className="action-row">
+          <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
               Cancel
             </Button>
@@ -272,7 +272,7 @@ function InstallValidationSummary({ message }: { readonly message?: string }) {
   return (
     <div
       id={INSTALL_VALIDATION_SUMMARY_ID}
-      className="state-error readout"
+      className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm"
       role="alert"
       aria-live="assertive"
     >
@@ -320,11 +320,20 @@ function resolveInstallSubmitDescriptionId(
 
 function GrantPreview({ grants }: { readonly grants: readonly string[] }) {
   return (
-    <div id="requestedGrants-preview" className="readout" aria-live="polite">
-      <p className="eyebrow">Requested grants ({grants.length})</p>
-      <ul className="action-row" aria-label="Requested grants preview">
+    <div
+      id="requestedGrants-preview"
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-live="polite"
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Requested grants ({grants.length})
+      </p>
+      <ul className="flex flex-wrap gap-2" aria-label="Requested grants preview">
         {grants.map((grant) => (
-          <li key={grant} className="nav-link">
+          <li
+            key={grant}
+            className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+          >
             {grant}
           </li>
         ))}

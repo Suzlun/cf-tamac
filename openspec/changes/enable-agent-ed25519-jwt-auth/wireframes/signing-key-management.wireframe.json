@@ -1,0 +1,124 @@
+{
+  "name": "Signing Key Management",
+  "viewport": { "width": 1200, "height": 760 },
+  "root": {
+    "name": "Management Shell",
+    "direction": "horizontal",
+    "children": [
+      {
+        "name": "Left Sidebar",
+        "width": 256,
+        "direction": "vertical",
+        "padding": 16,
+        "gap": 16,
+        "children": [
+          { "name": "cf-tamac Management", "type": "text", "variant": "heading", "height": 40 },
+          { "name": "Agents", "type": "link", "height": 40 },
+          { "name": "Global Settings", "type": "link", "height": 40 },
+          { "name": "Global Settings section", "type": "text", "variant": "caption", "height": 24 },
+          {
+            "name": "Client-wide signing keys",
+            "type": "text",
+            "variant": "caption",
+            "height": 24
+          },
+          {
+            "name": "Agent RPC stays server-only",
+            "type": "text",
+            "variant": "caption",
+            "height": 32
+          }
+        ]
+      },
+      {
+        "name": "Signing Key Management Main",
+        "direction": "vertical",
+        "grow": true,
+        "padding": 32,
+        "gap": 24,
+        "children": [
+          {
+            "name": "Page Header",
+            "direction": "horizontal",
+            "align": "flex-start",
+            "justify": "space-between",
+            "gap": 24,
+            "children": [
+              {
+                "name": "Header Copy",
+                "direction": "vertical",
+                "gap": 8,
+                "grow": true,
+                "children": [
+                  {
+                    "name": "Global Settings / Signing Keys",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 20
+                  },
+                  {
+                    "name": "Client Service Signing Keys",
+                    "type": "text",
+                    "variant": "display",
+                    "height": 52
+                  },
+                  {
+                    "name": "Client-wide Ed25519 signing keys. Available before any Agent is registered. Private material never leaves the server.",
+                    "type": "text",
+                    "height": 48
+                  }
+                ]
+              },
+              {
+                "name": "Header Actions",
+                "direction": "horizontal",
+                "gap": 8,
+                "children": [
+                  { "name": "Rotation Guide", "type": "button", "height": 44 },
+                  { "name": "Trust Config Export", "type": "button", "height": 44 },
+                  { "name": "Generate Key", "type": "button", "height": 44 }
+                ]
+              }
+            ]
+          },
+          { "name": "Agent-zero Available Notice", "type": "card", "height": 72 },
+          { "name": "Secret Boundary Notice", "type": "card", "height": 72 },
+          {
+            "name": "Signing Key List",
+            "type": "table",
+            "columns": [
+              { "name": "Issuer / kid", "grow": true },
+              { "name": "Public fingerprint", "grow": true },
+              { "name": "Default", "width": 112 },
+              { "name": "Status", "width": 128 },
+              { "name": "Last used", "width": 152 },
+              { "name": "Actions", "width": 196 }
+            ],
+            "rows": 4
+          },
+          {
+            "name": "Lifecycle State Cards",
+            "direction": "horizontal",
+            "gap": 16,
+            "children": [
+              {
+                "name": "No signing keys yet — Agent-zero safe",
+                "type": "card",
+                "grow": true,
+                "height": 96
+              },
+              { "name": "Default active key state", "type": "card", "grow": true, "height": 96 },
+              {
+                "name": "Disabled or deleted key state",
+                "type": "card",
+                "grow": true,
+                "height": 96
+              },
+              { "name": "Secret-safe error state", "type": "card", "grow": true, "height": 96 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

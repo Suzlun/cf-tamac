@@ -1,27 +1,21 @@
-import { forwardRef } from 'react';
+'use client';
 
-import { cn } from './cn';
+import * as LabelPrimitive from '@radix-ui/react-label';
+import { cva, type VariantProps } from 'class-variance-authority';
+import * as React from 'react';
 
-/** Props for the shadcn-style Label component. */
-export type LabelProps = React.LabelHTMLAttributes<HTMLLabelElement>;
+import { cn } from '@cf-tamac/client/lib/utils';
 
-/**
- * shadcn-style Label component.
- *
- * Uses plain HTML `<label>` (no `@radix-ui/react-label` dependency required).
- * Styled with `--signal` text color and monospace font per the wireframe §4.7
- * typography mapping for form labels.
- */
-export const Label = forwardRef<HTMLLabelElement, LabelProps>(({ className, ...props }, ref) => {
-  return (
-    <label
-      ref={ref}
-      className={cn(
-        'block mb-1.5 font-mono text-xs uppercase tracking-wider text-primary',
-        className
-      )}
-      {...props}
-    />
-  );
-});
-Label.displayName = 'Label';
+const labelVariants = cva(
+  'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+);
+
+const Label = React.forwardRef<
+  React.ComponentRef<typeof LabelPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> & VariantProps<typeof labelVariants>
+>(({ className, ...props }, ref) => (
+  <LabelPrimitive.Root ref={ref} className={cn(labelVariants(), className)} {...props} />
+));
+Label.displayName = LabelPrimitive.Root.displayName;
+
+export { Label };

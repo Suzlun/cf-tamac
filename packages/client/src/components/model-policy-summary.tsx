@@ -38,25 +38,28 @@ export function ModelPolicySummary({
   }
 
   return (
-    <section className="readout" aria-labelledby="model-policy-summary-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="model-policy-summary-heading"
+    >
       <strong id="model-policy-summary-heading">Default model policy</strong>
       <p>
         Current Agent-owned policy metadata. The policy body and credentials stay inside the Agent
         service boundary.
       </p>
       {metadata === undefined ? (
-        <p className="form-helper">{emptyMessage}</p>
+        <p className="text-xs text-muted-foreground">{emptyMessage}</p>
       ) : (
         <MetadataList metadata={metadata} />
       )}
       {metadata?.status === 'disabled' || metadata?.status === 'archived' ? (
-        <p className="state-error" role="status">
+        <p className="text-destructive" role="status">
           The referenced policy is {metadata.status}. Runs will fail until an active policy is
           saved.
         </p>
       ) : null}
       {permissionDenied ? (
-        <p className="form-helper" role="status">
+        <p className="text-xs text-muted-foreground" role="status">
           You can view safe metadata, but you do not have permission to update the default model
           policy.
         </p>
@@ -80,7 +83,9 @@ function MetadataList({ metadata }: { readonly metadata: BrowserSafeModelPolicyM
         <SummaryItem label="Model" value={metadata.model} mono />
         <SummaryItem label="Policy version" value={`v${metadata.version}`} />
         <div>
-          <dt className="eyebrow">Status</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Status
+          </dt>
           <dd>
             <SignalBadge
               label={metadata.status}
@@ -115,22 +120,22 @@ function SummaryItem({
 }) {
   return (
     <div>
-      <dt className="eyebrow">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className={mono === true ? 'font-mono' : undefined} style={{ overflowWrap: 'anywhere' }}>
         {value === '' ? 'not returned' : value}
       </dd>
-      {helper !== undefined ? <p className="form-helper">{helper}</p> : null}
+      {helper !== undefined ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
     </div>
   );
 }
 
 function WarningsList({ metadata }: { readonly metadata: BrowserSafeModelPolicyMetadata }) {
   if (metadata.warnings.length === 0) {
-    return <p className="form-helper">Warnings: No validation warnings.</p>;
+    return <p className="text-xs text-muted-foreground">Warnings: No validation warnings.</p>;
   }
   return (
     <div role="status" aria-live="polite">
-      <p className="form-helper">Warnings: {metadata.warnings.length}</p>
+      <p className="text-xs text-muted-foreground">Warnings: {metadata.warnings.length}</p>
       <ul className="mt-2 list-disc pl-5 font-mono text-xs">
         {metadata.warnings.map((warning) => (
           <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>
@@ -142,13 +147,18 @@ function WarningsList({ metadata }: { readonly metadata: BrowserSafeModelPolicyM
 
 function ModelPolicySummarySkeleton() {
   return (
-    <section className="readout state-loading" aria-labelledby="model-policy-summary-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm"
+      aria-labelledby="model-policy-summary-heading"
+    >
       <strong id="model-policy-summary-heading">Default model policy</strong>
       <p>Loading policy metadata…</p>
       <dl className="grid gap-3 md:grid-cols-2">
         {['Policy ref', 'Digest', 'Provider', 'Model'].map((label) => (
           <div key={label}>
-            <dt className="eyebrow">{label}</dt>
+            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {label}
+            </dt>
             <dd className="font-mono">pending server metadata</dd>
           </div>
         ))}

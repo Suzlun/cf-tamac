@@ -1,18 +1,19 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import * as React from 'react';
 
-import { cn } from './cn';
+import { cn } from '@cf-tamac/client/lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs uppercase tracking-wider transition-colors',
+  'inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   {
     variants: {
       variant: {
-        default: 'border-signal/70 bg-signal text-primary-foreground',
-        secondary: 'border-line bg-secondary text-secondary-foreground',
-        outline: 'border-cyan/60 text-cyan',
-        muted: 'border-line text-muted-foreground',
-        destructive: 'border-error/60 text-error',
-        success: 'border-cyan/60 text-cyan',
+        default: 'border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80',
+        secondary:
+          'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        destructive:
+          'border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80',
+        outline: 'text-foreground',
       },
     },
     defaultVariants: {
@@ -21,18 +22,16 @@ const badgeVariants = cva(
   }
 );
 
-/** Props for the shadcn-style Badge component. */
-export type BadgeProps = React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>;
-
 /**
- * shadcn-style Badge component customized to the control-room theme.
+ * Badge component の props。
  *
- * Variants map to the wireframe §4.5 state tokens: `default` (amber signal),
- * `outline` (cyan agent token), `muted` (pending), `destructive` (error),
- * `success` (cyan confirmation).
+ * HTML の div 属性に Shadcn badge variant を合成し、状態や種別を小さなラベルとして表示するために使います。
  */
-export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
-export { badgeVariants };
+export { Badge, badgeVariants };
