@@ -1,4 +1,9 @@
-import type { AgentEventRow, AgentRunInputSnapshotRow, AgentStorageRepositories } from '../storage';
+import type {
+  AgentEventRow,
+  AgentRunInputSnapshotRow,
+  AgentStorageRepositories,
+  AgentThreadMemoryItemRow,
+} from '../storage';
 
 /**
  * Stable Context Builder section order required by Agent Runtime and Memory specs.
@@ -105,13 +110,70 @@ export function buildHarnessContextFromRepositories(input: {
       threadId: input.snapshot.threadId,
     })
     .filter((event) => event.threadSequence <= input.snapshot.uncompactedUpperSequence);
+  const policy = {
+    ...input.policy,
+    threadMemoryText:
+      input.policy.threadMemoryText ??
+      resolveSnapshotThreadMemoryText(input.repositories, input.snapshot),
+  };
   return buildHarnessContext({
     agentId: input.agentId,
     events,
-    policy: input.policy,
+    policy,
     snapshot: input.snapshot,
     triggerEvent: input.repositories.events.findByEventId(input.snapshot.triggerEventId),
   });
+}
+
+function resolveSnapshotThreadMemoryText(
+  repositories: AgentStorageRepositories,
+  snapshot: AgentRunInputSnapshotRow
+): string | undefined {
+  const snapshotRef = snapshot.threadMemoryRef;
+  if (snapshotRef === null || snapshot.threadMemoryVersion <= 0) return undefined;
+  const memory = repositories.memory.findActiveThreadMemoryVersion(snapshot.threadId);
+  if (memory === undefined) return undefined;
+
+  // The Run snapshot pins the version/ref that was current when the Run started. Do not silently
+  // hydrate a newer active Memory version into an older snapshot.
+  if (memory.version !== snapshot.threadMemoryVersion || memory.memoryRef !== snapshotRef) {
+    return undefined;
+  }
+
+  const items = repositories.memory.listThreadMemoryItems(snapshot.threadId, memory.memoryId);
+  if (items.length === 0) return `ThreadMemory version ${String(memory.version)} has no items.`;
+  return [
+    `ThreadMemory version ${String(memory.version)}:`,
+    ...items.map(formatThreadMemoryItem),
+  ].join('\n');
+}
+
+function formatThreadMemoryItem(item: AgentThreadMemoryItemRow): string {
+  const contentText = normalizePromptTextFragment(item.contentText ?? '');
+  const parts = [
+    `- ${item.memoryItemId}`,
+    `status=${item.status}`,
+    contentText === '' ? formatThreadMemoryItemReference(item) : `content=${contentText}`,
+    item.provenanceRef === null ? undefined : `provenance=${item.provenanceRef}`,
+    item.supersedesItemId === null ? undefined : `supersedes=${item.supersedesItemId}`,
+    item.invalidatesItemId === null ? undefined : `invalidates=${item.invalidatesItemId}`,
+    item.sourceCompactionId === null ? undefined : `source_compaction=${item.sourceCompactionId}`,
+    item.sourceHistoryId === null ? undefined : `source_history=${item.sourceHistoryId}`,
+    item.sourceEventId === null ? undefined : `source_event=${item.sourceEventId}`,
+  ].filter((value): value is string => value !== undefined);
+  return parts.join(' | ');
+}
+
+function formatThreadMemoryItemReference(item: AgentThreadMemoryItemRow): string {
+  const refs = [
+    item.contentRef === null ? undefined : `content_ref=${item.contentRef}`,
+    item.contentSha256 === null ? undefined : `content_sha256=${item.contentSha256}`,
+  ].filter((value): value is string => value !== undefined);
+  return refs.length === 0 ? 'content=metadata-only' : refs.join(' ');
+}
+
+function normalizePromptTextFragment(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
 }
 
 function buildIdentityPolicyPart(policy: HarnessContextPolicyInput): HarnessContextPart {
