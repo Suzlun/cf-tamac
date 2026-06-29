@@ -243,13 +243,13 @@ function CurrentCredentialSummary({ credential }: { readonly credential?: Curren
     >
       <strong>Current credential</strong>
       <p>generation {credential?.generation ?? '—'}</p>
-      <p>
+      <div>
         status:{' '}
         <SignalBadge
           label={(credential?.status ?? 'unknown').toUpperCase()}
           variant={credential?.status === 'active' ? 'signal' : 'muted'}
         />
-      </p>
+      </div>
       <p>key id: {credential?.keyId ?? '—'}</p>
       <p>masked hint: {credential?.maskedHint ?? '—'}</p>
     </div>

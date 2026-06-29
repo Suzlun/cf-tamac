@@ -84,13 +84,15 @@ CI-style の drift check は次を使います。
 pnpm check:codegen
 ```
 
-Agent public API は Connect unary binary Protobuf だけを公開します。REST/OpenAPI/Orval、ad-hoc JSON DTO、Browser direct Agent RPC、Client Agent API proxy route は追加しないでください。
+Agent public API は Connect unary binary Protobuf だけを公開します。REST/OpenAPI/Orval、ad-hoc JSON DTO、Browser direct Agent RPC、Client Agent API proxy route は追加しないでください。Agent 本番 Client Service 認証は Ed25519 JWT と `AGENT_CONTROL_PLANE_TRUST` に閉じ、HS256、`AGENT_CREDENTIAL_*`、bootstrap RPC、AgentTrustRegistry、REST/JSON auth route を本番 trust source にしません。
 
 ### DB
 
 Agent Service は D1 を持ちません。Agent-owned state は Drizzle ORM（`drizzle-orm/durable-sqlite` または現行の Durable Object SQLite adapter）経由の `AIAgent` Durable Object SQLite と Agent-owned blob storage に置きます。Prisma は使用しません。
 
-Client D1 schema を変更する場合は、Drizzle ORM（`drizzle-orm/d1`）を Client D1 repository layer として使い、`packages/client/src/server/db/schema.ts` と `packages/client/src/server/db/migrations/**` を同時に更新してください。Client D1 は `client_managed_agents` と `client_agent_credential_refs` だけを保持します。
+Client D1 schema を変更する場合は、Drizzle ORM（`drizzle-orm/d1`）を Client D1 repository layer として使い、`packages/client/src/server/db/schema.ts` と `packages/client/src/server/db/migrations/**` を同時に更新してください。Client D1 は managed Agent records、外部 credential references、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` で保護する encrypted Client Service signing key store だけを保持します。Agent domain snapshots、plaintext secrets、private JWK plaintext、raw JWT は保存しません。
+
+Client Service signing key を扱う変更では、Management Client の server-only module だけが encrypted private JWK を復号し、Browser payload、HTML、bundle、storage、public Client route、log に private JWK、encrypted private JWK、生 JWT、signing material を出さないことを確認してください。運用手順は `docs/operations/agent-control-plane-auth.md` を更新し、signing key generation、public-only trust config export、Agent Worker secret setup、rotation、emergency revoke、break-glass recovery、health verification を同期してください。
 
 適用は `wrangler d1 execute ... --config packages/client/wrangler.toml --file <migration.sql>` を使います。
 

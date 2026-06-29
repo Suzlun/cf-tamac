@@ -113,4 +113,54 @@ it('${scenarioReference(orphanId)} references an unknown behavior', () => {});
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
+
+  it('[WORKSPACE-GOVERNANCE-S012] Scenario coverage validates production auth specs and manual tags', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'openspec-auth-coverage-fixtures-'));
+    const agentAuthId = 'AGENT-SECURITY-S010';
+    const clientAuthId = 'CLIENT-REGISTRY-S011';
+    const manualSmokeId = 'WORKSPACE-GOVERNANCE-S013';
+
+    try {
+      const authSpec = writeFixture(
+        fixtureRoot,
+        'specs/auth/spec.md',
+        `## ADDED Requirements
+
+### Requirement: Production auth coverage
+
+#### Scenario: Trust config resolves Ed25519 keys (${agentAuthId})
+- **WHEN** auth tests reference this scenario
+- **THEN** coverage passes
+
+#### Scenario: Signing key store is the only Agent RPC source (${clientAuthId})
+- **WHEN** auth tests reference this scenario
+- **THEN** coverage passes
+
+#### Scenario: Operator smoke remains manual (${manualSmokeId})
+Tags: manual
+- **WHEN** staging-only operator flow is documented
+- **THEN** automated coverage is not required
+`
+      );
+      const testFile = writeFixture(
+        fixtureRoot,
+        'tests/auth-coverage.test.mjs',
+        `it('${scenarioReference(agentAuthId)} covers trust config auth', () => {});
+it('${scenarioReference(clientAuthId)} covers signing source auth', () => {});
+`
+      );
+
+      const { scenarios, parseErrors } = loadScenarios([authSpec]);
+      const byId = indexScenariosById(scenarios);
+      const referencedIn = collectTestScenarioReferences([testFile]);
+      const { missing, orphans } = computeCoverage(byId, scenarios, referencedIn);
+
+      expect(parseErrors).toEqual([]);
+      expect(scenarios.find((scenario) => scenario.id === manualSmokeId)?.manual).toBe(true);
+      expect(missing).toEqual([]);
+      expect(orphans).toEqual([]);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
 });

@@ -121,6 +121,9 @@ function createPreparedStatement(db: DatabaseSync, sql: string): D1PreparedState
 
 /**
  * Apply the Client D1 foundation migration to a test database.
+ *
+ * @remarks 0001 + 0002 を適用し、管理対象 Agent 台帳・外部 credential 参照・
+ * 暗号化済み Client Service signing key store と managed Agent の署名 metadata column を揃える。
  */
 export async function applyClientMigration(db: D1Database): Promise<void> {
   await db.exec(
@@ -132,7 +135,11 @@ export async function applyClientMigration(db: D1Database): Promise<void> {
       pinned INTEGER NOT NULL DEFAULT 0,
       last_opened_at_ms INTEGER,
       created_at_ms INTEGER NOT NULL,
-      updated_at_ms INTEGER NOT NULL
+      updated_at_ms INTEGER NOT NULL,
+      signing_issuer TEXT,
+      signing_key_id TEXT,
+      signing_public_fingerprint TEXT,
+      signing_last_verified_at_ms INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS client_agent_credential_refs (
@@ -146,6 +153,20 @@ export async function applyClientMigration(db: D1Database): Promise<void> {
       updated_at_ms INTEGER NOT NULL,
       PRIMARY KEY (agent_id, credential_ref),
       FOREIGN KEY (agent_id) REFERENCES client_managed_agents(agent_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS client_signing_keys (
+      issuer TEXT NOT NULL,
+      key_id TEXT NOT NULL,
+      public_jwk TEXT NOT NULL,
+      public_fingerprint TEXT NOT NULL,
+      private_jwk_ciphertext TEXT NOT NULL,
+      status TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL,
+      last_used_at_ms INTEGER,
+      PRIMARY KEY (issuer, key_id)
     );`
   );
 }

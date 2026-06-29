@@ -3,35 +3,42 @@ import 'server-only';
 import type { ClientWorkerEnv } from '../env';
 
 /**
- * Resolved credential secret material bound to a managed Agent.
+ * Provider/外部 credential 参照から解決した秘密素材。
  *
- * This type is server-only and must never appear in browser bundles, Server
- * Action return values, or rendered HTML.
+ * @remarks
+ * この型は Provider / model provider / Integration など Agent RPC 認証 *以外* の用途向け
+ * 外部 credential 解決だけに使う。Agent RPC bearer JWT の署名 source としては絶対に使わず、
+ * server-only scope の外へ出さない。
+ *
+ * 後方互換性は完全悪: 旧 `AGENT_CREDENTIAL_*` 経路は撤去し、外部 credential 参照は
+ * `PROVIDER_CREDENTIAL_*` prefix のみを受け付ける。
  */
-export interface ResolvedCredentialSecret {
+export interface ResolvedProviderCredentialSecret {
   readonly agentId: string;
   readonly credentialRef: string;
   readonly secretMaterial: string;
 }
 
 /**
- * Allowed prefix for Worker secret names that store Agent credential material.
+ * Provider/外部 credential 参照として許容する Worker secret name の prefix。
  *
- * Secret references stored in Client D1 must match this prefix so that
- * `resolveCredentialSecret` cannot read arbitrary Worker environment keys.
+ * @remarks
+ * Agent RPC 認証とは無関係な外部 credential (model provider API key など) だけを解決するため、
+ * `AGENT_CREDENTIAL_*` は一切受け付けない。これにより、誤って Provider credential 参照が
+ * Agent RPC 署名経路へ接続されることを防ぐ。
  */
-const ALLOWED_CREDENTIAL_REF_PREFIX = 'AGENT_CREDENTIAL_';
+const ALLOWED_PROVIDER_CREDENTIAL_REF_PREFIX = 'PROVIDER_CREDENTIAL_';
 
 /**
- * Validate that a credential reference is a safe Worker secret name.
+ * Provider credential 参照が安全な Worker secret 名であるか検証する。
  *
- * The reference must start with the allowed prefix and contain only uppercase
- * alphanumeric characters and underscores, preventing path traversal or
- * access to unrelated environment variables.
+ * @remarks
+ * 参照は許可された `PROVIDER_CREDENTIAL_` prefix で始まり、英大文字・数字・アンダースコアだけを
+ * 含む必要がある。path traversal や無関係な環境変数へのアクセスを防ぐための境界。
  */
-function assertSafeCredentialRef(credentialRef: string): void {
-  if (!credentialRef.startsWith(ALLOWED_CREDENTIAL_REF_PREFIX)) {
-    throw new TypeError('credentialRef must reference a provisioned Agent credential secret.');
+function assertSafeProviderCredentialRef(credentialRef: string): void {
+  if (!credentialRef.startsWith(ALLOWED_PROVIDER_CREDENTIAL_REF_PREFIX)) {
+    throw new TypeError('credentialRef must reference a provisioned Provider credential secret.');
   }
   if (!/^[\dA-Z_]+$/.test(credentialRef)) {
     throw new TypeError('credentialRef must contain only uppercase alphanumeric characters.');
@@ -39,57 +46,56 @@ function assertSafeCredentialRef(credentialRef: string): void {
 }
 
 /**
- * Check whether a resolved secret string has content without timing-attack risk.
- *
- * Uses `length` comparison before value comparison to avoid timing side channels
- * on secret material.
+ * 空文字判定を長さ比較だけで行い、secret 値の timing side-channel を避ける。
  */
 function isSecretEmpty(secret: string): boolean {
   return secret.length === 0;
 }
 
 /**
- * Resolve a credential reference to its secret material using server-side Worker bindings.
+ * Provider/外部 credential 参照を Worker binding から解決する。
  *
- * This function is server-only. It reads the provisioned Worker secret that
- * matches the stored `credentialRef` and returns the material for server-side
- * Agent RPC authentication. The result must not be serialized to browser
- * responses, logs, or Client D1 records.
+ * @remarks
+ * この関数は server-only であり、Provider / model provider / Integration など Agent RPC 認証 *以外* の
+ * 外部 credential 解決にだけ使う。Agent RPC bearer JWT 署名 source としては絶対に呼び出さず、
+ * `packages/client/src/server/agent-rpc/**` からは import しない。
  *
- * The `credentialRef` is validated against an allowed prefix to prevent access
- * to arbitrary Worker environment variables.
+ * 結果は browser response・log・Client D1 record へ直列化してはならない。
+ * 参照は許可された prefix で検証し、任意の Worker 環境変数アクセスを防ぐ。
+ *
+ * 後方互換性は完全悪: 旧 `AGENT_CREDENTIAL_*` 解決は撤去済み。
  */
-export function resolveCredentialSecret(
+export function resolveProviderCredentialSecret(
   env: ClientWorkerEnv,
   agentId: string,
   credentialRef: string
-): Promise<ResolvedCredentialSecret> {
+): Promise<ResolvedProviderCredentialSecret> {
   return Promise.resolve().then(() => {
     if (agentId === '') {
       throw new TypeError('agentId must not be empty.');
     }
-    assertSafeCredentialRef(credentialRef);
+    assertSafeProviderCredentialRef(credentialRef);
 
     const secret = readWorkerSecret(env, credentialRef);
     if (isSecretEmpty(secret)) {
-      throw new Error('The requested Agent credential is not provisioned.');
+      throw new Error('The requested Provider credential is not provisioned.');
     }
 
     return {
       agentId,
       credentialRef,
       secretMaterial: secret,
-    } satisfies ResolvedCredentialSecret;
+    } satisfies ResolvedProviderCredentialSecret;
   });
 }
 
 /**
- * Read a validated credential secret from the Worker environment.
+ * 検証済み Provider credential secret を Worker 環境から読み出す。
  *
- * Uses `Object.entries` iteration instead of dynamic key access to avoid
- * object-injection risk. The `credentialRef` has already been validated by
- * `assertSafeCredentialRef` to start with `AGENT_CREDENTIAL_` and contain
- * only safe characters.
+ * @remarks
+ * 動的 key access による object-injection リスクを避けるため `Object.entries` で反復する。
+ * `credentialRef` は `assertSafeProviderCredentialRef` で `PROVIDER_CREDENTIAL_` prefix と
+ * 安全な文字種だけで検証済みである。
  */
 function readWorkerSecret(env: ClientWorkerEnv, credentialRef: string): string {
   const envRecord = env as unknown as Readonly<Record<string, unknown>>;

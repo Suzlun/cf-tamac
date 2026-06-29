@@ -36,8 +36,10 @@ import type {
 } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
 import { getAIAgentDurableObjectStub } from '../agent-routing';
+import { loadControlPlaneTrustConfig } from '../domain/security';
 
 import { createAgentCoreContext } from './command-context';
+import { getCurrentAgentRpcExecutionPrincipal } from './interceptors/audit';
 import {
   mapConfigCommand,
   mapCredentialCommand,
@@ -126,6 +128,8 @@ export async function dispatchAgentHealthCheck(
           safeDetailRef: health.modelExecution.safeDetailRef,
           status: health.modelExecution.status,
         };
+  const trustConfig = await createTrustConfigDiagnostic(env);
+  const currentPrincipalTrust = createCurrentPrincipalTrustDiagnostic();
 
   return {
     agentId: health.agentId,
@@ -144,6 +148,68 @@ export async function dispatchAgentHealthCheck(
     modelExecution,
     serviceVersion: agentServiceVersion,
     status: servingStatus,
+    trustConfig,
+    currentPrincipalTrust,
+  };
+}
+
+async function createTrustConfigDiagnostic(env: AgentWorkerEnv): Promise<
+  | {
+      readonly fingerprint: string;
+      readonly issuerCount: number;
+      readonly keyCount: number;
+      readonly loadedAtUnixMs: bigint;
+      readonly status: string;
+      readonly version: string;
+    }
+  | undefined
+> {
+  try {
+    // health response は trust config の公開 fingerprint と集約数だけを返し、公開鍵全文や secret は返しません。
+    const config = await loadControlPlaneTrustConfig(env.AGENT_CONTROL_PLANE_TRUST);
+    return {
+      fingerprint: config.diagnostic.fingerprint,
+      issuerCount: config.diagnostic.issuerCount,
+      keyCount: config.diagnostic.keyCount,
+      loadedAtUnixMs: BigInt(config.diagnostic.loadedAtUnixMs),
+      status: config.diagnostic.status,
+      version: config.diagnostic.version,
+    };
+  } catch {
+    // 認証済み RPC でここへ来ることは通常ありませんが、diagnostic は secret-free degraded として返します。
+    return {
+      fingerprint: 'unavailable',
+      issuerCount: 0,
+      keyCount: 0,
+      loadedAtUnixMs: BigInt(Date.now()),
+      status: 'unavailable',
+      version: 'unavailable',
+    };
+  }
+}
+
+function createCurrentPrincipalTrustDiagnostic():
+  | {
+      readonly fingerprint: string;
+      readonly issuer: string;
+      readonly keyStatus: string;
+      readonly kid: string;
+      readonly principalType: string;
+      readonly verified: boolean;
+      readonly verifiedAtUnixMs: bigint;
+    }
+  | undefined {
+  const summary = getCurrentAgentRpcExecutionPrincipal()?.trustSummary;
+  if (summary === undefined) return undefined;
+  // 認証済み principal の安全な issuer/kid/fingerprint だけを health response へ写します。
+  return {
+    fingerprint: summary.fingerprint,
+    issuer: summary.issuer,
+    keyStatus: summary.keyStatus,
+    kid: summary.kid,
+    principalType: summary.principalType,
+    verified: summary.verified,
+    verifiedAtUnixMs: BigInt(summary.verifiedAtUnixMs),
   };
 }
 

@@ -80,6 +80,12 @@ Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-agent-s
 NG例: `packages/agent/src` で `new Hono()`、`.get('/')`、`Response.json(...)`、`openapi.json`、`orval` を追加する。
 OK例: `packages/agent/src/rpc/**` の Connect facade と generated descriptors を public path として使う。
 
+**Rule: Agent 本番 Client Service 認証は Ed25519 JWT と `AGENT_CONTROL_PLANE_TRUST` に閉じる。**
+Summary: 本番 Client Service trust source は public-only trust config と EdDSA JWT であり、HS256、`AGENT_CREDENTIAL_*`、bootstrap RPC、AgentTrustRegistry、REST/JSON auth route を使いません。
+Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-agent-surface.mjs` and `scripts/governance/verify-package-boundaries.mjs`; scenario coverage via `WORKSPACE-GOVERNANCE-S011`.
+NG例: Client Agent RPC signing で `HS256` や `resolveCredentialSecret` を使う、Agent に `/auth` JSON route や bootstrap trust RPC を追加する、Client private signing key を Worker Secret へ手貼りする前提を書く。
+OK例: Client D1 の encrypted Client Service signing key store を `CLIENT_CREDENTIAL_ENCRYPTION_KEY` で復号し、server-only module が EdDSA JWT を署名し、Agent が `AGENT_CONTROL_PLANE_TRUST` の issuer/kid/fingerprint/scope policy で検証する。
+
 **Rule: Connect transport は binary Protobuf profile と fail-closed routing を守る。**
 Summary: Agent Worker は `POST` + `Content-Type: application/proto` の unary request を受け、JSON/GET/unmapped method/public Durable Object fetch fallback を成功させません。
 Enforcement point: `pnpm test:agent` via `packages/agent/src/tests/connect-binary.test.ts`, `packages/agent/src/tests/fail-closed-routing.test.ts`, and `packages/agent/src/tests/health-rpc.test.ts`.
@@ -109,7 +115,7 @@ OK例: `packages/agent/wrangler.toml` は `AI_AGENT` Durable Object と `AGENT_B
 ## 3. Management Client server/browser boundary
 
 **Rule: Browser-visible Client modules は server-only Agent RPC、credentials、generated RPC construction、Connect runtime を import しない。**
-Summary: Browser bundle に Agent RPC credential seam や direct Agent RPC invocation logic を入れません。
+Summary: Browser bundle に Agent RPC credential seam、private JWK、encrypted private JWK、生 JWT、direct Agent RPC invocation logic を入れません。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
 NG例: `packages/client/app/page.tsx` から `@connectrpc/connect`、`@cf-tamac/client-agent-rpc/**`、`packages/client/src/server/**` を import する。
 OK例: Agent RPC client construction は `packages/client/src/server/agent-rpc/**` に閉じ、App Router は Server Components/Server Actions 経由で使う。
@@ -121,9 +127,9 @@ NG例: `packages/client/app/**` や browser-visible `packages/client/src/**` で
 OK例: Agent 通信は server-only Agent RPC module または Server Actions/Server Components の internal UI boundary に閉じる。
 
 **Rule: Browser-visible Client source に credential/D1/RPC seam 文字列を置かない。**
-Summary: Browser-visible source に Agent credential headers、Client D1 seam、server Agent RPC factory 名を漏らしません。
+Summary: Browser-visible source に Agent credential headers、Client D1 seam、server Agent RPC factory 名、private JWK、encrypted private JWK、生 JWT、signing material を漏らしません。
 Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
-NG例: `createServerAgentRpcClients`、`CLIENT_DB`、`credentialRef`、`credential_ref`、`Authorization`、`Bearer` を app/browser-visible source に置く。
+NG例: `createServerAgentRpcClients`、`CLIENT_DB`、`credentialRef`、`credential_ref`、`Authorization`、`Bearer`、`privateJwk`、`encryptedPrivateJwk` を app/browser-visible source に置く。
 OK例: Credential refs と Agent RPC metadata は `packages/client/src/server/**` に閉じる。
 
 **Rule: Client Agent RPC server modules は `server-only` boundary を持つ。**
@@ -156,11 +162,11 @@ Enforcement point: `pnpm test:client` via `packages/client/src/tests/agent-regis
 NG例: `management-content.tsx` や route shells に旧 `hello` / `users` navigation/content を戻す。
 OK例: `Agent registry`、`Register the first managed Agent.`、`New Agent record`、`Preview detail shell`、`agent_id:` を含む shell を表示する。
 
-**Rule: Client D1 は management ledger だけを保持し、Agent-domain snapshots を保存しない。**
-Summary: Client-owned D1 は managed Agent records と credential refs だけを持ちます。
+**Rule: Client D1 は management ledger と encrypted signing key store だけを保持し、Agent-domain snapshots を保存しない。**
+Summary: Client-owned D1 は managed Agent records、外部 credential refs、encrypted Client Service signing key store だけを持ちます。
 Enforcement point: `pnpm test:client` via `packages/client/src/tests/client-d1-schema.test.ts`, `packages/client/src/tests/client-repository-boundary.test.ts`, and `packages/client/src/server/db/schema.ts`.
-NG例: Client D1 に Agent events、thread memory、state snapshots、schedules、tool invocations、integration installations、adapter connections、compaction bodies を保存する table/API を追加する。
-OK例: `client_managed_agents` と `client_agent_credential_refs` だけを Client-owned management data として扱う。
+NG例: Client D1 に Agent events、thread memory、state snapshots、schedules、tool invocations、integration installations、adapter connections、compaction bodies、plaintext secret、private JWK plaintext を保存する table/API を追加する。
+OK例: `client_managed_agents`、`client_agent_credential_refs`、`client_signing_keys` を Client-owned data として扱い、`client_signing_keys.encrypted_private_jwk` は `CLIENT_CREDENTIAL_ENCRYPTION_KEY` で暗号化された値だけを保持する。
 
 ## 4. Agent layer direction
 

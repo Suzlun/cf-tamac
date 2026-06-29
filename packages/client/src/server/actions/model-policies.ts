@@ -14,7 +14,8 @@ import {
   createE2eFakeAgentRpcClients,
   isE2eFakeAgentRpcEnabled,
 } from '../agent-rpc/e2e-fake-clients';
-import { resolveCredentialSecret } from '../credentials/secret-resolution';
+import { resolveEd25519PrivateKey } from '../credentials/signing-keys';
+import { createSigningKeyRepository } from '../db';
 import { getClientWorkerEnv } from '../env';
 
 import {
@@ -36,9 +37,10 @@ import type {
  * Agent 作成前の model policy validation に必要な browser-safe 入力です。
  *
  * @remarks
- * Browser は credential secret 本体を渡さず、既存 registration form と同じ lookup reference と
- * Agent RPC origin だけを渡します。Server Action は Worker secret binding から material を解決し、
- * generated Agent RPC client を server-only で作成します。
+ * Browser は Provider / model provider credential の登録 metadata と Agent RPC origin だけを渡します。
+ * Server Action は Agent RPC 署名 source として credential 参照を使わず、Client D1 の既定 Ed25519
+ * signing key record と `CLIENT_CREDENTIAL_ENCRYPTION_KEY` だけで generated Agent RPC client を
+ * server-only に作成します。
  */
 export interface ModelPolicyRegistrationValidationInput {
   readonly agentId: string;
@@ -51,11 +53,12 @@ export interface ModelPolicyRegistrationValidationInput {
 /**
  * Agent 作成前の policy draft を server-only Agent RPC で検証します。
  *
- * @param input - Agent ID、RPC origin、credential lookup reference、model policy draft を含む入力です。
+ * @param input - Agent ID、RPC origin、Provider credential 登録 metadata、model policy draft を含む入力です。
  * @returns Browser-safe な validation result です。
  * @remarks
- * Client D1 に registry row を作る前に Agent Service の `ValidateModelPolicy` を呼びます。credential
- * secret は server-only に解決し、result には safe warning/error だけを含めます。
+ * Client D1 に registry row を作る前に Agent Service の `ValidateModelPolicy` を呼びます。
+ * Agent RPC bearer JWT は既定 Ed25519 signing key store から署名し、result には safe warning/error
+ * だけを含めます。`credentialReference` と `keyId` は registration metadata であり署名 source ではありません。
  */
 export async function validateModelPolicyForRegistration(
   input: ModelPolicyRegistrationValidationInput
@@ -262,19 +265,43 @@ async function createRegistrationAgentRpcClients(
   }
 
   const env = getClientWorkerEnv();
-  const resolvedSecret = await resolveCredentialSecret(
-    env,
-    input.agentId,
-    input.credentialReference
+  // 登録前 validation は Client D1 に managed Agent record が無い状態で Agent RPC を呼ぶため、
+  // Ed25519 signing key store の既定鍵を署名 source に使う。credentialRef / AGENT_CREDENTIAL_* は使わない。
+  const signingKeys = createSigningKeyRepository(env.CLIENT_DB);
+  const signingKey = await signingKeys.getDefaultSigningKey();
+  if (signingKey === undefined) {
+    throw new Error('No active default Client Service signing key is configured.');
+  }
+  if (signingKey.status !== 'active') {
+    throw new Error('The default Client Service signing key is not active.');
+  }
+  let publicJwk: { readonly kty: 'OKP'; readonly crv: 'Ed25519'; readonly x: string };
+  try {
+    publicJwk = JSON.parse(signingKey.publicJwk) as {
+      readonly kty: 'OKP';
+      readonly crv: 'Ed25519';
+      readonly x: string;
+    };
+  } catch {
+    throw new Error('The default signing key public JWK is malformed.');
+  }
+  const privateKey = await resolveEd25519PrivateKey(
+    env.CLIENT_CREDENTIAL_ENCRYPTION_KEY,
+    signingKey.privateJwkCiphertext
   );
   return createServerAgentRpcClients({
     agentRpcOrigin: input.agentRpcOrigin,
     credential: {
       agentId: input.agentId,
-      credentialRef: input.credentialReference,
-      keyId: input.keyId,
-      secretMaterial: resolvedSecret.secretMaterial,
+      issuer: signingKey.issuer,
+      keyId: signingKey.keyId,
+      publicFingerprint: signingKey.publicFingerprint,
+      publicJwk,
+      privateKey,
       actingUser: deriveActingUserContext(),
+      // 登録前 validation でも実際に JWT 署名が成功した時点で既定鍵の利用時刻を更新する。
+      // 更新失敗時は authentication layer が fail-closed し、未追跡の validation RPC を送信しない。
+      onJwtSigned: () => signingKeys.touchSigningKeyLastUsed(signingKey.issuer, signingKey.keyId),
     },
   });
 }

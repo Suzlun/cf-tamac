@@ -142,9 +142,10 @@ function resolveSnapshotThreadMemoryText(
 
   const items = repositories.memory.listThreadMemoryItems(snapshot.threadId, memory.memoryId);
   if (items.length === 0) return `ThreadMemory version ${String(memory.version)} has no items.`;
-  return [`ThreadMemory version ${String(memory.version)}:`, ...items.map(formatThreadMemoryItem)].join(
-    '\n'
-  );
+  return [
+    `ThreadMemory version ${String(memory.version)}:`,
+    ...items.map(formatThreadMemoryItem),
+  ].join('\n');
 }
 
 function formatThreadMemoryItem(item: AgentThreadMemoryItemRow): string {

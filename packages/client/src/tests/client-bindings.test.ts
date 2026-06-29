@@ -11,7 +11,6 @@ describe('Management Client Worker bindings', () => {
 
     expect(config).toContain('[[d1_databases]]');
     expect(config).toContain('binding = "CLIENT_DB"');
-    expect(config).toContain('CLIENT_CREDENTIAL_SECRET_REF');
     expect(config).toContain('CLIENT_CREDENTIAL_ENCRYPTION_KEY');
 
     expect(config).not.toContain('AI_AGENT');

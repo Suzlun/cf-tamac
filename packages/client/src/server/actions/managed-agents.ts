@@ -14,6 +14,7 @@ import {
 import {
   createCredentialReferenceRepository,
   createManagedAgentRepository,
+  createSigningKeyRepository,
   type ManagedAgentRecord,
 } from '../db';
 import { getClientWorkerEnv } from '../env';
@@ -203,6 +204,37 @@ export async function submitManagedAgentRegistration(
   }
 
   const env = getClientWorkerEnv();
+  // edit mode 判定。create のみ初期化に既定 signing key が必要で、失敗時は今回作成した行だけ削除する。
+  // edit mode では既存台帳行を絶対に削除せず、prerequisite error や init failure を formError へ変換する。
+  const isCreate = options.existingAgentId === undefined;
+  let createDefaultSigningKey:
+    | {
+        readonly issuer: string;
+        readonly keyId: string;
+        readonly publicFingerprint: string;
+      }
+    | undefined;
+
+  if (isCreate) {
+    // create のみ、DB 書き込み前に既定 signing key の前提を検査し、台帳への partial write を防ぐ。
+    const defaultSigningKey = await createSigningKeyRepository(
+      env.CLIENT_DB
+    ).getDefaultSigningKey();
+    if (defaultSigningKey?.status !== 'active') {
+      return {
+        ok: false,
+        fieldErrors: {},
+        formError:
+          'Generate and select a default Client Service signing key under Global Settings before registering an Agent.',
+      };
+    }
+    createDefaultSigningKey = {
+      issuer: defaultSigningKey.issuer,
+      keyId: defaultSigningKey.keyId,
+      publicFingerprint: defaultSigningKey.publicFingerprint,
+    };
+  }
+
   const result = await persistManagedAgentRegistration(
     validation.value,
     {
@@ -214,6 +246,16 @@ export async function submitManagedAgentRegistration(
 
   if (result.ok) {
     try {
+      // create のみ、新規 Agent に既定 signing key を割り当ててから初期化する。
+      // edit は既存の signing metadata を保持し、default で上書きしない。
+      if (isCreate && createDefaultSigningKey !== undefined) {
+        await createManagedAgentRepository(env.CLIENT_DB).updateManagedAgentSigningKey({
+          agentId: result.agentId,
+          signingIssuer: createDefaultSigningKey.issuer,
+          signingKeyId: createDefaultSigningKey.keyId,
+          signingPublicFingerprint: createDefaultSigningKey.publicFingerprint,
+        });
+      }
       await initializeAgentWithDefaultModelPolicy(
         result.agentId,
         buildRegistrationIdempotencyKey(result.agentId),
@@ -224,7 +266,10 @@ export async function submitManagedAgentRegistration(
       revalidatePath(`/agents/${result.agentId}`);
       revalidatePath(`/agents/${result.agentId}/settings`);
     } catch (error) {
-      await rollbackFailedAgentInitialization(env.CLIENT_DB, result.agentId);
+      // create のみ、今回作成した行を rollback する。edit は既存台帳行を削除しない。
+      if (isCreate) {
+        await rollbackFailedAgentInitialization(env.CLIENT_DB, result.agentId);
+      }
       return {
         ok: false,
         fieldErrors: {},
@@ -524,4 +569,62 @@ export async function deleteManagedAgent(agentId: string): Promise<void> {
   await createManagedAgentRepository(env.CLIENT_DB).deleteManagedAgent(agentId);
   revalidatePath('/agents');
   revalidatePath(`/agents/${agentId}`);
+}
+
+/**
+ * 選択済み Client Service signing key を managed Agent metadata へ保存するための入力です。
+ *
+ * @remarks issuer / keyId / publicFingerprint は Global Settings で生成済みの signing key から選んだ値。
+ */
+export interface SaveManagedAgentSigningKeyInput {
+  readonly agentId: string;
+  readonly issuer: string;
+  readonly keyId: string;
+  readonly publicFingerprint: string;
+}
+
+/**
+ * managed Agent に既存 global signing key を割り当てる Server Action。
+ *
+ * @param input - Agent ID と Global signing key の issuer / keyId / publicFingerprint。
+ * @returns 更新後の managed Agent metadata。
+ * @remarks
+ * issuer / keyId / fingerprint を Client D1 台帳 metadata へ同時に保存する。Agent Worker の
+ * trust config は変更せず、Health Check Server Action で別途検証する。
+ */
+export async function saveManagedAgentSigningKey(
+  input: SaveManagedAgentSigningKeyInput
+): Promise<ManagedAgentRecord | undefined> {
+  if (input.agentId === '') {
+    throw new TypeError('agentId must not be empty.');
+  }
+  if (input.issuer === '' || input.keyId === '' || input.publicFingerprint === '') {
+    throw new TypeError('issuer, keyId, and publicFingerprint are required together.');
+  }
+  const env = getClientWorkerEnv();
+  const signingKey = await createSigningKeyRepository(env.CLIENT_DB).getSigningKey(
+    input.issuer,
+    input.keyId
+  );
+  if (signingKey === undefined) {
+    throw new Error('The selected Client Service signing key was not found.');
+  }
+  if (signingKey.status !== 'active') {
+    throw new Error('The selected Client Service signing key is not active.');
+  }
+  if (signingKey.publicFingerprint !== input.publicFingerprint) {
+    throw new Error('The selected signing key fingerprint does not match the signing key store.');
+  }
+  const record = await createManagedAgentRepository(env.CLIENT_DB).updateManagedAgentSigningKey({
+    agentId: input.agentId,
+    signingIssuer: signingKey.issuer,
+    signingKeyId: signingKey.keyId,
+    signingPublicFingerprint: signingKey.publicFingerprint,
+  });
+  if (record === undefined) {
+    throw new Error('Managed Agent not found in Client registry.');
+  }
+  revalidatePath(`/agents/${input.agentId}`);
+  revalidatePath(`/agents/${input.agentId}/settings`);
+  return record;
 }

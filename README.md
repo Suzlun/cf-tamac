@@ -18,6 +18,7 @@
 - 初期必須 transport は Connect unary binary Protobuf です。
 - Worker facade は `POST` + `Content-Type: application/proto` だけを public success path とします。
 - REST resource API、OpenAPI Agent API、Orval Agent client、ad-hoc JSON DTO API、public Durable Object fetch API、browser direct Agent API は公開しません。
+- 本番 Client Service 認証は Ed25519 JWT と `AGENT_CONTROL_PLANE_TRUST` に閉じます。Agent は公開鍵だけを含む trust config を required secret として読み、HS256、`AGENT_CREDENTIAL_*`、bootstrap RPC、AgentTrustRegistry、REST/JSON auth route を本番 trust source にしません。
 
 ## Agent Domain
 
@@ -38,14 +39,23 @@
 - Agent-local Queue は scheduler wake/coalescing mechanism であり、Event や Run の正本ではありません。
 - 大きな Event payload、History body、Tool result blob、artifact、archive segment は Agent-owned blob storage に offload します。
 - Agent Worker は `CLIENT_DB`、Agent-cross D1、Cloudflare Queues producer/consumer binding を持ちません。
-- Management Client Worker は `CLIENT_DB` と credential references を持ちますが、Agent domain snapshot を Client D1 に複製しません。
+- Management Client Worker は `CLIENT_DB`、外部 credential references、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` で保護された encrypted Client Service signing key store を持ちますが、Agent domain snapshot、plaintext secrets、private JWK plaintext を Client D1 に複製しません。
 
 ## Management Client
 
 - Agent registry、Agent detail、Thread/Event/Run/Compaction、Schedule、Tool approval、Integration install/uninstall、Agent settings を管理する UI です。
 - Agent credential material、Agent RPC client construction、Agent runtime imports は browser bundle に入りません。
+- private JWK、encrypted private JWK、生 JWT、Agent RPC signing logic は browser response、bundle、storage、public Client route に入りません。
 - `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding route は公開しません。
 - Server Actions と Server Components は UI 内部の execution boundary であり、Agent public API ではありません。
+
+## Credential Operations
+
+- 本番運用 runbook は `docs/operations/agent-control-plane-auth.md` です。
+- Management Client の `Global Settings > Signing Keys` は Agent が 0 件でも Ed25519 signing key を生成し、private JWK を `CLIENT_CREDENTIAL_ENCRYPTION_KEY` で暗号化して Client D1 に保存します。
+- `Global Settings > Trust Config Export` は Agent Worker の Variables and Secrets に設定できる public-only `AGENT_CONTROL_PLANE_TRUST` JSON を出力します。出力には private key parameter `d`、private JWK、encrypted private JWK、生 JWT を含めません。
+- Agent Worker の監査識別子 hash は `AGENT_AUDIT_HASH_PEPPER` を使う HMAC で生成し、既知 user ID / email の辞書照合を防ぎます。
+- Rotation は新 key 追加、旧 key `retiring`、Agent health verification、旧 key `revoked` の順で進めます。Emergency revoke と break-glass recovery は Dashboard/API/Wrangler で Agent trust config を更新し、Health Check で確認します。
 
 ## Code Generation
 

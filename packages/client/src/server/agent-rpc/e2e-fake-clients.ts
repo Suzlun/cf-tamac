@@ -506,12 +506,28 @@ function buildFakeHealthClient(
     check: () =>
       resolveFake({
         agentId,
+        checkedAtUnixMs: BigInt(Date.now()),
+        currentPrincipalTrust: {
+          fingerprint: `sha256:e2e-${agentId}`,
+          issuer: 'cf-tamac-client',
+          keyStatus: 'active',
+          kid: `e2e-key-${safeIdSuffix(agentId)}`,
+          verified: true,
+          verifiedAtUnixMs: BigInt(Date.now()),
+        },
         modelExecution: {
           bindingPresent: true,
           origin: agentRpcOrigin,
           status: 'serving',
         },
+        serviceVersion: 'e2e-fake',
         status: 'serving',
+        trustConfig: {
+          fingerprint: `sha256:e2e-trust-${safeIdSuffix(agentId)}`,
+          loadedAtUnixMs: BigInt(Date.now()),
+          status: 'serving',
+          version: '1',
+        },
       }),
   } as unknown as ServerAgentRpcClients['health'];
 }

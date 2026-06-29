@@ -1,3 +1,4 @@
+import { verifyAgentHealth } from '@cf-tamac/client/server/actions/agent-health';
 import {
   destroyAgent,
   getAgentConfig,
@@ -10,13 +11,16 @@ import {
   getActingOperatorId,
   getManagedAgentForEdit,
   saveAgentAccessLookup,
+  saveManagedAgentSigningKey,
 } from '@cf-tamac/client/server/actions/managed-agents';
 import {
   getDefaultModelPolicyForManagedAgent,
   validateModelPolicyForManagedAgent,
 } from '@cf-tamac/client/server/actions/model-policies';
+import { listSigningKeys } from '@cf-tamac/client/server/actions/signing-keys';
 
 import { AgentSettingsForm } from '../../../../src/components/agent-settings-form';
+import { AgentSigningKeySelect } from '../../../../src/components/agent-signing-key-select';
 import { ControlRoomFrame } from '../../../../src/components/control-room-frame';
 import { ErrorAlert } from '../../../../src/components/error-alert';
 
@@ -88,31 +92,30 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
     );
   }
 
+  // signing key selection と Health Check は Client D1 だけで完結し、Agent RPC 不要。
+  // Agent RPC config 取得が signing key 未選択で fail-closed しても、選択 UI へ到達できるように分離する。
+  const signingKeys = await listSigningKeys();
+
   const [configResult, overviewResult, policyResult] = await Promise.allSettled([
     getAgentConfig(agentId),
     getAgentOverview(agentId),
     getDefaultModelPolicyForManagedAgent(agentId),
   ]);
 
-  if (configResult.status === 'rejected') {
-    return (
-      <SettingsErrorFrame
-        agentId={agentId}
-        message={safeSettingsErrorMessage(configResult.reason)}
-      />
-    );
-  }
-
   const actingOperatorId = await getActingOperatorId();
   const overview = overviewResult.status === 'fulfilled' ? overviewResult.value : undefined;
   const defaultPolicy =
     policyResult.status === 'fulfilled' ? policyResult.value.metadata : undefined;
-  const initialNotice =
-    overviewResult.status === 'rejected'
-      ? safeSettingsErrorMessage(overviewResult.reason)
-      : policyResult.status === 'rejected'
-        ? safeSettingsErrorMessage(policyResult.reason)
-        : undefined;
+  // config / overview / policy のいずれかが signing key 未選択等で失敗しても、
+  // signing key select + Health Check は表示できるように notice に変換する。
+  const agentRpcNotice =
+    configResult.status === 'rejected'
+      ? safeSettingsErrorMessage(configResult.reason)
+      : overviewResult.status === 'rejected'
+        ? safeSettingsErrorMessage(overviewResult.reason)
+        : policyResult.status === 'rejected'
+          ? safeSettingsErrorMessage(policyResult.reason)
+          : undefined;
   const currentCredential = {
     generation: overview?.credential?.generation ?? overview?.credentialGeneration,
     status: overview?.credential?.status ?? managedAgent.credential?.status ?? 'unknown',
@@ -121,21 +124,39 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
   };
 
   return (
-    <AgentSettingsForm
-      agentId={agentId}
-      displayName={managedAgent.agent.displayName}
-      initialConfig={configResult.value}
-      initialModelPolicy={defaultPolicy}
-      currentCredential={currentCredential}
-      actingOperatorId={actingOperatorId}
-      initialNotice={initialNotice}
-      onUpdateConfig={updateAgentConfig}
-      onValidateModelPolicy={validateModelPolicyForManagedAgent}
-      onSaveDefaultModelPolicy={saveDefaultModelPolicy}
-      onRotateCredential={rotateAgentCredential}
-      onSaveAccessLookup={saveSettingsCredentialReference}
-      onDestroy={destroyAgent}
-    />
+    <div className="space-y-8">
+      {configResult.status === 'fulfilled' ? (
+        <AgentSettingsForm
+          agentId={agentId}
+          displayName={managedAgent.agent.displayName}
+          initialConfig={configResult.value}
+          initialModelPolicy={defaultPolicy}
+          currentCredential={currentCredential}
+          actingOperatorId={actingOperatorId}
+          initialNotice={agentRpcNotice}
+          onUpdateConfig={updateAgentConfig}
+          onValidateModelPolicy={validateModelPolicyForManagedAgent}
+          onSaveDefaultModelPolicy={saveDefaultModelPolicy}
+          onRotateCredential={rotateAgentCredential}
+          onSaveAccessLookup={saveSettingsCredentialReference}
+          onDestroy={destroyAgent}
+        />
+      ) : (
+        <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="settings unavailable">
+          <ErrorAlert message={agentRpcNotice ?? 'Agent settings are temporarily unavailable.'} />
+        </ControlRoomFrame>
+      )}
+      <AgentSigningKeySelect
+        agentId={agentId}
+        signingKeys={signingKeys}
+        selectedIssuer={managedAgent.agent.signingIssuer}
+        selectedKeyId={managedAgent.agent.signingKeyId}
+        selectedPublicFingerprint={managedAgent.agent.signingPublicFingerprint}
+        lastVerifiedAtMs={managedAgent.agent.signingLastVerifiedAtMs}
+        saveSelectionAction={saveManagedAgentSigningKey}
+        runHealthCheckAction={verifyAgentHealth}
+      />
+    </div>
   );
 }
 

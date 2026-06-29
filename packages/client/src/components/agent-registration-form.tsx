@@ -32,7 +32,7 @@ import {
   FormMessage,
 } from './ui/form';
 import { Input } from './ui/input';
-import { Select } from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 import type { BrowserSafeModelPolicyWarning } from './schemas/model-policy';
 
@@ -403,13 +403,23 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
         render={({ field }) => (
           <FormItem>
             <FormLabel>Status</FormLabel>
-            <FormControl>
-              <Select {...field} disabled={pending}>
-                <option value="active">active</option>
-                <option value="pending">pending</option>
-                <option value="rotating">rotating</option>
-              </Select>
-            </FormControl>
+            <Select
+              value={field.value}
+              onValueChange={field.onChange}
+              disabled={pending}
+              name={field.name}
+            >
+              <FormControl>
+                <SelectTrigger aria-label="Status">
+                  <SelectValue />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="active">active</SelectItem>
+                <SelectItem value="pending">pending</SelectItem>
+                <SelectItem value="rotating">rotating</SelectItem>
+              </SelectContent>
+            </Select>
             <FormMessage />
           </FormItem>
         )}

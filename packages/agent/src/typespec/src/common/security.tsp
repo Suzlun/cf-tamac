@@ -21,6 +21,64 @@ model PrincipalContext {
   @field(9) scopes: string[];
 }
 
+/**
+ * Agent Worker が読み込んだ control-plane trust config の安全な診断情報です。
+ * version と fingerprint は運用者が設定反映を照合するための識別子だけを表し、公開鍵本文や秘密鍵 material は含めません。
+ * loaded_at_unix_ms は Agent Worker が設定を検証済みとして保持し始めた時刻を Unix epoch milliseconds で示します。
+ * status は serving / degraded / unavailable など、health 応答で secret-free に表示できる設定状態を入れるための文字列です。
+ * issuer_count と key_count は構成規模の要約であり、issuer/key の完全な設定内容を返さないための集約値です。
+ */
+@message
+model TrustConfigDiagnostic {
+  /** trust config schema または運用設定の version を示す安全な識別子です。 */
+  @field(1) version: string;
+
+  /** trust config 全体を公開情報だけから計算した fingerprint です。 */
+  @field(2) fingerprint: string;
+
+  /** Agent Worker が trust config を読み込み検証した Unix epoch milliseconds です。 */
+  @field(3) loaded_at_unix_ms: int64;
+
+  /** health 応答で利用する trust config の診断状態です。 */
+  @field(4) status: string;
+
+  /** trust config に含まれる issuer 数の集約値です。 */
+  @field(5) issuer_count: int32;
+
+  /** trust config に含まれる Ed25519 public key 数の集約値です。 */
+  @field(6) key_count: int32;
+}
+
+/**
+ * 認証済み Client Service principal が提示した issuer / kid / fingerprint の検証済み要約です。
+ * Agent health 応答はこの情報により、選択中の Client 署名鍵が Agent trust config 上で active または retiring として受理されたかを確認できます。
+ * fingerprint は公開鍵の安全な識別子だけを返し、public JWK 全文、JWT 本文、signature、private JWK、暗号化済み private JWK は返しません。
+ * verified_at_unix_ms は認証 interceptor が当該 issuer/kid/fingerprint を検証した時刻を Unix epoch milliseconds で表します。
+ */
+@message
+model AuthenticatedPrincipalTrustSummary {
+  /** JWT payload の iss として検証された issuer です。 */
+  @field(1) issuer: string;
+
+  /** JWT header の kid として検証された key id です。 */
+  @field(2) kid: string;
+
+  /** trust config 上の公開鍵 fingerprint と照合済みの安全な識別子です。 */
+  @field(3) fingerprint: string;
+
+  /** active / retiring など、trust config 上の key lifecycle 状態です。 */
+  @field(4) key_status: string;
+
+  /** client_service など、認証済み principal の種別です。 */
+  @field(5) principal_type: string;
+
+  /** issuer/kid/fingerprint が trust config と一致し、署名検証まで完了したかを示します。 */
+  @field(6) verified: boolean;
+
+  /** この要約を生成した検証時刻の Unix epoch milliseconds です。 */
+  @field(7) verified_at_unix_ms: int64;
+}
+
 @message
 model ReplayMetadata {
   @field(1) idempotency_key: string;

@@ -186,8 +186,8 @@ describe('Server Action credential safety with mocked Agent RPC', () => {
     expect(lifecycleSource).toContain('clients.state.getState({ agentId })');
 
     expect(loaderSource).toContain('createManagedAgentRepository(env.CLIENT_DB).getManagedAgent');
-    expect(loaderSource).toContain('createCredentialReferenceRepository');
-    expect(loaderSource).toContain('resolveCredentialSecret');
+    expect(loaderSource).toContain('createSigningKeyRepository');
+    expect(loaderSource).toContain('resolveEd25519PrivateKey');
     expect(loaderSource).toContain('createServerAgentRpcClients');
 
     expect(schemaSource).toContain('clientManagedAgentsTable');
@@ -320,16 +320,19 @@ describe('Registry mutation Server Actions coverage', () => {
 });
 
 describe('Server Action credential resolver integration', () => {
-  it('[CLIENT-REGISTRY-S002] agent-loader calls resolveCredentialSecret in the Agent RPC path', async () => {
+  it('[CLIENT-REGISTRY-S002] agent-loader resolves the Ed25519 signing key store in the Agent RPC path', async () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
 
     const loaderPath = new URL('../server/agent-rpc/agent-loader.ts', import.meta.url);
     const source = readFileSync(fileURLToPath(loaderPath.href), 'utf8');
 
-    expect(source).toContain('resolveCredentialSecret');
-    expect(source).toContain('secretMaterial');
+    expect(source).toContain('createSigningKeyRepository');
+    expect(source).toContain('resolveEd25519PrivateKey');
     expect(source).toContain('deriveActingUserContext');
+    // Agent RPC signing 経路から credentialRef / AGENT_CREDENTIAL_* 解決は撤去済みであること。
+    expect(source).not.toContain('resolveCredentialSecret');
+    expect(source).not.toContain('secretMaterial');
   });
 
   it('[CLIENT-REGISTRY-S005] Server Actions do not accept actingUser parameter from browser', async () => {

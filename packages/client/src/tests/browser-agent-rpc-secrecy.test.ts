@@ -16,6 +16,8 @@ const forbiddenBrowserPatterns = [
   /x-client-credential-ref/,
   /x-client-key-id/,
   /x-agent-id/,
+  /privateJwkCiphertext/,
+  /privateJwk/,
 ];
 
 function collectFiles(root: URL): string[] {
@@ -60,5 +62,17 @@ describe('Management Client browser Agent RPC secrecy', () => {
         'utf8'
       )
     ).toContain('useBinaryFormat: true');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S011] Browser never receives signing material from signing key UI', () => {
+    const componentsRoot = new URL('../components', import.meta.url);
+    const signingComponentIssues = collectFiles(componentsRoot).flatMap((filePath) => {
+      const content = readFileSync(filePath, 'utf8');
+      return [/privateJwkCiphertext/, /privateJwk/, /Bearer /, /secretMaterial/]
+        .filter((pattern) => pattern.test(content))
+        .map((pattern) => `${relativePath(filePath)} matched ${String(pattern)}`);
+    });
+
+    expect(signingComponentIssues).toEqual([]);
   });
 });

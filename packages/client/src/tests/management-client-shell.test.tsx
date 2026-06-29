@@ -160,10 +160,12 @@ describe('Management Client shell scope separation', () => {
   it('[MANAGEMENT-CLIENT-SHELL-S013] Global Settings が Client-wide 設定だけを表示する', () => {
     const globalSettings = read(globalSettingsPagePath);
 
-    // Client-wide 設定（workspace preferences / credential vault / operational settings）を表示する。
+    // Client-wide 設定（workspace preferences / credential vault / Client Service signing operations）を表示する。
     expect(globalSettings).toContain('Workspace preferences');
     expect(globalSettings).toContain('Credential vault references');
-    expect(globalSettings).toContain('Operational settings');
+    expect(globalSettings).toContain('Client Service signing');
+    expect(globalSettings).toContain('Signing Keys');
+    expect(globalSettings).toContain('Trust Config Export');
     expect(globalSettings).toContain('Client-wide');
 
     // selected-Agent identity / Agent scoped actions は含まれない。

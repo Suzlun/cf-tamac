@@ -227,13 +227,13 @@ function OverviewZones({
             <CardTitle className="text-sm">Profile + lifecycle</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <p className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               Lifecycle status:{' '}
               <SignalBadge
                 label={formatStatus(overview.status)}
                 variant={statusVariant(overview.status)}
               />
-            </p>
+            </div>
             <p>Config version: v{overview.configVersion}</p>
             <CredentialLine overview={overview} />
             <p>Last opened: {formatTimestamp(managedAgent.lastOpenedAtMs)}</p>
@@ -278,7 +278,7 @@ function OverviewZones({
               />
             </div>
             <p>R2 archive: safe metadata only</p>
-            <p className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               Health:{' '}
               <SignalBadge
                 label={formatStatus(
@@ -288,7 +288,7 @@ function OverviewZones({
                   state?.storageStatus ?? state?.schedulerStatus ?? state?.status
                 )}
               />
-            </p>
+            </div>
             <p className="text-xs text-muted-foreground">
               Safe metadata only — no secrets, no raw stack.
             </p>
@@ -329,13 +329,13 @@ function CredentialLine({ overview }: { readonly overview: BrowserSafeAgentOverv
     return <p>Credential: generation {overview.credentialGeneration} · status unknown</p>;
   }
   return (
-    <p className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       Credential: generation {overview.credential.generation} ·{' '}
       <SignalBadge
         label={formatStatus(overview.credential.status)}
         variant={statusVariant(overview.credential.status)}
       />{' '}
       · key id: {overview.credential.keyId ?? '—'}
-    </p>
+    </div>
   );
 }

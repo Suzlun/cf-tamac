@@ -13,6 +13,7 @@ const repositoryFiles = [
   new URL('../server/db/index.ts', import.meta.url),
   new URL('../server/db/managed-agents.ts', import.meta.url),
   new URL('../server/db/access-credentials.ts', import.meta.url),
+  new URL('../server/db/signing-keys.ts', import.meta.url),
 ];
 
 const forbiddenRepositoryTerms = [
@@ -39,6 +40,8 @@ describe('Management Client repository boundary', () => {
       'setManagedAgentPinned',
       'reorderManagedAgents',
       'deleteManagedAgent',
+      'updateManagedAgentSigningKey',
+      'markManagedAgentSigningVerified',
     ]);
     expect(Object.keys(createCredentialReferenceRepository({} as D1Database))).toEqual([
       'upsertCredentialReference',

@@ -12,6 +12,8 @@ import {
   type AgentIdentity,
   type AgentLifecycleStatus,
   type AgentModelExecutionCapabilityView,
+  type ClientServiceJwtReplayReservationInput,
+  type ClientServiceJwtReplayReservationResult,
   type AgentScopedQuery,
   type GetAgentStateResult,
   type DestroyAgentCommand,
@@ -211,6 +213,37 @@ export class AIAgent extends Agent<AgentWorkerEnv, AIAgentState> {
    */
   createThreadIdentity(threadKey: string): ThreadKeyIdentity {
     return createThreadKeyIdentity(this.name, threadKey);
+  }
+
+  /**
+   * Client Service JWT の `jti` を Agent-owned SQLite replay ledger に予約します。
+   *
+   * @remarks
+   * RPC facade は domain mutation に到達する前にこの method を呼び、同じ principal と同じ Agent scope で
+   * 同一 `jti` が再利用された場合に fail closed します。保存値は issuer/kid/jti などの安全な識別子だけで、
+   * 生 JWT、署名、公開鍵全文、秘密鍵 material は含めません。
+   *
+   * @param input principalReplayId、jwtId、期限、現在時刻を含む replay reservation 入力です。
+   * @returns 新規予約、または replay 検出時の初回観測時刻です。
+   */
+  reserveClientServiceJwtId(
+    input: ClientServiceJwtReplayReservationInput
+  ): ClientServiceJwtReplayReservationResult {
+    // Durable Object 名である this.name と input.agentId がずれた場合は、別 Agent への横流しを拒否します。
+    if (input.agentId !== this.name) {
+      return { firstSeenUnixMs: input.nowUnixMs, status: 'replay' };
+    }
+    // 既存の Agent request nonce ledger を利用し、Client Service `jti` を principal scope で一意化します。
+    const reservation = this.repositories.requestNonces.reserveNonce({
+      createdAtMs: input.nowUnixMs,
+      expiresAtMs: input.expiresAtUnixMs,
+      nonce: input.jwtId,
+      principalId: input.principalReplayId,
+    });
+    if (reservation.status === 'replay') {
+      return { firstSeenUnixMs: reservation.firstSeenAtMs, status: 'replay' };
+    }
+    return { status: 'reserved' };
   }
 
   /**

@@ -3,7 +3,10 @@ import type { ReplayMetadata, SecurityMetadata } from '@cf-tamac/agent-rpc/cftam
 import { createAgentDomainError } from '../domain/errors';
 import { computeSha256Hex } from '../domain/security';
 
-import { getCurrentAgentRpcAuditContext } from './interceptors/audit';
+import {
+  getCurrentAgentRpcAuditContext,
+  getCurrentAgentRpcExecutionPrincipal,
+} from './interceptors/audit';
 
 import type { AgentCoreRequestContext } from '../domain';
 import type { AgentPrincipalContext, AgentRawBodyDigest } from '../domain/security';
@@ -31,19 +34,19 @@ export async function createAgentCoreContext(
   input: CreateAgentCoreContextInput
 ): Promise<AgentCoreRequestContext> {
   const auditContext = getCurrentAgentRpcAuditContext();
-  const principal = createPrincipal(input.agentId, input.security, auditContext?.principal);
+  const principal = createPrincipal(input.agentId, getCurrentAgentRpcExecutionPrincipal());
   const nowMs = Date.now();
   const requestTimestampMs = Number(
-    input.security?.timestamp?.unixMs ?? input.replay?.requestTimestampUnixMs ?? nowMs
+    input.replay?.requestTimestampUnixMs ?? auditContext?.startedAtUnixMs ?? nowMs
   );
   return {
     agentId: input.agentId,
-    bodyDigest: await createBodyDigest(input),
+    bodyDigest: await createBodyDigest(input, auditContext?.rawBodyDigest),
     causationId: input.causationId,
     correlationId: input.correlationId,
     idempotencyKey: input.idempotencyKey ?? input.replay?.idempotencyKey,
     method: input.method,
-    nonce: input.security?.nonce?.nonce ?? input.replay?.nonce,
+    nonce: input.replay?.nonce,
     principal,
     requestId: auditContext?.requestId,
     requestTimestampMs,
@@ -54,56 +57,48 @@ export async function createAgentCoreContext(
 
 function createPrincipal(
   agentId: string,
-  security: SecurityMetadata | undefined,
   auditPrincipal: AuthenticatedAgentPrincipal | undefined
 ): AgentPrincipalContext {
-  if (security?.principal !== undefined) {
-    return {
-      actingUserId: security.principal.actingUserId,
-      agentId,
-      audience: security.principal.audience,
-      issuer: security.principal.issuer,
-      jwtId: security.principal.jwtId,
-      keyId: security.principal.keyId,
-      principalId: security.principal.principalId,
-      principalType: normalizePrincipalType(security.principal.principalType),
-      scopes: security.principal.scopes,
-      subject: security.principal.subject,
-    };
-  }
   if (auditPrincipal !== undefined) {
-    return { agentId, ...auditPrincipal };
+    // public RPC body の SecurityMetadata は caller が書けるため、検証済み JWT principal だけを AIAgent へ渡します。
+    return {
+      actingUserId: auditPrincipal.actingUserId,
+      agentId,
+      allowedAgentIds: auditPrincipal.allowedAgentIds,
+      allowedScopes: auditPrincipal.allowedScopes,
+      audience: auditPrincipal.audience,
+      expiresAtUnixMs: auditPrincipal.expiresAtUnixMs,
+      fingerprint: auditPrincipal.fingerprint,
+      issuer: auditPrincipal.issuer,
+      jwtId: auditPrincipal.jwtId,
+      keyId: auditPrincipal.keyId,
+      keyStatus: auditPrincipal.keyStatus,
+      notBeforeUnixMs: auditPrincipal.notBeforeUnixMs,
+      principalId: auditPrincipal.principalId,
+      principalType: auditPrincipal.principalType,
+      scopes: auditPrincipal.scopes,
+      subject: auditPrincipal.subject,
+      trustSummary: auditPrincipal.trustSummary,
+    };
   }
   throw createAgentDomainError({ kind: 'authentication', message: 'Agent RPC principal missing.' });
 }
 
-async function createBodyDigest(input: CreateAgentCoreContextInput): Promise<AgentRawBodyDigest> {
-  const fallback = stableStringify(input.fallbackDigestSeed);
-  const digestHex =
-    input.security?.rawBodyDigest?.digestHex ??
-    input.security?.idempotency?.bodySha256 ??
-    input.replay?.bodySha256 ??
-    (await computeSha256Hex(new TextEncoder().encode(fallback)));
+async function createBodyDigest(
+  input: CreateAgentCoreContextInput,
+  verifiedBodyDigest: AgentRawBodyDigest | undefined
+): Promise<AgentRawBodyDigest> {
+  if (verifiedBodyDigest !== undefined) {
+    // digest は adapter が読んだ不変 Protobuf bytes から算出した値を正本にし、body 内の自己申告 digest は信用しません。
+    return verifiedBodyDigest;
+  }
+  const fallbackBytes = new TextEncoder().encode(stableStringify(input.fallbackDigestSeed));
+  const digestHex = await computeSha256Hex(fallbackBytes);
   return {
     algorithm: 'sha-256',
-    byteLength:
-      input.security?.rawBodyDigest?.byteLength === undefined
-        ? new TextEncoder().encode(fallback).byteLength
-        : Number(input.security.rawBodyDigest.byteLength),
+    byteLength: fallbackBytes.byteLength,
     digestHex,
   };
-}
-
-function normalizePrincipalType(value: string): AgentPrincipalContext['principalType'] {
-  if (
-    value === 'CLIENT_SERVICE' ||
-    value === 'INTEGRATION_INSTALLATION' ||
-    value === 'INTERNAL_SERVICE' ||
-    value === 'ADMIN_OPERATOR'
-  ) {
-    return value;
-  }
-  return 'CLIENT_SERVICE';
 }
 
 function stableStringify(value: unknown): string {

@@ -320,6 +320,16 @@ async function determineRegistrationMode(
   if (options.existingAgentId === undefined && existing !== undefined) {
     return { ok: false, fieldErrors: { agentId: 'Agent ID is already registered.' } };
   }
+  // edit mode は既存台帳行の存在を必須とする。存在しない edit target を upsert で新規作成せず、
+  // 安全側で formError を返す (partial row / default-key prerequisite 回避を防ぐ)。
+  if (options.existingAgentId !== undefined && existing === undefined) {
+    return {
+      ok: false,
+      fieldErrors: {
+        agentId: 'This Agent is no longer registered. Refresh the registry and retry.',
+      },
+    };
+  }
   return {
     ok: true,
     action: options.existingAgentId === undefined ? 'create' : 'update',

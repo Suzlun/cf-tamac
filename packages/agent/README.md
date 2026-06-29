@@ -36,13 +36,17 @@ The local Worker should be exercised through generated Connect clients using `PO
 
 - Configure non-secret local defaults in `wrangler.toml` only.
 - Provision secrets with `wrangler secret put --config packages/agent/wrangler.toml <NAME>`; never commit secret values.
-- Required secret references today are documented in `wrangler.toml`: `AGENT_CLIENT_JWT_PUBLIC_KEYS`, `AGENT_INTEGRATION_SIGNATURE_KEYS`, and `AGENT_MODEL_PROVIDER_SECRET_REFS`.
-- Logs, audit records, and smoke output must redact raw tokens, private keys, Provider credentials, and complete signature bases.
+- Required production Client Service trust is `AGENT_CONTROL_PLANE_TRUST`. The value is a public-only JSON trust config containing version, audiences, issuers, Ed25519 public keys, key status, principal type, allowed Agent IDs, allowed scopes, and fingerprints.
+- Required audit hashing pepper is `AGENT_AUDIT_HASH_PEPPER`. It is a random secret used only for HMAC-SHA-256 audit identifier hashes and must be rotated separately from signing keys.
+- Do not use `AGENT_CLIENT_JWT_PUBLIC_KEYS`, HS256 shared secrets, `AGENT_CREDENTIAL_*`, bootstrap RPC, AgentTrustRegistry Durable Object, REST/JSON auth routes, or public Durable Object fetch routes as the production Client Service trust source.
+- Logs, audit records, and smoke output must redact raw tokens, private keys, private JWK, encrypted private JWK, Provider credentials, public key full values, and complete signature bases.
 
 ## Deployment notes
 
 - Deploy the Agent Worker with `packages/agent/wrangler.toml`; keep `AI_AGENT` and Agent-owned blob storage as the only stateful product bindings.
-- After deployment, run smoke checks with generated Protobuf RPC clients instead of REST, JSON, OpenAPI, Orval, or public Durable Object probes.
+- Set `AGENT_AUDIT_HASH_PEPPER` and `AGENT_CONTROL_PLANE_TRUST` with `wrangler secret put --config packages/agent/wrangler.toml <NAME>`; use the public-only trust export from the Management Client only for `AGENT_CONTROL_PLANE_TRUST`.
+- After deployment, run smoke checks with generated Protobuf RPC clients instead of REST, JSON, OpenAPI, Orval, or public Durable Object probes. Use `AgentHealthService.Check` to verify issuer/kid/fingerprint and trust config fingerprint without returning key material.
+- Follow `../../docs/operations/agent-control-plane-auth.md` for rotation, emergency revoke, break-glass recovery, local/staging smoke, and private-key non-exposure checks.
 
 ## Provider interop profile
 
