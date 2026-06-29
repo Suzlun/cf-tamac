@@ -4,6 +4,8 @@ import { asc, desc } from 'drizzle-orm/sql/expressions/select';
 
 import { clientManagedAgentsTable } from './schema';
 
+const AGENT_ID_REQUIRED_ERROR = 'agentId must not be empty.';
+
 /**
  * managed agents table から Drizzle が推論する select row 型です。
  *
@@ -41,6 +43,19 @@ export interface ManagedAgentRecord {
   readonly lastOpenedAtMs?: number;
   readonly createdAtMs: number;
   readonly updatedAtMs: number;
+  /**
+   * この managed Agent が使用する Client Service signing key の issuer。
+   *
+   * @remarks key 未選択状態では `undefined` になり、Agent RPC 実行前に明示的な
+   * signing key selection を要求する。自由入力ではなく Global Settings で生成済みの鍵から選ぶ。
+   */
+  readonly signingIssuer?: string;
+  /** 選択中 signing key の key id。未選択時は `undefined`。 */
+  readonly signingKeyId?: string;
+  /** 選択中 signing key の public fingerprint。未選択時は `undefined`。 */
+  readonly signingPublicFingerprint?: string;
+  /** 最後に Agent health verification が成功した Unix epoch milliseconds。未検証時は `undefined`。 */
+  readonly signingLastVerifiedAtMs?: number;
 }
 
 /**
@@ -80,6 +95,20 @@ export interface ManagedAgentOrderEntry {
 }
 
 /**
+ * managed Agent に選択済み Client Service signing key を割り当てる入力。
+ *
+ * @remarks
+ * issuer / keyId / publicFingerprint は Global Settings で生成済みの signing key から選んだ値で、
+ * UI の自由入力ではない。いずれかを空にすることで key 未選択状態へ戻せる。
+ */
+export interface UpdateManagedAgentSigningKeyInput {
+  readonly agentId: string;
+  readonly signingIssuer?: string;
+  readonly signingKeyId?: string;
+  readonly signingPublicFingerprint?: string;
+}
+
+/**
  * Client-owned managed Agent repository operations です。
  *
  * @remarks
@@ -109,6 +138,13 @@ export interface ManagedAgentRepository {
     entries: readonly ManagedAgentOrderEntry[]
   ) => Promise<readonly ManagedAgentRecord[]>;
   readonly deleteManagedAgent: (agentId: string) => Promise<void>;
+  readonly updateManagedAgentSigningKey: (
+    input: UpdateManagedAgentSigningKeyInput
+  ) => Promise<ManagedAgentRecord | undefined>;
+  readonly markManagedAgentSigningVerified: (
+    agentId: string,
+    verifiedAtMs: number
+  ) => Promise<ManagedAgentRecord | undefined>;
 }
 
 /**
@@ -150,6 +186,12 @@ export function createManagedAgentRepository(d1: D1Database): ManagedAgentReposi
     },
     deleteManagedAgent(agentId) {
       return deleteManagedAgent(db, agentId);
+    },
+    updateManagedAgentSigningKey(input) {
+      return updateManagedAgentSigningKey(db, input);
+    },
+    markManagedAgentSigningVerified(agentId, verifiedAtMs) {
+      return markManagedAgentSigningVerified(db, agentId, verifiedAtMs);
     },
   };
 }
@@ -263,7 +305,7 @@ async function renameManagedAgent(
   input: RenameManagedAgentInput
 ): Promise<ManagedAgentRecord | undefined> {
   if (input.agentId === '') {
-    throw new TypeError('agentId must not be empty.');
+    throw new TypeError(AGENT_ID_REQUIRED_ERROR);
   }
   if (input.displayName === '') {
     throw new TypeError('displayName must not be empty.');
@@ -301,7 +343,7 @@ async function reorderManagedAgents(
   const now = Date.now();
   for (const entry of entries) {
     if (entry.agentId === '') {
-      throw new TypeError('agentId must not be empty.');
+      throw new TypeError(AGENT_ID_REQUIRED_ERROR);
     }
     await db
       .update(clientManagedAgentsTable)
@@ -314,12 +356,91 @@ async function reorderManagedAgents(
 
 async function deleteManagedAgent(db: ManagedAgentDb, agentId: string): Promise<void> {
   if (agentId === '') {
-    throw new TypeError('agentId must not be empty.');
+    throw new TypeError(AGENT_ID_REQUIRED_ERROR);
   }
   await db
     .delete(clientManagedAgentsTable)
     .where(eq(clientManagedAgentsTable.agentId, agentId))
     .run();
+}
+
+/**
+ * managed Agent に選択済み Client Service signing key metadata を保存する。
+ *
+ * @remarks
+ * 3 つの signing metadata は同時に設定または同時に解除する。一部だけの更新は許可しない。
+ * ここでは Agent Worker domain state は変更せず、Client-owned 台帳 metadata だけを更新する。
+ */
+async function updateManagedAgentSigningKey(
+  db: ManagedAgentDb,
+  input: UpdateManagedAgentSigningKeyInput
+): Promise<ManagedAgentRecord | undefined> {
+  if (input.agentId === '') {
+    throw new TypeError(AGENT_ID_REQUIRED_ERROR);
+  }
+  assertSigningKeySelection(
+    input.signingIssuer,
+    input.signingKeyId,
+    input.signingPublicFingerprint
+  );
+  const now = Date.now();
+  await db
+    .update(clientManagedAgentsTable)
+    .set({
+      signingIssuer: input.signingIssuer,
+      signingKeyId: input.signingKeyId,
+      signingPublicFingerprint: input.signingPublicFingerprint,
+      updatedAtMs: now,
+    })
+    .where(eq(clientManagedAgentsTable.agentId, input.agentId))
+    .run();
+  return getManagedAgent(db, input.agentId);
+}
+
+/**
+ * Agent health verification 成功時刻を Client D1 台帳へ記録する。
+ *
+ * @remarks
+ * Health Check 成功だけを記録し、失敗時は呼び出さない。Agent domain state は変更しない。
+ */
+async function markManagedAgentSigningVerified(
+  db: ManagedAgentDb,
+  agentId: string,
+  verifiedAtMs: number
+): Promise<ManagedAgentRecord | undefined> {
+  if (agentId === '') {
+    throw new TypeError(AGENT_ID_REQUIRED_ERROR);
+  }
+  if (!Number.isFinite(verifiedAtMs) || verifiedAtMs <= 0) {
+    throw new TypeError('verifiedAtMs must be a positive Unix epoch millisecond.');
+  }
+  const now = Date.now();
+  await db
+    .update(clientManagedAgentsTable)
+    .set({ signingLastVerifiedAtMs: verifiedAtMs, updatedAtMs: now })
+    .where(eq(clientManagedAgentsTable.agentId, agentId))
+    .run();
+  return getManagedAgent(db, agentId);
+}
+
+/**
+ * signing key selection の全指定/全解除だけを許可する validation。
+ *
+ * @remarks
+ * issuer / keyId / publicFingerprint は同時に指定するか、同時に空にする。
+ * 一部だけの指定は fingerprint 照合不整合の原因になるため許可しない。
+ */
+function assertSigningKeySelection(
+  issuer: string | undefined,
+  keyId: string | undefined,
+  fingerprint: string | undefined
+): void {
+  const values = [issuer, keyId, fingerprint];
+  const anyEmpty = values.some((value) => value === undefined || value === '');
+  const allEmpty = values.every((value) => value === undefined || value === '');
+  if (!allEmpty && anyEmpty) {
+    throw new TypeError('Signing key selection must set issuer, keyId and fingerprint together.');
+  }
 }
 
 function toManagedAgentRecord(row: ManagedAgentRow): ManagedAgentRecord {
@@ -332,12 +453,16 @@ function toManagedAgentRecord(row: ManagedAgentRow): ManagedAgentRecord {
     lastOpenedAtMs: row.lastOpenedAtMs ?? undefined,
     createdAtMs: row.createdAtMs,
     updatedAtMs: row.updatedAtMs,
+    signingIssuer: row.signingIssuer ?? undefined,
+    signingKeyId: row.signingKeyId ?? undefined,
+    signingPublicFingerprint: row.signingPublicFingerprint ?? undefined,
+    signingLastVerifiedAtMs: row.signingLastVerifiedAtMs ?? undefined,
   };
 }
 
 function assertManagedAgentInput(input: UpsertManagedAgentInput): void {
   if (input.agentId === '') {
-    throw new TypeError('agentId must not be empty.');
+    throw new TypeError(AGENT_ID_REQUIRED_ERROR);
   }
   if (input.agentRpcOrigin === '') {
     throw new TypeError('agentRpcOrigin must not be empty.');

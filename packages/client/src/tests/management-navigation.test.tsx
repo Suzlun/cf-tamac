@@ -62,5 +62,10 @@ describe('Management Client navigation route graph', () => {
     // standalone tools/compactions route は supported graph に含まれない。
     expect(SUPPORTED_MANAGEMENT_ROUTES).not.toContain('/agents/:agentId/tools');
     expect(SUPPORTED_MANAGEMENT_ROUTES).not.toContain('/agents/:agentId/compactions');
+
+    // Global Settings 配下の Client-wide signing operations は Agent 0 件でも到達できる。
+    expect(SUPPORTED_MANAGEMENT_ROUTES).toContain('/global-settings/signing-keys');
+    expect(SUPPORTED_MANAGEMENT_ROUTES).toContain('/global-settings/trust-config-export');
+    expect(SUPPORTED_MANAGEMENT_ROUTES).toContain('/global-settings/key-rotation');
   });
 });

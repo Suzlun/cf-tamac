@@ -11,9 +11,13 @@ migrations_dir = "src/server/db/migrations"
 
 [vars]
 AGENT_RPC_DEFAULT_ORIGIN = "http://localhost:8787"
-CLIENT_CREDENTIAL_SECRET_REF = "CLIENT_CREDENTIAL_ENCRYPTION_KEY"
 CLIENT_ACTING_OPERATOR_ID = "client-management-operator"
 CLIENT_ACTING_SCOPES = "agent:read agent:write"
 
 # Required Client credential secrets are provisioned with `wrangler secret put`.
 # - CLIENT_CREDENTIAL_ENCRYPTION_KEY
+#   base64-encoded 32-byte AES-256 key material used to encrypt Ed25519 private
+#   JWKs persisted in the `client_signing_keys` table. This is the only signing
+#   material secret for Agent RPC bearer JWTs and must be provisioned as a Worker
+#   Secret before the Management Client signs any request. HS256 shared secrets,
+#   `AGENT_CREDENTIAL_*`, and `credentialRef` signing sources are not used.

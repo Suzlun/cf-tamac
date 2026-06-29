@@ -5,4 +5,5 @@ export * from './jwt';
 export * from './provider-signing';
 export * from './replay';
 export * from './signature';
+export * from './trust-config';
 export * from './types';

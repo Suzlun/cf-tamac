@@ -147,11 +147,11 @@ function readStringField(
     return undefined;
   }
 
-  return stringFromUnknown(record[key]);
+  return stringFromUnknown(Reflect.get(record, key));
 }
 
 function getConfigEntry(config: ChartConfig, key: string) {
-  return Object.prototype.hasOwnProperty.call(config, key) ? config[key] : undefined;
+  return Object.prototype.hasOwnProperty.call(config, key) ? Reflect.get(config, key) : undefined;
 }
 
 function getPayloadConfigFromPayload(config: ChartConfig, item: ChartPayloadItem, key: string) {
@@ -164,7 +164,9 @@ function getPayloadConfigFromPayload(config: ChartConfig, item: ChartPayloadItem
 function resolveThemeColor(config: ChartConfig[string], theme: keyof typeof THEMES) {
   if ('theme' in config) {
     const themeConfig = config.theme;
-    return themeConfig != null ? themeConfig[theme] : undefined;
+    return themeConfig != null
+      ? (Reflect.get(themeConfig, theme) as string | undefined)
+      : undefined;
   }
 
   return config.color;

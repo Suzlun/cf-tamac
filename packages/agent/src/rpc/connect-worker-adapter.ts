@@ -50,7 +50,13 @@ export function createAgentConnectFetchHandler(
       return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
     }
 
-    const authentication = authenticateAgentRequest(request);
+    const path = new URL(request.url).pathname;
+    const handler = handlersByPath.get(path);
+    if (handler === undefined) {
+      return createUnimplementedResponse(`Unsupported Agent RPC path: ${path}`);
+    }
+
+    const authentication = await authenticateAgentRequest(request, { env });
     if (authentication.rejection !== undefined) {
       return createConnectErrorResponse(
         authentication.rejection.code,
@@ -58,7 +64,11 @@ export function createAgentConnectFetchHandler(
       );
     }
 
-    const authorizationRejection = authorizeAgentRequest(request, authentication.principal);
+    const authorizationRejection = authorizeAgentRequest({
+      principal: authentication.principal,
+      rawBody,
+      request,
+    });
     if (authorizationRejection !== undefined) {
       return createConnectErrorResponse(
         authorizationRejection.code,
@@ -66,7 +76,11 @@ export function createAgentConnectFetchHandler(
       );
     }
 
-    const replayRejection = inspectReplayProtection(request);
+    const replayRejection = await inspectReplayProtection({
+      env,
+      principal: authentication.principal,
+      request,
+    });
     if (replayRejection !== undefined) {
       return createConnectErrorResponse(replayRejection.code, replayRejection.message);
     }
@@ -81,15 +95,10 @@ export function createAgentConnectFetchHandler(
       return createConnectErrorResponse(validationRejection.code, validationRejection.message);
     }
 
-    const path = new URL(request.url).pathname;
-    const handler = handlersByPath.get(path);
-    if (handler === undefined) {
-      return createUnimplementedResponse(`Unsupported Agent RPC path: ${path}`);
-    }
     const auditContext = createAgentRpcAuditContext(
       request,
       authentication.principal,
-      createReplayProtectionContext(request),
+      createReplayProtectionContext(request, authentication.principal),
       await createRawBodyDigest(rawBody)
     );
     return runWithAgentRpcAuditContext(auditContext, () => handler(request)).catch(

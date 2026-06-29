@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collectAgentLayerIssues,
   collectClientBoundaryIssues,
+  collectClientD1StoragePolicyIssues,
   collectOpenCodeWorkflowIssuesFromFiles,
   collectRuntimeCouplingIssues,
 } from './verify-package-boundaries.mjs';
@@ -180,6 +181,94 @@ export const leaked = createServerAgentRpcClients;
     );
 
     expect(collectOpenCodeWorkflowIssuesFromFiles(files)).toEqual([]);
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S011] Lint rejects browser signing material and forbidden Agent RPC signing sources', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'signing-material-boundary-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/client/app/signing-leak.tsx',
+        `'use client';
+
+export const privateJwk = { d: 'forbidden' };
+export const rawJwt = 'header.payload.signature';
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/agent-rpc/authentication.ts',
+        `import 'server-only';
+import { resolveCredentialSecret } from '../credentials/secret-resolution';
+
+export async function signWithLegacySecret() {
+  const secretMaterial = await resolveCredentialSecret({}, 'agent-alpha', 'AGENT_CREDENTIAL_ALPHA');
+  return { alg: 'HS256', secretMaterial, credentialRef: 'AGENT_CREDENTIAL_ALPHA' };
+}
+`
+      );
+
+      const issues = collectClientBoundaryIssues(fixtureRoot);
+
+      expect(issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('Client browser-visible modules must not contain signing material'),
+          expect.stringContaining('Client Agent RPC signing must use the encrypted Ed25519 signing key store'),
+        ])
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S011] Client D1 policy permits encrypted signing key store and rejects plaintext snapshots', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'client-d1-policy-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/db/migrations/0002_allowed_signing_keys.sql',
+        `CREATE TABLE IF NOT EXISTS client_signing_keys (
+  issuer TEXT NOT NULL,
+  key_id TEXT NOT NULL,
+  public_jwk_json TEXT NOT NULL,
+  public_fingerprint TEXT NOT NULL,
+  encrypted_private_jwk TEXT NOT NULL,
+  status TEXT NOT NULL
+);
+`
+      );
+      expect(collectClientD1StoragePolicyIssues(fixtureRoot)).toEqual([]);
+
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/db/migrations/0003_forbidden_plaintext.sql',
+        `CREATE TABLE IF NOT EXISTS client_signing_keys_plaintext (
+  issuer TEXT NOT NULL,
+  private_jwk TEXT NOT NULL,
+  shared_secret TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_events (
+  event_id TEXT PRIMARY KEY,
+  payload TEXT NOT NULL
+);
+`
+      );
+
+      const issues = collectClientD1StoragePolicyIssues(fixtureRoot);
+
+      expect(issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('Client D1 must not define plaintext signing material or secret column private_jwk'),
+          expect.stringContaining('Client D1 must not define plaintext signing material or secret column shared_secret'),
+          expect.stringContaining('Client D1 must not define Agent domain snapshot table agent_events'),
+        ])
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
   });
 
   it('blocks stale demo-only OpenCode workflow fixtures', () => {

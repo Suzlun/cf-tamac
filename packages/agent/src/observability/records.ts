@@ -6,6 +6,8 @@ import { redactObservabilityRecord } from './redaction';
 export interface AgentObservabilityCorrelationFields {
   readonly adapterConnectionId?: string;
   readonly agentId?: string;
+  readonly actingUserId?: string;
+  readonly authFailureReason?: string;
   readonly causationId?: string;
   readonly compactionId?: string;
   readonly correlationId?: string;
@@ -13,6 +15,10 @@ export interface AgentObservabilityCorrelationFields {
   readonly eventId?: string;
   readonly idempotencyKey?: string;
   readonly installationId?: string;
+  readonly issuer?: string;
+  readonly jwtId?: string;
+  readonly keyFingerprint?: string;
+  readonly keyId?: string;
   readonly method?: string;
   readonly modelPolicyDigest?: string;
   readonly modelPolicyRef?: string;
@@ -23,6 +29,8 @@ export interface AgentObservabilityCorrelationFields {
   readonly responseDigest?: string;
   readonly runId?: string;
   readonly service?: string;
+  readonly subject?: string;
+  readonly scopes?: readonly string[];
   readonly threadId?: string;
   readonly threadKeyHash?: string;
   readonly toolInvocationId?: string;

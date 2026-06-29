@@ -39,6 +39,8 @@ describe('Management Client repository boundary', () => {
       'setManagedAgentPinned',
       'reorderManagedAgents',
       'deleteManagedAgent',
+      'updateManagedAgentSigningKey',
+      'markManagedAgentSigningVerified',
     ]);
     expect(Object.keys(createCredentialReferenceRepository({} as D1Database))).toEqual([
       'upsertCredentialReference',

@@ -32,6 +32,7 @@ export function collectPackageBoundaryIssues(root = projectRoot) {
     ...collectRuntimeCouplingIssues(root),
     ...collectAgentLayerIssues(root),
     ...collectClientBoundaryIssues(root),
+    ...collectClientD1StoragePolicyIssues(root),
     ...collectBindingIssues(root),
     ...collectOpenCodeWorkflowIssues(root),
   ];
@@ -175,13 +176,18 @@ export function collectClientBoundaryIssues(root) {
           );
         }
       }
+      if (/createServerAgentRpcClients|CLIENT_DB|credentialRef|credential_ref|Authorization|Bearer/.test(content)) {
+        issues.push(
+          `${normalizedPath}: Client browser-visible modules must not contain Agent RPC credential or Client D1 access seams`
+        );
+      }
       if (
-        /createServerAgentRpcClients|CLIENT_DB|credentialRef|credential_ref|Authorization|Bearer/.test(
+        /privatejwk|private_jwk|encryptedprivatejwk|encrypted_private_jwk|rawjwt|raw_jwt|signingmaterial|signing material|createcompactjwt|crypto\.subtle\.sign/i.test(
           content
         )
       ) {
         issues.push(
-          `${normalizedPath}: Client browser-visible modules must not contain Agent RPC credential or Client D1 access seams`
+          `${normalizedPath}: Client browser-visible modules must not contain signing material, private JWK, encrypted private JWK, raw JWT, or signing logic`
         );
       }
       if (
@@ -201,8 +207,74 @@ export function collectClientBoundaryIssues(root) {
     ) {
       issues.push(`${normalizedPath}: Client Agent RPC modules must import server-only`);
     }
+    if (
+      normalizedPath.startsWith('/packages/client/src/server/agent-rpc/') &&
+      /\bHS256\b|resolveCredentialSecret|AGENT_CREDENTIAL_|credentialRef|credential_ref|secretMaterial|sharedSecret|shared_secret/.test(
+        content
+      )
+    ) {
+      issues.push(
+        `${normalizedPath}: Client Agent RPC signing must use the encrypted Ed25519 signing key store, not HS256, resolveCredentialSecret, AGENT_CREDENTIAL_ Worker Secrets, credentialRef, or shared secrets`
+      );
+    }
   }
   return [...new Set(issues)];
+}
+
+/**
+ * Client D1 の永続化対象が encrypted signing key store を許可しつつ、Agent domain snapshot と平文 secret を拒否することを検査します。
+ */
+export function collectClientD1StoragePolicyIssues(root) {
+  const issues = [];
+  for (const filePath of collectFiles(`${root}/packages/client/src/server/db`)) {
+    const normalizedPath = normalizePath(root, filePath);
+    if (!/\.(?:ts|sql)$/.test(normalizedPath) || normalizedPath.includes('/src/tests/')) {
+      continue;
+    }
+    const content = readFileSync(filePath, 'utf8');
+    const tableNames = collectTableNames(content);
+    for (const tableName of tableNames) {
+      if (isForbiddenClientD1TableName(tableName)) {
+        issues.push(`${normalizedPath}: Client D1 must not define Agent domain snapshot table ${tableName}`);
+      }
+    }
+    for (const forbiddenColumn of collectForbiddenClientD1SecretColumns(content)) {
+      issues.push(
+        `${normalizedPath}: Client D1 must not define plaintext signing material or secret column ${forbiddenColumn}`
+      );
+    }
+  }
+  return [...new Set(issues)];
+}
+
+function collectTableNames(content) {
+  return [
+    ...content.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(["'`]?)(\w+)\1/gi),
+    ...content.matchAll(/sqliteTable\(\s*["'](\w+)["']/g),
+  ].map((match) => match[2] ?? match[1]);
+}
+
+function isForbiddenClientD1TableName(tableName) {
+  return /^agent_(?:events|threads|runs|schedules|tool_invocations|integration_installations|adapter_connections|compactions|state|thread_memory|history)/i.test(
+    tableName
+  );
+}
+
+function collectForbiddenClientD1SecretColumns(content) {
+  const columnNames = [
+    ...content.matchAll(/^\s*(["'`]?)(\w+)\1\s+(?:text|blob|varchar|integer)\b/gim),
+    ...content.matchAll(/\b(?:text|integer|blob)\(\s*["'](\w+)["']/g),
+  ].map((match) => match[2] ?? match[1]);
+  return columnNames.filter((columnName) => isForbiddenClientD1SecretColumn(columnName));
+}
+
+function isForbiddenClientD1SecretColumn(columnName) {
+  if (columnName === 'encrypted_private_jwk') {
+    return false;
+  }
+  return /^(?:secret|secret_material|shared_secret|private_key|private_jwk|raw_jwt|token|signing_material)$/i.test(
+    columnName
+  );
 }
 
 function collectBindingIssues(root) {

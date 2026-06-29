@@ -16,13 +16,18 @@ export function isSensitiveObservabilityKey(key: string): boolean {
     normalized.includes('chain_of_thought') ||
     normalized.includes('completiontext') ||
     normalized.includes('credential') ||
+    normalized.includes('encryptedprivatejwk') ||
     normalized.includes('hiddenreasoning') ||
+    normalized.includes('jwk') ||
     normalized.includes('jwt') ||
+    normalized.includes('keymaterial') ||
     normalized.includes('password') ||
     normalized.includes('prompttext') ||
     normalized.includes('private') ||
+    normalized.includes('publickey') ||
     normalized.includes('rawcompletion') ||
     normalized.includes('raw_completion') ||
+    normalized.includes('rawjwt') ||
     normalized.includes('rawprompt') ||
     normalized.includes('raw_prompt') ||
     normalized.includes('rawreasoning') ||
@@ -31,7 +36,8 @@ export function isSensitiveObservabilityKey(key: string): boolean {
     normalized.includes('secret') ||
     normalized.includes('set-cookie') ||
     normalized.includes('signature') ||
-    normalized.includes('token')
+    normalized.includes('token') ||
+    normalized === 'x'
   );
 }
 

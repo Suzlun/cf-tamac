@@ -10,7 +10,7 @@ import {
   FormMessage,
 } from './ui/form';
 import { Input } from './ui/input';
-import { Select } from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 import type { BrowserSafeModelPolicyWarning, ModelPolicyFieldName } from './schemas/model-policy';
 import type { FieldValues, Path, UseFormReturn } from 'react-hook-form';
@@ -245,11 +245,22 @@ function ProviderField<TValues extends FieldValues>({
           <FormDescription>
             Only Workers AI is available for this change. Provider credentials stay server-side.
           </FormDescription>
-          <FormControl>
-            <Select {...field} disabled={disabled} required>
-              <option value="workers-ai">workers-ai</option>
-            </Select>
-          </FormControl>
+          <Select
+            value={field.value}
+            onValueChange={field.onChange}
+            disabled={disabled}
+            name={field.name}
+            required
+          >
+            <FormControl>
+              <SelectTrigger aria-label="Provider">
+                <SelectValue />
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              <SelectItem value="workers-ai">workers-ai</SelectItem>
+            </SelectContent>
+          </Select>
           <FormMessage />
         </FormItem>
       )}

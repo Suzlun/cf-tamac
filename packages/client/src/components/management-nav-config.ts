@@ -45,6 +45,9 @@ export const SUPPORTED_MANAGEMENT_ROUTES: readonly string[] = [
   '/agents',
   '/agents/new',
   '/global-settings',
+  '/global-settings/signing-keys',
+  '/global-settings/trust-config-export',
+  '/global-settings/key-rotation',
   '/agents/:agentId',
   '/agents/:agentId/threads',
   '/agents/:agentId/events',
@@ -52,6 +55,18 @@ export const SUPPORTED_MANAGEMENT_ROUTES: readonly string[] = [
   '/agents/:agentId/schedules',
   '/agents/:agentId/integrations',
   '/agents/:agentId/settings',
+];
+
+/**
+ * Global Settings 配下の Client-wide route 一覧 (Agent 0 件でも到達可能)。
+ *
+ * @remarks signing key lifecycle / trust config export / rotation guidance は Client-wide 操作で、
+ * Agent scoped ではないため global scope の nav / route graph に含める。
+ */
+export const GLOBAL_SETTINGS_CHILD_ROUTES: readonly string[] = [
+  '/global-settings/signing-keys',
+  '/global-settings/trust-config-export',
+  '/global-settings/key-rotation',
 ];
 
 /**

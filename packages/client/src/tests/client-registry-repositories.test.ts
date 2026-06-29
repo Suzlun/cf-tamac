@@ -62,6 +62,38 @@ describe('Managed Agent registry persistence', () => {
   });
 });
 
+describe('Managed Agent signing identity metadata persistence', () => {
+  it('[CLIENT-REGISTRY-S001] managed Agent registry persists signing issuer/kid/fingerprint and last verified at', async () => {
+    const db = createTestD1Database();
+    await applyClientMigration(db);
+    const repository = createManagedAgentRepository(db);
+
+    await repository.upsertManagedAgent({
+      agentId: 'agent-alpha',
+      agentRpcOrigin: 'http://localhost:8787',
+      displayName: 'Alpha Agent',
+    });
+
+    const updated = await repository.updateManagedAgentSigningKey({
+      agentId: 'agent-alpha',
+      signingIssuer: 'cf-tamac-client',
+      signingKeyId: 'key-001',
+      signingPublicFingerprint: 'sha256_b64u:abc',
+    });
+    expect(updated?.signingIssuer).toBe('cf-tamac-client');
+    expect(updated?.signingKeyId).toBe('key-001');
+    expect(updated?.signingPublicFingerprint).toBe('sha256_b64u:abc');
+
+    const verifiedAt = Date.now();
+    const verified = await repository.markManagedAgentSigningVerified('agent-alpha', verifiedAt);
+    expect(verified?.signingLastVerifiedAtMs).toBe(verifiedAt);
+
+    // 台帳だけの更新では Agent Service 状態は変更されない (repository は client_managed_agents だけを扱う)。
+    const reloaded = await repository.getManagedAgent('agent-alpha');
+    expect(reloaded?.signingLastVerifiedAtMs).toBe(verifiedAt);
+  });
+});
+
 describe('Credential reference safety', () => {
   it('[CLIENT-REGISTRY-S002] Credential reference stores no plaintext secret', async () => {
     const db = createTestD1Database();

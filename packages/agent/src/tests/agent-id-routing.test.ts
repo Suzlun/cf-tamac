@@ -6,6 +6,8 @@ import {
   getAIAgentDurableObjectStub,
 } from '../agent-routing';
 
+import { testControlPlaneTrustConfig } from './test-control-plane-trust';
+
 import type { AIAgent } from '../AIAgent';
 import type { AgentWorkerEnv } from '../env';
 
@@ -31,7 +33,7 @@ function createRoutingEnv(): AgentWorkerEnv {
 
   return {
     AGENT_BLOBS: {} as R2Bucket,
-    AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+    AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
     AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',

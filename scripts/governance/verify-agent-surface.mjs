@@ -4,7 +4,7 @@ import { URL, fileURLToPath } from 'node:url';
 
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 
-const scanRoots = ['packages/agent', 'packages/client/app'];
+const scanRoots = ['packages/agent', 'packages/client/app', 'packages/client/src/server/agent-rpc'];
 const ignoredPathFragments = [
   '/.next/',
   '/.wrangler/',
@@ -30,6 +30,11 @@ const guardrails = {
     concern:
       'Client must not expose public Agent proxy API routes; Agent operations stay behind Server Actions or Server Components',
     scenario: 'CLIENT-REGISTRY-S005',
+  },
+  productionAuth: {
+    concern:
+      'Production Agent Client Service authentication must use Ed25519 JWT and AGENT_CONTROL_PLANE_TRUST, not JSON auth routes, bootstrap trust, AgentTrustRegistry, or manually pasted Client private signing keys',
+    scenario: 'WORKSPACE-GOVERNANCE-S011',
   },
 };
 
@@ -69,6 +74,29 @@ const forbiddenSourcePatterns = [
     name: 'json-health-response',
     pattern: /response\.json\(\s*{[\S\s]{0,160}(?:health|ok|serving|status)|application\/json[\S\s]{0,160}health/i,
     guardrail: guardrails.agentHealth,
+  },
+  {
+    name: 'agent-rest-json-auth-route',
+    pattern:
+      /app\.(?:get|post|put|patch)\(["'][^"']*(?:auth|jwt|token|credential|bootstrap)|response\.json\([\S\s]{0,240}(?:auth|jwt|token|credential)|application\/json[\S\s]{0,240}(?:auth|jwt|token|credential)/i,
+    guardrail: guardrails.productionAuth,
+  },
+  {
+    name: 'bootstrap-rpc-trust-source',
+    pattern:
+      /\b(?:Bootstrap(?:Agent|Trust|Credential|ControlPlane)\w*|bootstrap(?:Agent|Trust|Credential|ControlPlane|Rpc|RPC|Token)\w*|rpc\s+\w*Bootstrap\w*)\b/,
+    guardrail: guardrails.productionAuth,
+  },
+  {
+    name: 'agent-trust-registry',
+    pattern: /\bAgentTrustRegistry\b/,
+    guardrail: guardrails.productionAuth,
+  },
+  {
+    name: 'client-private-key-worker-secret',
+    pattern:
+      /\b(?:client_(?:private_)?signing_key|client_service_private_jwk|client_private_jwk|client_signing_private_jwk)\b|wrangler\s+secret\s+put[\S\s]{0,120}(?:private_jwk|signing_private|client_service_private)/i,
+    guardrail: guardrails.productionAuth,
   },
 ];
 

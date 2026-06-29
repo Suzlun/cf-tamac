@@ -19,6 +19,8 @@ import {
   searchThreadHistoryFromStore,
 } from '../threads';
 
+import { testControlPlaneTrustConfig } from './test-control-plane-trust';
+
 import type { AIAgent } from '../AIAgent';
 import type {
   AgentCoreRequestContext,
@@ -423,7 +425,7 @@ function createTestEnv(runtime: Stage4QueryRuntime): {
   return {
     env: {
       AGENT_BLOBS: {} as R2Bucket,
-      AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+      AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
       AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
       AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
       AGENT_RPC_AUDIENCE: 'test-audience',
@@ -504,8 +506,9 @@ function createRpcRequest(path: string, body: Uint8Array): Request {
     body,
     headers: {
       'Content-Type': 'application/proto',
+      'x-agent-test-agent-id': agentId,
       'x-agent-test-principal-id': principalId,
-      'x-agent-test-scopes': 'agent.rpc,agent.read',
+      'x-agent-test-scopes': 'agent:read,agent.rpc,agent.read',
     },
     method: 'POST',
   });

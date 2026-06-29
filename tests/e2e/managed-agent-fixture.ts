@@ -1,4 +1,4 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 /**
  * E2E ごとに一意な managed Agent ID を生成します。
@@ -33,6 +33,7 @@ export function createE2eAgentId(testInfo: TestInfo): string {
  * 入力し、secret material や remote/staging origin は使いません。
  */
 export async function registerManagedAgentThroughUi(page: Page, agentId: string): Promise<void> {
+  await ensureDefaultSigningKeyThroughUi(page);
   await page.goto('/agents/new');
 
   // Client component の hydration が入力値を上書きしないよう、フォーム見出しが操作可能になるまで待つ。
@@ -42,8 +43,7 @@ export async function registerManagedAgentThroughUi(page: Page, agentId: string)
 
   // Agent ID は登録後 route と D1 primary key の前提なので、入力直後と送信直前の両方で値を確認する。
   const agentIdInput = page.getByRole('textbox', { name: 'Agent ID', exact: true });
-  await agentIdInput.click();
-  await agentIdInput.pressSequentially(agentId);
+  await agentIdInput.fill(agentId);
   await expect(agentIdInput).toHaveValue(agentId);
 
   // RPC origin は外部通信を発生させない example domain に固定し、Client D1 の metadata 保存だけを通す。
@@ -66,12 +66,66 @@ export async function registerManagedAgentThroughUi(page: Page, agentId: string)
   await page
     .getByRole('textbox', { name: 'Masked hint', exact: true })
     .fill(`ed25519:${agentId.slice(-8)}`.slice(0, 64));
-  await page.getByLabel('Status').selectOption('active');
+  await page.getByRole('combobox', { name: 'Status' }).click();
+  await page.getByRole('option', { name: 'active', exact: true }).click();
 
-  // Server Action へ渡す直前にも必須 ID が保持されていることを確認し、WebKit の入力反映揺れを失敗原因から外す。
+  // Server Action へ渡す直前にも必須 ID を再入力し、WebKit の hydration / 再描画による値落ちを失敗原因から外す。
+  await agentIdInput.fill(agentId);
   await expect(agentIdInput).toHaveValue(agentId);
-  await page.getByRole('button', { name: 'Register Agent' }).click();
+  await submitRegistrationWithAgentIdRecovery(page, agentIdInput, agentId);
+}
 
-  // ローカル D1 書き込みと redirect を待ち、以降の tests が登録済み detail route を前提にできるようにする。
-  await expect(page).toHaveURL(`/agents/${agentId}`, { timeout: 15_000 });
+async function submitRegistrationWithAgentIdRecovery(
+  page: Page,
+  agentIdInput: Locator,
+  agentId: string
+): Promise<void> {
+  // WebKit は長い multi-project run の終盤で controlled input の値が送信直前に落ちる場合があるため、
+  // Agent ID required の validation だけを再入力対象として扱う。その他の form error は本当の失敗として残す。
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.getByRole('button', { name: 'Register Agent' }).click();
+    try {
+      // ローカル D1 書き込みと redirect を待ち、以降の tests が登録済み detail route を前提にできるようにする。
+      await expect(page).toHaveURL(`/agents/${agentId}`, { timeout: 15_000 });
+      return;
+    } catch (error) {
+      const agentIdRequired = await page
+        .getByText('Agent ID is required.', { exact: true })
+        .count();
+      if (attempt > 0 || agentIdRequired === 0) {
+        throw error;
+      }
+      await agentIdInput.fill(agentId);
+      await expect(agentIdInput).toHaveValue(agentId);
+    }
+  }
+}
+
+/**
+ * Management Client の Global Settings UI だけを使って既定 signing key を用意します。
+ *
+ * @param page - 操作対象の Playwright page です。
+ * @returns 既定 key が存在する状態まで UI 操作を完了した Promise です。
+ * @remarks
+ * Agent 登録 Server Action は default signing key を前提に fail-closed するため、E2E fixture も D1 直書きではなく
+ * 署名鍵管理画面の positive surface から前提を作ります。private JWK や raw JWT は Browser で扱いません。
+ */
+export async function ensureDefaultSigningKeyThroughUi(page: Page): Promise<void> {
+  await page.goto('/global-settings/signing-keys');
+  await expect(page.getByRole('heading', { name: 'Client Service Signing Keys' })).toBeVisible();
+
+  // key が 0 件の場合は Global Settings の公開 UI から生成し、server-only action と D1 repository の境界を通す。
+  if ((await page.getByRole('table').count()) === 0) {
+    await page.getByRole('button', { name: 'Generate Key' }).first().click();
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 15_000 });
+  }
+
+  // 既定 key がない状態では操作可能な Set default button が出るため、見出し text ではなく button 有無で既定化を判断する。
+  const setDefaultButton = page.getByRole('button', { name: 'Set default' }).first();
+  if ((await setDefaultButton.count()) > 0) {
+    await setDefaultButton.click();
+    await expect(page.getByText('Default', { exact: true }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+  }
 }

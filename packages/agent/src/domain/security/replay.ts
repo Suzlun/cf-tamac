@@ -75,6 +75,48 @@ export interface AgentIdempotencyRepository<RecordedValue> {
 }
 
 /**
+ * Client Service JWT の `jti` replay reservation 入力です。
+ *
+ * @remarks
+ * `principalReplayId` は principal 種別、issuer、subject、kid を束ねた値で、storage 側では
+ * Agent ID と組み合わせて一意性を確保します。同じ `jti` でも別 principal / 別 Agent には波及させません。
+ */
+export interface ClientServiceJwtReplayReservationInput {
+  readonly agentId: string;
+  readonly expiresAtUnixMs: number;
+  readonly jwtId: string;
+  readonly nowUnixMs: number;
+  readonly principalReplayId: string;
+}
+
+/**
+ * Client Service JWT `jti` replay reservation の結果です。
+ */
+export type ClientServiceJwtReplayReservationResult =
+  | { readonly status: 'reserved' }
+  | { readonly firstSeenUnixMs?: number; readonly status: 'replay' };
+
+/**
+ * Client Service JWT の `jti` を Agent scope と principal scope に結び付ける storage nonce です。
+ *
+ * @param principal 認証済み Client Service principal です。
+ * @returns Agent-owned replay ledger に保存する principalReplayId と nonce です。
+ */
+export function createClientServiceJwtReplayKey(principal: AgentPrincipalContext): {
+  readonly nonce: string;
+  readonly principalReplayId: string;
+} {
+  // principalReplayId は安全な識別子だけを連結し、生 token や key material を含めません。
+  const principalReplayId = [
+    principal.principalType,
+    principal.issuer ?? 'unknown-issuer',
+    principal.subject ?? principal.principalId,
+    principal.keyId ?? 'unknown-kid',
+  ].join(':');
+  return { nonce: `client-service-jti:${principal.jwtId ?? 'missing-jti'}`, principalReplayId };
+}
+
+/**
  * Replay metadata bound to a decoded Agent command.
  */
 export interface AgentReplayContext {

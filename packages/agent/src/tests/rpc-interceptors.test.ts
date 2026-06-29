@@ -7,7 +7,15 @@ import { CheckHealthRequestSchema } from '@cf-tamac/agent-rpc/cftamac/agent/v1_p
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
 import { createAgentRpcAuditContext } from '../rpc/interceptors/audit';
 import { authenticateAgentRequest } from '../rpc/interceptors/authentication';
+import {
+  authorizeAgentRequest,
+  getRequiredAgentRpcScopes,
+  isProviderIngressOperation,
+} from '../rpc/interceptors/authorization';
 import { createReplayProtectionContext } from '../rpc/interceptors/replay-protection';
+import { createAgentRpcRouter } from '../rpc/router';
+
+import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
 import type { AgentWorkerEnv } from '../env';
@@ -44,7 +52,7 @@ function createTestEnv(
   return {
     env: {
       AGENT_BLOBS: {} as R2Bucket,
-      AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+      AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
       AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
       AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
       AGENT_RPC_AUDIENCE: 'test-audience',
@@ -74,9 +82,8 @@ async function readErrorCode(response: Response): Promise<string> {
 }
 
 describe('Agent RPC interceptors', () => {
-  it('[AGENT-PLATFORM-S008] extracts safe authentication, replay, and audit context', () => {
+  it('[AGENT-PLATFORM-S008] extracts safe authentication, replay, and audit context', async () => {
     const request = createHealthRequest({
-      Authorization: 'Bearer do-not-copy',
       'x-agent-idempotency-key': 'idem-1',
       'x-agent-nonce': 'nonce-1',
       'x-agent-test-acting-user-id': 'user-1',
@@ -87,12 +94,12 @@ describe('Agent RPC interceptors', () => {
       'x-agent-test-key-id': 'key-1',
       'x-agent-test-principal-id': 'principal-1',
       'x-agent-test-principal-type': 'CLIENT_SERVICE',
-      'x-agent-test-scopes': 'agent.rpc,agent.health',
+      'x-agent-test-scopes': 'agent:read',
       'x-agent-test-subject': 'client-1',
       'x-request-id': 'request-1',
     });
 
-    const authentication = authenticateAgentRequest(request);
+    const authentication = await authenticateAgentRequest(request);
     expect(authentication.rejection).toBeUndefined();
     expect(authentication.principal).toMatchObject({
       actingUserId: 'user-1',
@@ -102,7 +109,7 @@ describe('Agent RPC interceptors', () => {
       keyId: 'key-1',
       principalId: 'principal-1',
       principalType: 'CLIENT_SERVICE',
-      scopes: ['agent.rpc', 'agent.health'],
+      scopes: ['agent:read'],
       subject: 'client-1',
     });
 
@@ -122,7 +129,7 @@ describe('Agent RPC interceptors', () => {
       requestId: 'request-1',
       service: 'cftamac.agent.v1.AgentHealthService',
     });
-    expect(JSON.stringify(auditContext)).not.toContain('do-not-copy');
+    expect(JSON.stringify(auditContext)).not.toContain('Bearer');
   });
 
   it('[AGENT-PLATFORM-S008] [AGENT-SECURITY-S009] rejects guard failures before AIAgent routing', async () => {
@@ -169,6 +176,77 @@ describe('Agent RPC interceptors', () => {
     }
   });
 
+  it('[AGENT-SECURITY-S002] 本番 path は x-agent-test-* を credential として扱わない', async () => {
+    const request = createHealthRequest({
+      'x-agent-test-grant': 'allow',
+      'x-agent-test-principal-id': 'principal-1',
+      'x-agent-test-scopes': 'agent:read',
+    });
+    const directAuthentication = await authenticateAgentRequest(request, { allowTestSeam: false });
+    expect(directAuthentication.rejection).toMatchObject({ code: Code.Unauthenticated });
+
+    const { env, healthCalls } = createTestEnv();
+    const bearerWithTestHeaders = createHealthRequest({
+      Authorization: 'Bearer malformed-token',
+      'x-agent-test-grant': 'allow',
+      'x-agent-test-principal-id': 'principal-1',
+      'x-agent-test-scopes': 'agent:read',
+    });
+    const response = await handleAgentConnectRequest(bearerWithTestHeaders, env);
+    expect(await readErrorCode(response)).toBe('unauthenticated');
+    expect(healthCalls).toEqual([]);
+  });
+
+  it('[AGENT-SECURITY-S013] 登録済み Agent RPC method は明示的な認可 policy を持つ', () => {
+    const { env } = createTestEnv();
+    const registeredOperations = createAgentRpcRouter(env).handlers.map((handler) =>
+      parseConnectMethodIdentity(handler.requestPath)
+    );
+
+    const unmappedClientServiceOperations = registeredOperations.filter(
+      (operation) =>
+        !isProviderIngressOperation(operation) && getRequiredAgentRpcScopes(operation) === undefined
+    );
+    const providerIngressOperations = registeredOperations.filter(isProviderIngressOperation);
+
+    expect(unmappedClientServiceOperations).toEqual([]);
+    expect(
+      providerIngressOperations
+        .map((operation) => `${operation.service}/${operation.method}`)
+        .sort()
+    ).toEqual([
+      'cftamac.agent.v1.IntegrationIngressService/PublishDeliveryResult',
+      'cftamac.agent.v1.IntegrationIngressService/PublishEvent',
+      'cftamac.agent.v1.IntegrationIngressService/PublishToolResult',
+    ]);
+  });
+
+  it('[AGENT-SECURITY-S014] 認可は wildcard principal agent_id でも request agent_id 完全一致を要求する', () => {
+    const body = toBinary(
+      CheckHealthRequestSchema,
+      create(CheckHealthRequestSchema, { agentId: 'agent-interceptor' })
+    );
+    const result = authorizeAgentRequest({
+      principal: {
+        agentId: '*',
+        allowedAgentIds: ['*'],
+        allowedScopes: ['agent:read'],
+        authenticationMode: 'bearer',
+        principalId: 'principal-1',
+        principalType: 'CLIENT_SERVICE',
+        scopes: ['agent:read'],
+      },
+      rawBody: body,
+      request: new Request(`${baseUrl}${healthPath}`, {
+        body,
+        headers: { 'Content-Type': 'application/proto' },
+        method: 'POST',
+      }),
+    });
+
+    expect(result).toMatchObject({ code: Code.PermissionDenied, reason: 'agent_scope_mismatch' });
+  });
+
   it('[AGENT-PLATFORM-S008] maps Connect errors without exposing Durable Object fallback routes', async () => {
     const { env } = createTestEnv({
       throwHealthError: new ConnectError('Agent health unavailable.', Code.Unavailable),
@@ -184,3 +262,11 @@ describe('Agent RPC interceptors', () => {
     expect(await readErrorCode(response)).toBe('unavailable');
   });
 });
+
+function parseConnectMethodIdentity(path: string): {
+  readonly method: string;
+  readonly service: string;
+} {
+  const segments = path.split('/').filter((segment) => segment !== '');
+  return { method: segments.at(1) ?? 'unknown', service: segments.at(0) ?? 'unknown' };
+}

@@ -159,13 +159,15 @@ async function fillCreationFormWithSafePolicyDraft(
     .getByRole('textbox', { name: 'Public fingerprint', exact: true })
     .fill(`fp-${agentId}`.slice(0, 128));
   await page.getByRole('textbox', { name: 'Masked hint', exact: true }).fill('ed25519:e2e-safe');
-  await page.getByLabel('Status').selectOption('active');
+  await page.getByRole('combobox', { name: 'Status' }).click();
+  await page.getByRole('option', { name: 'active', exact: true }).click();
 }
 
 async function fillPolicyDraftFields(page: Page, policyRef: string): Promise<void> {
   // Model policy draft は Browser-safe な ref/provider/model/生成 parameter だけを入力する。
   await page.getByLabel('Policy ref').fill(policyRef);
-  await page.getByLabel('Provider').selectOption('workers-ai');
+  await page.getByRole('combobox', { name: 'Provider' }).click();
+  await page.getByRole('option', { name: 'workers-ai', exact: true }).click();
   await page.getByLabel('Model ID').fill('@cf/meta/llama-3.1-8b-instruct');
   await page.getByLabel('Temperature').fill('0.20');
   await page.getByLabel('Top P').fill('0.90');

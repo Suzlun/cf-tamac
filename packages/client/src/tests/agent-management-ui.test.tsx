@@ -838,3 +838,183 @@ describe('Browser secrecy boundaries (AGENT-MANAGEMENT-UI-S009)', () => {
     }
   });
 });
+
+/**
+ * Ed25519 signing key / trust config export / Agent key selection / health verification / rotation
+ * UI (AGENT-MANAGEMENT-UI-S003, S004, S010-S016, S019, S020)。
+ *
+ * @remarks feature component は server-only module を直接 import せず、page (Server Component)
+ * から action callback を受け取る。これらの tests は source 上の境界と UI 要素の存在を検査する。
+ */
+describe('Client Service signing key UI and server action boundary', () => {
+  const signingKeyManagementPath = new URL(
+    '../components/signing-key-management.tsx',
+    import.meta.url
+  );
+  const trustConfigExportPath = new URL('../components/trust-config-export.tsx', import.meta.url);
+  const agentSigningKeySelectPath = new URL(
+    '../components/agent-signing-key-select.tsx',
+    import.meta.url
+  );
+  const keyRotationGuidePath = new URL('../components/key-rotation-guide.tsx', import.meta.url);
+  const signingKeyActionPath = new URL('../server/actions/signing-keys.ts', import.meta.url);
+  const trustConfigActionPath = new URL('../server/actions/trust-config.ts', import.meta.url);
+  const agentHealthActionPath = new URL('../server/actions/agent-health.ts', import.meta.url);
+  const signingKeysPagePath = new URL(
+    '../../app/global-settings/signing-keys/page.tsx',
+    import.meta.url
+  );
+  const trustConfigExportPagePath = new URL(
+    '../../app/global-settings/trust-config-export/page.tsx',
+    import.meta.url
+  );
+  const keyRotationPagePath = new URL(
+    '../../app/global-settings/key-rotation/page.tsx',
+    import.meta.url
+  );
+  const globalSettingsNavPath = new URL('../components/management-nav-config.ts', import.meta.url);
+
+  it('[AGENT-MANAGEMENT-UI-S010] signing key management UI handles key lifecycle under Global Settings', () => {
+    const source = read(signingKeyManagementPath);
+    const page = read(signingKeysPagePath);
+
+    // Global Settings 配下で issuer / kid / public fingerprint / status / default / lifecycle 操作を扱う。
+    expect(source).toContain('Client Service Signing Keys');
+    expect(source).toContain('Public fingerprint');
+    expect(source).toContain('Set default');
+    expect(source).toContain('Disable');
+    expect(source).toContain('Delete');
+    expect(page).toContain('SigningKeyManagement');
+    // private material を一切表示しない。
+    expect(source).not.toContain('privateJwkCiphertext');
+    expect(source).not.toContain('privateJwk');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S011] browser never receives signing material from components', () => {
+    const sources = [
+      read(signingKeyManagementPath),
+      read(trustConfigExportPath),
+      read(agentSigningKeySelectPath),
+      read(keyRotationGuidePath),
+    ].join('\n');
+
+    expect(sources).not.toContain('privateJwkCiphertext');
+    expect(sources).not.toContain('privateJwk');
+    expect(sources).not.toContain('"d"');
+    expect(sources).not.toContain('Bearer ');
+    expect(sources).not.toContain('Authorization');
+    // feature component は server-only module を直接 import しない。
+    expect(sources).not.toContain('server/actions/signing-keys');
+    expect(sources).not.toContain('server/actions/trust-config');
+    expect(sources).not.toContain('server/actions/agent-health');
+    expect(sources).not.toContain('server/credentials');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S012] Agent settings detail shows issuer/kid/fingerprint and verification result', () => {
+    const source = read(agentSigningKeySelectPath);
+
+    expect(source).toContain('Selected issuer / kid / fingerprint (read-only)');
+    expect(source).toContain('Current Trust Match');
+    expect(source).toContain('Last Verified At');
+    expect(source).toContain('Safe diagnostic codes');
+    // 自由入力ではなく既存 global key selection。
+    expect(source).toContain('Select an existing Global signing key');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S013] trust config export produces public-only JSON under Global Settings', () => {
+    const source = read(trustConfigExportPath);
+    const page = read(trustConfigExportPagePath);
+    const action = read(trustConfigActionPath);
+
+    expect(page).toContain('TrustConfigExportView');
+    expect(source).toContain('AGENT_CONTROL_PLANE_TRUST');
+    expect(source).toContain('No private parameter');
+    // action は private parameter d を含まない公開 JSON を組み立てる。
+    expect(action).not.toMatch(/\.d\b/);
+    expect(action).toContain('TrustConfigExport');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S014] broad scope selection shows warning and schema validation together', () => {
+    const source = read(trustConfigExportPath);
+    const action = read(trustConfigActionPath);
+
+    // wireframe/spec は broad permission warning と schema validation result を同時表示することを要求する。
+    // 実装は両 Alert を独立描画する (early return しない)。
+    expect(source).toContain('Broad permission warning');
+    expect(source).toContain('Schema validation passed');
+    expect(source).toContain('Schema validation');
+    // Server Action は ok:true と broadPermissionWarning を同時に返せる。
+    expect(action).toContain('broadPermissionWarning');
+    expect(action).toContain('ok: true');
+    expect(action).toContain('resolveBroadPermissionWarning');
+    // ADMIN_OPERATOR は break-glass 専用で trust config export からは除外。
+    expect(action).not.toContain("principalType === 'ADMIN_OPERATOR'");
+    expect(action).toContain('High-privilege scopes');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S015] rotation guidance ties trust config and Agent verification together', () => {
+    const source = read(keyRotationGuidePath);
+    const page = read(keyRotationPagePath);
+
+    expect(page).toContain('KeyRotationGuide');
+    expect(source).toContain('Generate replacement key');
+    expect(source).toContain('Export trust config update');
+    expect(source).toContain('Switch managed Agent selection');
+    expect(source).toContain('Health verification before revoke');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S016] emergency revoke and break-glass recovery guidance is displayed', () => {
+    const source = read(keyRotationGuidePath);
+
+    expect(source).toContain('Emergency Revoke');
+    expect(source).toContain('Break-glass Recovery');
+    expect(source).toContain('ADMIN_OPERATOR');
+    expect(source).toContain('revoke');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S019] selected-Agent pages route through server-only Agent RPC after trust setup', () => {
+    const action = read(agentHealthActionPath);
+
+    // Health 成功後に selected-Agent pages の実データ表示へ繋げる revalidate と Agent RPC 呼び出し。
+    expect(action).toContain('verifyAgentHealth');
+    expect(action).toContain('loadAgentRpcClients');
+    expect(action).toContain('clients.health.check');
+    expect(action).toContain('markManagedAgentSigningVerified');
+    expect(action).toContain("'threads'");
+    expect(action).toContain("'events'");
+    expect(action).toContain("'runs'");
+    expect(action).toContain("'schedules'");
+    expect(action).toContain("'integrations'");
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S020] Agent-zero Global Settings signing operations are reachable', () => {
+    const nav = read(globalSettingsNavPath);
+
+    expect(nav).toContain('/global-settings/signing-keys');
+    expect(nav).toContain('/global-settings/trust-config-export');
+    expect(nav).toContain('/global-settings/key-rotation');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S003] Agent overview rendering excludes signing material and uses server RPC', () => {
+    const sources = [
+      read(signingKeyManagementPath),
+      read(trustConfigExportPath),
+      read(agentSigningKeySelectPath),
+    ].join('\n');
+
+    // overview / settings は server action callback 経由で server-side RPC を使う。
+    expect(sources).not.toContain('privateKey');
+    expect(sources).not.toContain('secretMaterial');
+    expect(sources).not.toContain('credentialRef');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S004] settings screen keeps signing key generation / trust export in Global Settings', () => {
+    const signingAction = read(signingKeyActionPath);
+    const trustAction = read(trustConfigActionPath);
+
+    // signing key generation と trust config export は Client-wide operation として Server Action に置く。
+    expect(signingAction).toContain('generateSigningKey');
+    expect(signingAction).toContain('setDefaultSigningKey');
+    expect(trustAction).toContain('buildTrustConfigExport');
+  });
+});
