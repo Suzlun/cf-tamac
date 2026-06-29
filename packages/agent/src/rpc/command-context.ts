@@ -3,7 +3,10 @@ import type { ReplayMetadata, SecurityMetadata } from '@cf-tamac/agent-rpc/cftam
 import { createAgentDomainError } from '../domain/errors';
 import { computeSha256Hex } from '../domain/security';
 
-import { getCurrentAgentRpcAuditContext } from './interceptors/audit';
+import {
+  getCurrentAgentRpcAuditContext,
+  getCurrentAgentRpcExecutionPrincipal,
+} from './interceptors/audit';
 
 import type { AgentCoreRequestContext } from '../domain';
 import type { AgentPrincipalContext, AgentRawBodyDigest } from '../domain/security';
@@ -31,7 +34,7 @@ export async function createAgentCoreContext(
   input: CreateAgentCoreContextInput
 ): Promise<AgentCoreRequestContext> {
   const auditContext = getCurrentAgentRpcAuditContext();
-  const principal = createPrincipal(input.agentId, auditContext?.principal);
+  const principal = createPrincipal(input.agentId, getCurrentAgentRpcExecutionPrincipal());
   const nowMs = Date.now();
   const requestTimestampMs = Number(
     input.replay?.requestTimestampUnixMs ?? auditContext?.startedAtUnixMs ?? nowMs

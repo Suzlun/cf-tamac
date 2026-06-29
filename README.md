@@ -54,6 +54,7 @@
 - 本番運用 runbook は `docs/operations/agent-control-plane-auth.md` です。
 - Management Client の `Global Settings > Signing Keys` は Agent が 0 件でも Ed25519 signing key を生成し、private JWK を `CLIENT_CREDENTIAL_ENCRYPTION_KEY` で暗号化して Client D1 に保存します。
 - `Global Settings > Trust Config Export` は Agent Worker の Variables and Secrets に設定できる public-only `AGENT_CONTROL_PLANE_TRUST` JSON を出力します。出力には private key parameter `d`、private JWK、encrypted private JWK、生 JWT を含めません。
+- Agent Worker の監査識別子 hash は `AGENT_AUDIT_HASH_PEPPER` を使う HMAC で生成し、既知 user ID / email の辞書照合を防ぎます。
 - Rotation は新 key 追加、旧 key `retiring`、Agent health verification、旧 key `revoked` の順で進めます。Emergency revoke と break-glass recovery は Dashboard/API/Wrangler で Agent trust config を更新し、Health Check で確認します。
 
 ## Code Generation

@@ -47,7 +47,7 @@ Client と Provider は、失敗時に再試行すべきか、入力を直すべ
 **要件**
 
 - Domain error は `invalid_argument`、`unauthenticated`、`permission_denied`、`not_found`、`already_exists` または冪等成功、`failed_precondition`、`aborted`、`resource_exhausted`、`unavailable`、`deadline_exceeded`、`internal` を含む安定した Connect code に map MUST。
-- Log、metrics、監査 Event は agent_id、thread_id または thread_key hash、event_id、run_id、compaction_id、tool_invocation_id、installation_id、adapter_connection_id、RPC service/method、principal、issuer、subject、kid、principalType、actingUserId、scopes、jwtId、リクエスト ID、idempotency key、correlation ID、causation ID などの安全な文脈を含める MUST。
+- Log、metrics、監査 Event は agent_id、thread_id または thread_key hash、event_id、run_id、compaction_id、tool_invocation_id、installation_id、adapter_connection_id、RPC service/method、principal、issuer、kid、principalType、scopes、jwtId、subject hash、actingUserId hash、リクエスト ID、idempotency key、correlation ID、causation ID などの安全な文脈を含める MUST。
 - 認証失敗理由は token 不在、不正な token、不正署名、未知の issuer、未知の kid、無効 key、audience 拒否、時間範囲拒否、Agent 拒否、scope 拒否、replay 拒否、profile 拒否などの分類として観測可能である MUST。
 - Secret、生 token、秘密鍵、機密値を含む完全な signature base、生 Provider credential、private JWK、public key full value は log して MUST NOT、ブラウザークライアントに返して MUST NOT。
 - Key fingerprint と `kid` は調査用の安全な識別子として log できる SHALL。
@@ -65,6 +65,7 @@ Client と Provider は、失敗時に再試行すべきか、入力を直すべ
 - **GIVEN** Client Service または Integration Provider RPC が成功または失敗する
 - **WHEN** log、metrics、監査記録が出力される
 - **THEN** 調査用の安全な correlation field が含まれる
+- **AND** subject と actingUserId は `AGENT_AUDIT_HASH_PEPPER` による HMAC hash としてだけ含まれる
 - **AND** 生 token、秘密鍵、生 shared secret、完全な Provider credential、未 redaction の signature material、private JWK、public key full value は含まれない
 
 ## ADDED Requirements
@@ -79,7 +80,7 @@ Agent Service は `AGENT_CONTROL_PLANE_TRUST` を production Client Service trus
 
 **要件**
 
-- Agent Service は `AGENT_CONTROL_PLANE_TRUST` を required Agent secret として扱う SHALL。
+- Agent Service は `AGENT_CONTROL_PLANE_TRUST` と `AGENT_AUDIT_HASH_PEPPER` を required Agent secret として扱う SHALL。
 - Trust config は version、audiences、issuers、issuer ごとの keys を持つ JSON として validation される MUST。
 - Trust config の key は `kid`、`kty = OKP`、`crv = Ed25519`、public parameter `x`、status、principalType、allowedAgentIds、allowedScopes を含む MUST。
 - Trust config は private key parameter `d` を含んで MUST NOT。

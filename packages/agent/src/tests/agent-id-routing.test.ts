@@ -33,6 +33,7 @@ function createRoutingEnv(): AgentWorkerEnv {
 
   return {
     AGENT_BLOBS: {} as R2Bucket,
+    AGENT_AUDIT_HASH_PEPPER: 'test-audit-hash-pepper',
     AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
     AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',

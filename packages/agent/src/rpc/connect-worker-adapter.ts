@@ -107,7 +107,8 @@ export function createAgentConnectFetchHandler(
       request,
       authentication.principal,
       createReplayProtectionContext(request, authentication.principal),
-      await createRawBodyDigest(rawBody)
+      await createRawBodyDigest(rawBody),
+      env.AGENT_AUDIT_HASH_PEPPER
     );
     return runWithAgentRpcAuditContext(auditContext, () => handler(request)).catch(
       (error: unknown) => {

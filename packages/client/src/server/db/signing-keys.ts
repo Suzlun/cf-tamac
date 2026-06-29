@@ -1,8 +1,7 @@
 import 'server-only';
 
+import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, ne } from 'drizzle-orm/sql/expressions/conditions';
-import { asc, desc } from 'drizzle-orm/sql/expressions/select';
 
 import { clientManagedAgentsTable, clientSigningKeysTable } from './schema';
 
@@ -242,9 +241,6 @@ async function updateSigningKeyStatus(
   if (current.status === 'deleted' && status !== 'deleted') {
     throw new TypeError('Deleted signing keys cannot be reactivated. Generate a new key instead.');
   }
-  if (status !== 'active') {
-    await assertSigningKeyCanBeInvalidated(db, current);
-  }
   const now = Date.now();
   const set: Record<string, unknown> = { status, updatedAtMs: now };
   // 削除 tombstone: private material を復号不能な sentinel へ置換し、公開 tombstone metadata だけ残す。
@@ -255,12 +251,24 @@ async function updateSigningKeyStatus(
   } else if (status !== 'active') {
     set.isDefault = false;
   }
-  await db
-    .update(clientSigningKeysTable)
-    .set(set)
-    .where(and(eq(clientSigningKeysTable.issuer, issuer), eq(clientSigningKeysTable.keyId, keyId)))
-    .run();
-  return getSigningKey(db, issuer, keyId);
+  // active 復帰は deleted tombstone を除外し、deleted key の再利用を race 時も防ぎます。
+  const updateCondition =
+    status === 'active'
+      ? and(
+          createSigningKeyTargetCondition(issuer, keyId),
+          ne(clientSigningKeysTable.status, 'deleted')
+        )
+      : createInvalidatableSigningKeyCondition(issuer, keyId);
+  await db.update(clientSigningKeysTable).set(set).where(updateCondition).run();
+  const updated = await getSigningKey(db, issuer, keyId);
+  if (updated?.status === status) {
+    return updated;
+  }
+  await assertSigningKeyCanBeInvalidated(db, current);
+  if (updated?.status === 'deleted' && status === 'active') {
+    throw new TypeError('Deleted signing keys cannot be reactivated. Generate a new key instead.');
+  }
+  throw new TypeError('Signing key status was not updated atomically. Retry the operation.');
 }
 
 /**
@@ -319,13 +327,37 @@ async function deleteSigningKey(db: SigningKeyDb, issuer: string, keyId: string)
   if (current === undefined) {
     return;
   }
-  await assertSigningKeyCanBeInvalidated(db, current);
   // 完全削除: private material を含め行全体を取り除く。tombstone を残す場合は
   // updateSigningKeyStatus('deleted') を使う。
   await db
     .delete(clientSigningKeysTable)
-    .where(and(eq(clientSigningKeysTable.issuer, issuer), eq(clientSigningKeysTable.keyId, keyId)))
+    .where(createInvalidatableSigningKeyCondition(issuer, keyId))
     .run();
+  const remaining = await getSigningKey(db, issuer, keyId);
+  if (remaining === undefined) {
+    return;
+  }
+  await assertSigningKeyCanBeInvalidated(db, current);
+  throw new TypeError('Signing key was not deleted atomically. Retry the operation.');
+}
+
+function createSigningKeyTargetCondition(issuer: string, keyId: string) {
+  // issuer/keyId の複合 identity だけを対象にし、他 issuer の同一 kid を誤更新しません。
+  return and(eq(clientSigningKeysTable.issuer, issuer), eq(clientSigningKeysTable.keyId, keyId));
+}
+
+function createInvalidatableSigningKeyCondition(issuer: string, keyId: string) {
+  // default key と managed Agent 参照を同一 UPDATE/DELETE statement の条件へ入れ、check-then-act race を閉じます。
+  return and(
+    createSigningKeyTargetCondition(issuer, keyId),
+    eq(clientSigningKeysTable.isDefault, false),
+    sql`not exists (
+      select 1
+      from ${clientManagedAgentsTable}
+      where ${clientManagedAgentsTable.signingIssuer} = ${issuer}
+        and ${clientManagedAgentsTable.signingKeyId} = ${keyId}
+    )`
+  );
 }
 
 async function assertSigningKeyCanBeInvalidated(

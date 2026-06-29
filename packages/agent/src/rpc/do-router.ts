@@ -39,7 +39,7 @@ import { getAIAgentDurableObjectStub } from '../agent-routing';
 import { loadControlPlaneTrustConfig } from '../domain/security';
 
 import { createAgentCoreContext } from './command-context';
-import { getCurrentAgentRpcAuditContext } from './interceptors/audit';
+import { getCurrentAgentRpcExecutionPrincipal } from './interceptors/audit';
 import {
   mapConfigCommand,
   mapCredentialCommand,
@@ -199,7 +199,7 @@ function createCurrentPrincipalTrustDiagnostic():
       readonly verifiedAtUnixMs: bigint;
     }
   | undefined {
-  const summary = getCurrentAgentRpcAuditContext()?.principal.trustSummary;
+  const summary = getCurrentAgentRpcExecutionPrincipal()?.trustSummary;
   if (summary === undefined) return undefined;
   // 認証済み principal の安全な issuer/kid/fingerprint だけを health response へ写します。
   return {

@@ -20,6 +20,7 @@ export interface AgentWorkerVars {
  * 旧 `AGENT_CLIENT_JWT_PUBLIC_KEYS` は本番 trust source として扱わないため、required secret から除外します。
  */
 export const requiredAgentSecretNames = [
+  'AGENT_AUDIT_HASH_PEPPER',
   'AGENT_CONTROL_PLANE_TRUST',
   'AGENT_INTEGRATION_SIGNATURE_KEYS',
   'AGENT_MODEL_PROVIDER_SECRET_REFS',
@@ -79,6 +80,10 @@ export interface AgentWorkerEnv
  */
 export function getMissingAgentSecrets(env: Partial<AgentWorkerEnv>): RequiredAgentSecretName[] {
   const missingSecrets: RequiredAgentSecretName[] = [];
+  // 監査用 hash は secret pepper 付き HMAC で作り、既知 ID の辞書照合を防ぎます。
+  if (isMissingSecret(env.AGENT_AUDIT_HASH_PEPPER)) {
+    missingSecrets.push('AGENT_AUDIT_HASH_PEPPER');
+  }
   // 本番 Client Service trust は `AGENT_CONTROL_PLANE_TRUST` だけを正本にします。
   if (isMissingSecret(env.AGENT_CONTROL_PLANE_TRUST)) {
     missingSecrets.push('AGENT_CONTROL_PLANE_TRUST');

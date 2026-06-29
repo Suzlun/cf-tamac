@@ -22,6 +22,7 @@ binding = "AI"
 AGENT_RPC_AUDIENCE = "cf-tamac-agent"
 
 # Required secrets are provisioned with `wrangler secret put` and never committed.
+# - AGENT_AUDIT_HASH_PEPPER
 # - AGENT_CONTROL_PLANE_TRUST
 # - AGENT_INTEGRATION_SIGNATURE_KEYS
 # - AGENT_MODEL_PROVIDER_SECRET_REFS

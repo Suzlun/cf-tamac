@@ -52,6 +52,7 @@ function createTestEnv(
   return {
     env: {
       AGENT_BLOBS: {} as R2Bucket,
+      AGENT_AUDIT_HASH_PEPPER: 'test-audit-hash-pepper',
       AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
       AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
       AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
@@ -120,16 +121,30 @@ describe('Agent RPC interceptors', () => {
       request,
       authentication.principal,
       createReplayProtectionContext(request),
-      { algorithm: 'sha-256', byteLength: 3, digestHex: 'abc123' }
+      { algorithm: 'sha-256', byteLength: 3, digestHex: 'abc123' },
+      'test-audit-hash-pepper'
     );
-    expect(auditContext).toMatchObject({
+    expect(auditContext.audit).toMatchObject({
       method: 'Check',
       path: healthPath,
       replay: { idempotencyKey: 'idem-1', nonce: 'nonce-1' },
       requestId: 'request-1',
       service: 'cftamac.agent.v1.AgentHealthService',
     });
+    const alternatePepperContext = await createAgentRpcAuditContext(
+      request,
+      authentication.principal,
+      createReplayProtectionContext(request),
+      { algorithm: 'sha-256', byteLength: 3, digestHex: 'abc123' },
+      'different-test-audit-hash-pepper'
+    );
+    expect(auditContext.audit.auth.actingUserIdHash).toBeDefined();
+    expect(auditContext.audit.auth.actingUserIdHash).not.toBe(
+      alternatePepperContext.audit.auth.actingUserIdHash
+    );
     expect(JSON.stringify(auditContext)).not.toContain('Bearer');
+    expect(JSON.stringify(auditContext.audit)).not.toContain('user-1');
+    expect(JSON.stringify(auditContext.audit)).not.toContain('client-1');
   });
 
   it('[AGENT-PLATFORM-S008] [AGENT-SECURITY-S009] rejects guard failures before AIAgent routing', async () => {

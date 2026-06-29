@@ -1,8 +1,7 @@
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm/sql/expressions/conditions';
-import { asc, desc } from 'drizzle-orm/sql/expressions/select';
 
-import { clientManagedAgentsTable } from './schema';
+import { clientManagedAgentsTable, clientSigningKeysTable } from './schema';
 
 const AGENT_ID_REQUIRED_ERROR = 'agentId must not be empty.';
 
@@ -384,6 +383,14 @@ async function updateManagedAgentSigningKey(
     input.signingPublicFingerprint
   );
   const now = Date.now();
+  // signing key を割り当てる場合は、active key と fingerprint の一致を同じ UPDATE statement で検査します。
+  const updateCondition =
+    selection === undefined
+      ? eq(clientManagedAgentsTable.agentId, input.agentId)
+      : and(
+          eq(clientManagedAgentsTable.agentId, input.agentId),
+          createActiveSigningKeySelectionCondition(selection)
+        );
   await db
     .update(clientManagedAgentsTable)
     .set({
@@ -393,9 +400,36 @@ async function updateManagedAgentSigningKey(
       signingPublicFingerprint: selection?.fingerprint ?? null,
       updatedAtMs: now,
     })
-    .where(eq(clientManagedAgentsTable.agentId, input.agentId))
+    .where(updateCondition)
     .run();
-  return getManagedAgent(db, input.agentId);
+  const record = await getManagedAgent(db, input.agentId);
+  if (record === undefined || selection === undefined) {
+    return record;
+  }
+  if (
+    record.signingIssuer === selection.issuer &&
+    record.signingKeyId === selection.keyId &&
+    record.signingPublicFingerprint === selection.fingerprint
+  ) {
+    return record;
+  }
+  throw new TypeError('Selected signing key must exist, be active, and match the fingerprint.');
+}
+
+function createActiveSigningKeySelectionCondition(selection: {
+  readonly fingerprint: string;
+  readonly issuer: string;
+  readonly keyId: string;
+}) {
+  // Client D1 内の key store を同じ statement で参照し、古い active 判定に基づく割り当てを防ぎます。
+  return sql`exists (
+    select 1
+    from ${clientSigningKeysTable}
+    where ${clientSigningKeysTable.issuer} = ${selection.issuer}
+      and ${clientSigningKeysTable.keyId} = ${selection.keyId}
+      and ${clientSigningKeysTable.publicFingerprint} = ${selection.fingerprint}
+      and ${clientSigningKeysTable.status} = 'active'
+  )`;
 }
 
 /**

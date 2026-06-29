@@ -4,7 +4,7 @@
 
 ## 1. 運用境界
 
-- Agent Worker は `AGENT_CONTROL_PLANE_TRUST` を required secret として読み、公開鍵、issuer、kid、status、allowed Agent、allowed scope、audience だけを信頼します。
+- Agent Worker は `AGENT_CONTROL_PLANE_TRUST` と `AGENT_AUDIT_HASH_PEPPER` を required secret として読み、公開鍵、issuer、kid、status、allowed Agent、allowed scope、audience だけを認証に信頼し、監査上の利用者識別子は secret pepper 付き HMAC で相関します。
 - Management Client は `CLIENT_CREDENTIAL_ENCRYPTION_KEY` を required secret として使い、Client D1 の encrypted Client Service signing key store に private JWK を暗号化保存します。
 - Browser、HTML、Client bundle、public Client route、log、D1 の平文列、Worker variables には private JWK plaintext、encrypted private JWK、生 JWT、署名 logic、完全な public key value を出しません。
 - Client private signing key JSON を Worker Secret へ手貼りする運用は禁止です。Worker Secret は暗号化 root key と Agent 側 public-only trust config に限定します。
@@ -50,9 +50,10 @@ Agent Worker に設定する値は public-only JSON です。秘密鍵 parameter
 
 2. Management Client の `Global Settings > Signing Keys` で Ed25519 signing key pair を生成します。Client server は private JWK を `CLIENT_CREDENTIAL_ENCRYPTION_KEY` で暗号化し、Client D1 の encrypted signing key store に保存します。
 3. `Global Settings > Trust Config Export` で public-only `AGENT_CONTROL_PLANE_TRUST` JSON を生成します。export に `d`、private JWK、encrypted private JWK、生 JWT がないことを確認します。
-4. Agent Worker に trust config を secret として設定します。
+4. Agent Worker に trust config と監査 hash pepper を secret として設定します。`AGENT_AUDIT_HASH_PEPPER` は監査 record の `actingUserIdHash` / `subjectHash` だけに使う長いランダム値で、Client signing key や trust config とは分離します。
 
    ```bash
+   wrangler secret put --config packages/agent/wrangler.toml AGENT_AUDIT_HASH_PEPPER
    wrangler secret put --config packages/agent/wrangler.toml AGENT_CONTROL_PLANE_TRUST
    ```
 

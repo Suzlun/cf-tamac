@@ -204,26 +204,51 @@ describe('Client Service signing key store and encryption boundary', () => {
     expect(updated?.signingKeyId).toBe(material.keyId);
     expect(updated?.signingPublicFingerprint).toBe(material.publicFingerprint);
 
-    // 不一致 (fingerprint だけ変えた選択) は実際の loader 解決経路で fail-closed にする。
-    await agents.updateManagedAgentSigningKey({
+    // fingerprint 不一致は Client D1 の保存 statement 自体で拒否し、後続 loader へ不整合 record を渡さない。
+    await expect(
+      agents.updateManagedAgentSigningKey({
+        agentId: 'agent-alpha',
+        signingIssuer: material.issuer,
+        signingKeyId: material.keyId,
+        signingPublicFingerprint: 'sha256_b64u:mismatch',
+      })
+    ).rejects.toThrow('Selected signing key must exist, be active, and match the fingerprint.');
+    const unchanged = await agents.getManagedAgent('agent-alpha');
+    expect(unchanged?.signingPublicFingerprint).toBe(material.publicFingerprint);
+  });
+
+  it('[CLIENT-REGISTRY-S007] inactive signing keys cannot be assigned to managed Agents', async () => {
+    const db = createTestD1Database();
+    await applyClientMigration(db);
+    const agents = createManagedAgentRepository(db);
+    const signingKeys = createSigningKeyRepository(db);
+
+    const material = await generateEd25519SigningKeyMaterial(TEST_ENCRYPTION_KEY_BASE64);
+    await signingKeys.createSigningKey({
+      issuer: material.issuer,
+      keyId: material.keyId,
+      publicJwk: JSON.stringify(material.publicJwk),
+      publicFingerprint: material.publicFingerprint,
+      privateJwkCiphertext: material.privateJwkCiphertext,
+    });
+    await agents.upsertManagedAgent({
       agentId: 'agent-alpha',
-      signingIssuer: material.issuer,
-      signingKeyId: material.keyId,
-      signingPublicFingerprint: 'sha256_b64u:mismatch',
+      agentRpcOrigin: 'http://localhost:8787',
+      displayName: 'Alpha Agent',
     });
-    mocks.getCloudflareContext.mockReturnValue({
-      env: {
-        AGENT_RPC_DEFAULT_ORIGIN: 'http://localhost:8787',
-        CLIENT_ACTING_OPERATOR_ID: 'operator-test',
-        CLIENT_ACTING_SCOPES: 'agent:read',
-        CLIENT_CREDENTIAL_ENCRYPTION_KEY: TEST_ENCRYPTION_KEY_BASE64,
-        CLIENT_DB: db,
-      },
-    });
-    const { loadAgentRpcClients } = await import('../server/agent-rpc/agent-loader');
-    await expect(loadAgentRpcClients('agent-alpha')).rejects.toThrow(
-      'The selected signing key fingerprint does not match the registry record.'
-    );
+    await signingKeys.updateSigningKeyStatus(material.issuer, material.keyId, 'disabled');
+
+    // save action の事前 active 確認が古くても、repository update は active key の存在を同一 statement で再確認する。
+    await expect(
+      agents.updateManagedAgentSigningKey({
+        agentId: 'agent-alpha',
+        signingIssuer: material.issuer,
+        signingKeyId: material.keyId,
+        signingPublicFingerprint: material.publicFingerprint,
+      })
+    ).rejects.toThrow('Selected signing key must exist, be active, and match the fingerprint.');
+    const unchanged = await agents.getManagedAgent('agent-alpha');
+    expect(unchanged?.signingIssuer).toBeUndefined();
   });
 
   it('[CLIENT-REGISTRY-S007] default or assigned signing keys cannot be invalidated independently', async () => {

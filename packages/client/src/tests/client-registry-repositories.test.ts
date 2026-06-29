@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createCredentialReferenceRepository,
   createManagedAgentRepository,
+  createSigningKeyRepository,
   type ManagedAgentRecord,
 } from '../server/db';
 
@@ -67,11 +68,19 @@ describe('Managed Agent signing identity metadata persistence', () => {
     const db = createTestD1Database();
     await applyClientMigration(db);
     const repository = createManagedAgentRepository(db);
+    const signingKeys = createSigningKeyRepository(db);
 
     await repository.upsertManagedAgent({
       agentId: 'agent-alpha',
       agentRpcOrigin: 'http://localhost:8787',
       displayName: 'Alpha Agent',
+    });
+    await signingKeys.createSigningKey({
+      issuer: 'cf-tamac-client',
+      keyId: 'key-001',
+      privateJwkCiphertext: '{"v":1,"iv":"i","ct":"c"}',
+      publicFingerprint: 'sha256_b64u:abc',
+      publicJwk: '{"kty":"OKP","crv":"Ed25519","x":"public"}',
     });
 
     const updated = await repository.updateManagedAgentSigningKey({

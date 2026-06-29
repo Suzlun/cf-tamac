@@ -239,6 +239,7 @@ function SigningKeyRowActions({
 }): ReactNode {
   return (
     <div className="flex flex-wrap gap-2">
+      {/* active かつ non-default の key だけを既定 key に昇格でき、既定化すると署名 fallback の選択先が切り替わる。 */}
       {signingKey.status === 'active' && !signingKey.isDefault ? (
         <form action={actions.setDefault}>
           <SigningKeyFields signingKey={signingKey} />
@@ -247,6 +248,7 @@ function SigningKeyRowActions({
           </Button>
         </form>
       ) : null}
+      {/* default key は常に署名可能な退避先として残すため、active かつ non-default の key だけ無効化を許可する。 */}
       {signingKey.status === 'active' && !signingKey.isDefault ? (
         <form action={actions.disable}>
           <SigningKeyFields signingKey={signingKey} />
@@ -255,6 +257,7 @@ function SigningKeyRowActions({
           </Button>
         </form>
       ) : null}
+      {/* disabled key の再有効化は署名候補へ戻す副作用があるため、disabled 状態の行だけに限定する。 */}
       {signingKey.status === 'disabled' ? (
         <form action={actions.enable}>
           <SigningKeyFields signingKey={signingKey} />
@@ -263,6 +266,7 @@ function SigningKeyRowActions({
           </Button>
         </form>
       ) : null}
+      {/* default key の削除は server action 側でも拒否されるが、誤操作を避けるため UI でも non-default に限定する。 */}
       {!signingKey.isDefault ? (
         <form action={actions.delete}>
           <SigningKeyFields signingKey={signingKey} />
