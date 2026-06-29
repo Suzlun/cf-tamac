@@ -99,7 +99,7 @@ describe('Agent RPC interceptors', () => {
       'x-request-id': 'request-1',
     });
 
-    const authentication = await authenticateAgentRequest(request);
+    const authentication = await authenticateAgentRequest(request, { allowTestSeam: true });
     expect(authentication.rejection).toBeUndefined();
     expect(authentication.principal).toMatchObject({
       actingUserId: 'user-1',
@@ -116,7 +116,7 @@ describe('Agent RPC interceptors', () => {
     if (authentication.principal === undefined) {
       throw new Error('principal should be extracted for the test seam.');
     }
-    const auditContext = createAgentRpcAuditContext(
+    const auditContext = await createAgentRpcAuditContext(
       request,
       authentication.principal,
       createReplayProtectionContext(request),
@@ -170,7 +170,9 @@ describe('Agent RPC interceptors', () => {
 
     for (const testCase of cases) {
       const { env, healthCalls } = createTestEnv();
-      const response = await handleAgentConnectRequest(createHealthRequest(testCase.headers), env);
+      const response = await handleAgentConnectRequest(createHealthRequest(testCase.headers), env, {
+        allowTestSeam: true,
+      });
       expect(await readErrorCode(response)).toBe(testCase.code);
       expect(healthCalls).toEqual([]);
     }
@@ -256,7 +258,8 @@ describe('Agent RPC interceptors', () => {
         'x-agent-test-grant': 'allow',
         'x-agent-test-principal-id': 'principal-1',
       }),
-      env
+      env,
+      { allowTestSeam: true }
     );
 
     expect(await readErrorCode(response)).toBe('unavailable');

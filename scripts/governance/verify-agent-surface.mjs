@@ -78,7 +78,7 @@ const forbiddenSourcePatterns = [
   {
     name: 'agent-rest-json-auth-route',
     pattern:
-      /app\.(?:get|post|put|patch)\(["'][^"']*(?:auth|jwt|token|credential|bootstrap)|response\.json\([\S\s]{0,240}(?:auth|jwt|token|credential)|application\/json[\S\s]{0,240}(?:auth|jwt|token|credential)/i,
+      /\b(?:[$_a-z][\w$]*|new\s+[$_a-z][\w$]*\([^)]*\))\s*\.\s*(?:get|post|put|patch)\(["'][^"']*\/[^"']*(?:auth|jwt|token|credential|bootstrap)|response\.json\([\S\s]{0,240}(?:auth|jwt|token|credential)|application\/json[\S\s]{0,240}(?:auth|jwt|token|credential)/i,
     guardrail: guardrails.productionAuth,
   },
   {

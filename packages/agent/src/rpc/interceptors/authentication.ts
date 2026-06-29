@@ -179,17 +179,7 @@ function mapJwtFailureToConnectCode(reason: ClientServiceJwtFailureReason): Code
 }
 
 function isTestSeamAllowed(options: AgentAuthenticationOptions): boolean {
-  if (options.allowTestSeam !== undefined) return options.allowTestSeam;
-  return isVitestRuntime();
-}
-
-function isVitestRuntime(): boolean {
-  const processLike = (
-    globalThis as {
-      readonly process?: { readonly env?: Readonly<Record<string, string | undefined>> };
-    }
-  ).process;
-  return processLike?.env?.VITEST === 'true' || processLike?.env?.NODE_ENV === 'test';
+  return options.allowTestSeam === true;
 }
 
 function parsePrincipalType(rawType: string | null): AgentPrincipalType | undefined {

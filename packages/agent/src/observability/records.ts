@@ -6,7 +6,7 @@ import { redactObservabilityRecord } from './redaction';
 export interface AgentObservabilityCorrelationFields {
   readonly adapterConnectionId?: string;
   readonly agentId?: string;
-  readonly actingUserId?: string;
+  readonly actingUserIdHash?: string;
   readonly authFailureReason?: string;
   readonly causationId?: string;
   readonly compactionId?: string;
@@ -29,7 +29,7 @@ export interface AgentObservabilityCorrelationFields {
   readonly responseDigest?: string;
   readonly runId?: string;
   readonly service?: string;
-  readonly subject?: string;
+  readonly subjectHash?: string;
   readonly scopes?: readonly string[];
   readonly threadId?: string;
   readonly threadKeyHash?: string;

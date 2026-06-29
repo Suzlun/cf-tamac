@@ -6,7 +6,7 @@ import type { AgentRawBodyDigest } from '../../domain/security';
  * Agent RPC audit context に含める secret-free な認証 field です。
  */
 export interface AgentRpcAuditAuthFields {
-  readonly actingUserId?: string;
+  readonly actingUserIdHash?: string;
   readonly authenticationMode: 'bearer' | 'test';
   readonly fingerprint?: string;
   readonly issuer?: string;
@@ -15,7 +15,7 @@ export interface AgentRpcAuditAuthFields {
   readonly principalId: string;
   readonly principalType: string;
   readonly scopes: readonly string[];
-  readonly subject?: string;
+  readonly subjectHash?: string;
 }
 
 /**
@@ -38,16 +38,16 @@ let currentAgentRpcAuditContext: AgentRpcAuditContext | undefined;
 /**
  * Create the audit context for an Agent RPC request.
  */
-export function createAgentRpcAuditContext(
+export async function createAgentRpcAuditContext(
   request: Request,
   principal: AuthenticatedAgentPrincipal,
   replay: ReplayProtectionContext,
   rawBodyDigest: AgentRawBodyDigest
-): AgentRpcAuditContext {
+): Promise<AgentRpcAuditContext> {
   const path = new URL(request.url).pathname;
   const methodIdentity = parseConnectMethodIdentity(path);
   return {
-    auth: createSafeAuditAuthFields(principal),
+    auth: await createSafeAuditAuthFields(principal),
     method: methodIdentity.method,
     path,
     requestId: getRequestId(request),
@@ -59,12 +59,12 @@ export function createAgentRpcAuditContext(
   };
 }
 
-function createSafeAuditAuthFields(
+async function createSafeAuditAuthFields(
   principal: AuthenticatedAgentPrincipal
-): AgentRpcAuditAuthFields {
-  // token 本文や signature は含めず、調査に必要な issuer/kid/fingerprint/jti だけを保持します。
+): Promise<AgentRpcAuditAuthFields> {
+  // 利用者識別子はハッシュ化し、token 本文や signature は含めず、調査に必要な issuer/kid/fingerprint/jti だけを保持します。
   return {
-    actingUserId: principal.actingUserId,
+    actingUserIdHash: await hashAuditIdentifier(principal.actingUserId),
     authenticationMode: principal.authenticationMode,
     fingerprint: principal.fingerprint,
     issuer: principal.issuer,
@@ -73,8 +73,18 @@ function createSafeAuditAuthFields(
     principalId: principal.principalId,
     principalType: principal.principalType,
     scopes: principal.scopes,
-    subject: principal.subject,
+    subjectHash: await hashAuditIdentifier(principal.subject),
   };
+}
+
+async function hashAuditIdentifier(value: string | undefined): Promise<string | undefined> {
+  if (value === undefined) return undefined;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return encodeHex(new Uint8Array(digest));
+}
+
+function encodeHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**

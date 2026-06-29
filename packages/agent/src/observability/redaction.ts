@@ -8,8 +8,7 @@ export const agentRedactedValue = '[REDACTED]';
  */
 export function isSensitiveObservabilityKey(key: string): boolean {
   const normalized = key.toLowerCase();
-  if (normalized.endsWith('digest') || normalized.endsWith('summary')) return false;
-  return (
+  const secretBearing =
     normalized.includes('authorization') ||
     normalized.includes('bearer') ||
     normalized.includes('chainofthought') ||
@@ -37,8 +36,9 @@ export function isSensitiveObservabilityKey(key: string): boolean {
     normalized.includes('set-cookie') ||
     normalized.includes('signature') ||
     normalized.includes('token') ||
-    normalized === 'x'
-  );
+    normalized === 'x';
+  if (secretBearing) return true;
+  return false;
 }
 
 /**

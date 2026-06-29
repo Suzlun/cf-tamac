@@ -247,7 +247,7 @@ function SigningKeyRowActions({
           </Button>
         </form>
       ) : null}
-      {signingKey.status === 'active' ? (
+      {signingKey.status === 'active' && !signingKey.isDefault ? (
         <form action={actions.disable}>
           <SigningKeyFields signingKey={signingKey} />
           <Button type="submit" variant="outline" size="sm">
@@ -263,12 +263,14 @@ function SigningKeyRowActions({
           </Button>
         </form>
       ) : null}
-      <form action={actions.delete}>
-        <SigningKeyFields signingKey={signingKey} />
-        <Button type="submit" variant="destructive" size="sm">
-          Delete (revoke in trust config)
-        </Button>
-      </form>
+      {!signingKey.isDefault ? (
+        <form action={actions.delete}>
+          <SigningKeyFields signingKey={signingKey} />
+          <Button type="submit" variant="destructive" size="sm">
+            Delete (revoke in trust config)
+          </Button>
+        </form>
+      ) : null}
     </div>
   );
 }

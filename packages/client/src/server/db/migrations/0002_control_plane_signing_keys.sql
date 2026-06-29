@@ -13,13 +13,17 @@ CREATE TABLE IF NOT EXISTS client_signing_keys (
   public_jwk TEXT NOT NULL,
   public_fingerprint TEXT NOT NULL,
   private_jwk_ciphertext TEXT NOT NULL,
-  status TEXT NOT NULL,
-  is_default INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL CHECK (status IN ('active', 'disabled', 'deleted')),
+  is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
   created_at_ms INTEGER NOT NULL,
   updated_at_ms INTEGER NOT NULL,
   last_used_at_ms INTEGER,
   PRIMARY KEY (issuer, key_id)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS client_signing_keys_one_default
+  ON client_signing_keys(is_default)
+  WHERE is_default = 1;
 
 -- managed Agent ごとの署名 identity metadata。既存行を壊さないためすべて nullable。
 -- key 未選択状態 (NULL) の場合は Agent RPC 呼び出し前に明示的な signing key selection を要求する。

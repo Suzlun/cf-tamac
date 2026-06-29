@@ -156,7 +156,7 @@ function mapTrustDiagnostic(
     principalKid: readOptionalString(principal?.kid),
     principalFingerprint: readOptionalString(principal?.fingerprint),
     principalKeyStatus: readOptionalString(principal?.keyStatus),
-    principalVerified: principal?.verified === undefined ? undefined : Boolean(principal.verified),
+    principalVerified: typeof principal?.verified === 'boolean' ? principal.verified : undefined,
     verifiedAtUnixMs: readBigIntMillis(principal?.verifiedAtUnixMs),
   };
 }

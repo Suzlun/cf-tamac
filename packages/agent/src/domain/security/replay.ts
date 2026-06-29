@@ -1,6 +1,19 @@
 import type { AgentPrincipalContext, AgentRawBodyDigest, AgentRpcOperationIdentity } from './types';
 
 /**
+ * Client Service JWT replay key を作るために必須の検証済み principal claim です。
+ *
+ * @remarks issuer / jwtId / keyId / subject が欠落した principal から replay key を合成しないため、
+ * 呼び出し前の認証・replay-protection 層で必ず存在を検査します。
+ */
+export type ClientServiceReplayPrincipal = AgentPrincipalContext & {
+  readonly issuer: string;
+  readonly jwtId: string;
+  readonly keyId: string;
+  readonly subject: string;
+};
+
+/**
  * Nonce reservation input scoped to an Agent principal.
  */
 export interface AgentNonceReservationInput {
@@ -102,18 +115,18 @@ export type ClientServiceJwtReplayReservationResult =
  * @param principal 認証済み Client Service principal です。
  * @returns Agent-owned replay ledger に保存する principalReplayId と nonce です。
  */
-export function createClientServiceJwtReplayKey(principal: AgentPrincipalContext): {
+export function createClientServiceJwtReplayKey(principal: ClientServiceReplayPrincipal): {
   readonly nonce: string;
   readonly principalReplayId: string;
 } {
-  // principalReplayId は安全な識別子だけを連結し、生 token や key material を含めません。
-  const principalReplayId = [
+  // principalReplayId は構造化 JSON として保存し、区切り文字を含む issuer / subject / kid でも衝突しないようにする。
+  const principalReplayId = JSON.stringify([
     principal.principalType,
-    principal.issuer ?? 'unknown-issuer',
-    principal.subject ?? principal.principalId,
-    principal.keyId ?? 'unknown-kid',
-  ].join(':');
-  return { nonce: `client-service-jti:${principal.jwtId ?? 'missing-jti'}`, principalReplayId };
+    principal.issuer,
+    principal.subject,
+    principal.keyId,
+  ]);
+  return { nonce: `client-service-jti:${principal.jwtId}`, principalReplayId };
 }
 
 /**

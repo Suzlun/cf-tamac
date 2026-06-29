@@ -130,6 +130,9 @@ describe('Management Client D1 schema', () => {
       }[];
       const signingKeyColumns = signingKeyRows.map((c) => c.name);
       expect(signingKeyColumns).toContain('private_jwk_ciphertext');
+      expect(signingKeysMigration).toContain("CHECK (status IN ('active', 'disabled', 'deleted'))");
+      expect(signingKeysMigration).toContain('CHECK (is_default IN (0, 1))');
+      expect(signingKeysMigration).toContain('client_signing_keys_one_default');
       expect(signingKeyColumns).not.toContain('private_jwk_plaintext');
       expect(signingKeyColumns).not.toContain('private_key');
       expect(signingKeyColumns).not.toContain('d');

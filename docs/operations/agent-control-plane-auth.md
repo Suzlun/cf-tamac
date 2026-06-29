@@ -79,4 +79,4 @@ Management Client が利用不能な場合でも、Cloudflare Dashboard、Cloudf
 - Agent と Client の required secrets が設定されていることを確認します。
 - `AgentHealthService.Check` を generated Connect client から binary Protobuf で呼び、REST `/health`、Connect JSON、HTTP GET unary が成功 path にならないことを確認します。
 - Browser response、storage、bundle、public Client route に private JWK、encrypted private JWK、生 JWT、signing material、Agent credential forwarding が含まれないことを確認します。
-- Client D1 は managed Agent records、外部 credential references、encrypted Client Service signing key store だけを持ち、Agent domain snapshots と plaintext secrets を持たないことを確認します。
+- Client D1 は managed Agent records、外部 credential references (external credential references)、encrypted Client Service signing key store だけを持ち、Agent domain snapshots と plaintext secrets を持たないことを確認します。

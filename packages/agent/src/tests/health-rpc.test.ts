@@ -306,7 +306,8 @@ describe('Agent health RPC', () => {
         healthRpcPath,
         toBinary(CheckHealthRequestSchema, create(CheckHealthRequestSchema, { agentId: '' }))
       ),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(await readErrorCode(missingAgentId)).toBe('invalid_argument');
   });
@@ -328,7 +329,8 @@ describe('Agent health RPC', () => {
 
     const response = await handleAgentConnectRequest(
       createHealthRequest(healthRpcPath, requestBytes),
-      env
+      env,
+      { allowTestSeam: true }
     );
 
     expect(response.status).toBe(200);

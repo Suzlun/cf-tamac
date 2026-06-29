@@ -27,6 +27,7 @@ const ALLOWED_TRUST_SCOPES = new Set([
   'agent:admin',
   '*',
 ]);
+const ALLOWED_TRUST_STATUSES = new Set(['active', 'retiring', 'revoked']);
 
 export type {
   TrustConfigExport,
@@ -127,8 +128,17 @@ function validateTrustConfigInput(input: TrustConfigExportInput): string | undef
   if (input.issuer === '') {
     return 'Issuer is required.';
   }
+  const tamperableInput = input as { readonly principalType?: unknown };
+  if (tamperableInput.principalType !== 'CLIENT_SERVICE') {
+    return 'Trust config export only supports the Client Service principal type.';
+  }
   if (input.allowedAgentIds.length === 0) {
     return 'At least one allowed agent id is required.';
+  }
+  for (const agentId of input.allowedAgentIds) {
+    if (agentId === '') {
+      return 'Allowed agent ids must not be empty.';
+    }
   }
   if (input.allowedScopes.length === 0) {
     return 'At least one allowed scope is required.';
@@ -144,6 +154,12 @@ function validateTrustConfigInput(input: TrustConfigExportInput): string | undef
   for (const selection of input.selections) {
     if (selection.issuer === '' || selection.kid === '') {
       return 'Each signing key selection needs an issuer and key id.';
+    }
+    if (selection.issuer !== input.issuer) {
+      return 'Each signing key selection must match the exported issuer.';
+    }
+    if (!ALLOWED_TRUST_STATUSES.has(selection.trustStatus)) {
+      return 'Each signing key selection needs a recognized trust status.';
     }
   }
   return undefined;

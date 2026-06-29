@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createClientServiceJwt,
@@ -32,7 +32,26 @@ import { applyClientMigration, createTestD1Database } from './test-d1-helper';
 
 const TEST_ENCRYPTION_KEY_BASE64 = Buffer.alloc(32, 11).toString('base64');
 
+const mocks = vi.hoisted(() => ({
+  getCloudflareContext: vi.fn(),
+}));
+
+vi.mock('@opennextjs/cloudflare', () => ({
+  getCloudflareContext: mocks.getCloudflareContext,
+}));
+
+vi.mock('../server/agent-rpc/create-client', () => ({
+  createServerAgentRpcClients() {
+    throw new Error('createServerAgentRpcClients should not run before fingerprint validation.');
+  },
+}));
+
 describe('Client Service signing key store and encryption boundary', () => {
+  beforeEach(() => {
+    mocks.getCloudflareContext.mockReset();
+    delete process.env.E2E_FAKE_AGENT_RPC;
+  });
+
   it('[CLIENT-REGISTRY-S002] credential references and encrypted signing key store persist no plaintext secret', async () => {
     const db = createTestD1Database();
     await applyClientMigration(db);
@@ -142,6 +161,8 @@ describe('Client Service signing key store and encryption boundary', () => {
 
     // deleted key は private material を復号不能 tombstone へ置換し、署名 source に戻せない。
     const deletedRecord = await signingKeys.getSigningKey(material.issuer, material.keyId);
+    expect(deletedRecord).toBeDefined();
+    expect(deletedRecord?.status).toBe('deleted');
     expect(deletedRecord?.privateJwkCiphertext).not.toBe(material.privateJwkCiphertext);
     await expect(
       resolveEd25519PrivateKey(
@@ -149,14 +170,25 @@ describe('Client Service signing key store and encryption boundary', () => {
         deletedRecord?.privateJwkCiphertext ?? ''
       )
     ).rejects.toThrow();
+    await expect(
+      signingKeys.updateSigningKeyStatus(material.issuer, material.keyId, 'active')
+    ).rejects.toThrow('Deleted signing keys cannot be reactivated.');
   });
 
   it('[CLIENT-REGISTRY-S008] signing key fingerprint is verified against managed Agent metadata', async () => {
     const db = createTestD1Database();
     await applyClientMigration(db);
     const agents = createManagedAgentRepository(db);
+    const signingKeys = createSigningKeyRepository(db);
 
     const material = await generateEd25519SigningKeyMaterial(TEST_ENCRYPTION_KEY_BASE64);
+    await signingKeys.createSigningKey({
+      issuer: material.issuer,
+      keyId: material.keyId,
+      publicJwk: JSON.stringify(material.publicJwk),
+      publicFingerprint: material.publicFingerprint,
+      privateJwkCiphertext: material.privateJwkCiphertext,
+    });
     await agents.upsertManagedAgent({
       agentId: 'agent-alpha',
       agentRpcOrigin: 'http://localhost:8787',
@@ -172,15 +204,74 @@ describe('Client Service signing key store and encryption boundary', () => {
     expect(updated?.signingKeyId).toBe(material.keyId);
     expect(updated?.signingPublicFingerprint).toBe(material.publicFingerprint);
 
-    // 不一致 (fingerprint だけ変えた選択) は repository validation で一部更新を拒否する。
+    // 不一致 (fingerprint だけ変えた選択) は実際の loader 解決経路で fail-closed にする。
+    await agents.updateManagedAgentSigningKey({
+      agentId: 'agent-alpha',
+      signingIssuer: material.issuer,
+      signingKeyId: material.keyId,
+      signingPublicFingerprint: 'sha256_b64u:mismatch',
+    });
+    mocks.getCloudflareContext.mockReturnValue({
+      env: {
+        AGENT_RPC_DEFAULT_ORIGIN: 'http://localhost:8787',
+        CLIENT_ACTING_OPERATOR_ID: 'operator-test',
+        CLIENT_ACTING_SCOPES: 'agent:read',
+        CLIENT_CREDENTIAL_ENCRYPTION_KEY: TEST_ENCRYPTION_KEY_BASE64,
+        CLIENT_DB: db,
+      },
+    });
+    const { loadAgentRpcClients } = await import('../server/agent-rpc/agent-loader');
+    await expect(loadAgentRpcClients('agent-alpha')).rejects.toThrow(
+      'The selected signing key fingerprint does not match the registry record.'
+    );
+  });
+
+  it('[CLIENT-REGISTRY-S007] default or assigned signing keys cannot be invalidated independently', async () => {
+    const db = createTestD1Database();
+    await applyClientMigration(db);
+    const agents = createManagedAgentRepository(db);
+    const signingKeys = createSigningKeyRepository(db);
+    const material = await generateEd25519SigningKeyMaterial(TEST_ENCRYPTION_KEY_BASE64);
+    await signingKeys.createSigningKey({
+      issuer: material.issuer,
+      keyId: material.keyId,
+      publicJwk: JSON.stringify(material.publicJwk),
+      publicFingerprint: material.publicFingerprint,
+      privateJwkCiphertext: material.privateJwkCiphertext,
+    });
+    await signingKeys.setDefaultSigningKey(material.issuer, material.keyId);
+
     await expect(
-      agents.updateManagedAgentSigningKey({
-        agentId: 'agent-alpha',
-        signingIssuer: material.issuer,
-        signingKeyId: material.keyId,
-        signingPublicFingerprint: 'sha256_b64u:mismatch',
-      })
-    ).resolves.toBeDefined(); // 書込み自体は成功するが loader が照合で拒否する。
+      signingKeys.updateSigningKeyStatus(material.issuer, material.keyId, 'disabled')
+    ).rejects.toThrow('The default signing key cannot be disabled or deleted.');
+
+    const replacement = await generateEd25519SigningKeyMaterial(TEST_ENCRYPTION_KEY_BASE64);
+    await signingKeys.createSigningKey({
+      issuer: replacement.issuer,
+      keyId: replacement.keyId,
+      publicJwk: JSON.stringify(replacement.publicJwk),
+      publicFingerprint: replacement.publicFingerprint,
+      privateJwkCiphertext: replacement.privateJwkCiphertext,
+    });
+    await signingKeys.setDefaultSigningKey(replacement.issuer, replacement.keyId);
+    await agents.upsertManagedAgent({
+      agentId: 'agent-alpha',
+      agentRpcOrigin: 'http://localhost:8787',
+      displayName: 'Alpha Agent',
+    });
+    await agents.updateManagedAgentSigningKey({
+      agentId: 'agent-alpha',
+      signingIssuer: material.issuer,
+      signingKeyId: material.keyId,
+      signingPublicFingerprint: material.publicFingerprint,
+    });
+
+    await expect(
+      signingKeys.updateSigningKeyStatus(material.issuer, material.keyId, 'deleted')
+    ).rejects.toThrow('Signing keys assigned to managed Agents cannot be disabled or deleted.');
+    await expect(signingKeys.deleteSigningKey(material.issuer, material.keyId)).rejects.toThrow(
+      'Signing keys assigned to managed Agents cannot be disabled or deleted.'
+    );
   });
 
   it('[CLIENT-REGISTRY-S011] Agent RPC signing source is Ed25519 signing key store only', async () => {

@@ -176,7 +176,10 @@ export function collectClientBoundaryIssues(root) {
           );
         }
       }
-      if (/createServerAgentRpcClients|CLIENT_DB|credentialRef|credential_ref|Authorization|Bearer/.test(content)) {
+      if (
+        /createServerAgentRpcClients|CLIENT_DB|credentialRef|credential_ref/.test(content) ||
+        /authorization|bearer/i.test(content)
+      ) {
         issues.push(
           `${normalizedPath}: Client browser-visible modules must not contain Agent RPC credential or Client D1 access seams`
         );
@@ -263,7 +266,7 @@ function isForbiddenClientD1TableName(tableName) {
 function collectForbiddenClientD1SecretColumns(content) {
   const columnNames = [
     ...content.matchAll(/^\s*(["'`]?)(\w+)\1\s+(?:text|blob|varchar|integer)\b/gim),
-    ...content.matchAll(/\b(?:text|integer|blob)\(\s*["'](\w+)["']/g),
+    ...content.matchAll(/\b(?:text|integer|blob|varchar)\(\s*["'](\w+)["']/g),
   ].map((match) => match[2] ?? match[1]);
   return columnNames.filter((columnName) => isForbiddenClientD1SecretColumn(columnName));
 }

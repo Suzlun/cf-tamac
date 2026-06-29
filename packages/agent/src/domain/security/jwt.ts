@@ -299,10 +299,13 @@ function selectAcceptedAudience(
   claims: Record<string, unknown>,
   options: ClientServiceJwtVerifierOptions
 ): string | undefined {
-  const accepted = new Set(options.trustConfig.audiences);
-  if (options.expectedAudience !== undefined) {
-    accepted.add(options.expectedAudience);
-  }
+  const trustedAudiences = new Set(options.trustConfig.audiences);
+  const accepted =
+    options.expectedAudience === undefined
+      ? trustedAudiences
+      : trustedAudiences.has(options.expectedAudience)
+        ? new Set([options.expectedAudience])
+        : new Set<string>();
   for (const audience of readAudience(claims)) {
     if (accepted.has(audience)) {
       return audience;

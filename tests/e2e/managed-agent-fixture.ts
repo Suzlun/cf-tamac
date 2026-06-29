@@ -115,7 +115,10 @@ export async function ensureDefaultSigningKeyThroughUi(page: Page): Promise<void
   await expect(page.getByRole('heading', { name: 'Client Service Signing Keys' })).toBeVisible();
 
   // key が 0 件の場合は Global Settings の公開 UI から生成し、server-only action と D1 repository の境界を通す。
-  if ((await page.getByRole('table').count()) === 0) {
+  const signingKeyTable = page.getByRole('table');
+  const signingKeyRowCount =
+    (await signingKeyTable.count()) === 0 ? 0 : await signingKeyTable.getByRole('row').count();
+  if (signingKeyRowCount <= 1) {
     await page.getByRole('button', { name: 'Generate Key' }).first().click();
     await expect(page.getByRole('table')).toBeVisible({ timeout: 15_000 });
   }

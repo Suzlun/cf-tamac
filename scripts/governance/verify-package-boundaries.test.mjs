@@ -194,6 +194,7 @@ export const leaked = createServerAgentRpcClients;
 
 export const privateJwk = { d: 'forbidden' };
 export const rawJwt = 'header.payload.signature';
+export const auth = { authorization: 'bearer forbidden' };
 `
       );
       writeFixture(
@@ -249,6 +250,10 @@ export async function signWithLegacySecret() {
   private_jwk TEXT NOT NULL,
   shared_secret TEXT NOT NULL
 );
+
+export const forbiddenPlaintext = sqliteTable('client_plaintext', {
+  privateJwk: varchar('private_jwk'),
+});
 
 CREATE TABLE IF NOT EXISTS agent_events (
   event_id TEXT PRIMARY KEY,

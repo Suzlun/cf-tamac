@@ -90,7 +90,7 @@ async function createBodyDigest(
     return verifiedBodyDigest;
   }
   const fallbackBytes = new TextEncoder().encode(stableStringify(input.fallbackDigestSeed));
-  const digestHex = input.replay?.bodySha256 ?? (await computeSha256Hex(fallbackBytes));
+  const digestHex = await computeSha256Hex(fallbackBytes);
   return {
     algorithm: 'sha-256',
     byteLength: fallbackBytes.byteLength,

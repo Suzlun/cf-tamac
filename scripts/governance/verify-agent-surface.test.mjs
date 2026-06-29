@@ -161,6 +161,9 @@ export async function callAgentFromServerAction() {
 
 const app = new Hono();
 app.post('/auth/token', () => Response.json({ token: 'legacy-json-auth' }));
+
+const router = new Hono();
+router.post('/jwt/bootstrap', () => Response.json({ credential: 'legacy-json-auth' }));
 `
       );
       writeFixture(
@@ -297,11 +300,11 @@ app.get('/agents', () => new Response('forbidden'));
   });
 
   it('[WORKSPACE-GOVERNANCE-S010] Documentation exposes the production credential runbook', () => {
+    const runbook = readFileSync(join(projectRoot, 'docs/operations/agent-control-plane-auth.md'), 'utf8');
     const docs = credentialRunbookDocs
       .map((relativePath) => readFileSync(join(projectRoot, relativePath), 'utf8'))
       .join('\n');
-    const requiredTerms = [
-      'docs/operations/agent-control-plane-auth.md',
+    const requiredRunbookTerms = [
       'AGENT_CONTROL_PLANE_TRUST',
       'CLIENT_CREDENTIAL_ENCRYPTION_KEY',
       'encrypted Client Service signing key store',
@@ -311,14 +314,20 @@ app.get('/agents', () => new Response('forbidden'));
       'rotation',
       'emergency revoke',
       'break-glass recovery',
+      'staging smoke',
       'private JWK',
       'encrypted private JWK',
       'managed Agent records',
       'external credential references',
       'Agent domain snapshots',
     ];
+    const requiredDiscoverabilityTerms = ['docs/operations/agent-control-plane-auth.md'];
+    const normalizedRunbook = runbook.toLowerCase();
 
-    for (const term of requiredTerms) {
+    for (const term of requiredRunbookTerms) {
+      expect(normalizedRunbook).toContain(term.toLowerCase());
+    }
+    for (const term of requiredDiscoverabilityTerms) {
       expect(docs).toContain(term);
     }
   });

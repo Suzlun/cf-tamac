@@ -70,7 +70,7 @@ export function AgentSigningKeySelect(props: AgentSigningKeySelectProps): ReactN
   }
 
   async function runSaveSelection(): Promise<void> {
-    if (!selectionState.selectedRef.includes(':')) {
+    if (selectionState.selectedRef === '') {
       return;
     }
     setSelectionState((current) => ({ ...current, saving: true }));
@@ -148,7 +148,7 @@ function initialSelectionState(
     selectedIssuer !== undefined && selectedKeyId !== undefined
       ? activeKeys.find((key) => key.issuer === selectedIssuer && key.keyId === selectedKeyId) !==
         undefined
-        ? `${selectedIssuer}:${selectedKeyId}`
+        ? encodeSigningKeyRef({ issuer: selectedIssuer, keyId: selectedKeyId })
         : ''
       : '';
   return { selectedRef: ref, saving: false, verifying: false };
@@ -158,9 +158,29 @@ function findSelectedKey(
   activeKeys: readonly BrowserSafeSigningKey[],
   selectedRef: string
 ): BrowserSafeSigningKey | undefined {
-  const [issuer, ...kidParts] = selectedRef.split(':');
-  const keyId = kidParts.join(':');
-  return activeKeys.find((key) => key.issuer === issuer && key.keyId === keyId);
+  const parsed = decodeSigningKeyRef(selectedRef);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  return activeKeys.find((key) => key.issuer === parsed.issuer && key.keyId === parsed.keyId);
+}
+
+function encodeSigningKeyRef(input: { readonly issuer: string; readonly keyId: string }): string {
+  return encodeURIComponent(JSON.stringify(input));
+}
+
+function decodeSigningKeyRef(
+  selectedRef: string
+): { readonly issuer: string; readonly keyId: string } | undefined {
+  try {
+    const parsed = JSON.parse(decodeURIComponent(selectedRef)) as Record<string, unknown>;
+    if (typeof parsed.issuer !== 'string' || typeof parsed.keyId !== 'string') {
+      return undefined;
+    }
+    return { issuer: parsed.issuer, keyId: parsed.keyId };
+  } catch {
+    return undefined;
+  }
 }
 
 function AgentSelectionHeader(): ReactNode {
@@ -271,11 +291,12 @@ function SelectionFormCard({
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-3">
           <RadioGroup value={selectedRef} onValueChange={onSelect} className="space-y-2">
-            {activeKeys.map((key) => {
-              const ref = `${key.issuer}:${key.keyId}`;
+            {activeKeys.map((key, index) => {
+              const ref = encodeSigningKeyRef({ issuer: key.issuer, keyId: key.keyId });
+              const inputId = `agent-key-${String(index)}`;
               return (
                 <label key={ref} className="flex items-start gap-2 text-sm">
-                  <RadioGroupItem value={ref} id={`agent-key-${ref}`} />
+                  <RadioGroupItem value={ref} id={inputId} />
                   <span>
                     <span className="font-medium">
                       {key.issuer} / {key.keyId}

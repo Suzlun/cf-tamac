@@ -602,12 +602,28 @@ export async function saveManagedAgentSigningKey(
     throw new TypeError('issuer, keyId, and publicFingerprint are required together.');
   }
   const env = getClientWorkerEnv();
+  const signingKey = await createSigningKeyRepository(env.CLIENT_DB).getSigningKey(
+    input.issuer,
+    input.keyId
+  );
+  if (signingKey === undefined) {
+    throw new Error('The selected Client Service signing key was not found.');
+  }
+  if (signingKey.status !== 'active') {
+    throw new Error('The selected Client Service signing key is not active.');
+  }
+  if (signingKey.publicFingerprint !== input.publicFingerprint) {
+    throw new Error('The selected signing key fingerprint does not match the signing key store.');
+  }
   const record = await createManagedAgentRepository(env.CLIENT_DB).updateManagedAgentSigningKey({
     agentId: input.agentId,
-    signingIssuer: input.issuer,
-    signingKeyId: input.keyId,
-    signingPublicFingerprint: input.publicFingerprint,
+    signingIssuer: signingKey.issuer,
+    signingKeyId: signingKey.keyId,
+    signingPublicFingerprint: signingKey.publicFingerprint,
   });
+  if (record === undefined) {
+    throw new Error('Managed Agent not found in Client registry.');
+  }
   revalidatePath(`/agents/${input.agentId}`);
   revalidatePath(`/agents/${input.agentId}/settings`);
   return record;

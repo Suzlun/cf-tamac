@@ -378,7 +378,7 @@ async function updateManagedAgentSigningKey(
   if (input.agentId === '') {
     throw new TypeError(AGENT_ID_REQUIRED_ERROR);
   }
-  assertSigningKeySelection(
+  const selection = normalizeSigningKeySelection(
     input.signingIssuer,
     input.signingKeyId,
     input.signingPublicFingerprint
@@ -387,9 +387,10 @@ async function updateManagedAgentSigningKey(
   await db
     .update(clientManagedAgentsTable)
     .set({
-      signingIssuer: input.signingIssuer,
-      signingKeyId: input.signingKeyId,
-      signingPublicFingerprint: input.signingPublicFingerprint,
+      signingIssuer: selection?.issuer ?? null,
+      signingKeyId: selection?.keyId ?? null,
+      signingLastVerifiedAtMs: null,
+      signingPublicFingerprint: selection?.fingerprint ?? null,
       updatedAtMs: now,
     })
     .where(eq(clientManagedAgentsTable.agentId, input.agentId))
@@ -430,17 +431,28 @@ async function markManagedAgentSigningVerified(
  * issuer / keyId / publicFingerprint は同時に指定するか、同時に空にする。
  * 一部だけの指定は fingerprint 照合不整合の原因になるため許可しない。
  */
-function assertSigningKeySelection(
+function normalizeSigningKeySelection(
   issuer: string | undefined,
   keyId: string | undefined,
   fingerprint: string | undefined
-): void {
+): { readonly fingerprint: string; readonly issuer: string; readonly keyId: string } | undefined {
   const values = [issuer, keyId, fingerprint];
   const anyEmpty = values.some((value) => value === undefined || value === '');
   const allEmpty = values.every((value) => value === undefined || value === '');
-  if (!allEmpty && anyEmpty) {
+  if (allEmpty) {
+    return undefined;
+  }
+  if (anyEmpty) {
     throw new TypeError('Signing key selection must set issuer, keyId and fingerprint together.');
   }
+  if (issuer === undefined || keyId === undefined || fingerprint === undefined) {
+    throw new TypeError('Signing key selection must set issuer, keyId and fingerprint together.');
+  }
+  return { fingerprint, issuer, keyId };
+}
+
+function normalizeOptionalDbString(value: string | null): string | undefined {
+  return value === null || value === '' ? undefined : value;
 }
 
 function toManagedAgentRecord(row: ManagedAgentRow): ManagedAgentRecord {
@@ -453,9 +465,9 @@ function toManagedAgentRecord(row: ManagedAgentRow): ManagedAgentRecord {
     lastOpenedAtMs: row.lastOpenedAtMs ?? undefined,
     createdAtMs: row.createdAtMs,
     updatedAtMs: row.updatedAtMs,
-    signingIssuer: row.signingIssuer ?? undefined,
-    signingKeyId: row.signingKeyId ?? undefined,
-    signingPublicFingerprint: row.signingPublicFingerprint ?? undefined,
+    signingIssuer: normalizeOptionalDbString(row.signingIssuer),
+    signingKeyId: normalizeOptionalDbString(row.signingKeyId),
+    signingPublicFingerprint: normalizeOptionalDbString(row.signingPublicFingerprint),
     signingLastVerifiedAtMs: row.signingLastVerifiedAtMs ?? undefined,
   };
 }

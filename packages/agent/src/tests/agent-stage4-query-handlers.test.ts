@@ -450,7 +450,8 @@ async function callGetLatestCompaction(env: AgentWorkerEnv) {
         create(GetLatestCompactionRequestSchema, { agentId, threadId })
       )
     ),
-    env
+    env,
+    { allowTestSeam: true }
   );
   expect(response.status).toBe(200);
   return fromBinary(
@@ -468,7 +469,8 @@ async function callGetThreadMemory(env: AgentWorkerEnv) {
         create(GetThreadMemoryRequestSchema, { agentId, threadId })
       )
     ),
-    env
+    env,
+    { allowTestSeam: true }
   );
   expect(response.status).toBe(200);
   return fromBinary(GetThreadMemoryResponseSchema, new Uint8Array(await response.arrayBuffer()));
@@ -492,7 +494,8 @@ async function callSearchThreadHistory(env: AgentWorkerEnv) {
         })
       )
     ),
-    env
+    env,
+    { allowTestSeam: true }
   );
   expect(response.status).toBe(200);
   return fromBinary(

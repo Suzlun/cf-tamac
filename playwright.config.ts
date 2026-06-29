@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// E2E 専用に毎回ランダムな 32-byte AES key を生成し、署名鍵 store の暗号化前提だけを満たす。
-// 値は shell 実行時にのみ環境変数へ入り、repository には固定 secret を保存しない。
+// E2E 専用に決定論的な 32-byte AES key を生成し、local D1 に残る暗号化済み signing key を再実行時にも復号可能にする。
+// production secret ではなく test-only seed から shell 実行時に導出し、実運用の秘密値は repository に保存しない。
 const e2eClientCredentialEncryptionKeyCommand =
-  "node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64'))\"";
+  "node -e \"console.log(require('node:crypto').createHash('sha256').update('cf-tamac-e2e-client-credential-encryption-key').digest('base64'))\"";
 // Client の local D1 migration を先に適用してから Next dev server を起動し、E2E fake Agent RPC で外部 Agent Worker 依存を避ける。
 // Playwright の長い multi-browser run では Turbopack HMR chunk 再生成が WebKit 終盤の chunk load error になり得るため、E2E 専用に webpack dev server を使う。
 const e2eClientWebServerCommand = `CLIENT_CREDENTIAL_ENCRYPTION_KEY="$(${e2eClientCredentialEncryptionKeyCommand})" E2E_FAKE_AGENT_RPC=1 sh -c 'pnpm --filter @cf-tamac/client db:migrate:local && pnpm --filter @cf-tamac/client exec next dev --webpack'`;

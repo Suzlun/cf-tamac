@@ -1,8 +1,10 @@
+import 'server-only';
+
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, ne } from 'drizzle-orm/sql/expressions/conditions';
 import { asc, desc } from 'drizzle-orm/sql/expressions/select';
 
-import { clientSigningKeysTable } from './schema';
+import { clientManagedAgentsTable, clientSigningKeysTable } from './schema';
 
 import type { ClientSigningKeyStatus } from '../credentials/signing-keys';
 
@@ -55,8 +57,8 @@ export interface CreateSigningKeyInput {
  * Client-owned signing key repository operations。
  *
  * @remarks
- * すべての method は `client_signing_keys` table だけを扱う。Agent domain snapshot、Agent runtime source、
- * 平文秘密鍵 plaintext は扱わない。`active` key だけが署名に使われ、`disabled` / `deleted` は署名に使われない。
+ * すべての method は `client_signing_keys` table を正本にし、失効・削除時だけ `client_managed_agents` の参照有無を確認する。
+ * Agent domain snapshot、Agent runtime source、平文秘密鍵 plaintext は扱わない。`active` key だけが署名に使われる。
  */
 export interface ClientSigningKeyRepository {
   readonly createSigningKey: (input: CreateSigningKeyInput) => Promise<ClientSigningKeyRecord>;
@@ -89,13 +91,13 @@ export interface ClientSigningKeyRepository {
  * Drizzle ORM を使う Client Service signing key repository を作成する。
  *
  * @param d1 - Cloudflare Worker の `CLIENT_DB` D1 binding。
- * @returns `client_signing_keys` table だけを操作する `ClientSigningKeyRepository`。
+ * @returns `client_signing_keys` を操作し、失効時に managed Agent 参照を検査する `ClientSigningKeyRepository`。
  * @remarks
  * Drizzle D1 driver はこの server-only repository layer に閉じ込める。
  * raw Drizzle row は `ClientSigningKeyRecord` へ変換し、平文秘密鍵 plaintext は扱わない。
  */
 export function createSigningKeyRepository(d1: D1Database): ClientSigningKeyRepository {
-  const db = drizzle(d1, { schema: { clientSigningKeysTable } });
+  const db = drizzle(d1, { schema: { clientManagedAgentsTable, clientSigningKeysTable } });
   return {
     createSigningKey(input) {
       return createSigningKey(db, input);
@@ -131,7 +133,10 @@ export function createSigningKeyRepository(d1: D1Database): ClientSigningKeyRepo
 }
 
 type SigningKeyDb = ReturnType<
-  typeof drizzle<{ clientSigningKeysTable: typeof clientSigningKeysTable }>
+  typeof drizzle<{
+    clientManagedAgentsTable: typeof clientManagedAgentsTable;
+    clientSigningKeysTable: typeof clientSigningKeysTable;
+  }>
 >;
 
 async function createSigningKey(
@@ -230,6 +235,16 @@ async function updateSigningKeyStatus(
   status: ClientSigningKeyStatus
 ): Promise<ClientSigningKeyRecord | undefined> {
   assertSigningKeyTarget(issuer, keyId);
+  const current = await getSigningKey(db, issuer, keyId);
+  if (current === undefined) {
+    return undefined;
+  }
+  if (current.status === 'deleted' && status !== 'deleted') {
+    throw new TypeError('Deleted signing keys cannot be reactivated. Generate a new key instead.');
+  }
+  if (status !== 'active') {
+    await assertSigningKeyCanBeInvalidated(db, current);
+  }
   const now = Date.now();
   const set: Record<string, unknown> = { status, updatedAtMs: now };
   // 削除 tombstone: private material を復号不能な sentinel へ置換し、公開 tombstone metadata だけ残す。
@@ -300,12 +315,43 @@ async function touchSigningKeyLastUsed(
 
 async function deleteSigningKey(db: SigningKeyDb, issuer: string, keyId: string): Promise<void> {
   assertSigningKeyTarget(issuer, keyId);
+  const current = await getSigningKey(db, issuer, keyId);
+  if (current === undefined) {
+    return;
+  }
+  await assertSigningKeyCanBeInvalidated(db, current);
   // 完全削除: private material を含め行全体を取り除く。tombstone を残す場合は
   // updateSigningKeyStatus('deleted') を使う。
   await db
     .delete(clientSigningKeysTable)
     .where(and(eq(clientSigningKeysTable.issuer, issuer), eq(clientSigningKeysTable.keyId, keyId)))
     .run();
+}
+
+async function assertSigningKeyCanBeInvalidated(
+  db: SigningKeyDb,
+  record: ClientSigningKeyRecord
+): Promise<void> {
+  if (record.isDefault) {
+    throw new TypeError(
+      'The default signing key cannot be disabled or deleted. Set another default key first.'
+    );
+  }
+  const referencingAgents = await db
+    .select({ agentId: clientManagedAgentsTable.agentId })
+    .from(clientManagedAgentsTable)
+    .where(
+      and(
+        eq(clientManagedAgentsTable.signingIssuer, record.issuer),
+        eq(clientManagedAgentsTable.signingKeyId, record.keyId)
+      )
+    )
+    .limit(1);
+  if (referencingAgents[0] !== undefined) {
+    throw new TypeError(
+      'Signing keys assigned to managed Agents cannot be disabled or deleted. Unassign or rotate the Agent first.'
+    );
+  }
 }
 
 function toSigningKeyRecord(row: SigningKeyRow): ClientSigningKeyRecord {

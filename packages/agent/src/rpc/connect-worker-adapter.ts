@@ -27,10 +27,15 @@ import { createAgentRpcRouter } from './router';
 import type { AgentWorkerEnv } from '../env';
 
 /**
- * Create a Worker fetch handler for generated Agent Connect RPC services.
+ * 生成済み Agent Connect RPC service 用の Worker fetch handler を作成します。
+ *
+ * @param env - Agent Worker binding と trust config を含む実行環境です。
+ * @param options - unit test 専用 seam を明示的に許可する任意設定です。本番既定では test seam を開きません。
+ * @returns Connect binary Protobuf request だけを処理する fetch handler です。
  */
 export function createAgentConnectFetchHandler(
-  env: AgentWorkerEnv
+  env: AgentWorkerEnv,
+  options: { readonly allowTestSeam?: boolean } = {}
 ): (request: Request) => Promise<Response> {
   const router = createAgentRpcRouter(env);
   const handlersByPath = new Map<string, (request: Request) => Promise<Response>>();
@@ -44,24 +49,27 @@ export function createAgentConnectFetchHandler(
       return createConnectErrorResponse(rejection.code, rejection.message);
     }
 
-    const rawBody = new Uint8Array(await request.clone().arrayBuffer());
-    const protobufRejection = getMalformedProtobufRequestRejection(rawBody);
-    if (protobufRejection !== undefined) {
-      return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
-    }
-
     const path = new URL(request.url).pathname;
     const handler = handlersByPath.get(path);
     if (handler === undefined) {
       return createUnimplementedResponse(`Unsupported Agent RPC path: ${path}`);
     }
 
-    const authentication = await authenticateAgentRequest(request, { env });
+    const authentication = await authenticateAgentRequest(
+      request,
+      createAuthenticationOptions(env, options)
+    );
     if (authentication.rejection !== undefined) {
       return createConnectErrorResponse(
         authentication.rejection.code,
         authentication.rejection.message
       );
+    }
+
+    const rawBody = new Uint8Array(await request.clone().arrayBuffer());
+    const protobufRejection = getMalformedProtobufRequestRejection(rawBody);
+    if (protobufRejection !== undefined) {
+      return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
     }
 
     const authorizationRejection = authorizeAgentRequest({
@@ -95,7 +103,7 @@ export function createAgentConnectFetchHandler(
       return createConnectErrorResponse(validationRejection.code, validationRejection.message);
     }
 
-    const auditContext = createAgentRpcAuditContext(
+    const auditContext = await createAgentRpcAuditContext(
       request,
       authentication.principal,
       createReplayProtectionContext(request, authentication.principal),
@@ -124,6 +132,16 @@ export function createAgentConnectFetchHandler(
   };
 }
 
+function createAuthenticationOptions(
+  env: AgentWorkerEnv,
+  options: { readonly allowTestSeam?: boolean }
+): { readonly allowTestSeam?: boolean; readonly env: AgentWorkerEnv } {
+  if (options.allowTestSeam === undefined) {
+    return { env };
+  }
+  return { allowTestSeam: options.allowTestSeam, env };
+}
+
 function isMalformedProtobufError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
@@ -144,11 +162,17 @@ function isMalformedProtobufDescription(description: string): boolean {
 }
 
 /**
- * Handle a single Agent Worker request through the Connect facade.
+ * 単一の Agent Worker request を Connect facade 経由で処理します。
+ *
+ * @param request - Worker が受け取った HTTP request です。
+ * @param env - Agent Worker binding と trust config を含む実行環境です。
+ * @param options - unit test 専用 seam を明示的に許可する任意設定です。本番既定では test seam を開きません。
+ * @returns Connect response、または fail-closed な Connect error response です。
  */
 export function handleAgentConnectRequest(
   request: Request,
-  env: AgentWorkerEnv
+  env: AgentWorkerEnv,
+  options: { readonly allowTestSeam?: boolean } = {}
 ): Promise<Response> {
-  return createAgentConnectFetchHandler(env)(request);
+  return createAgentConnectFetchHandler(env, options)(request);
 }

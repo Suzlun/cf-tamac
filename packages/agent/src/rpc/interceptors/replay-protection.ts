@@ -46,22 +46,37 @@ export async function inspectReplayProtection(
     };
   }
 
-  if (input.principal.authenticationMode !== 'bearer') return undefined;
-  if (input.principal.jwtId === undefined || input.principal.expiresAtUnixMs === undefined) {
+  const { principal } = input;
+  if (principal.authenticationMode !== 'bearer') return undefined;
+  const { expiresAtUnixMs, issuer, jwtId, keyId, subject } = principal;
+  if (jwtId === undefined || expiresAtUnixMs === undefined) {
     return {
       code: Code.Unauthenticated,
       message: 'Client Service JWT replay identifier is required.',
       reason: 'missing_jti',
     };
   }
+  if (issuer === undefined || keyId === undefined || subject === undefined) {
+    return {
+      code: Code.Unauthenticated,
+      message: 'Client Service JWT replay principal is incomplete.',
+      reason: 'missing_replay_principal',
+    };
+  }
 
-  const replayKey = createClientServiceJwtReplayKey(input.principal);
+  const replayKey = createClientServiceJwtReplayKey({
+    ...principal,
+    issuer,
+    jwtId,
+    keyId,
+    subject,
+  });
   const reservation = await getAIAgentDurableObjectStub(
     input.env,
-    input.principal.agentId
+    principal.agentId
   ).reserveClientServiceJwtId({
-    agentId: input.principal.agentId,
-    expiresAtUnixMs: input.principal.expiresAtUnixMs,
+    agentId: principal.agentId,
+    expiresAtUnixMs,
     jwtId: replayKey.nonce,
     nowUnixMs: Date.now(),
     principalReplayId: replayKey.principalReplayId,

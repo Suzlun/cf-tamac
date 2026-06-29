@@ -71,7 +71,7 @@ export default async function SigningKeysPage() {
     <ControlRoomFrame
       title="Global Settings › Signing Keys"
       signalLabel="Client signing keys"
-      description="Client-wide Ed25519 signing keys for Agent RPC bearer JWTs."
+      description="Client-wide Ed25519 signing keys for Agent RPC JWT signing."
     >
       <SigningKeyManagement
         signingKeys={signingKeys}

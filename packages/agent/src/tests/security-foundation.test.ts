@@ -224,13 +224,18 @@ describe('Agent security foundation', () => {
       attributes: {
         Authorization: 'Bearer raw-token',
         keyMaterial: 'raw-key-material',
-        nested: { providerCredential: 'raw-secret', signatureBase: 'full-signature-base' },
+        nested: {
+          hiddenReasoningSummary: 'chain-of-thought-summary',
+          providerCredential: 'raw-secret',
+          rawJwtSummary: 'header.payload.signature.summary',
+          signatureBase: 'full-signature-base',
+        },
         publicJwk: { crv: 'Ed25519', kty: 'OKP', x: 'public-key-full-value' },
         rawJwt: 'header.payload.signature',
         safe: 'kept',
       },
       fields: {
-        actingUserId: 'user-1',
+        actingUserIdHash: 'hash-user-1',
         agentId: 'agent-alpha',
         authFailureReason: 'invalid_signature',
         idempotencyKey: 'idem-1',
@@ -244,7 +249,7 @@ describe('Agent security foundation', () => {
         requestId: 'request-1',
         scopes: ['agent:read'],
         service: 'cftamac.agent.v1.AgentHealthService',
-        subject: 'client-service-principal',
+        subjectHash: 'hash-client-service-principal',
       },
       message: 'request completed',
       severity: 'info',
@@ -288,6 +293,7 @@ describe('Agent security foundation', () => {
     expect(serialized).not.toContain('raw-key-material');
     expect(serialized).not.toContain('public-key-full-value');
     expect(serialized).not.toContain('header.payload.signature');
+    expect(serialized).not.toContain('chain-of-thought-summary');
     expect(serialized).not.toContain('ciphertext');
     expect(serialized).not.toContain('full-signature-base');
   });

@@ -75,7 +75,8 @@ describe('Agent Connect binary transport', () => {
 
     const success = await handleAgentConnectRequest(
       createAuthenticatedRequest({ body, contentType: 'application/proto' }),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(success.status).toBe(200);
     const successBody = fromBinary(
@@ -98,37 +99,43 @@ describe('Agent Connect binary transport', () => {
 
     const json = await handleAgentConnectRequest(
       createAuthenticatedRequest({ body: '{}', contentType: 'application/json' }),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(await readErrorCode(json)).toBe('unimplemented');
 
     const connectJson = await handleAgentConnectRequest(
       createAuthenticatedRequest({ body: '{}', contentType: 'application/connect+json' }),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(await readErrorCode(connectJson)).toBe('unimplemented');
 
     const get = await handleAgentConnectRequest(
       createAuthenticatedRequest({ contentType: 'application/proto', method: 'GET' }),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(await readErrorCode(get)).toBe('unimplemented');
 
     const missingContentType = await handleAgentConnectRequest(
       createAuthenticatedRequest({ body }),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(await readErrorCode(missingContentType)).toBe('invalid_argument');
 
     const malformedContentType = await handleAgentConnectRequest(
       createAuthenticatedRequest({ body, contentType: 'text/plain' }),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(await readErrorCode(malformedContentType)).toBe('invalid_argument');
 
     const malformedProto = await handleAgentConnectRequest(
       createAuthenticatedRequest({ body: new Uint8Array([255]), contentType: 'application/proto' }),
-      env
+      env,
+      { allowTestSeam: true }
     );
     expect(await readErrorCode(malformedProto)).toBe('invalid_argument');
   });

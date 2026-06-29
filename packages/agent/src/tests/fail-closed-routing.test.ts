@@ -84,7 +84,8 @@ describe('Agent fail-closed routing', () => {
     for (const testCase of cases) {
       const response = await handleAgentConnectRequest(
         createRpcRequest(testCase.path, testCase.body),
-        createTestEnv()
+        createTestEnv(),
+        { allowTestSeam: true }
       );
       expect(await readErrorCode(response)).toBe('unimplemented');
     }
