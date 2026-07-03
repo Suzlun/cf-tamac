@@ -19,9 +19,11 @@ bucket_name = "cf-tamac-agent-blobs"
 binding = "AI"
 
 [vars]
+# Deploy Button users keep this audience aligned with `AGENT_CONTROL_PLANE_TRUST.audiences`.
 AGENT_RPC_AUDIENCE = "cf-tamac-agent"
 
 # Required secrets are provisioned with `wrangler secret put` and never committed.
+# `AGENT_CONTROL_PLANE_TRUST` is public-key-only JSON; it must never contain an Ed25519 private `d` value.
 # - AGENT_AUDIT_HASH_PEPPER
 # - AGENT_CONTROL_PLANE_TRUST
 # - AGENT_INTEGRATION_SIGNATURE_KEYS

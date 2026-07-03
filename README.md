@@ -57,6 +57,19 @@
 - Agent Worker の監査識別子 hash は `AGENT_AUDIT_HASH_PEPPER` を使う HMAC で生成し、既知 user ID / email の辞書照合を防ぎます。
 - Rotation は新 key 追加、旧 key `retiring`、Agent health verification、旧 key `revoked` の順で進めます。Emergency revoke と break-glass recovery は Dashboard/API/Wrangler で Agent trust config を更新し、Health Check で確認します。
 
+## Self-host Deploy
+
+[Deploy Agent to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/Suzlun/cf-tamac/tree/deploy-agent)
+
+[Deploy Client to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/Suzlun/cf-tamac/tree/deploy-client)
+
+- Primary install path は Cloudflare Dashboard の Deploy flow です。利用者に repository clone、local `pnpm install`、local `wrangler` 操作を要求しません。
+- Agent Deploy Button を先に押し、`AI_AGENT` Durable Object、SQLite migration、`AGENT_BLOBS` R2、Workers AI `AI` binding、`AGENT_RPC_AUDIENCE` を持つ Agent Worker を deploy します。
+- Client Deploy Button を後に押し、`CLIENT_DB` D1、`AGENT_RPC_DEFAULT_ORIGIN`、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` を設定します。
+- Client private signing key は Worker Secret へ貼らず、Management Client が生成して Client D1 の encrypted signing key store に保存します。Agent Worker へ渡すのは public-only `AGENT_CONTROL_PLANE_TRUST` だけです。
+- `deploy-agent` と `deploy-client` は generated artifact branch です。source branch から CI が再生成し、branch root が self-contained Worker application になるよう維持します。
+- 手順の詳細は `docs/operations/self-host-deploy.md` を参照してください。
+
 ## Code Generation
 
 ```bash
@@ -64,6 +77,8 @@ pnpm gen:agent:proto
 pnpm gen:agent:rpc
 pnpm gen
 pnpm check:codegen
+pnpm gen:deploy-artifacts
+pnpm check:deploy-artifacts
 ```
 
 Command-owned generated outputs は手編集しません。

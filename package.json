@@ -22,6 +22,8 @@
     "gen:agent:rpc": "pnpm --filter @cf-tamac/agent --if-present gen:rpc",
     "gen": "pnpm gen:agent:proto && pnpm gen:agent:rpc",
     "check:codegen": "pnpm gen && node scripts/codegen/check-agent-codegen-drift.mjs && git diff --exit-code -- packages/agent/proto packages/agent/src/generated/rpc packages/client/src/generated/agent-rpc",
+    "gen:deploy-artifacts": "node scripts/deploy/generate-deploy-artifacts.mjs",
+    "check:deploy-artifacts": "node scripts/deploy/generate-deploy-artifacts.mjs --out .deploy",
     "deploy:agent": "pnpm --filter @cf-tamac/agent --if-present deploy",
     "deploy:client": "pnpm --filter @cf-tamac/client --if-present deploy",
     "test": "vitest",

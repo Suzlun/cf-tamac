@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
   pull_request:
 
 jobs:
@@ -52,3 +53,6 @@ jobs:
 
       - name: Agent codegen target smoke
         run: pnpm gen:agent:proto && pnpm gen:agent:rpc
+
+      - name: Deploy artifact generation smoke
+        run: pnpm check:deploy-artifacts

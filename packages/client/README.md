@@ -50,7 +50,9 @@ Use `AGENT_RPC_DEFAULT_ORIGIN` for local Agent RPC origin defaults. Client UI da
 
 ## Deployment and Client D1 migration notes
 
+- Deploy Button 用 artifact は repository root の `pnpm gen:deploy-artifacts` から `.deploy/client` に生成され、`deploy-client` branch root へ CI が publish します。artifact branch は手編集しません。
 - Deploy the Management Client with `packages/client/wrangler.toml`; the Worker owns `CLIENT_DB` and credential references only, not `AI_AGENT` or Agent-owned storage.
+- Deploy Button users can start from `packages/client/.dev.vars.example`; it contains `AGENT_RPC_DEFAULT_ORIGIN` and `CLIENT_CREDENTIAL_ENCRYPTION_KEY`, not a Client private signing key secret.
 - Apply reviewed Client D1 migrations with `wrangler d1 execute --config packages/client/wrangler.toml --file packages/client/src/server/db/migrations/<migration>.sql`.
 - Migrations must stay limited to managed Agent registry, external credential reference tables, and encrypted Client Service signing key store tables; do not add Agent-domain snapshot tables or plaintext secret/private JWK columns to Client D1.
 

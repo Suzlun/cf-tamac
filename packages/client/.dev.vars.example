@@ -1,0 +1,4 @@
+AGENT_RPC_DEFAULT_ORIGIN="https://cf-tamac-agent.example.workers.dev"
+CLIENT_ACTING_OPERATOR_ID="client-management-operator"
+CLIENT_ACTING_SCOPES="agent:read agent:write"
+CLIENT_CREDENTIAL_ENCRYPTION_KEY="replace-with-base64-encoded-32-byte-aes-key"

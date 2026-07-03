@@ -43,7 +43,9 @@ The local Worker should be exercised through generated Connect clients using `PO
 
 ## Deployment notes
 
+- Deploy Button 用 artifact は repository root の `pnpm gen:deploy-artifacts` から `.deploy/agent` に生成され、`deploy-agent` branch root へ CI が publish します。artifact branch は手編集しません。
 - Deploy the Agent Worker with `packages/agent/wrangler.toml`; keep `AI_AGENT` and Agent-owned blob storage as the only stateful product bindings.
+- Deploy Button users can start from `packages/agent/.dev.vars.example`; the example contains public-key-only trust config shape and no private key parameter `d`.
 - Set `AGENT_AUDIT_HASH_PEPPER` and `AGENT_CONTROL_PLANE_TRUST` with `wrangler secret put --config packages/agent/wrangler.toml <NAME>`; use the public-only trust export from the Management Client only for `AGENT_CONTROL_PLANE_TRUST`.
 - After deployment, run smoke checks with generated Protobuf RPC clients instead of REST, JSON, OpenAPI, Orval, or public Durable Object probes. Use `AgentHealthService.Check` to verify issuer/kid/fingerprint and trust config fingerprint without returning key material.
 - Follow `../../docs/operations/agent-control-plane-auth.md` for rotation, emergency revoke, break-glass recovery, local/staging smoke, and private-key non-exposure checks.

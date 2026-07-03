@@ -10,6 +10,7 @@ database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "src/server/db/migrations"
 
 [vars]
+# Deploy Button users replace this with the deployed Agent Worker origin after Agent deployment.
 AGENT_RPC_DEFAULT_ORIGIN = "http://localhost:8787"
 CLIENT_ACTING_OPERATOR_ID = "client-management-operator"
 CLIENT_ACTING_SCOPES = "agent:read agent:write"
@@ -21,3 +22,6 @@ CLIENT_ACTING_SCOPES = "agent:read agent:write"
 #   material secret for Agent RPC bearer JWTs and must be provisioned as a Worker
 #   Secret before the Management Client signs any request. HS256 shared secrets,
 #   `AGENT_CREDENTIAL_*`, and `credentialRef` signing sources are not used.
+# - CLIENT_CONTROL_PLANE_PRIVATE_KEYS is intentionally unsupported; private JWKs
+#   are generated in the Management Client and encrypted into CLIENT_DB instead
+#   of being pasted into Worker Secrets.
