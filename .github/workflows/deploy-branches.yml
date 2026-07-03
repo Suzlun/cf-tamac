@@ -67,7 +67,7 @@ jobs:
           cp -R .deploy/agent/. ../deploy-agent-worktree/
           git -C ../deploy-agent-worktree add -A
           git -C ../deploy-agent-worktree commit -m "chore: update deploy-agent artifact [skip ci]"
-          git -C ../deploy-agent-worktree push origin HEAD:deploy-agent --force
+          git -C ../deploy-agent-worktree push origin HEAD:refs/heads/deploy-agent --force
 
       - name: Publish deploy-client branch
         run: |
@@ -79,4 +79,4 @@ jobs:
           cp -R .deploy/client/. ../deploy-client-worktree/
           git -C ../deploy-client-worktree add -A
           git -C ../deploy-client-worktree commit -m "chore: update deploy-client artifact [skip ci]"
-          git -C ../deploy-client-worktree push origin HEAD:deploy-client --force
+          git -C ../deploy-client-worktree push origin HEAD:refs/heads/deploy-client --force
