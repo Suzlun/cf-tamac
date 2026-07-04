@@ -24,6 +24,7 @@ permission:
     'git log*': allow
     'git show*': allow
     'git grep*': allow
+    'pnpm*': allow
     'rm *': deny
 ---
 

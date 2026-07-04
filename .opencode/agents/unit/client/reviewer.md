@@ -25,6 +25,7 @@ permission:
     'git log*': allow
     'git show*': allow
     'git grep*': allow
+    'pnpm*': allow
     'npx impeccable *': allow
     'node .opencode/skills/impeccable/scripts/*': allow
     'rm *': deny
