@@ -3,6 +3,13 @@ main = ".open-next/worker.js"
 compatibility_date = "2026-06-20"
 compatibility_flags = ["nodejs_compat"]
 
+[assets]
+# OpenNext が生成する Next.js static chunks を Workers Assets として配信し、
+# `/_next/static/**` が Worker SSR ではなく asset store から返るようにする。
+directory = ".open-next/assets"
+binding = "ASSETS"
+run_worker_first = false
+
 [[d1_databases]]
 binding = "CLIENT_DB"
 database_name = "cf-tamac-client-db"

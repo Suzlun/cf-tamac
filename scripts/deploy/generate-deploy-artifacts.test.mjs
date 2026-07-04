@@ -65,6 +65,9 @@ describe('Deploy Button artifact generation', () => {
       expect(clientTsconfig).toContain('"@cf-tamac/client-agent-rpc/*"');
       expect(clientTsconfig).not.toContain('../../tsconfig.base.json');
       expect(clientWrangler).toContain('binding = "CLIENT_DB"');
+      expect(clientWrangler).toContain('[assets]');
+      expect(clientWrangler).toContain('directory = ".open-next/assets"');
+      expect(clientWrangler).toContain('binding = "ASSETS"');
       expect(clientWrangler).not.toContain('AI_AGENT');
       expect(clientDevVars).toContain('CLIENT_CREDENTIAL_ENCRYPTION_KEY');
       expect(clientDevVars).not.toContain('CLIENT_CONTROL_PLANE_PRIVATE_KEYS');
