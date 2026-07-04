@@ -1,4 +1,9 @@
-import type { AgentEventRow, AgentRunInputSnapshotRow, AgentStorageRepositories } from '../storage';
+import type {
+  AgentEventRow,
+  AgentRunInputSnapshotRow,
+  AgentStorageRepositories,
+  AgentThreadMemoryItemRow,
+} from '../storage';
 
 /**
  * Stable Context Builder section order required by Agent Runtime and Memory specs.
@@ -36,6 +41,7 @@ export interface HarnessContextPolicyInput {
 export interface HarnessContextPart {
   readonly events?: readonly AgentEventRow[];
   readonly kind: HarnessContextPartKind;
+  readonly metadata?: Readonly<Record<string, string | number | readonly string[] | undefined>>;
   readonly order: number;
   readonly refs?: readonly string[];
   readonly status: 'ready' | 'pending' | 'empty';
@@ -104,13 +110,70 @@ export function buildHarnessContextFromRepositories(input: {
       threadId: input.snapshot.threadId,
     })
     .filter((event) => event.threadSequence <= input.snapshot.uncompactedUpperSequence);
+  const policy = {
+    ...input.policy,
+    threadMemoryText:
+      input.policy.threadMemoryText ??
+      resolveSnapshotThreadMemoryText(input.repositories, input.snapshot),
+  };
   return buildHarnessContext({
     agentId: input.agentId,
     events,
-    policy: input.policy,
+    policy,
     snapshot: input.snapshot,
     triggerEvent: input.repositories.events.findByEventId(input.snapshot.triggerEventId),
   });
+}
+
+function resolveSnapshotThreadMemoryText(
+  repositories: AgentStorageRepositories,
+  snapshot: AgentRunInputSnapshotRow
+): string | undefined {
+  const snapshotRef = snapshot.threadMemoryRef;
+  if (snapshotRef === null || snapshot.threadMemoryVersion <= 0) return undefined;
+  const memory = repositories.memory.findActiveThreadMemoryVersion(snapshot.threadId);
+  if (memory === undefined) return undefined;
+
+  // The Run snapshot pins the version/ref that was current when the Run started. Do not silently
+  // hydrate a newer active Memory version into an older snapshot.
+  if (memory.version !== snapshot.threadMemoryVersion || memory.memoryRef !== snapshotRef) {
+    return undefined;
+  }
+
+  const items = repositories.memory.listThreadMemoryItems(snapshot.threadId, memory.memoryId);
+  if (items.length === 0) return `ThreadMemory version ${String(memory.version)} has no items.`;
+  return [
+    `ThreadMemory version ${String(memory.version)}:`,
+    ...items.map(formatThreadMemoryItem),
+  ].join('\n');
+}
+
+function formatThreadMemoryItem(item: AgentThreadMemoryItemRow): string {
+  const contentText = normalizePromptTextFragment(item.contentText ?? '');
+  const parts = [
+    `- ${item.memoryItemId}`,
+    `status=${item.status}`,
+    contentText === '' ? formatThreadMemoryItemReference(item) : `content=${contentText}`,
+    item.provenanceRef === null ? undefined : `provenance=${item.provenanceRef}`,
+    item.supersedesItemId === null ? undefined : `supersedes=${item.supersedesItemId}`,
+    item.invalidatesItemId === null ? undefined : `invalidates=${item.invalidatesItemId}`,
+    item.sourceCompactionId === null ? undefined : `source_compaction=${item.sourceCompactionId}`,
+    item.sourceHistoryId === null ? undefined : `source_history=${item.sourceHistoryId}`,
+    item.sourceEventId === null ? undefined : `source_event=${item.sourceEventId}`,
+  ].filter((value): value is string => value !== undefined);
+  return parts.join(' | ');
+}
+
+function formatThreadMemoryItemReference(item: AgentThreadMemoryItemRow): string {
+  const refs = [
+    item.contentRef === null ? undefined : `content_ref=${item.contentRef}`,
+    item.contentSha256 === null ? undefined : `content_sha256=${item.contentSha256}`,
+  ].filter((value): value is string => value !== undefined);
+  return refs.length === 0 ? 'content=metadata-only' : refs.join(' ');
+}
+
+function normalizePromptTextFragment(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
 }
 
 function buildIdentityPolicyPart(policy: HarnessContextPolicyInput): HarnessContextPart {
@@ -129,6 +192,11 @@ function buildThreadMemoryPart(
   const ref = snapshot.threadMemoryRef;
   return {
     kind: 'thread_memory',
+    metadata: {
+      digest: createContextDigest([ref ?? '', policy.threadMemoryText ?? '']),
+      provenanceRef: ref ?? undefined,
+      version: snapshot.threadMemoryVersion,
+    },
     order: 1,
     refs: ref === null ? [] : [ref],
     status: policy.threadMemoryText === undefined && ref === null ? 'empty' : 'ready',
@@ -143,6 +211,10 @@ function buildHandoffPart(
   const ref = policy.handoffRef ?? snapshot.latestReadyCompactionRef;
   return {
     kind: 'handoff',
+    metadata: {
+      digest: createContextDigest([ref ?? '']),
+      provenanceRef: ref ?? undefined,
+    },
     order: 2,
     refs: ref === null ? [] : [ref],
     status: ref === null ? 'empty' : 'ready',
@@ -154,6 +226,12 @@ function buildUncompactedEventsPart(events: readonly AgentEventRow[]): HarnessCo
   return {
     events,
     kind: 'uncompacted_events',
+    metadata: {
+      digest: createContextDigest(events.map((event) => event.requestDigest ?? event.eventId)),
+      eventIds: events.map((event) => event.eventId),
+      maxThreadSequence: events.at(-1)?.threadSequence,
+      minThreadSequence: events[0]?.threadSequence,
+    },
     order: 3,
     status: events.length === 0 ? 'empty' : 'ready',
     text: events.map((event) => formatEventLine(event)).join('\n'),
@@ -164,6 +242,10 @@ function buildRetrievedHistoryPart(policy: HarnessContextPolicyInput): HarnessCo
   const refs = policy.retrievedHistoryRefs ?? [];
   return {
     kind: 'retrieved_history',
+    metadata: {
+      digest: createContextDigest(refs),
+      historyRefs: refs,
+    },
     order: 4,
     refs,
     status: refs.length === 0 ? 'pending' : 'ready',
@@ -175,6 +257,10 @@ function buildAgentMemoryPart(policy: HarnessContextPolicyInput): HarnessContext
   const refs = policy.agentMemoryRefs ?? [];
   return {
     kind: 'agent_memory',
+    metadata: {
+      digest: createContextDigest(refs),
+      memoryRefs: refs,
+    },
     order: 5,
     refs,
     status: refs.length === 0 ? 'pending' : 'ready',
@@ -188,6 +274,15 @@ function buildTriggerEventPart(
 ): HarnessContextPart {
   return {
     kind: 'trigger_event',
+    metadata: {
+      digest: createContextDigest([
+        event?.requestDigest ?? '',
+        event?.payloadSha256 ?? '',
+        triggerEventId,
+      ]),
+      eventId: event?.eventId ?? triggerEventId,
+      provenanceRef: event === undefined ? undefined : `event:${event.eventId}`,
+    },
     order: 6,
     status: event === undefined ? 'pending' : 'ready',
     text:
@@ -200,6 +295,18 @@ function buildTriggerEventPart(
 
 function formatEventLine(event: AgentEventRow): string {
   return `${String(event.threadSequence)} ${event.eventId} ${event.eventType}`;
+}
+
+function createContextDigest(values: readonly string[]): string {
+  // Context metadata 用の軽量 digest は raw body ではなく、既存 digest/ref/ID のみから安定生成します。
+  let hash = 2166136261;
+  for (const value of values) {
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 function selectSnapshotEvents(

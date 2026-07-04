@@ -270,6 +270,10 @@ function createRunHandlerRuntime() {
     events: createEventsRepository(events),
     grants: { listGrantsForPrincipal: () => createGrantRows(), tableName: 'agent_grants' },
     idempotency: createIdempotencyRepository(idempotencyRecords),
+    modelInvocations: {
+      findLatestForRun: () => undefined,
+      tableName: 'agent_model_invocations',
+    },
     pendingRuns: createRunsRepository(runs, snapshots),
     profile: { getProfile: () => createProfile(), tableName: 'agent_profile' },
     requestNonces: {

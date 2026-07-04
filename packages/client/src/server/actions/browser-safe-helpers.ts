@@ -126,6 +126,36 @@ export interface BrowserSafePagedResult<T> {
 }
 
 /**
+ * Agent config editor に渡してよい安全な preview JSON です。
+ *
+ * @remarks
+ * Agent RPC の generated `AgentConfig` には model policy summary、validation result、payload reference、
+ * `bigint` timestamp など Browser / Server Action return 境界へそのまま渡すべきではない値が含まれます。
+ * この型は operator が汎用 config JSON editor で編集できる safe string field だけを表し、
+ * `modelPolicyRef` は専用の default model policy section だけで扱います。
+ */
+export interface BrowserSafeAgentConfigPreview extends Record<string, string | undefined> {
+  readonly displayName?: string;
+  readonly budgetPolicyRef?: string;
+  readonly memoryPolicyRef?: string;
+  readonly toolPolicyRef?: string;
+  readonly schedulePolicyRef?: string;
+}
+
+type BrowserSafeAgentConfigPreviewFieldName =
+  | 'displayName'
+  | 'budgetPolicyRef'
+  | 'memoryPolicyRef'
+  | 'toolPolicyRef'
+  | 'schedulePolicyRef';
+
+type MutableBrowserSafeAgentConfigPreview = Record<
+  BrowserSafeAgentConfigPreviewFieldName,
+  string | undefined
+> &
+  Record<string, string | undefined>;
+
+/**
  * unknown 値がプレーンな object として扱える場合だけ `Record` として返す。
  *
  * @param value - Agent RPC から返された未検証の値。
@@ -159,6 +189,63 @@ export function toBrowserSafePayloadReference(
     byteSize: toSafeStringFromInt64(record.byteSize),
     sha256: toSafeString(record.sha256),
     storageClass: toSafeString(record.storageClass),
+  };
+}
+
+/**
+ * Agent RPC の config response から汎用 editor 用の安全な preview だけを抽出する。
+ *
+ * @param value - generated `AgentConfig` 互換の未検証値。
+ * @returns Browser へ渡せる safe string field だけを含む preview object。
+ * @throws 例外は送出しない。`defaultModelPolicy`、`modelPolicyValidation`、`configBodyRef`、
+ *         `inlineBytes`、`bigint`、credential 情報は意図的に含めない。
+ * @example
+ * ```ts
+ * const configJson = JSON.stringify(toBrowserSafeAgentConfigPreview(response.config), null, 2);
+ * ```
+ */
+export function toBrowserSafeAgentConfigPreview(value: unknown): BrowserSafeAgentConfigPreview {
+  const record = toSafeRecord(value);
+  const preview: MutableBrowserSafeAgentConfigPreview = {
+    budgetPolicyRef: undefined,
+    displayName: undefined,
+    memoryPolicyRef: undefined,
+    schedulePolicyRef: undefined,
+    toolPolicyRef: undefined,
+  };
+  setConfigPreviewField(preview, 'displayName', record?.displayName);
+  setConfigPreviewField(preview, 'budgetPolicyRef', record?.budgetPolicyRef);
+  setConfigPreviewField(preview, 'memoryPolicyRef', record?.memoryPolicyRef);
+  setConfigPreviewField(preview, 'toolPolicyRef', record?.toolPolicyRef);
+  setConfigPreviewField(preview, 'schedulePolicyRef', record?.schedulePolicyRef);
+  return removeUndefinedConfigPreviewFields(preview);
+}
+
+function setConfigPreviewField(
+  preview: MutableBrowserSafeAgentConfigPreview,
+  fieldName: BrowserSafeAgentConfigPreviewFieldName,
+  value: unknown
+): void {
+  const safeValue = toOptionalString(value);
+  if (safeValue === undefined) return;
+  if (fieldName === 'displayName') preview.displayName = safeValue;
+  if (fieldName === 'budgetPolicyRef') preview.budgetPolicyRef = safeValue;
+  if (fieldName === 'memoryPolicyRef') preview.memoryPolicyRef = safeValue;
+  if (fieldName === 'toolPolicyRef') preview.toolPolicyRef = safeValue;
+  if (fieldName === 'schedulePolicyRef') preview.schedulePolicyRef = safeValue;
+}
+
+function removeUndefinedConfigPreviewFields(
+  preview: MutableBrowserSafeAgentConfigPreview
+): BrowserSafeAgentConfigPreview {
+  return {
+    ...(preview.displayName === undefined ? {} : { displayName: preview.displayName }),
+    ...(preview.budgetPolicyRef === undefined ? {} : { budgetPolicyRef: preview.budgetPolicyRef }),
+    ...(preview.memoryPolicyRef === undefined ? {} : { memoryPolicyRef: preview.memoryPolicyRef }),
+    ...(preview.toolPolicyRef === undefined ? {} : { toolPolicyRef: preview.toolPolicyRef }),
+    ...(preview.schedulePolicyRef === undefined
+      ? {}
+      : { schedulePolicyRef: preview.schedulePolicyRef }),
   };
 }
 

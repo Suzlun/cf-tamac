@@ -3,11 +3,12 @@
 import Link from 'next/link';
 
 import { AgentToken } from './agent-token';
-import { ControlRoomFrame } from './control-room-frame';
 import { DataTable } from './data-table';
 import { EmptyState } from './empty-state';
 import { ErrorAlert } from './error-alert';
 import { PaginationBar } from './pagination-bar';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface PayloadReference {
   readonly ref: string;
@@ -118,14 +119,11 @@ export function CompactionView({
   const selectedThread = threads.find((thread) => thread.threadId === selectedThreadId);
 
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="compactions"
-      agentId={agentId}
-      currentSection="compactions"
-    >
-      <p className="eyebrow">Compaction & Memory</p>
-      <h2>Section boundaries, Handoff, History, Memory</h2>
+    // page-level ControlRoomFrame は親 page が1つだけ提供する。CompactionView は sub-section として描画する。
+    <section aria-label="Compaction and Memory detail" className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Section boundaries, Handoff, History, Memory</h2>
+      </div>
       <AgentToken agentId={agentId} />
 
       {threads.length === 0 ? (
@@ -145,7 +143,7 @@ export function CompactionView({
           history={history}
         />
       )}
-    </ControlRoomFrame>
+    </section>
   );
 }
 
@@ -158,15 +156,17 @@ function ThreadSelectorTable({
 }) {
   return (
     <>
-      <p className="lead">Select a Thread to view its latest compaction, memory, and history.</p>
+      <p className="text-sm text-muted-foreground">
+        Select a Thread to view its latest compaction, memory, and history.
+      </p>
       <DataTable
         ariaLabel="Threads"
         headers={['Thread key', 'Status']}
         rows={threads.map((thread) => [
           <Link
             key={thread.threadId}
-            className="nav-link"
-            href={`/agents/${agentId}/compactions?thread=${thread.threadId}`}
+            className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            href={`/agents/${agentId}/threads?thread=${thread.threadId}`}
           >
             {thread.threadKey}
           </Link>,
@@ -192,7 +192,7 @@ function CompactionDetailContent({
 }) {
   return (
     <>
-      <p className="lead">
+      <p className="text-sm text-muted-foreground">
         Thread: {selectedThread.threadKey} ({selectedThread.status})
       </p>
       <LatestCompactionZone latestCompaction={latestCompaction} />
@@ -208,7 +208,10 @@ function LatestCompactionZone({
   readonly latestCompaction?: CompactionDetail;
 }) {
   return (
-    <section className="readout" aria-labelledby="compaction-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="compaction-heading"
+    >
       <strong id="compaction-heading">LATEST READY COMPACTION</strong>
       {latestCompaction?.compactionId === undefined ? (
         <ErrorAlert message="No compaction data available." />
@@ -231,7 +234,7 @@ function LatestCompactionZone({
           </p>
           <details>
             <summary>View full Handoff metadata</summary>
-            <pre className="form-control">
+            <pre className="h-9 w-full rounded-md border bg-transparent px-3 text-sm">
               {JSON.stringify(
                 {
                   handoffRef: latestCompaction.handoffRef,
@@ -251,7 +254,10 @@ function LatestCompactionZone({
 
 function ThreadMemoryZone({ memory }: { readonly memory?: MemoryDetail }) {
   return (
-    <section className="readout" aria-labelledby="memory-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="memory-heading"
+    >
       <strong id="memory-heading">THREAD MEMORY</strong>
       {memory === undefined ? (
         <ErrorAlert message="No memory data available." />
@@ -289,17 +295,28 @@ function ThreadHistoryZone({
   readonly history?: HistoryResult;
 }) {
   return (
-    <section className="readout" aria-labelledby="history-heading">
+    <section
+      className="space-y-4 rounded-lg border bg-card p-5 text-sm"
+      aria-labelledby="history-heading"
+    >
       <strong id="history-heading">THREAD HISTORY SEARCH</strong>
-      <form className="action-row" method="get">
+      <form
+        className="grid gap-3 sm:grid-cols-[minmax(14rem,24rem)_auto] sm:items-end"
+        method="get"
+      >
         <input type="hidden" name="thread" value={threadId} />
-        <label className="eyebrow" htmlFor="history-query">
-          Search
-        </label>
-        <input id="history-query" name="q" className="form-control" placeholder="query…" />
-        <button type="submit" className="nav-link">
+        <div className="space-y-2">
+          <label
+            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            htmlFor="history-query"
+          >
+            Search
+          </label>
+          <Input id="history-query" name="q" placeholder="query…" />
+        </div>
+        <Button type="submit" variant="outline">
           Search History
-        </button>
+        </Button>
       </form>
       {history === undefined ? (
         <ErrorAlert message="No history data available." />
@@ -325,7 +342,7 @@ function ThreadHistoryZone({
       )}
       {history === undefined ? null : (
         <PaginationBar
-          basePath={`/agents/${agentId}/compactions`}
+          basePath={`/agents/${agentId}/threads`}
           page={history.page}
           extraQuery={{ thread: threadId }}
         />

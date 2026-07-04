@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   toOptionalString,
+  toBrowserSafeAgentConfigPreview,
   toSafeNumber,
   toSafeString,
   toSafeStringFromInt64,
@@ -47,6 +48,52 @@ describe('Browser-safe helper type conversions', () => {
     expect(toOptionalString(42)).toBeUndefined();
     expect(toOptionalString(undefined)).toBeUndefined();
   });
+
+  it('[CLIENT-REGISTRY-S010] Agent config preview strips raw model policy and payload refs', () => {
+    const rawConfig = {
+      agentId: 'agent-alpha',
+      configVersion: '7',
+      displayName: 'Alpha Agent',
+      modelPolicyRef: 'workers-ai-default',
+      budgetPolicyRef: 'budget-default',
+      memoryPolicyRef: 'memory-default',
+      toolPolicyRef: 'tool-default',
+      schedulePolicyRef: 'schedule-default',
+      updatedAtUnixMs: BigInt(42),
+      configBodyRef: {
+        ref: 'inline:config',
+        inlineBytes: new Uint8Array([1, 2, 3]),
+      },
+      defaultModelPolicy: {
+        policyRef: 'workers-ai-default',
+        version: BigInt(3),
+        safeMetadataRef: {
+          ref: 'inline:policy-metadata',
+          inlineBytes: new Uint8Array([4, 5, 6]),
+        },
+      },
+      modelPolicyValidation: {
+        ok: true,
+        checkedAtUnixMs: BigInt(43),
+      },
+    };
+
+    const safePreview = toBrowserSafeAgentConfigPreview(rawConfig);
+    const serialized = JSON.stringify(safePreview);
+
+    expect(safePreview.displayName).toBe('Alpha Agent');
+    expect(safePreview.budgetPolicyRef).toBe('budget-default');
+    expect(safePreview.memoryPolicyRef).toBe('memory-default');
+    expect(safePreview.toolPolicyRef).toBe('tool-default');
+    expect(safePreview.schedulePolicyRef).toBe('schedule-default');
+    expect(Object.keys(safePreview)).not.toContain('modelPolicyRef');
+    expect(Object.keys(safePreview)).not.toContain('defaultModelPolicy');
+    expect(Object.keys(safePreview)).not.toContain('modelPolicyValidation');
+    expect(Object.keys(safePreview)).not.toContain('configBodyRef');
+    expect(Object.keys(safePreview)).not.toContain('updatedAtUnixMs');
+    expect(serialized).not.toContain('inlineBytes');
+    expect(serialized).not.toContain('safeMetadataRef');
+  });
 });
 
 describe('Acting user context derivation', () => {
@@ -55,7 +102,7 @@ describe('Acting user context derivation', () => {
 
     expect(context.operatorId).not.toBe('');
     expect(context.scopes.length).toBeGreaterThan(0);
-    expect(context.operatorId).toBe('client-management-test-operator');
+    expect(context.operatorId).toBe('agent-management-ui-test-operator');
     expect(context.scopes).toContain('agent:read');
   });
 });
@@ -139,8 +186,8 @@ describe('Server Action credential safety with mocked Agent RPC', () => {
     expect(lifecycleSource).toContain('clients.state.getState({ agentId })');
 
     expect(loaderSource).toContain('createManagedAgentRepository(env.CLIENT_DB).getManagedAgent');
-    expect(loaderSource).toContain('createCredentialReferenceRepository');
-    expect(loaderSource).toContain('resolveCredentialSecret');
+    expect(loaderSource).toContain('createSigningKeyRepository');
+    expect(loaderSource).toContain('resolveEd25519PrivateKey');
     expect(loaderSource).toContain('createServerAgentRpcClients');
 
     expect(schemaSource).toContain('clientManagedAgentsTable');
@@ -230,6 +277,27 @@ describe('Server Action field mapping with generated Protobuf types', () => {
     expect(summary.displayName).toBe('Search Web');
     expect(summary.toolId).toBe('tool-001');
   });
+
+  it('[CLIENT-REGISTRY-S010] Client server reads default policy truth from Agent RPC safely', () => {
+    const modelPoliciesSource = readSource(
+      new URL('../server/actions/model-policies.ts', import.meta.url)
+    );
+    const viewModelSource = readSource(
+      new URL('../server/actions/model-policy-view-models.ts', import.meta.url)
+    );
+    const settingsPageSource = readSource(
+      new URL('../../app/agents/[agentId]/settings/page.tsx', import.meta.url)
+    );
+
+    expect(modelPoliciesSource).toContain('clients.state.getConfig({ agentId })');
+    expect(modelPoliciesSource).toContain('clients.modelPolicies.getModelPolicy');
+    expect(modelPoliciesSource).toContain('getDefaultModelPolicyForManagedAgent');
+    expect(settingsPageSource).toContain('getDefaultModelPolicyForManagedAgent');
+    expect(viewModelSource).toContain('toBrowserSafeModelPolicyMetadata');
+    expect(viewModelSource).not.toContain('raw prompt');
+    expect(viewModelSource).not.toContain('raw completion');
+    expect(viewModelSource).not.toContain('raw reasoning');
+  });
 });
 
 describe('Registry mutation Server Actions coverage', () => {
@@ -252,16 +320,19 @@ describe('Registry mutation Server Actions coverage', () => {
 });
 
 describe('Server Action credential resolver integration', () => {
-  it('[CLIENT-REGISTRY-S002] agent-loader calls resolveCredentialSecret in the Agent RPC path', async () => {
+  it('[CLIENT-REGISTRY-S002] agent-loader resolves the Ed25519 signing key store in the Agent RPC path', async () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
 
     const loaderPath = new URL('../server/agent-rpc/agent-loader.ts', import.meta.url);
     const source = readFileSync(fileURLToPath(loaderPath.href), 'utf8');
 
-    expect(source).toContain('resolveCredentialSecret');
-    expect(source).toContain('secretMaterial');
+    expect(source).toContain('createSigningKeyRepository');
+    expect(source).toContain('resolveEd25519PrivateKey');
     expect(source).toContain('deriveActingUserContext');
+    // Agent RPC signing 経路から credentialRef / AGENT_CREDENTIAL_* 解決は撤去済みであること。
+    expect(source).not.toContain('resolveCredentialSecret');
+    expect(source).not.toContain('secretMaterial');
   });
 
   it('[CLIENT-REGISTRY-S005] Server Actions do not accept actingUser parameter from browser', async () => {

@@ -1,0 +1,106 @@
+{
+  "name": "Agent Signing Key Select Health",
+  "viewport": { "width": 1200, "height": 760 },
+  "root": {
+    "name": "Management Shell",
+    "direction": "horizontal",
+    "children": [
+      {
+        "name": "Left Sidebar With Selected Agent",
+        "width": 256,
+        "direction": "vertical",
+        "padding": 16,
+        "gap": 12,
+        "children": [
+          { "name": "cf-tamac Management", "type": "text", "variant": "heading", "height": 40 },
+          { "name": "Agents", "type": "link", "height": 40 },
+          { "name": "Global Settings", "type": "link", "height": 40 },
+          { "name": "Selected Agent", "type": "text", "variant": "caption", "height": 24 },
+          { "name": "Overview", "type": "link", "height": 40 },
+          { "name": "Threads", "type": "link", "height": 40 },
+          { "name": "Runs", "type": "link", "height": 40 },
+          { "name": "Settings", "type": "link", "height": 40 }
+        ]
+      },
+      {
+        "name": "Agent Settings Main",
+        "direction": "vertical",
+        "grow": true,
+        "padding": 32,
+        "gap": 24,
+        "children": [
+          {
+            "name": "Agent Header",
+            "direction": "vertical",
+            "gap": 8,
+            "children": [
+              { "name": "Agent / Settings", "type": "text", "variant": "caption", "height": 20 },
+              {
+                "name": "Signing Key Selection And Health",
+                "type": "text",
+                "variant": "display",
+                "height": 52
+              },
+              {
+                "name": "Select an existing Global signing key for this Agent and verify it against the Agent Worker trust config. Keys are managed under Global Settings.",
+                "type": "text",
+                "height": 48
+              }
+            ]
+          },
+          {
+            "name": "Signing Key Selection And Health Result",
+            "direction": "horizontal",
+            "gap": 24,
+            "children": [
+              {
+                "name": "Selection Form",
+                "direction": "vertical",
+                "width": 420,
+                "gap": 16,
+                "children": [
+                  {
+                    "name": "No Global signing keys available state",
+                    "type": "card",
+                    "height": 88
+                  },
+                  {
+                    "name": "Signing key select from Global Settings",
+                    "type": "input",
+                    "height": 44
+                  },
+                  {
+                    "name": "Selected issuer / kid / fingerprint read-only",
+                    "type": "card",
+                    "height": 96
+                  },
+                  { "name": "Save Agent Selection", "type": "button", "height": 44 },
+                  { "name": "Run Health Check", "type": "button", "height": 44 },
+                  {
+                    "name": "Health Check disabled reason",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  }
+                ]
+              },
+              {
+                "name": "Verification Panel",
+                "direction": "vertical",
+                "grow": true,
+                "gap": 16,
+                "children": [
+                  { "name": "Current Trust Match", "type": "card", "height": 112 },
+                  { "name": "Last Verified At", "type": "card", "height": 88 },
+                  { "name": "Safe Diagnostic Codes", "type": "card", "height": 132 },
+                  { "name": "Blocked until Global key selected", "type": "card", "height": 88 },
+                  { "name": "Next Step Guidance", "type": "card", "height": 96 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

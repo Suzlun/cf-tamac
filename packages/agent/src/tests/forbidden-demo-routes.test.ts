@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
 
+import { testControlPlaneTrustConfig } from './test-control-plane-trust';
+
 import type { AIAgent } from '../AIAgent';
 import type { AgentWorkerEnv } from '../env';
 
@@ -11,7 +13,8 @@ const forbiddenDemoPaths = ['/api/v1/hello', '/api/v1/users', '/api/v1/users/use
 function createTestEnv(): AgentWorkerEnv {
   return {
     AGENT_BLOBS: {} as R2Bucket,
-    AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+    AGENT_AUDIT_HASH_PEPPER: 'test-audit-hash-pepper',
+    AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
     AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',

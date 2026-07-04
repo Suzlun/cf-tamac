@@ -64,6 +64,37 @@ message PrincipalContext {
   repeated string scopes = 9;
 }
 
+// Agent Worker が読み込んだ control-plane trust config の安全な診断情報です。
+// version と fingerprint は運用者が設定反映を照合するための識別子だけを表し、公開鍵本文や秘密鍵 material は含めません。
+// loaded_at_unix_ms は Agent Worker が設定を検証済みとして保持し始めた時刻を Unix epoch milliseconds で示します。
+// status は serving / degraded / unavailable など、health 応答で secret-free に表示できる設定状態を入れるための文字列です。
+// issuer_count と key_count は構成規模の要約であり、issuer/key の完全な設定内容を返さないための集約値です。
+message TrustConfigDiagnostic {
+  string version = 1; // trust config schema または運用設定の version を示す安全な識別子です。
+  string fingerprint = 2; // trust config 全体を公開情報だけから計算した fingerprint です。
+  // Agent Worker が trust config を読み込み検証した Unix epoch milliseconds です。
+  int64 loaded_at_unix_ms = 3;
+  string status = 4; // health 応答で利用する trust config の診断状態です。
+  int32 issuer_count = 5; // trust config に含まれる issuer 数の集約値です。
+  int32 key_count = 6; // trust config に含まれる Ed25519 public key 数の集約値です。
+}
+
+// 認証済み Client Service principal が提示した issuer / kid / fingerprint の検証済み要約です。
+// Agent health 応答はこの情報により、選択中の Client 署名鍵が Agent trust config 上で active または retiring として受理されたかを確認できます。
+// fingerprint は公開鍵の安全な識別子だけを返し、public JWK 全文、JWT 本文、signature、private JWK、暗号化済み private JWK は返しません。
+// verified_at_unix_ms は認証 interceptor が当該 issuer/kid/fingerprint を検証した時刻を Unix epoch milliseconds で表します。
+message AuthenticatedPrincipalTrustSummary {
+  string issuer = 1; // JWT payload の iss として検証された issuer です。
+  string kid = 2; // JWT header の kid として検証された key id です。
+  string fingerprint = 3; // trust config 上の公開鍵 fingerprint と照合済みの安全な識別子です。
+  // active / retiring など、trust config 上の key lifecycle 状態です。
+  string key_status = 4;
+  string principal_type = 5; // client_service など、認証済み principal の種別です。
+  // issuer/kid/fingerprint が trust config と一致し、署名検証まで完了したかを示します。
+  bool verified = 6;
+  int64 verified_at_unix_ms = 7; // この要約を生成した検証時刻の Unix epoch milliseconds です。
+}
+
 message ReplayMetadata {
   string idempotency_key = 1;
   optional string nonce = 2;
@@ -175,6 +206,8 @@ message AdapterConnection {
   int64 created_at_unix_ms = 10;
   optional int64 disabled_at_unix_ms = 11;
   BytePayloadReference metadata_ref = 12;
+  repeated string allowed_model_policy_refs = 13;
+  BytePayloadReference model_policy_grant_ref = 14;
 }
 
 message AdapterDeliveryResult {
@@ -186,6 +219,10 @@ message AdapterDeliveryResult {
   optional string connection_id = 6;
   optional string delivery_context_id = 7;
   optional string provider_operation_id = 8;
+  optional string run_id = 9;
+  optional string decision_id = 10;
+  optional string resume_action = 11;
+  BytePayloadReference safe_metadata_ref = 12;
 }
 
 message AdapterDefinition {
@@ -209,6 +246,8 @@ message DeliveryContext {
   int64 created_at_unix_ms = 9;
   optional int64 expires_at_unix_ms = 10;
   BytePayloadReference metadata_ref = 11;
+  optional string model_policy_ref = 12;
+  optional string model_policy_digest = 13;
 }
 
 message AdapterDelivery {
@@ -240,6 +279,40 @@ message AgentProfile {
   optional string latest_audit_event_id = 10;
 }
 
+message AgentModelPolicySummary {
+  string agent_id = 1;
+  string policy_ref = 2;
+  int64 version = 3;
+  string status = 4;
+  string provider = 5;
+  string model_id = 6;
+  string policy_digest = 7;
+  string decision_schema_version = 8;
+  BytePayloadReference safe_metadata_ref = 9;
+  optional int64 validated_at_unix_ms = 10;
+}
+
+message ModelPolicyValidationIssue {
+  string code = 1;
+  string severity = 2;
+  optional string target = 3;
+  string safe_message = 4;
+  bool retryable = 5;
+}
+
+message AgentModelPolicyValidationResult {
+  bool ok = 1;
+  string status = 2;
+  string policy_ref = 3;
+  string provider = 4;
+  string model_id = 5;
+  optional string policy_digest = 6;
+  repeated ModelPolicyValidationIssue issues = 7;
+  repeated ModelPolicyValidationIssue warnings = 8;
+  BytePayloadReference safe_metadata_ref = 9;
+  optional int64 checked_at_unix_ms = 10;
+}
+
 message AgentConfig {
   string agent_id = 1;
   string config_version = 2;
@@ -252,6 +325,8 @@ message AgentConfig {
   optional string updated_by_principal_id = 9;
   optional int64 updated_at_unix_ms = 10;
   BytePayloadReference config_body_ref = 11;
+  AgentModelPolicySummary default_model_policy = 12;
+  AgentModelPolicyValidationResult model_policy_validation = 13;
 }
 
 message AgentPrincipal {
@@ -296,6 +371,18 @@ message AgentCapabilitySummary {
   int32 delivery_capability_count = 6;
 }
 
+message ModelExecutionCapability {
+  string status = 1;
+  bool binding_present = 2;
+  optional string provider = 3;
+  optional string model_id = 4;
+  optional string default_policy_ref = 5;
+  optional string default_policy_digest = 6;
+  int64 checked_at_unix_ms = 7;
+  BytePayloadReference last_safe_smoke_ref = 8;
+  optional string safe_detail_ref = 9;
+}
+
 message AgentHealthSnapshot {
   string agent_id = 1;
   string serving_status = 2;
@@ -303,6 +390,7 @@ message AgentHealthSnapshot {
   string contract_package = 4;
   int64 checked_at_unix_ms = 5;
   optional string dependency_status_ref = 6;
+  ModelExecutionCapability model_execution = 7;
 }
 
 message ThreadCompaction {
@@ -351,6 +439,10 @@ message AgentEvent {
   optional string causation_id = 16;
   optional string run_id = 17;
   optional string delivery_context_id = 18;
+  optional string requested_model_policy_ref = 19;
+  AgentModelPolicySummary model_policy = 20;
+  AgentModelPolicyValidationResult model_policy_validation = 21;
+  optional string policy_override_source = 22;
 }
 
 message AgentEventInput {
@@ -364,6 +456,7 @@ message AgentEventInput {
   optional string correlation_id = 8;
   optional string causation_id = 9;
   DeliveryContext delivery_context = 10;
+  optional string model_policy_ref = 11;
 }
 
 message IntegrationInstallation {
@@ -471,6 +564,77 @@ message AgentMemory {
   optional int64 updated_at_unix_ms = 8;
 }
 
+message AgentModelPolicyInput {
+  string policy_ref = 1;
+  string provider = 2;
+  string model_id = 3;
+  optional string status = 4;
+  string decision_schema_version = 5;
+  BytePayloadReference generation_parameters_ref = 6;
+  BytePayloadReference budget_metadata_ref = 7;
+  BytePayloadReference safety_metadata_ref = 8;
+  optional string credential_reference = 9;
+  BytePayloadReference safe_metadata_ref = 10;
+  optional string expected_policy_digest = 11;
+}
+
+message AgentModelPolicy {
+  string agent_id = 1;
+  string policy_ref = 2;
+  int64 version = 3;
+  string status = 4;
+  string provider = 5;
+  string model_id = 6;
+  string decision_schema_version = 7;
+  string policy_digest = 8;
+  BytePayloadReference safe_generation_parameters_ref = 9;
+  BytePayloadReference safe_budget_metadata_ref = 10;
+  BytePayloadReference safe_safety_metadata_ref = 11;
+  BytePayloadReference safe_metadata_ref = 12;
+  optional string created_by_principal_id = 13;
+  optional string updated_by_principal_id = 14;
+  int64 created_at_unix_ms = 15;
+  int64 updated_at_unix_ms = 16;
+  optional int64 archived_at_unix_ms = 17;
+}
+
+message RunModelPolicySnapshot {
+  optional string requested_policy_ref = 1;
+  string resolved_policy_ref = 2;
+  string resolved_policy_digest = 3;
+  string provider = 4;
+  string model_id = 5;
+  int64 policy_version = 6;
+  string policy_source = 7;
+  string decision_schema_version = 8;
+  string config_version = 9;
+  optional string tool_catalog_generation = 10;
+  optional string integration_capability_generation = 11;
+  optional string thread_memory_version = 12;
+  optional int64 trigger_start_thread_sequence = 13;
+  optional int64 trigger_end_thread_sequence = 14;
+  BytePayloadReference safe_metadata_ref = 15;
+}
+
+message AgentModelInvocationSummary {
+  string invocation_id = 1;
+  string run_id = 2;
+  string status = 3;
+  string provider = 4;
+  string model_id = 5;
+  string policy_ref = 6;
+  string policy_digest = 7;
+  string decision_schema_version = 8;
+  RawBodyDigest request_digest = 9;
+  RawBodyDigest response_digest = 10;
+  optional string provider_error_category = 11;
+  optional int64 input_token_count = 12;
+  optional int64 output_token_count = 13;
+  optional int64 latency_ms = 14;
+  int32 attempt = 15;
+  BytePayloadReference safe_metadata_ref = 16;
+}
+
 message AgentRun {
   string run_id = 1;
   string agent_id = 2;
@@ -488,6 +652,10 @@ message AgentRun {
   optional string integration_version = 14;
   optional string interrupt_reason = 15;
   RpcErrorDetail safe_error = 16;
+  RunModelPolicySnapshot model_policy_snapshot = 17;
+  AgentModelInvocationSummary model_invocation_summary = 18;
+  optional string decision_schema_version = 19;
+  optional string failure_category = 20;
 }
 
 message AgentRunInput {
@@ -506,6 +674,8 @@ message AgentRunInput {
   optional string tool_set_version = 13;
   optional string integration_installation_version = 14;
   optional string state_snapshot_ref = 15;
+  RunModelPolicySnapshot model_policy_snapshot = 16;
+  AgentModelInvocationSummary model_invocation_summary = 17;
 }
 
 message RunSnapshotReference {
@@ -515,6 +685,8 @@ message RunSnapshotReference {
   string run_id = 4;
   int64 created_at_unix_ms = 5;
   string digest_sha256 = 6;
+  optional string model_policy_digest = 7;
+  optional string decision_schema_version = 8;
 }
 
 message AgentSchedule {
@@ -570,6 +742,8 @@ message AgentStateSnapshot {
   string config_version = 8;
   AgentCapabilitySummary capability_summary = 9;
   int64 updated_at_unix_ms = 10;
+  AgentModelPolicySummary default_model_policy = 11;
+  ModelExecutionCapability model_execution = 12;
 }
 
 message StorageThresholdStatus {
@@ -699,6 +873,7 @@ message PublishIntegrationEventResponse {
   AgentThread thread = 2;
   DeliveryContext delivery_context = 3;
   bool replayed = 4;
+  AgentModelPolicySummary requested_model_policy = 5;
 }
 
 message PublishToolResultRequest {
@@ -740,6 +915,8 @@ message PublishDeliveryResultResponse {
   AdapterDeliveryResult result = 1;
   AdapterDelivery delivery = 2;
   bool replayed = 3;
+  optional string resume_action = 4;
+  BytePayloadReference safe_metadata_ref = 5;
 }
 
 message PublishEventRequest {
@@ -757,6 +934,7 @@ message PublishEventResponse {
   bool accepted = 3;
   AgentRun pending_run = 4;
   bool replayed = 5;
+  AgentModelPolicySummary requested_model_policy = 6;
 }
 
 message GetEventRequest {
@@ -894,6 +1072,9 @@ message CheckHealthResponse {
   int64 checked_at_unix_ms = 5;
   AgentHealthSnapshot health = 6;
   optional string dependency_status_ref = 7;
+  ModelExecutionCapability model_execution = 8;
+  TrustConfigDiagnostic trust_config = 9;
+  AuthenticatedPrincipalTrustSummary current_principal_trust = 10;
 }
 
 message InitializeAgentRequest {
@@ -903,6 +1084,7 @@ message InitializeAgentRequest {
   AgentConfig initial_config = 4;
   CredentialRotationPolicy credential_policy = 5;
   SecurityMetadata security = 6;
+  AgentModelPolicyInput initial_model_policy = 7;
 }
 
 message InitializeAgentResponse {
@@ -911,6 +1093,7 @@ message InitializeAgentResponse {
   AccessCredential credential = 3;
   AgentAuditRecord audit = 4;
   ThreadKeyIdentityRule thread_key_rule = 5;
+  AgentModelPolicySummary default_model_policy = 6;
 }
 
 message GetAgentRequest {
@@ -922,6 +1105,7 @@ message GetAgentResponse {
   AgentConfig config = 2;
   AccessCredential active_credential = 3;
   AgentCapabilitySummary capability_summary = 4;
+  AgentModelPolicySummary default_model_policy = 5;
 }
 
 message DestroyAgentRequest {
@@ -951,6 +1135,65 @@ message RotateAgentCredentialResponse {
   AgentAuditRecord audit = 3;
 }
 
+message UpsertModelPolicyRequest {
+  string agent_id = 1;
+  string idempotency_key = 2;
+  AgentModelPolicyInput policy = 3;
+  SecurityMetadata security = 4;
+}
+
+message UpsertModelPolicyResponse {
+  AgentModelPolicy policy = 1;
+  AgentModelPolicyValidationResult validation = 2;
+  AgentAuditRecord audit = 3;
+  bool replayed = 4;
+}
+
+message GetModelPolicyRequest {
+  string agent_id = 1;
+  string policy_ref = 2;
+}
+
+message GetModelPolicyResponse {
+  AgentModelPolicy policy = 1;
+}
+
+message ListModelPoliciesRequest {
+  string agent_id = 1;
+  PageRequest page = 2;
+  optional string status = 3;
+}
+
+message ListModelPoliciesResponse {
+  repeated AgentModelPolicy policies = 1;
+  PageResponse page = 2;
+}
+
+message ArchiveModelPolicyRequest {
+  string agent_id = 1;
+  string idempotency_key = 2;
+  string policy_ref = 3;
+  optional string reason = 4;
+  SecurityMetadata security = 5;
+}
+
+message ArchiveModelPolicyResponse {
+  AgentModelPolicy policy = 1;
+  AgentAuditRecord audit = 2;
+  bool replayed = 3;
+}
+
+message ValidateModelPolicyRequest {
+  string agent_id = 1;
+  AgentModelPolicyInput policy = 2;
+  SecurityMetadata security = 3;
+}
+
+message ValidateModelPolicyResponse {
+  AgentModelPolicyValidationResult validation = 1;
+  AgentModelPolicySummary policy_preview = 2;
+}
+
 message GetRunRequest {
   string agent_id = 1;
   string run_id = 2;
@@ -960,6 +1203,8 @@ message GetRunResponse {
   AgentRun run = 1;
   AgentRunInput input = 2;
   RunSnapshotReference snapshot = 3;
+  RunModelPolicySnapshot model_policy_snapshot = 4;
+  AgentModelInvocationSummary model_invocation = 5;
 }
 
 message ListRunsRequest {
@@ -973,6 +1218,7 @@ message ListRunsRequest {
 message ListRunsResponse {
   repeated AgentRun runs = 1;
   PageResponse page = 2;
+  repeated RunModelPolicySnapshot model_policies = 3;
 }
 
 message CancelRunRequest {
@@ -1050,6 +1296,7 @@ message GetStateRequest {
 message GetStateResponse {
   AgentStateSnapshot state = 1;
   StorageThresholdStatus storage = 2;
+  ModelExecutionCapability model_execution = 3;
 }
 
 message GetConfigRequest {
@@ -1059,6 +1306,7 @@ message GetConfigRequest {
 message GetConfigResponse {
   AgentConfig config = 1;
   PrincipalContext updated_by = 2;
+  AgentModelPolicySummary default_model_policy = 3;
 }
 
 message UpdateConfigRequest {
@@ -1072,6 +1320,8 @@ message UpdateConfigResponse {
   AgentConfig config = 1;
   AgentAuditRecord audit = 2;
   bool replayed = 3;
+  AgentModelPolicySummary default_model_policy = 4;
+  AgentModelPolicyValidationResult validation = 5;
 }
 
 message ListThreadsRequest {
@@ -1317,6 +1567,14 @@ service AgentLifecycleService {
   rpc GetAgent(GetAgentRequest) returns (GetAgentResponse);
   rpc DestroyAgent(DestroyAgentRequest) returns (DestroyAgentResponse);
   rpc RotateAgentCredential(RotateAgentCredentialRequest) returns (RotateAgentCredentialResponse);
+}
+
+service AgentModelPolicyService {
+  rpc UpsertModelPolicy(UpsertModelPolicyRequest) returns (UpsertModelPolicyResponse);
+  rpc GetModelPolicy(GetModelPolicyRequest) returns (GetModelPolicyResponse);
+  rpc ListModelPolicies(ListModelPoliciesRequest) returns (ListModelPoliciesResponse);
+  rpc ArchiveModelPolicy(ArchiveModelPolicyRequest) returns (ArchiveModelPolicyResponse);
+  rpc ValidateModelPolicy(ValidateModelPolicyRequest) returns (ValidateModelPolicyResponse);
 }
 
 service AgentRunService {

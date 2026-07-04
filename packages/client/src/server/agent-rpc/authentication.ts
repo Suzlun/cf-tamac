@@ -1,12 +1,13 @@
 import 'server-only';
 
+import type { Ed25519PublicJwk } from '../credentials/signing-keys';
 import type { Interceptor } from '@connectrpc/connect';
 
 /**
  * Agent RPC に付与する acting user context。
  *
  * @remarks Browser から受け取った値ではなく、Client の server-only 認証境界で検証済みの
- * operator identity と scope だけを保持する。
+ * operator identity と scope だけを保持する。JWT payload の `acting_user_id` / `scopes` になる。
  */
 export interface ActingUserContext {
   readonly operatorId: string;
@@ -14,26 +15,46 @@ export interface ActingUserContext {
 }
 
 /**
- * Server-only Agent RPC credential reference metadata。
+ * Server-only Agent RPC 署名鍵 metadata と復号済み Ed25519 秘密鍵。
  *
- * @remarks credentialRef/keyId は参照識別子であり、JWT 署名用 material は別途
- * `ResolvedAgentRpcCredential` の `secretMaterial` として server-only に解決する。
+ * @remarks
+ * Ed25519 signing key store だけを Agent RPC bearer JWT の署名 source にする。
+ * `privateKey` は Web Crypto の CryptoKey であり、browser・log・Server Action 戻り値・Client D1 へ
+ * 絶対に直列化しない。共有 secret / Worker Secret 参照経路は撤去済みであり、
+ * この interface は公開鍵・fingerprint・ issuer / kid のみを扱う。
  */
 export interface AgentRpcCredentialMetadata {
   readonly agentId: string;
-  readonly credentialRef: string;
+  readonly issuer: string;
   readonly keyId: string;
+  readonly publicFingerprint: string;
+  readonly publicJwk: Ed25519PublicJwk;
   readonly actingUser?: ActingUserContext;
 }
 
 /**
- * Server-only Agent RPC credential with resolved signing material。
+ * Server-only に復号した Ed25519 秘密鍵を含む Agent RPC credential。
  *
- * @remarks `secretMaterial` は短時間 Client Service JWT の HMAC signing key として使い、
- * Browser response、log、Client D1 record へは渡さない。
+ * @remarks
+ * `privateKey` を JWT 署名だけに使い、署名後に server-only scope から落とす。
+ * この型は `packages/client/src/server/agent-rpc/**` と server-only credentials helper の間でのみ扱う。
  */
 export interface ResolvedAgentRpcCredential extends AgentRpcCredentialMetadata {
-  readonly secretMaterial: string;
+  readonly privateKey: CryptoKey;
+  /**
+   * JWT 署名が成功した直後に signing key の利用時刻を server-only store へ反映する callback。
+   *
+   * @remarks
+   * 関数値は browser payload へ直列化できない server-only seam として扱い、Client D1 の
+   * `lastUsedAtMs` 更新以外の秘密情報を返さない。失敗時は JWT を返さず Agent RPC 呼び出しを止める。
+   */
+  readonly onJwtSigned?: () => Promise<void>;
+}
+
+interface ClientServiceJwtHeader {
+  readonly alg: 'EdDSA';
+  readonly typ: 'JWT';
+  readonly kid: string;
 }
 
 interface ClientServiceJwtPayload {
@@ -46,46 +67,36 @@ interface ClientServiceJwtPayload {
   readonly agent_id: string;
   readonly scopes: readonly string[];
   readonly acting_user_id: string;
+  readonly fingerprint: string;
 }
 
-const CLIENT_SERVICE_ISSUER = 'cf-tamac-management-client';
 const CLIENT_SERVICE_AUDIENCE = 'agent service';
 const CLIENT_SERVICE_JWT_TTL_SECONDS = 300;
 
 /**
- * Server-side Agent RPC calls に付与する参照 header を作成する。
+ * 短時間 Client Service EdDSA compact JWT を生成する。
  *
- * @param metadata - Agent ID、credential reference、key ID、acting user context。
- * @returns Agent RPC transport に追加する Headers。secret material は含めない。
- */
-export function createAgentRpcAuthHeaders(metadata: AgentRpcCredentialMetadata): Headers {
-  const headers = new Headers();
-  headers.set('x-agent-id', metadata.agentId);
-  headers.set('x-client-credential-ref', metadata.credentialRef);
-  headers.set('x-client-key-id', metadata.keyId);
-  if (metadata.actingUser !== undefined && metadata.actingUser.operatorId !== '') {
-    headers.set('x-client-acting-operator-id', metadata.actingUser.operatorId);
-    if (metadata.actingUser.scopes.length > 0) {
-      headers.set('x-client-acting-scopes', metadata.actingUser.scopes.join(' '));
-    }
-  }
-  return headers;
-}
-
-/**
- * 短時間 Client Service JWT を生成する。
- *
- * @param credential - server-only に解決済みの Agent RPC credential。
- * @returns Agent Service が検証できる署名済み compact JWT。
- * @throws signing material または acting user context が欠落している場合は TypeError。
+ * @param credential - server-only に復号した Ed25519 秘密鍵と署名 metadata。
+ * @returns Agent Service が `AGENT_CONTROL_PLANE_TRUST` で検証できる署名済み compact JWT。
+ * @throws acting user context が未設定の場合、Ed25519 署名に失敗した場合、または利用時刻更新に
+ * 失敗した場合は fail closed で error。
+ * @remarks
+ * JWT payload は `iss`、`sub`(=keyId)、`aud`、`agent_id`、`scopes`、`acting_user_id`、
+ * `jti`、`nbf`、`exp`、`fingerprint` に限定し、秘密鍵 material を含めない。
+ * `acting_user_id` と `scopes` は server-only 設定からだけ導出し、browser 入力は使わない。
  */
 export async function createClientServiceJwt(
   credential: ResolvedAgentRpcCredential
 ): Promise<string> {
   const actingUser = requireActingUser(credential);
   const now = Math.floor(Date.now() / 1000);
+  const header: ClientServiceJwtHeader = {
+    alg: 'EdDSA',
+    typ: 'JWT',
+    kid: credential.keyId,
+  };
   const payload: ClientServiceJwtPayload = {
-    iss: CLIENT_SERVICE_ISSUER,
+    iss: credential.issuer,
     sub: credential.keyId,
     jti: createJwtId(),
     aud: CLIENT_SERVICE_AUDIENCE,
@@ -94,31 +105,33 @@ export async function createClientServiceJwt(
     agent_id: credential.agentId,
     scopes: actingUser.scopes,
     acting_user_id: actingUser.operatorId,
+    fingerprint: credential.publicFingerprint,
   };
-  return signJwt(payload, credential.keyId, credential.secretMaterial);
+  const jwt = await signEdDsaJwt(header, payload, credential.privateKey);
+  // JWT 署名が成功した後、送信前に last-used metadata を更新する。
+  // 更新に失敗した場合は署名済み JWT を返さず、未追跡の Agent RPC 利用を防ぐ。
+  await credential.onJwtSigned?.();
+  return jwt;
 }
 
 /**
- * Connect interceptor として Client Service JWT と安全な参照 header を付与する。
+ * Connect interceptor として Client Service EdDSA JWT bearer metadata を付与する。
  *
- * @param credential - server-only に解決済みの Agent RPC credential。
- * @returns Connect unary request に認証 metadata を追加する interceptor。
+ * @param credential - server-only に復号した Ed25519 秘密鍵と署名 metadata。
+ * @returns Connect unary request に `Authorization: Bearer <jwt>` を付与する interceptor。
+ * @remarks
+ * 他の `x-client-*` / `x-agent-id` 参照 header は一切使わず、JWT payload だけが認証情報を運ぶ。
+ * これにより browser へ漏れうる server response に credential lookup material が残らない。
  */
 export function createAgentRpcAuthInterceptor(credential: ResolvedAgentRpcCredential): Interceptor {
   return (next) => async (request) => {
-    const headers = createAgentRpcAuthHeaders(credential);
-    headers.set('Authorization', `Bearer ${await createClientServiceJwt(credential)}`);
-    for (const [key, value] of headers) {
-      request.header.set(key, value);
-    }
+    const jwt = await createClientServiceJwt(credential);
+    request.header.set('Authorization', `Bearer ${jwt}`);
     return next(request);
   };
 }
 
 function requireActingUser(credential: ResolvedAgentRpcCredential): ActingUserContext {
-  if (credential.secretMaterial === '') {
-    throw new TypeError('Agent RPC signing material is not configured.');
-  }
   if (credential.actingUser === undefined || credential.actingUser.operatorId === '') {
     throw new TypeError('Acting user context is not configured.');
   }
@@ -128,39 +141,43 @@ function requireActingUser(credential: ResolvedAgentRpcCredential): ActingUserCo
   return credential.actingUser;
 }
 
-async function signJwt(
+async function signEdDsaJwt(
+  header: ClientServiceJwtHeader,
   payload: ClientServiceJwtPayload,
-  keyId: string,
-  secretMaterial: string
+  privateKey: CryptoKey
 ): Promise<string> {
-  const header = { alg: 'HS256', typ: 'JWT', kid: keyId } as const;
   const signingInput = `${encodeBase64UrlJson(header)}.${encodeBase64UrlJson(payload)}`;
-  const signature = await signHmacSha256(signingInput, secretMaterial);
-  return `${signingInput}.${encodeBase64UrlBytes(new Uint8Array(signature))}`;
-}
-
-async function signHmacSha256(signingInput: string, secretMaterial: string): Promise<ArrayBuffer> {
-  const encoder = new TextEncoder();
-  const key = await globalThis.crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secretMaterial),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
+  const signature = await globalThis.crypto.subtle.sign(
+    'Ed25519',
+    privateKey,
+    copyToArrayBuffer(new TextEncoder().encode(signingInput))
   );
-  return globalThis.crypto.subtle.sign('HMAC', key, encoder.encode(signingInput));
+  const signaturePart = encodeBase64Url(new Uint8Array(signature));
+  return `${signingInput}.${signaturePart}`;
 }
 
 function encodeBase64UrlJson(value: unknown): string {
-  return encodeBase64UrlBytes(new TextEncoder().encode(JSON.stringify(value)));
+  return encodeBase64Url(new TextEncoder().encode(JSON.stringify(value)));
 }
 
-function encodeBase64UrlBytes(bytes: Uint8Array): string {
+function encodeBase64Url(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+/**
+ * Uint8Array を確実な `ArrayBuffer` へコピーする。
+ *
+ * @remarks Ed25519 署名 API が `ArrayBuffer` backed BufferSource を要求するため、
+ * SharedArrayBuffer の可能性を排除する。戻り値は server-only scope だけで扱う。
+ */
+function copyToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 function createJwtId(): string {

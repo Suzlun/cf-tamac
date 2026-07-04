@@ -13,6 +13,8 @@ import { ControlRoomFrame } from '../../../src/components/control-room-frame';
 import { ErrorAlert } from '../../../src/components/error-alert';
 import { SignalBadge } from '../../../src/components/signal-badge';
 import { SkeletonTable } from '../../../src/components/skeleton-table';
+import { Button } from '../../../src/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../src/components/ui/card';
 
 interface AgentDetailPageProps {
   readonly params: Promise<{ readonly agentId: string }>;
@@ -103,17 +105,27 @@ function formatStatus(status: string | undefined): string {
 }
 
 /**
- * Agent overview page (CLIENT-MANAGEMENT-S003).
+ * Agent overview page (AGENT-MANAGEMENT-UI-S003 / S019 / S020)。
  *
- * Fetches Agent profile, lifecycle, config version, credential status, and
- * capability summary from Agent RPC via server-side actions.
+ * タスク 3.3: profile/lifecycle/config version/credential generation/capability summary/
+ * latest Memory/Compaction summary を card/list/detail composition で描画する。
+ * Agent RPC から server-side で取得し、Browser payload は secret-free である。
  */
 export default async function AgentDetailPage({ params }: AgentDetailPageProps) {
   const { agentId } = await params;
   const managedAgent = await getManagedAgentForDisplay(agentId);
 
   if (managedAgent === undefined) {
-    return <NotRegisteredOverview />;
+    return (
+      <ControlRoomFrame title="Agent registry" signalLabel="not registered">
+        <ErrorAlert message="This Agent is not registered in the Client ledger." />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/agents">Back to registry</Link>
+          </Button>
+        </div>
+      </ControlRoomFrame>
+    );
   }
 
   const { overview, state, error, errorCategory } = await loadOverview(agentId);
@@ -121,27 +133,35 @@ export default async function AgentDetailPage({ params }: AgentDetailPageProps) 
 
   return (
     <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
+      title={managedAgent.displayName}
       signalLabel={signalLabel}
-      agentId={agentId}
-      currentSection="overview"
-    >
-      <OverviewHeader agentId={agentId} managedAgent={managedAgent} />
-      {error !== undefined ? <ErrorAlert message={error} /> : null}
-      {overview === undefined ? (
-        error === undefined ? (
-          <SkeletonTable rows={3} columns={2} />
-        ) : (
-          <OverviewErrorActions agentId={agentId} category={errorCategory} />
+      description="Agent overview: profile, lifecycle, config, credential generation, and capability summary."
+      actions={
+        overview === undefined || overview.status === 'destroyed' ? undefined : (
+          <Button asChild variant="default">
+            <Link href={`/agents/${agentId}/settings`}>Open Settings</Link>
+          </Button>
         )
-      ) : (
-        <OverviewZones
-          agentId={agentId}
-          managedAgent={managedAgent}
-          overview={overview}
-          state={state}
-        />
-      )}
+      }
+    >
+      <div className="space-y-4">
+        <AgentToken agentId={agentId} />
+        {error !== undefined ? <ErrorAlert message={error} /> : null}
+        {overview === undefined ? (
+          error === undefined ? (
+            <SkeletonTable rows={3} columns={2} />
+          ) : (
+            <OverviewErrorActions agentId={agentId} category={errorCategory} />
+          )
+        ) : (
+          <OverviewZones
+            agentId={agentId}
+            managedAgent={managedAgent}
+            overview={overview}
+            state={state}
+          />
+        )}
+      </div>
     </ControlRoomFrame>
   );
 }
@@ -157,49 +177,20 @@ function OverviewErrorActions({
     return null;
   }
   return (
-    <div className="action-row">
+    <div className="flex flex-wrap gap-2">
       {category === 'not_found' ? (
-        <Link className="primary-action" href={`/agents/${agentId}/settings`}>
-          Open Settings
-        </Link>
+        <Button asChild variant="default">
+          <Link href={`/agents/${agentId}/settings`}>Open Settings</Link>
+        </Button>
       ) : (
-        <Link className="primary-action" href={`/agents/${agentId}`}>
-          Retry overview
-        </Link>
+        <Button asChild variant="default">
+          <Link href={`/agents/${agentId}`}>Retry overview</Link>
+        </Button>
       )}
-      <Link className="nav-link" href="/agents">
-        Back to registry
-      </Link>
+      <Button asChild variant="outline">
+        <Link href="/agents">Back to registry</Link>
+      </Button>
     </div>
-  );
-}
-
-function NotRegisteredOverview() {
-  return (
-    <ControlRoomFrame title="Agent registry" signalLabel="not registered" currentSection="overview">
-      <ErrorAlert message="This Agent is not registered in the Client ledger." />
-      <div className="action-row">
-        <Link className="nav-link" href="/agents">
-          Back to registry
-        </Link>
-      </div>
-    </ControlRoomFrame>
-  );
-}
-
-function OverviewHeader({
-  agentId,
-  managedAgent,
-}: {
-  readonly agentId: string;
-  readonly managedAgent: ManagedAgentDisplay;
-}) {
-  return (
-    <>
-      <p className="eyebrow">Agent overview</p>
-      <h2>{managedAgent.displayName}</h2>
-      <AgentToken agentId={agentId} />
-    </>
   );
 }
 
@@ -215,48 +206,121 @@ function OverviewZones({
   readonly state?: BrowserSafeAgentState;
 }) {
   const isDestroyed = overview.status === 'destroyed';
+  const summary = overview.capabilitySummary ?? state?.capabilitySummary;
+  const storagePercent = state?.storagePercent;
+  const clampedStoragePercent = Math.max(0, Math.min(storagePercent ?? 0, 100));
+
   return (
     <>
-      {isDestroyed ? <DestroyedNotice /> : null}
-      <div className="route-grid">
-        <ProfileZone managedAgent={managedAgent} overview={overview} />
-        <CapabilityZone overview={overview} state={state} />
-        <StorageHealthZone state={state} />
+      {isDestroyed ? (
+        <p
+          role="status"
+          className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          This Agent is destroyed. History remains viewable; mutations are disabled.
+        </p>
+      ) : null}
+      {/* profile/lifecycle/capability を card/list composition で並べる（nested card を避ける）。 */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Profile + lifecycle</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <div className="flex items-center gap-2">
+              Lifecycle status:{' '}
+              <SignalBadge
+                label={formatStatus(overview.status)}
+                variant={statusVariant(overview.status)}
+              />
+            </div>
+            <p>Config version: v{overview.configVersion}</p>
+            <CredentialLine overview={overview} />
+            <p>Last opened: {formatTimestamp(managedAgent.lastOpenedAtMs)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Capabilities</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <ul className="space-y-1">
+              <li>Threads: {overview.threadCount ?? '—'}</li>
+              <li>Active Run: {state?.currentRunId ?? overview.activeRunId ?? 'none'}</li>
+              <li>Pending Runs: {overview.pendingRunCount ?? '—'}</li>
+              <li>Schedules: {overview.scheduleCount ?? summary?.activeScheduleCount ?? '—'}</li>
+              <li>Tools: {overview.toolCount ?? summary?.toolCount ?? '—'}</li>
+              <li>
+                Integrations:{' '}
+                {overview.installationCount ?? summary?.activeInstallationCount ?? '—'}
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">{'Storage & health'}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p>DO storage: {storagePercent === undefined ? '—' : `${String(storagePercent)}%`}</p>
+            {/* storage 使用率は progressbar で表現し、color alone ではなく数値 label も併記する。 */}
+            <div
+              role="progressbar"
+              aria-valuenow={clampedStoragePercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Durable Object storage usage"
+              className="h-2 w-full overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full bg-primary"
+                style={{ width: `${String(clampedStoragePercent)}%` }}
+              />
+            </div>
+            <p>R2 archive: safe metadata only</p>
+            <div className="flex items-center gap-2">
+              Health:{' '}
+              <SignalBadge
+                label={formatStatus(
+                  state?.storageStatus ?? state?.schedulerStatus ?? state?.status
+                )}
+                variant={statusVariant(
+                  state?.storageStatus ?? state?.schedulerStatus ?? state?.status
+                )}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Safe metadata only — no secrets, no raw stack.
+            </p>
+          </CardContent>
+        </Card>
       </div>
-      <OverviewActions agentId={agentId} isDestroyed={isDestroyed} />
+      {/* 文脈 detail: Memory/Compaction summary への導線（タスク 2.6 / AGENT-MANAGEMENT-UI-S020）。 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">{'Latest memory & compaction'}</CardTitle>
+            <Link
+              href={`/agents/${agentId}/threads`}
+              className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+            >
+              Open in Threads
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Compaction and Memory provenance are available as contextual detail in Threads.
+        </CardContent>
+      </Card>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline">
+          <Link href={`/agents/${agentId}/threads`}>View Threads</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href={`/agents/${agentId}/runs`}>View Runs</Link>
+        </Button>
+      </div>
     </>
-  );
-}
-
-function DestroyedNotice() {
-  return (
-    <div className="state-error readout" role="status">
-      This Agent is destroyed. History remains viewable; mutations are disabled.
-    </div>
-  );
-}
-
-function ProfileZone({
-  managedAgent,
-  overview,
-}: {
-  readonly managedAgent: ManagedAgentDisplay;
-  readonly overview: BrowserSafeAgentOverview;
-}) {
-  return (
-    <section className="readout" aria-labelledby="profile-heading">
-      <strong id="profile-heading">Profile + lifecycle</strong>
-      <p>
-        Lifecycle status:{' '}
-        <SignalBadge
-          label={formatStatus(overview.status)}
-          variant={statusVariant(overview.status)}
-        />
-      </p>
-      <p>Config version: v{overview.configVersion}</p>
-      <CredentialLine overview={overview} />
-      <p>Last opened: {formatTimestamp(managedAgent.lastOpenedAtMs)}</p>
-    </section>
   );
 }
 
@@ -265,89 +329,13 @@ function CredentialLine({ overview }: { readonly overview: BrowserSafeAgentOverv
     return <p>Credential: generation {overview.credentialGeneration} · status unknown</p>;
   }
   return (
-    <p>
+    <div className="flex flex-wrap items-center gap-1">
       Credential: generation {overview.credential.generation} ·{' '}
       <SignalBadge
         label={formatStatus(overview.credential.status)}
         variant={statusVariant(overview.credential.status)}
       />{' '}
       · key id: {overview.credential.keyId ?? '—'}
-    </p>
-  );
-}
-
-function CapabilityZone({
-  overview,
-  state,
-}: {
-  readonly overview: BrowserSafeAgentOverview;
-  readonly state?: BrowserSafeAgentState;
-}) {
-  const summary = overview.capabilitySummary ?? state?.capabilitySummary;
-  return (
-    <section className="readout" aria-labelledby="capabilities-heading">
-      <strong id="capabilities-heading">Capabilities</strong>
-      <ul>
-        <li>Threads: {overview.threadCount ?? '—'}</li>
-        <li>Active Run: {state?.currentRunId ?? overview.activeRunId ?? 'none'}</li>
-        <li>Pending Runs: {overview.pendingRunCount ?? '—'}</li>
-        <li>Schedules: {overview.scheduleCount ?? summary?.activeScheduleCount ?? '—'}</li>
-        <li>Tools: {overview.toolCount ?? summary?.toolCount ?? '—'}</li>
-        <li>
-          Integrations: {overview.installationCount ?? summary?.activeInstallationCount ?? '—'}
-        </li>
-      </ul>
-    </section>
-  );
-}
-
-function StorageHealthZone({ state }: { readonly state?: BrowserSafeAgentState }) {
-  const storagePercent = state?.storagePercent;
-  const clampedStoragePercent = Math.max(0, Math.min(storagePercent ?? 0, 100));
-  const health = state?.storageStatus ?? state?.schedulerStatus ?? state?.status;
-  return (
-    <section className="readout" aria-labelledby="health-heading">
-      <strong id="health-heading">Storage & health</strong>
-      <p>DO storage: {storagePercent === undefined ? '—' : `${String(storagePercent)}%`}</p>
-      <div
-        className="storage-meter"
-        role="progressbar"
-        aria-valuenow={clampedStoragePercent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label="Durable Object storage usage"
-      >
-        <span style={{ width: `${String(clampedStoragePercent)}%` }} />
-      </div>
-      <p>R2 archive: safe metadata only</p>
-      <p>
-        Health: <SignalBadge label={formatStatus(health)} variant={statusVariant(health)} />
-      </p>
-      <p>Safe metadata only — no secrets, no raw stack.</p>
-    </section>
-  );
-}
-
-function OverviewActions({
-  agentId,
-  isDestroyed,
-}: {
-  readonly agentId: string;
-  readonly isDestroyed: boolean;
-}) {
-  return (
-    <div className="action-row">
-      {isDestroyed ? null : (
-        <Link className="primary-action" href={`/agents/${agentId}/settings`}>
-          Open Settings
-        </Link>
-      )}
-      <Link className="nav-link" href={`/agents/${agentId}/threads`}>
-        View Threads
-      </Link>
-      <Link className="nav-link" href={`/agents/${agentId}/runs`}>
-        View Runs
-      </Link>
     </div>
   );
 }

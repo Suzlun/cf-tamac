@@ -26,6 +26,7 @@ model PublishEventResponse {
   @field(3) accepted: boolean;
   @field(4) pending_run?: AgentRun;
   @field(5) replayed: boolean;
+  @field(6) requested_model_policy?: AgentModelPolicySummary;
 }
 
 @message

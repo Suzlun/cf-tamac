@@ -1,6 +1,6 @@
 ## Primary Rules
 
-- Think in **English**; MUST respond in **Japanese**.
+- **MUST Think in English**; **MUST respond in Japanese**; **NEVER NOT use in Other Langages**
 - Before calling `task` for any subagent, you MUST read the target agent definition and verify both `permission.task` and any self-call prohibition such as `Do not self-call.`.
 - You MUST doubt your assumptions, verify factual claims against available evidence, and MUST NOT present unsupported statements as facts.
 
@@ -30,9 +30,9 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 - Install: `corepack enable && pnpm install`
 - Dev (Agent Worker): `pnpm dev:agent`
-- Dev (Management Client): `pnpm dev:management-client`
-- Build Agent/Client: `pnpm build:foundation`
-- Check Agent/Client: `pnpm check:agent && pnpm check:management-client`
+- Dev (Management Client): `pnpm dev:client`
+- Build Agent/Client: `pnpm build`
+- Check Agent/Client: `pnpm check:agent && pnpm check:client`
 
 ## API Contract (TypeSpec)
 
@@ -48,7 +48,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 - All unit tests: `pnpm test:run`
 - Agent tests: `pnpm test:agent`
-- Management Client tests: `pnpm test:management-client`
+- Management Client tests: `pnpm test:client`
 - Governance tests: `pnpm test:governance`
 - E2E: `pnpm test:e2e`
 
@@ -68,7 +68,9 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - Agent Worker (`packages/agent`) exposes Protobuf RPC-only via Connect unary binary Protobuf. Accept `POST` + `Content-Type: application/proto`; reject JSON/GET and fail closed for unmapped generated methods.
 - Agent Worker owns `AI_AGENT` Durable Object and Agent blob storage only. It must not use `CLIENT_DB`, Agent-cross D1, Cloudflare Queues bindings, public Durable Object fetch APIs, REST/OpenAPI/Orval Agent surfaces, or ad-hoc JSON DTO APIs.
 - Agent-local Queue is only a scheduler wake/coalescing boundary; accepted Events, pending Runs, Thread identity, replay/idempotency, audit, and rate-limit state stay in `AIAgent` Durable Object SQLite storage.
-- Management Client (`packages/client`) owns `CLIENT_DB` and credential references only. It may call Agent RPC from server-only modules, but browser bundles must not contain Agent credentials, direct Agent RPC invocation logic, Agent runtime imports, or Agent API proxy routes.
+- Management Client (`packages/client`) owns `CLIENT_DB`, credential references, and encrypted Client Service signing key store only. It may call Agent RPC from server-only modules, but browser bundles must not contain Agent credentials, private JWK, encrypted private JWK, raw JWT, direct Agent RPC invocation logic, Agent runtime imports, or Agent API proxy routes.
+- Client D1 may store managed Agent records, external credential references, and encrypted Client Service signing key records protected by `CLIENT_CREDENTIAL_ENCRYPTION_KEY`; it must not store Agent domain snapshots, plaintext secrets, or private JWK plaintext.
+- Operations runbook: `docs/operations/agent-control-plane-auth.md` describes `AGENT_CONTROL_PLANE_TRUST`, signing key generation/export, Agent Worker secret setup, rotation, emergency revoke, break-glass recovery, staging smoke, health verification, and private-key non-exposure.
 
 ## OpenSpec (Spec -> Test Contract)
 

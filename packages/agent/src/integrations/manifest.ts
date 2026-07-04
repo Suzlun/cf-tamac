@@ -21,6 +21,7 @@ const manifestContentType = 'application/json';
  */
 export interface VerifiedIntegrationManifest {
   readonly adapters: readonly NormalizedAdapterDefinition[];
+  readonly allowedModelPolicyRefs: readonly string[];
   readonly deliveryCapabilityCount: number;
   readonly displayName: string;
   readonly grants: readonly string[];
@@ -250,6 +251,10 @@ function normalizeManifest(
   ).length;
   return {
     adapters,
+    allowedModelPolicyRefs: collectAllowedModelPolicyRefs(
+      record,
+      record.grants ?? record.requested_grants ?? record.requestedGrants
+    ),
     deliveryCapabilityCount,
     displayName: optionalText(record, ['display_name', 'displayName']) ?? integrationId,
     grants: readStringArray(record.grants ?? record.requested_grants ?? record.requestedGrants),
@@ -267,6 +272,34 @@ function normalizeManifest(
     tools,
     trustKey,
   };
+}
+
+function collectAllowedModelPolicyRefs(
+  manifest: Readonly<Record<string, unknown>>,
+  grantsValue: unknown
+): readonly string[] {
+  // Installation allowlist は明示配列と grant capability から policy ref だけを抽出し、Provider/model ID は含めない。
+  const explicitRefs = readStringArray(
+    manifest.allowed_model_policy_refs ?? manifest.allowedModelPolicyRefs
+  );
+  const grantRefs = readStringArray(grantsValue)
+    .map(extractPolicyRefFromGrant)
+    .filter((entry): entry is string => entry !== undefined);
+  return [...new Set([...explicitRefs, ...grantRefs])];
+}
+
+function extractPolicyRefFromGrant(grant: string): string | undefined {
+  if (grant.startsWith('model_policy:'))
+    return normalizePolicyRef(grant.slice('model_policy:'.length));
+  if (grant.startsWith('agent.model_policy.override:')) {
+    return normalizePolicyRef(grant.slice('agent.model_policy.override:'.length));
+  }
+  return undefined;
+}
+
+function normalizePolicyRef(value: string): string | undefined {
+  const normalized = value.trim().normalize('NFC');
+  return normalized === '' ? undefined : normalized;
 }
 
 function normalizeTrustKey(value: unknown): VerifiedIntegrationTrustKey {

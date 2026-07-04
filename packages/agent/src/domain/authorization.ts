@@ -44,6 +44,7 @@ export interface AgentCapabilityOwnershipContext {
     | 'delivery'
     | 'credential';
   readonly installationId?: string;
+  readonly modelPolicyRef?: string;
   readonly ownerAgentId: string;
   readonly toolId?: string;
 }

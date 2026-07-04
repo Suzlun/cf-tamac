@@ -1,6 +1,72 @@
 import type { AgentPrincipalContext, AgentRawBodyDigest } from './security/types';
 
 /**
+ * Agent-owned model policy の安全な参照 metadata です。
+ *
+ * @remarks
+ * provider credential や raw generation body は含めず、Run selection と UI 表示に必要な
+ * ref、digest、provider/model、schema version のみを返します。
+ */
+export interface AgentModelPolicySummaryView {
+  readonly agentId: string;
+  readonly checkedAtMs?: number;
+  readonly decisionSchemaVersion: string;
+  readonly modelId: string;
+  readonly policyDigest: string;
+  readonly policyRef: string;
+  readonly provider: string;
+  readonly safeMetadataRef?: AgentPayloadMetadataView;
+  readonly status: string;
+  readonly version: number;
+}
+
+/**
+ * Model policy validation issue の安全な view です。
+ */
+export interface AgentModelPolicyValidationIssueView {
+  readonly code: string;
+  readonly retryable: boolean;
+  readonly safeMessage: string;
+  readonly severity: string;
+  readonly target?: string;
+}
+
+/**
+ * Model policy validation の安全な view です。
+ */
+export interface AgentModelPolicyValidationView {
+  readonly checkedAtMs?: number;
+  readonly issues: readonly AgentModelPolicyValidationIssueView[];
+  readonly modelId: string;
+  readonly ok: boolean;
+  readonly policyDigest?: string;
+  readonly policyRef: string;
+  readonly provider: string;
+  readonly safeMetadataRef?: AgentPayloadMetadataView;
+  readonly status: string;
+  readonly warnings: readonly AgentModelPolicyValidationIssueView[];
+}
+
+/**
+ * Agent の model 実行能力を返す安全な view です。
+ *
+ * @remarks
+ * Workers AI binding の有無、現在の default model policy、provider/model ID、状態だけを含めます。
+ * credential、raw prompt、raw completion、hidden reasoning は含めず、Health/GetState の両方で同じ
+ * secret-free metadata として利用します。
+ */
+export interface AgentModelExecutionCapabilityView {
+  readonly bindingPresent: boolean;
+  readonly checkedAtMs: number;
+  readonly defaultPolicyDigest?: string;
+  readonly defaultPolicyRef?: string;
+  readonly modelId?: string;
+  readonly provider?: string;
+  readonly safeDetailRef?: string;
+  readonly status: 'degraded' | 'serving' | 'unavailable';
+}
+
+/**
  * Shared context for Agent-local commands and sensitive queries.
  */
 export interface AgentCoreRequestContext {
@@ -51,6 +117,24 @@ export interface InitializeAgentCommand {
   readonly credential: AgentCredentialCommandInput;
   readonly displayName?: string;
   readonly initialConfig: AgentConfigCommandInput;
+  readonly initialModelPolicy?: AgentModelPolicyCommandInput;
+}
+
+/**
+ * AgentModelPolicyService と InitializeAgent seed が共有する policy 入力です。
+ */
+export interface AgentModelPolicyCommandInput {
+  readonly budgetMetadataRef?: AgentPayloadMetadataView;
+  readonly credentialReference?: string;
+  readonly decisionSchemaVersion: string;
+  readonly expectedPolicyDigest?: string;
+  readonly generationParametersRef?: AgentPayloadMetadataView;
+  readonly modelId: string;
+  readonly policyRef: string;
+  readonly provider: string;
+  readonly safeMetadataRef?: AgentPayloadMetadataView;
+  readonly safetyMetadataRef?: AgentPayloadMetadataView;
+  readonly status?: string;
 }
 
 /**
@@ -95,6 +179,7 @@ export interface PublishAgentEventCommand {
   readonly payload?: Uint8Array;
   readonly payloadContentType?: string;
   readonly payloadReference?: AgentPayloadMetadataView;
+  readonly modelPolicyRef?: string;
   readonly source: string;
   readonly threadKey: string;
 }
@@ -228,9 +313,11 @@ export interface AgentConfigView {
   readonly budgetPolicyRef?: string;
   readonly configBodyRef?: string;
   readonly configVersion: number;
+  readonly defaultModelPolicy?: AgentModelPolicySummaryView;
   readonly displayName?: string;
   readonly memoryPolicyRef?: string;
   readonly modelPolicyRef?: string;
+  readonly modelPolicyValidation?: AgentModelPolicyValidationView;
   readonly schedulePolicyRef?: string;
   readonly toolPolicyRef?: string;
   readonly updatedAtMs: number;
@@ -344,6 +431,10 @@ export interface AgentEventView {
   readonly occurredAtMs: number;
   readonly payloadMetadata?: AgentPayloadMetadataView;
   readonly payloadRef?: string;
+  readonly policyOverrideSource?: string;
+  readonly modelPolicy?: AgentModelPolicySummaryView;
+  readonly modelPolicyValidation?: AgentModelPolicyValidationView;
+  readonly requestedModelPolicyRef?: string;
   readonly runId?: string;
   readonly sectionId: string;
   readonly source: string;
@@ -461,7 +552,9 @@ export interface AgentStateSnapshotView {
   readonly capabilitySummary: AgentCapabilitySummaryView;
   readonly configVersion: number;
   readonly currentRunId?: string;
+  readonly defaultModelPolicy?: AgentModelPolicySummaryView;
   readonly lifecycleStatus: string;
+  readonly modelExecution?: AgentModelExecutionCapabilityView;
   readonly schedulerStatus: string;
   readonly stateRef?: string;
   readonly stateVersion: string;
@@ -499,6 +592,7 @@ export interface InitializeAgentResult {
   readonly audit: AgentAuditView;
   readonly config: AgentConfigView;
   readonly credential: AgentCredentialView;
+  readonly defaultModelPolicy?: AgentModelPolicySummaryView;
   readonly replayed: boolean;
   readonly threadKeyRule: {
     readonly normalizedThreadKey: string;
@@ -514,6 +608,7 @@ export interface GetAgentResult {
   readonly agent: AgentProfileView;
   readonly capabilitySummary: AgentCapabilitySummaryView;
   readonly config: AgentConfigView;
+  readonly defaultModelPolicy?: AgentModelPolicySummaryView;
 }
 
 /**
@@ -624,6 +719,7 @@ export interface SearchAgentThreadHistoryResult {
  * GetState result produced by Agent-local state query handling.
  */
 export interface GetAgentStateResult {
+  readonly modelExecution?: AgentModelExecutionCapabilityView;
   readonly state: AgentStateSnapshotView;
   readonly storage: AgentStorageThresholdStatusView;
 }

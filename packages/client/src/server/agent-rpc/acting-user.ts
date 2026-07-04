@@ -5,7 +5,7 @@ import { getClientWorkerEnv } from '../env';
 import type { ActingUserContext } from './authentication';
 
 const TEST_ACTING_USER: ActingUserContext = {
-  operatorId: 'client-management-test-operator',
+  operatorId: 'agent-management-ui-test-operator',
   scopes: ['agent:read'],
 };
 

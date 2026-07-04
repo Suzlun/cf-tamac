@@ -9,6 +9,12 @@ import { collectAgentSurfaceIssues } from './verify-agent-surface.mjs';
 
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 const rootDocs = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'CODING_STANDARDS.md'];
+const credentialRunbookDocs = [
+  ...rootDocs,
+  'docs/operations/agent-control-plane-auth.md',
+  'packages/agent/README.md',
+  'packages/client/README.md',
+];
 
 function writeFixture(root, relativePath, content) {
   const filePath = join(root, relativePath);
@@ -144,6 +150,63 @@ export async function callAgentFromServerAction() {
     }
   });
 
+  it('[WORKSPACE-GOVERNANCE-S011] Lint rejects forbidden production Agent auth surfaces', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'agent-auth-surface-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/auth-route.ts',
+        `import { Hono } from 'hono';
+
+const app = new Hono();
+app.post('/auth/token', () => Response.json({ token: 'legacy-json-auth' }));
+
+const router = new Hono();
+router.post('/jwt/bootstrap', () => Response.json({ credential: 'legacy-json-auth' }));
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/rpc/bootstrap.ts',
+        `export function bootstrapTrustRpc() {
+  return 'forbidden bootstrap trust source';
+}
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/AgentTrustRegistry.ts',
+        `export class AgentTrustRegistry {
+  fetch() {
+    return new Response('forbidden');
+  }
+}
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/agent-rpc/private-key-secret.ts',
+        `export const secretName = 'CLIENT_SERVICE_PRIVATE_JWK';
+`
+      );
+
+      const issues = collectAgentSurfaceIssues(fixtureRoot);
+
+      expect(issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('[WORKSPACE-GOVERNANCE-S011]'),
+          expect.stringContaining('forbidden agent-rest-json-auth-route'),
+          expect.stringContaining('forbidden bootstrap-rpc-trust-source'),
+          expect.stringContaining('forbidden agent-trust-registry'),
+          expect.stringContaining('forbidden client-private-key-worker-secret'),
+        ])
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('[AGENT-SECURITY-S009] Connect fixtures and Server Action boundaries remain allowed', () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), 'allowed-agent-surface-fixtures-'));
 
@@ -216,14 +279,14 @@ app.get('/agents', () => new Response('forbidden'));
       'packages/agent/proto/**',
       'packages/client/src/generated/agent-rpc/**',
       'pnpm dev:agent',
-      'pnpm dev:management-client',
+      'pnpm dev:client',
       'pnpm gen:agent:proto',
       'pnpm gen:agent:rpc',
       'pnpm check:codegen',
       'pnpm check:agent',
-      'pnpm check:management-client',
+      'pnpm check:client',
       'pnpm test:agent',
-      'pnpm test:management-client',
+      'pnpm test:client',
       'Connect unary binary Protobuf',
       'Agent-local Queue',
       'Agent API proxy routes',
@@ -234,5 +297,38 @@ app.get('/agents', () => new Response('forbidden'));
     }
     expect(docs).not.toMatch(/\/api\/v1\/(?:hello|users)/u);
     expect(docs).not.toMatch(/GET\s+\/(?:hello|users)\b/iu);
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S010] Documentation exposes the production credential runbook', () => {
+    const runbook = readFileSync(join(projectRoot, 'docs/operations/agent-control-plane-auth.md'), 'utf8');
+    const docs = credentialRunbookDocs
+      .map((relativePath) => readFileSync(join(projectRoot, relativePath), 'utf8'))
+      .join('\n');
+    const requiredRunbookTerms = [
+      'AGENT_CONTROL_PLANE_TRUST',
+      'CLIENT_CREDENTIAL_ENCRYPTION_KEY',
+      'encrypted Client Service signing key store',
+      'Client signing key generation',
+      'Trust Config Export',
+      'AgentHealthService.Check',
+      'rotation',
+      'emergency revoke',
+      'break-glass recovery',
+      'staging smoke',
+      'private JWK',
+      'encrypted private JWK',
+      'managed Agent records',
+      'external credential references',
+      'Agent domain snapshots',
+    ];
+    const requiredDiscoverabilityTerms = ['docs/operations/agent-control-plane-auth.md'];
+    const normalizedRunbook = runbook.toLowerCase();
+
+    for (const term of requiredRunbookTerms) {
+      expect(normalizedRunbook).toContain(term.toLowerCase());
+    }
+    for (const term of requiredDiscoverabilityTerms) {
+      expect(docs).toContain(term);
+    }
   });
 });

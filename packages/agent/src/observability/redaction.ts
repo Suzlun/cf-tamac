@@ -8,18 +8,37 @@ export const agentRedactedValue = '[REDACTED]';
  */
 export function isSensitiveObservabilityKey(key: string): boolean {
   const normalized = key.toLowerCase();
-  return (
+  const secretBearing =
     normalized.includes('authorization') ||
     normalized.includes('bearer') ||
+    normalized.includes('chainofthought') ||
+    normalized.includes('chain_of_thought') ||
+    normalized.includes('completiontext') ||
     normalized.includes('credential') ||
+    normalized.includes('encryptedprivatejwk') ||
+    normalized.includes('hiddenreasoning') ||
+    normalized.includes('jwk') ||
     normalized.includes('jwt') ||
+    normalized.includes('keymaterial') ||
     normalized.includes('password') ||
+    normalized.includes('prompttext') ||
     normalized.includes('private') ||
+    normalized.includes('publickey') ||
+    normalized.includes('rawcompletion') ||
+    normalized.includes('raw_completion') ||
+    normalized.includes('rawjwt') ||
+    normalized.includes('rawprompt') ||
+    normalized.includes('raw_prompt') ||
+    normalized.includes('rawreasoning') ||
+    normalized.includes('raw_reasoning') ||
+    normalized === 'reasoning' ||
     normalized.includes('secret') ||
     normalized.includes('set-cookie') ||
     normalized.includes('signature') ||
-    normalized.includes('token')
-  );
+    normalized.includes('token') ||
+    normalized === 'x';
+  if (secretBearing) return true;
+  return false;
 }
 
 /**

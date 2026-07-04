@@ -15,9 +15,24 @@ import type { ThreadKeyIdentity } from './threads';
  */
 export interface AgentFoundationHealth {
   readonly agentId: string;
+  readonly modelExecution?: AgentFoundationModelExecutionCapability;
   readonly queue: 'agent_local';
   readonly status: AgentLifecycleStatus;
   readonly storage: 'sqlite';
+}
+
+/**
+ * Agent health が返す model execution capability の secret-free snapshot です。
+ */
+export interface AgentFoundationModelExecutionCapability {
+  readonly bindingPresent: boolean;
+  readonly checkedAtMs: number;
+  readonly defaultPolicyDigest?: string;
+  readonly defaultPolicyRef?: string;
+  readonly modelId?: string;
+  readonly provider?: string;
+  readonly safeDetailRef?: string;
+  readonly status: 'serving' | 'degraded' | 'unavailable';
 }
 
 /**

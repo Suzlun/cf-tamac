@@ -6,6 +6,7 @@ import {
   agentImmutableBlobOwnerKinds,
   agentInlineBodyLimitBytes,
   decideAgentBodyStorage,
+  validateAgentModelPolicy,
   writeAgentImmutableBlob,
 } from '../storage';
 
@@ -16,6 +17,8 @@ import type {
   AgentGrantRow,
   AgentImmutableBlobWriteInput,
   AgentImmutableBlobWriteResult,
+  AgentModelPolicyInputRecord,
+  AgentModelPolicyRow,
   AgentR2ObjectReferenceRow,
   AgentRunRow,
   AgentSectionRow,
@@ -134,6 +137,73 @@ describe('Agent Stage 4 R2 offload and storage thresholds', () => {
     );
   });
 
+  it('[AGENT-MODEL-POLICY-S006] [AGENT-EVENTING-S010] Client Event model policy override is accepted and coalesced into pending work', async () => {
+    const harness = new EventOffloadHarness();
+
+    const result = await publishEventInStore({
+      agentId,
+      blobWriter: (blob) => harness.writeBlob(blob),
+      command: {
+        context: createContext('PublishEvent', 'event-override-digest', {
+          scopes: ['agent.rpc', 'agent.event', 'agent.model_policy.override:policy-fast'],
+        }),
+        eventType: 'user.message.received',
+        modelPolicyRef: 'policy-fast',
+        source: 'client',
+        threadKey: 'customer:model-policy-override',
+      },
+      repositories: harness.repositories,
+    });
+
+    expect(result.event).toMatchObject({
+      policyOverrideSource: 'client_override',
+      requestedModelPolicyRef: 'policy-fast',
+    });
+    expect(result.event.modelPolicy).toMatchObject({
+      decisionSchemaVersion: 'v1',
+      policyDigest: 'f'.repeat(64),
+      policyRef: 'policy-fast',
+      provider: 'workers-ai',
+      status: 'active',
+      version: 1,
+    });
+    expect(harness.events[0]).toMatchObject({
+      policyOverrideSource: 'client_override',
+      requestedModelPolicyDigest: 'f'.repeat(64),
+      requestedModelPolicyRef: 'policy-fast',
+      requestedModelPolicyValidationStatus: 'active',
+      requestedModelPolicyVersion: 1,
+    });
+    expect(harness.repositories.pendingRuns.listRuns({ limit: 10 })).toHaveLength(1);
+  });
+
+  it('[AGENT-MODEL-POLICY-S006] [AGENT-EVENTING-S011] [AGENT-SECURITY-S016] Integration grant-outside policy override is rejected before Event and Run writes', async () => {
+    const harness = new EventOffloadHarness();
+
+    await expect(
+      publishEventInStore({
+        agentId,
+        blobWriter: (blob) => harness.writeBlob(blob),
+        command: {
+          context: createContext('PublishEvent', 'integration-override-digest', {
+            principalId: 'installation-inst-1',
+            principalType: 'INTEGRATION_INSTALLATION',
+            scopes: ['agent.rpc', 'agent.event'],
+          }),
+          eventType: 'integration.message.received',
+          modelPolicyRef: 'policy-expensive',
+          source: 'integration',
+          threadKey: 'customer:integration-policy-override',
+        },
+        repositories: harness.repositories,
+      })
+    ).rejects.toThrow(/model policy override grant/);
+
+    expect(harness.events).toHaveLength(0);
+    expect(harness.repositories.pendingRuns.listRuns({ limit: 10 })).toHaveLength(0);
+    expect(harness.blobWrites).toHaveLength(0);
+  });
+
   it('digest verification rejects mismatched immutable blob writes before indexing', async () => {
     await expect(
       writeAgentImmutableBlob({
@@ -229,6 +299,7 @@ class EventOffloadHarness {
         },
         tableName: 'agent_idempotency_records',
       },
+      modelPolicies: this.createModelPoliciesRepository(),
       pendingRuns: this.createPendingRunsRepository(),
       profile: {
         getProfile: () => ({
@@ -308,7 +379,12 @@ class EventOffloadHarness {
         readonly payloadRef?: string;
         readonly payloadSha256?: string;
         readonly payloadStorageClass?: string;
+        readonly policyOverrideSource?: string;
         readonly requestDigest?: string;
+        readonly requestedModelPolicyDigest?: string;
+        readonly requestedModelPolicyRef?: string;
+        readonly requestedModelPolicyValidationStatus?: string;
+        readonly requestedModelPolicyVersion?: number;
         readonly runId?: string;
         readonly sectionId: string;
         readonly sequences: AgentEventSequencePair;
@@ -332,7 +408,12 @@ class EventOffloadHarness {
           payloadRef: input.payloadRef ?? null,
           payloadSha256: input.payloadSha256 ?? null,
           payloadStorageClass: input.payloadStorageClass ?? null,
+          policyOverrideSource: input.policyOverrideSource ?? null,
           requestDigest: input.requestDigest ?? null,
+          requestedModelPolicyDigest: input.requestedModelPolicyDigest ?? null,
+          requestedModelPolicyRef: input.requestedModelPolicyRef ?? null,
+          requestedModelPolicyValidationStatus: input.requestedModelPolicyValidationStatus ?? null,
+          requestedModelPolicyVersion: input.requestedModelPolicyVersion ?? null,
           runId: input.runId ?? null,
           sectionId: input.sectionId,
           source: input.source,
@@ -351,6 +432,15 @@ class EventOffloadHarness {
       }),
       listEvents: () => [...this.events],
       tableName: 'agent_events' as const,
+    };
+  }
+
+  private createModelPoliciesRepository() {
+    return {
+      getActivePolicy: (policyRef: string) => createModelPolicyRow(policyRef),
+      tableName: 'agent_model_policies' as const,
+      validatePolicy: (policy: AgentModelPolicyInputRecord, checkedAtMs: number) =>
+        validateAgentModelPolicy(policy, checkedAtMs),
     };
   }
 
@@ -473,7 +563,15 @@ class EventOffloadHarness {
   }
 }
 
-function createContext(method: string, digestHex: string): AgentCoreRequestContext {
+function createContext(
+  method: string,
+  digestHex: string,
+  options?: {
+    readonly principalId?: string;
+    readonly principalType?: 'CLIENT_SERVICE' | 'INTEGRATION_INSTALLATION';
+    readonly scopes?: readonly string[];
+  }
+): AgentCoreRequestContext {
   return {
     agentId,
     bodyDigest: { algorithm: 'sha-256', byteLength: 10, digestHex },
@@ -481,12 +579,42 @@ function createContext(method: string, digestHex: string): AgentCoreRequestConte
     method,
     principal: {
       agentId,
-      principalId,
-      principalType: 'CLIENT_SERVICE',
-      scopes: ['agent.rpc', 'agent.event'],
+      principalId: options?.principalId ?? principalId,
+      principalType: options?.principalType ?? 'CLIENT_SERVICE',
+      scopes: options?.scopes ?? ['agent.rpc', 'agent.event'],
     },
     requestedAtMs: nowMs,
     service: 'cftamac.agent.v1.AgentEventService',
+  };
+}
+
+function createModelPolicyRow(policyRef: string): AgentModelPolicyRow {
+  return {
+    archivedAtMs: null,
+    budgetMetadataRef: 'policy-metadata://budget/default',
+    budgetMetadataSha256: 'b'.repeat(64),
+    createdAtMs: nowMs,
+    createdByPrincipalId: principalId,
+    credentialRef: null,
+    decisionSchemaVersion: 'v1',
+    generationMaxOutputTokens: null,
+    generationParametersRef: 'policy-metadata://generation/default',
+    generationParametersSha256: 'a'.repeat(64),
+    generationTemperature: null,
+    generationTopP: null,
+    modelId: '@cf/meta/llama-3.1-8b-instruct',
+    policyDigest: policyRef === 'policy-fast' ? 'f'.repeat(64) : 'e'.repeat(64),
+    policyRef,
+    provider: 'workers-ai',
+    safeMetadataRef: 'policy-metadata://safe/default',
+    safeMetadataSha256: 'c'.repeat(64),
+    safetyMetadataRef: 'policy-metadata://safety/default',
+    safetyMetadataSha256: 'd'.repeat(64),
+    status: 'active',
+    updatedAtMs: nowMs,
+    updatedByPrincipalId: principalId,
+    validatedAtMs: nowMs,
+    version: 1,
   };
 }
 

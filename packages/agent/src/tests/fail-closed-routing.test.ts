@@ -8,6 +8,8 @@ import {
 
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
 
+import { testControlPlaneTrustConfig } from './test-control-plane-trust';
+
 import type { AIAgent } from '../AIAgent';
 import type { AgentWorkerEnv } from '../env';
 
@@ -16,7 +18,8 @@ const baseUrl = 'https://agent.example.test';
 function createTestEnv(): AgentWorkerEnv {
   return {
     AGENT_BLOBS: {} as R2Bucket,
-    AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+    AGENT_AUDIT_HASH_PEPPER: 'test-audit-hash-pepper',
+    AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
     AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',
@@ -82,7 +85,8 @@ describe('Agent fail-closed routing', () => {
     for (const testCase of cases) {
       const response = await handleAgentConnectRequest(
         createRpcRequest(testCase.path, testCase.body),
-        createTestEnv()
+        createTestEnv(),
+        { allowTestSeam: true }
       );
       expect(await readErrorCode(response)).toBe('unimplemented');
     }

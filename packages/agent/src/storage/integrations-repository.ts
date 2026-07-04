@@ -272,7 +272,9 @@ function upsertAdapterDefinition(
   const values = {
     agentId,
     ...input,
+    allowedModelPolicyRefs: serializePolicyRefList(input.allowedModelPolicyRefs),
     deliveryCapabilityId: input.deliveryCapabilityId ?? null,
+    modelPolicyGrantRef: input.modelPolicyGrantRef ?? null,
     schemaRef: input.schemaRef ?? null,
   };
   database
@@ -384,6 +386,8 @@ function createDeliveryContext(
       ...input,
       expiresAtMs: input.expiresAtMs ?? null,
       metadataRef: input.metadataRef ?? null,
+      modelPolicyDigest: input.modelPolicyDigest ?? null,
+      modelPolicyRef: input.modelPolicyRef ?? null,
     })
     .run();
   return requireDeliveryContext(agentId, database, input.deliveryContextId);
@@ -587,10 +591,12 @@ function toInstallationValues(agentId: string, input: InsertAgentIntegrationInst
   return {
     agentId,
     ...input,
+    allowedModelPolicyRefs: serializePolicyRefList(input.allowedModelPolicyRefs),
     grantSummaryRef: input.grantSummaryRef ?? null,
     installedAtMs: input.installedAtMs ?? null,
     manifestDigestSha256: input.manifestDigestSha256 ?? null,
     manifestRef: input.manifestRef ?? null,
+    modelPolicyGrantRef: input.modelPolicyGrantRef ?? null,
     providerBaseUrl: input.providerBaseUrl ?? null,
     providerId: input.providerId ?? null,
     publicKeyRef: input.publicKeyRef ?? null,
@@ -602,10 +608,15 @@ function toInstallationValues(agentId: string, input: InsertAgentIntegrationInst
 
 function toInstallationUpdateValues(input: UpdateAgentIntegrationInstallationStatusInput) {
   return {
+    allowedModelPolicyRefs:
+      input.allowedModelPolicyRefs === undefined
+        ? undefined
+        : serializePolicyRefList(input.allowedModelPolicyRefs),
     grantSummaryRef: input.grantSummaryRef,
     installedAtMs: input.installedAtMs,
     manifestDigestSha256: input.manifestDigestSha256,
     manifestRef: input.manifestRef,
+    modelPolicyGrantRef: input.modelPolicyGrantRef,
     providerBaseUrl: input.providerBaseUrl,
     providerId: input.providerId,
     publicKeyRef: input.publicKeyRef,
@@ -620,13 +631,24 @@ function toConnectionValues(agentId: string, input: CreateAgentAdapterConnection
   return {
     agentId,
     ...input,
+    allowedModelPolicyRefs: serializePolicyRefList(input.allowedModelPolicyRefs),
     connectionKey: input.connectionKey ?? null,
     deliveryCapabilityId: input.deliveryCapabilityId ?? null,
     disabledAtMs: null,
     externalSubject: input.externalSubject ?? null,
     grantSummaryRef: input.grantSummaryRef ?? null,
+    modelPolicyGrantRef: input.modelPolicyGrantRef ?? null,
     metadataRef: input.metadataRef ?? null,
   };
+}
+
+function serializePolicyRefList(value: readonly string[] | undefined): string | null {
+  // policy ref だけを JSON 化し、Provider/model ID や credential を allowlist 永続化へ混入させない。
+  if (value === undefined) return null;
+  const normalized = [
+    ...new Set(value.map((entry) => entry.trim().normalize('NFC')).filter(Boolean)),
+  ];
+  return JSON.stringify(normalized);
 }
 
 function toDeliveryValues(agentId: string, input: CreateAgentAdapterDeliveryInput) {

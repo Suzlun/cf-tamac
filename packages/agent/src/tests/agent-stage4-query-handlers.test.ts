@@ -19,6 +19,8 @@ import {
   searchThreadHistoryFromStore,
 } from '../threads';
 
+import { testControlPlaneTrustConfig } from './test-control-plane-trust';
+
 import type { AIAgent } from '../AIAgent';
 import type {
   AgentCoreRequestContext,
@@ -32,6 +34,7 @@ import type {
   AgentEventRow,
   AgentGrantRow,
   AgentHistoryIndexRow,
+  AgentModelPolicyRow,
   AgentProfileRow,
   AgentRunInputSnapshotRow,
   AgentRunRow,
@@ -272,6 +275,10 @@ class Stage4QueryRuntime {
       grants: { listGrantsForPrincipal: () => createGrantRows(), tableName: 'agent_grants' },
       history: this.createHistoryRepository(),
       memory: this.createMemoryRepository(),
+      modelPolicies: {
+        getActivePolicy: (policyRef: string) => createModelPolicy(policyRef),
+        tableName: 'agent_model_policies',
+      },
       pendingRuns: this.createPendingRunsRepository(),
       profile: {
         getProfile: () => createProfile(this.lifecycleStatus),
@@ -418,7 +425,8 @@ function createTestEnv(runtime: Stage4QueryRuntime): {
   return {
     env: {
       AGENT_BLOBS: {} as R2Bucket,
-      AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+      AGENT_AUDIT_HASH_PEPPER: 'test-audit-hash-pepper',
+      AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
       AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
       AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
       AGENT_RPC_AUDIENCE: 'test-audience',
@@ -443,7 +451,8 @@ async function callGetLatestCompaction(env: AgentWorkerEnv) {
         create(GetLatestCompactionRequestSchema, { agentId, threadId })
       )
     ),
-    env
+    env,
+    { allowTestSeam: true }
   );
   expect(response.status).toBe(200);
   return fromBinary(
@@ -461,7 +470,8 @@ async function callGetThreadMemory(env: AgentWorkerEnv) {
         create(GetThreadMemoryRequestSchema, { agentId, threadId })
       )
     ),
-    env
+    env,
+    { allowTestSeam: true }
   );
   expect(response.status).toBe(200);
   return fromBinary(GetThreadMemoryResponseSchema, new Uint8Array(await response.arrayBuffer()));
@@ -485,7 +495,8 @@ async function callSearchThreadHistory(env: AgentWorkerEnv) {
         })
       )
     ),
-    env
+    env,
+    { allowTestSeam: true }
   );
   expect(response.status).toBe(200);
   return fromBinary(
@@ -499,8 +510,9 @@ function createRpcRequest(path: string, body: Uint8Array): Request {
     body,
     headers: {
       'Content-Type': 'application/proto',
+      'x-agent-test-agent-id': agentId,
       'x-agent-test-principal-id': principalId,
-      'x-agent-test-scopes': 'agent.rpc,agent.read',
+      'x-agent-test-scopes': 'agent:read,agent.rpc,agent.read',
     },
     method: 'POST',
   });
@@ -547,6 +559,36 @@ function createConfig(): AgentConfigRow {
     toolPolicyRef: 'tool-policy-safe',
     updatedAtMs: 2,
     updatedByPrincipalId: principalId,
+  };
+}
+
+function createModelPolicy(policyRef: string): AgentModelPolicyRow {
+  return {
+    archivedAtMs: null,
+    budgetMetadataRef: null,
+    budgetMetadataSha256: null,
+    createdAtMs: 2,
+    createdByPrincipalId: principalId,
+    credentialRef: null,
+    decisionSchemaVersion: 'agent-decision-v1',
+    generationMaxOutputTokens: null,
+    generationParametersRef: null,
+    generationParametersSha256: null,
+    generationTemperature: null,
+    generationTopP: null,
+    modelId: '@cf/meta/llama-3.1-8b-instruct',
+    policyDigest: 'f'.repeat(64),
+    policyRef,
+    provider: 'workers-ai',
+    safeMetadataRef: null,
+    safeMetadataSha256: null,
+    safetyMetadataRef: null,
+    safetyMetadataSha256: null,
+    status: 'active',
+    updatedAtMs: 3,
+    updatedByPrincipalId: principalId,
+    validatedAtMs: 3,
+    version: 1,
   };
 }
 

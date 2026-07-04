@@ -1,17 +1,27 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// E2E 専用に決定論的な 32-byte AES key を生成し、local D1 に残る暗号化済み signing key を再実行時にも復号可能にする。
+// production secret ではなく test-only seed から shell 実行時に導出し、実運用の秘密値は repository に保存しない。
+const e2eClientCredentialEncryptionKeyCommand =
+  "node -e \"console.log(require('node:crypto').createHash('sha256').update('cf-tamac-e2e-client-credential-encryption-key').digest('base64'))\"";
+// Client の local D1 migration を先に適用してから Next dev server を起動し、E2E fake Agent RPC で外部 Agent Worker 依存を避ける。
+// Playwright の長い multi-browser run では Turbopack HMR chunk 再生成が WebKit 終盤の chunk load error になり得るため、E2E 専用に webpack dev server を使う。
+const e2eClientWebServerCommand = `CLIENT_CREDENTIAL_ENCRYPTION_KEY="$(${e2eClientCredentialEncryptionKeyCommand})" E2E_FAKE_AGENT_RPC=1 sh -c 'pnpm --filter @cf-tamac/client db:migrate:local && pnpm --filter @cf-tamac/client exec next dev --webpack'`;
+
 /**
  * Playwright E2E テスト設定
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  /* Next dev + Cloudflare local D1 + 3 browser project の逐次実行では WebKit 終盤に 30 秒を超えるため、実運用 smoke の完走余裕を持たせる。 */
+  timeout: 60_000,
   /* テストを並列実行 */
   fullyParallel: true,
   /* CI環境でのリトライ設定 */
   retries: process.env.CI !== undefined ? 2 : 0,
-  /* CI環境でのワーカー数 */
-  workers: process.env.CI !== undefined ? 1 : undefined,
+  /* Next dev/Turbopack の chunk 再生成競合を避けるため、ローカルと CI の両方で 1 worker に固定する */
+  workers: 1,
   /* レポーター設定 */
   reporter: 'html',
   /* 共通設定 */
@@ -29,7 +39,7 @@ export default defineConfig({
   /* テスト前にサーバーを起動 */
   webServer: [
     {
-      command: 'pnpm dev:management-client',
+      command: e2eClientWebServerCommand,
       url: 'http://localhost:3000',
       reuseExistingServer: process.env.CI === undefined,
       timeout: 120 * 1000,

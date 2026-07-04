@@ -3,29 +3,33 @@ const textEncoder = new TextEncoder();
 type AgentSubtleKeyUsage = 'sign' | 'verify';
 
 /**
- * Signature algorithms supported by the dependency-free Agent security foundation.
+ * Agent security foundation が扱う署名 algorithm の固定集合です。
+ *
+ * @remarks
+ * Client Service JWT では `EdDSA` だけを使用します。`HS256` は Provider 署名など既存の
+ * Agent-local seam で引き続き検証するため残しますが、Client Service trust source には使いません。
  */
-export const agentSignatureAlgorithms = ['HS256', 'RS256', 'ES256'] as const;
+export const agentSignatureAlgorithms = ['EdDSA', 'HS256', 'RS256', 'ES256'] as const;
 
 /**
- * Signature algorithm value supported by Agent security primitives.
+ * Agent security primitive が受け取れる署名 algorithm 値です。
  */
 export type AgentSignatureAlgorithm = (typeof agentSignatureAlgorithms)[number];
 
 /**
- * Key material accepted by Agent signature verification and signing helpers.
+ * Agent 署名検証/署名 helper が受け取る key material です。
  */
 export type AgentSignatureKeyMaterial = CryptoKey | JsonWebKey | Uint8Array | string;
 
 /**
- * Return whether a value is a supported Agent signature algorithm.
+ * 文字列が Agent security primitive の署名 algorithm として許可されるかを返します。
  */
 export function isAgentSignatureAlgorithm(value: string): value is AgentSignatureAlgorithm {
-  return value === 'HS256' || value === 'RS256' || value === 'ES256';
+  return value === 'EdDSA' || value === 'HS256' || value === 'RS256' || value === 'ES256';
 }
 
 /**
- * Verify bytes with Web Crypto using Agent-supported JWT/signature algorithms.
+ * Agent が許可する algorithm で署名 bytes を Web Crypto により検証します。
  */
 export async function verifyBytesWithAgentKey(input: {
   readonly algorithm: AgentSignatureAlgorithm;
@@ -43,7 +47,7 @@ export async function verifyBytesWithAgentKey(input: {
 }
 
 /**
- * Sign bytes with Web Crypto using Agent-supported provider metadata algorithms.
+ * Agent が許可する algorithm で bytes に署名します。
  */
 export async function signBytesWithAgentKey(input: {
   readonly algorithm: AgentSignatureAlgorithm;
@@ -93,6 +97,9 @@ function importHmacKey(
 }
 
 function getSubtleImportAlgorithm(algorithm: AgentSignatureAlgorithm) {
+  if (algorithm === 'EdDSA') {
+    return { name: 'Ed25519' };
+  }
   if (algorithm === 'RS256') {
     return { hash: 'SHA-256', name: 'RSASSA-PKCS1-v1_5' };
   }
@@ -103,6 +110,9 @@ function getSubtleImportAlgorithm(algorithm: AgentSignatureAlgorithm) {
 }
 
 function getSubtleSignVerifyAlgorithm(algorithm: AgentSignatureAlgorithm) {
+  if (algorithm === 'EdDSA') {
+    return { name: 'Ed25519' };
+  }
   if (algorithm === 'RS256') {
     return { hash: 'SHA-256', name: 'RSASSA-PKCS1-v1_5' };
   }

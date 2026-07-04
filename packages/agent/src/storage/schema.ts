@@ -11,6 +11,16 @@ import {
   agentMemoryStorageDrizzleSchema,
   agentMemoryStorageRepositoryNames,
 } from './memory-schema';
+import {
+  agentModelInvocationFoundationTableDefinitions,
+  agentModelInvocationStorageDrizzleSchema,
+  agentModelInvocationStorageRepositoryNames,
+} from './model-invocation-schema';
+import {
+  agentModelPolicyFoundationTableDefinitions,
+  agentModelPolicyStorageDrizzleSchema,
+  agentModelPolicyStorageRepositoryNames,
+} from './model-policy-schema';
 import { agentScheduleFires, agentSchedules } from './schedule-schema';
 import {
   agentToolFoundationTableDefinitions,
@@ -226,6 +236,11 @@ const agentEvents = sqliteTable(
     correlationId: text('correlation_id'),
     causationId: text('causation_id'),
     deliveryContextId: text('delivery_context_id'),
+    requestedModelPolicyRef: text('requested_model_policy_ref'),
+    requestedModelPolicyDigest: text('requested_model_policy_digest'),
+    requestedModelPolicyVersion: integer('requested_model_policy_version'),
+    requestedModelPolicyValidationStatus: text('requested_model_policy_validation_status'),
+    policyOverrideSource: text('policy_override_source'),
     runId: text('run_id'),
     agentSequence: integer('agent_sequence').notNull(),
     threadSequence: integer('thread_sequence').notNull(),
@@ -277,6 +292,17 @@ const agentRunInputs = sqliteTable(
     configVersion: integer('config_version').notNull().default(0),
     toolSetVersion: integer('tool_set_version').notNull().default(0),
     integrationVersion: integer('integration_version').notNull().default(0),
+    requestedModelPolicyRef: text('requested_model_policy_ref'),
+    resolvedModelPolicyRef: text('resolved_model_policy_ref'),
+    resolvedModelPolicyDigest: text('resolved_model_policy_digest'),
+    modelProvider: text('model_provider'),
+    modelId: text('model_id'),
+    modelPolicyVersion: integer('model_policy_version'),
+    modelPolicySource: text('model_policy_source'),
+    decisionSchemaVersion: text('decision_schema_version'),
+    generationMaxOutputTokens: integer('generation_max_output_tokens'),
+    generationTemperature: text('generation_temperature'),
+    generationTopP: text('generation_top_p'),
     createdAtMs: integer('created_at_ms').notNull(),
   },
   (table) => [primaryKey({ columns: [table.agentId, table.runId] })]
@@ -360,6 +386,8 @@ export const agentStorageDrizzleSchema = {
   agentRunInterrupts,
   agentHarnessDecisionRecords,
   agentRunBudgetLedger,
+  ...agentModelPolicyStorageDrizzleSchema,
+  ...agentModelInvocationStorageDrizzleSchema,
   agentSchedules,
   agentScheduleFires,
   ...agentToolStorageDrizzleSchema,
@@ -489,6 +517,8 @@ export const agentFoundationTableDefinitions = [
     repositoryName: 'AgentRuntimeRepository',
     uniqueKeys: ['agent_id, budget_record_id'],
   },
+  ...agentModelPolicyFoundationTableDefinitions,
+  ...agentModelInvocationFoundationTableDefinitions,
   {
     tableName: 'agent_schedules',
     purpose: 'Agent-owned Thread-scoped schedule lifecycle and callback metadata',
@@ -529,6 +559,8 @@ export const agentStorageRepositoryNames = [
   'AgentEventsRepository',
   'AgentPendingRunsRepository',
   'AgentRuntimeRepository',
+  ...agentModelPolicyStorageRepositoryNames,
+  ...agentModelInvocationStorageRepositoryNames,
   'AgentSchedulesRepository',
   'AgentSchedulerWakeRepository',
   ...agentToolStorageRepositoryNames,

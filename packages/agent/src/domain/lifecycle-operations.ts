@@ -6,7 +6,6 @@ import {
   authorizeAgentOperation,
   checkAgentIdempotency,
   createEmptyCapabilitySummary,
-  mapAgentConfigRow,
   mapAgentCredentialRow,
   mapAgentProfileRow,
   recordAgentIdempotency,
@@ -14,6 +13,11 @@ import {
 } from './agent-operation-utils';
 import { createAgentDomainError } from './errors';
 import { recordLifecycleAudit } from './lifecycle-audit';
+import {
+  mapAgentModelPolicySummaryRow,
+  requireActiveAgentModelPolicy,
+  seedInitialAgentModelPolicy,
+} from './model-policy-operations';
 
 import type {
   AgentConfigCommandInput,
@@ -32,7 +36,7 @@ import type {
   UpdateAgentConfigCommand,
   UpdateAgentConfigResult,
 } from './agent-core';
-import type { AgentProfileRow, AgentStorageRepositories } from '../storage';
+import type { AgentConfigRow, AgentProfileRow, AgentStorageRepositories } from '../storage';
 
 /**
  * Run InitializeAgent against Agent-owned storage.
@@ -93,11 +97,13 @@ export function getAgentFromStore(input: {
   });
   if (profile === undefined)
     throw createAgentDomainError({ kind: 'not_found', message: 'Agent not found.' });
+  const config = getLatestConfigView(input.agentId, input.repositories);
   return {
     activeCredential: mapOptionalCredential(input.agentId, input.repositories, input.query.context),
     agent: mapAgentProfileRow(profile),
     capabilitySummary: createEmptyCapabilitySummary(input.agentId),
-    config: getLatestConfigView(input.agentId, input.repositories),
+    config,
+    defaultModelPolicy: config.defaultModelPolicy,
   };
 }
 
@@ -231,7 +237,7 @@ export function updateAgentConfigInStore(input: {
     input.repositories,
     input.command.context,
     profile.configVersion + 1,
-    input.command.config
+    mergeConfigWithLatest(input.agentId, input.repositories, input.command.config)
   );
   input.repositories.profile.upsertProfile({
     configVersion: nextConfig.configVersion,
@@ -243,7 +249,7 @@ export function updateAgentConfigInStore(input: {
   });
   const result = {
     audit: recordLifecycleAudit(input, 'agent.config.updated', 'succeeded'),
-    config: mapAgentConfigRow(input.agentId, nextConfig),
+    config: mapAgentConfigView(input.agentId, input.repositories, nextConfig),
     replayed: false,
   };
   recordAgentIdempotency({
@@ -283,12 +289,22 @@ function createInitializedAgent(input: {
 }): InitializeAgentResult {
   const now = input.command.context.requestedAtMs;
   const systemThreadId = createSystemThread(input.repositories, input.agentId, now);
-  const config = insertConfig(
-    input.repositories,
-    input.command.context,
-    1,
-    input.command.initialConfig
+  const defaultModelPolicy = seedInitialAgentModelPolicy({
+    agentId: input.agentId,
+    context: input.command.context,
+    policy: input.command.initialModelPolicy,
+    repositories: input.repositories,
+  });
+  const initialConfig = createInitialConfigWithPolicyRef(
+    input.command.initialConfig,
+    defaultModelPolicy.policyRef
   );
+  requireActiveAgentModelPolicy({
+    agentId: input.agentId,
+    policyRef: initialConfig.modelPolicyRef,
+    repositories: input.repositories,
+  });
+  const config = insertConfig(input.repositories, input.command.context, 1, initialConfig);
   const credential = insertRotatedCredential(
     input.repositories,
     input.command.context,
@@ -312,8 +328,9 @@ function createInitializedAgent(input: {
   return {
     agent,
     audit,
-    config: mapAgentConfigRow(input.agentId, config),
+    config: mapAgentConfigView(input.agentId, input.repositories, config),
     credential: mapAgentCredentialRow(input.agentId, credential),
+    defaultModelPolicy,
     replayed: false,
     threadKeyRule,
   };
@@ -459,7 +476,114 @@ function getLatestConfigView(
   const config = repositories.config.getLatestConfig();
   if (config === undefined)
     throw createAgentDomainError({ kind: 'not_found', message: 'Agent config not found.' });
-  return mapAgentConfigRow(agentId, config);
+  return mapAgentConfigView(agentId, repositories, config);
+}
+
+function createInitialConfigWithPolicyRef(
+  config: AgentConfigCommandInput,
+  defaultPolicyRef: string
+): AgentConfigCommandInput {
+  return { ...config, modelPolicyRef: config.modelPolicyRef ?? defaultPolicyRef };
+}
+
+function mergeConfigWithLatest(
+  agentId: string,
+  repositories: AgentStorageRepositories,
+  config: AgentConfigCommandInput
+): AgentConfigCommandInput {
+  const latest = repositories.config.getLatestConfig();
+  const merged = {
+    budgetPolicyRef: config.budgetPolicyRef ?? latest?.budgetPolicyRef ?? undefined,
+    configBodyRef: config.configBodyRef ?? latest?.configBodyRef ?? undefined,
+    displayName: config.displayName ?? latest?.displayName ?? undefined,
+    memoryPolicyRef: config.memoryPolicyRef ?? latest?.memoryPolicyRef ?? undefined,
+    modelPolicyRef: config.modelPolicyRef ?? latest?.modelPolicyRef ?? undefined,
+    schedulePolicyRef: config.schedulePolicyRef ?? latest?.schedulePolicyRef ?? undefined,
+    toolPolicyRef: config.toolPolicyRef ?? latest?.toolPolicyRef ?? undefined,
+  };
+  requireActiveAgentModelPolicy({
+    agentId,
+    policyRef: merged.modelPolicyRef,
+    repositories,
+  });
+  return merged;
+}
+
+function mapAgentConfigView(
+  agentId: string,
+  repositories: AgentStorageRepositories,
+  row: AgentConfigRow
+): AgentConfigView {
+  const defaultModelPolicy = mapDefaultPolicyForConfig(agentId, repositories, row.modelPolicyRef);
+  return {
+    agentId,
+    budgetPolicyRef: row.budgetPolicyRef ?? undefined,
+    configBodyRef: row.configBodyRef ?? undefined,
+    configVersion: row.configVersion,
+    defaultModelPolicy,
+    displayName: row.displayName ?? undefined,
+    memoryPolicyRef: row.memoryPolicyRef ?? undefined,
+    modelPolicyRef: row.modelPolicyRef ?? undefined,
+    modelPolicyValidation: mapModelPolicyValidationForConfig(
+      agentId,
+      repositories,
+      row.modelPolicyRef
+    ),
+    schedulePolicyRef: row.schedulePolicyRef ?? undefined,
+    toolPolicyRef: row.toolPolicyRef ?? undefined,
+    updatedAtMs: row.updatedAtMs,
+    updatedByPrincipalId: row.updatedByPrincipalId ?? undefined,
+  };
+}
+
+function mapDefaultPolicyForConfig(
+  agentId: string,
+  repositories: AgentStorageRepositories,
+  policyRef: string | null | undefined
+) {
+  if (policyRef === null || policyRef === undefined || policyRef === '') return undefined;
+  const policy = repositories.modelPolicies.getPolicy(policyRef);
+  return policy === undefined ? undefined : mapAgentModelPolicySummaryRow(agentId, policy);
+}
+
+function mapModelPolicyValidationForConfig(
+  agentId: string,
+  repositories: AgentStorageRepositories,
+  policyRef: string | null | undefined
+): AgentConfigView['modelPolicyValidation'] {
+  if (policyRef === null || policyRef === undefined || policyRef === '') return undefined;
+  const policy = repositories.modelPolicies.getActivePolicy(policyRef);
+  if (policy === undefined) {
+    return {
+      issues: [
+        {
+          code: 'model_policy_inactive',
+          retryable: false,
+          safeMessage: 'Configured model policy ref is not active for this Agent.',
+          severity: 'error',
+          target: 'model_policy_ref',
+        },
+      ],
+      modelId: '',
+      ok: false,
+      policyRef,
+      provider: '',
+      status: 'invalid',
+      warnings: [],
+    };
+  }
+  return {
+    checkedAtMs: policy.validatedAtMs ?? undefined,
+    issues: [],
+    modelId: policy.modelId,
+    ok: true,
+    policyDigest: policy.policyDigest,
+    policyRef: policy.policyRef,
+    provider: policy.provider,
+    safeMetadataRef: mapAgentModelPolicySummaryRow(agentId, policy).safeMetadataRef,
+    status: 'active',
+    warnings: [],
+  };
 }
 
 function mapOptionalCredential(

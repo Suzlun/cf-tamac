@@ -41,12 +41,17 @@ interface DataTableProps {
 export function DataTable({ headers, rows, ariaLabel }: DataTableProps) {
   const normalizedHeaders = headers.map(normalizeHeader);
   return (
-    <div className="data-table-wrapper">
+    // table-only responsive shim class は使わず、Shadcn Table primitive と data-label で対応する。
+    <div className="overflow-x-auto rounded-lg border bg-card">
       <Table aria-label={ariaLabel}>
         <TableHeader>
           <TableRow>
             {normalizedHeaders.map((header, index) => (
-              <TableHead key={`th-${String(index)}`} aria-sort={header.ariaSort}>
+              <TableHead
+                key={`th-${String(index)}`}
+                aria-sort={header.ariaSort}
+                className="h-12 px-4 text-xs uppercase tracking-wide"
+              >
                 {header.content ?? header.label}
               </TableHead>
             ))}
@@ -59,6 +64,7 @@ export function DataTable({ headers, rows, ariaLabel }: DataTableProps) {
                 <TableCell
                   key={`cell-${String(rowIndex)}-${String(cellIndex)}`}
                   data-label={normalizedHeaders.at(cellIndex)?.label ?? ''}
+                  className="px-4 py-3 align-top leading-6"
                 >
                   {cell}
                 </TableCell>

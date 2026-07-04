@@ -165,6 +165,46 @@ describe('Agent Stage 7 Integration implementation', () => {
       /discord|slack|github/i
     );
   });
+
+  it('[AGENT-INTEGRATION-S009] Connection allowlist accepts only granted model policy overrides', () => {
+    const manifest = readSource(integrationManifestPath);
+    const operations = readSource(integrationOperationsPath);
+    const ingress = readSource(integrationIngressDeliveryPath);
+    const mapper = readSource(new URL('../rpc/integration-message-mappers.ts', import.meta.url));
+    const doRouter = readSource(integrationDoRouterPath);
+
+    expect(manifest).toContain('allowedModelPolicyRefs');
+    expect(operations).toContain('allowedModelPolicyRefs: manifest.allowedModelPolicyRefs');
+    expect(operations).toContain('allowedModelPolicyRefs: deserializePolicyRefList');
+    expect(ingress).toContain('assertIntegrationModelPolicyOverrideAllowed');
+    expect(ingress.indexOf('await verifyIntegrationIngressSignature')).toBeLessThan(
+      ingress.indexOf('assertIntegrationModelPolicyOverrideAllowed')
+    );
+    expect(ingress).toContain(
+      'Integration model policy override is outside the Adapter Connection allowlist.'
+    );
+    expect(ingress).toContain('repositories.modelPolicies.getActivePolicy(policyRef)');
+    expect(doRouter).toContain('modelPolicyRef: event?.modelPolicyRef');
+    expect(mapper).toContain('allowedModelPolicyRefs: [...connection.allowedModelPolicyRefs]');
+  });
+
+  it('[AGENT-INTEGRATION-S010] Delivery result classifies resume failure follow-up and stale callbacks', () => {
+    const aiAgent = readSource(aiAgentPath);
+    const ingress = readSource(integrationIngressDeliveryPath);
+    const mapper = readSource(new URL('../rpc/integration-message-mappers.ts', import.meta.url));
+
+    expect(ingress).toContain('classifyDeliveryResult');
+    expect(ingress).toContain("'resume'");
+    expect(ingress).toContain("'terminal_failure'");
+    expect(ingress).toContain("'follow_up_event'");
+    expect(ingress).toContain("'stale_callback'");
+    expect(ingress).toContain('Delivery result provider operation identity does not match.');
+    expect(ingress).toContain("fromStatus: 'waiting'");
+    expect(ingress).toContain("toStatus: 'pending'");
+    expect(ingress).toContain('appendDeliveryFollowUpEvent');
+    expect(aiAgent).toContain("['follow_up_event', 'resume']");
+    expect(mapper).toContain('resumeAction: result.resumeAction');
+  });
 });
 
 function readSource(path: URL): string {

@@ -18,6 +18,7 @@
 - 初期必須 transport は Connect unary binary Protobuf です。
 - Worker facade は `POST` + `Content-Type: application/proto` だけを public success path とします。
 - REST resource API、OpenAPI Agent API、Orval Agent client、ad-hoc JSON DTO API、public Durable Object fetch API、browser direct Agent API は公開しません。
+- 本番 Client Service 認証は Ed25519 JWT と `AGENT_CONTROL_PLANE_TRUST` に閉じます。Agent は公開鍵だけを含む trust config を required secret として読み、HS256、`AGENT_CREDENTIAL_*`、bootstrap RPC、AgentTrustRegistry、REST/JSON auth route を本番 trust source にしません。
 
 ## Agent Domain
 
@@ -38,14 +39,36 @@
 - Agent-local Queue は scheduler wake/coalescing mechanism であり、Event や Run の正本ではありません。
 - 大きな Event payload、History body、Tool result blob、artifact、archive segment は Agent-owned blob storage に offload します。
 - Agent Worker は `CLIENT_DB`、Agent-cross D1、Cloudflare Queues producer/consumer binding を持ちません。
-- Management Client Worker は `CLIENT_DB` と credential references を持ちますが、Agent domain snapshot を Client D1 に複製しません。
+- Management Client Worker は `CLIENT_DB`、外部 credential references、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` で保護された encrypted Client Service signing key store を持ちますが、Agent domain snapshot、plaintext secrets、private JWK plaintext を Client D1 に複製しません。
 
 ## Management Client
 
 - Agent registry、Agent detail、Thread/Event/Run/Compaction、Schedule、Tool approval、Integration install/uninstall、Agent settings を管理する UI です。
 - Agent credential material、Agent RPC client construction、Agent runtime imports は browser bundle に入りません。
+- private JWK、encrypted private JWK、生 JWT、Agent RPC signing logic は browser response、bundle、storage、public Client route に入りません。
 - `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding route は公開しません。
 - Server Actions と Server Components は UI 内部の execution boundary であり、Agent public API ではありません。
+
+## Credential Operations
+
+- 本番運用 runbook は `docs/operations/agent-control-plane-auth.md` です。
+- Management Client の `Global Settings > Signing Keys` は Agent が 0 件でも Ed25519 signing key を生成し、private JWK を `CLIENT_CREDENTIAL_ENCRYPTION_KEY` で暗号化して Client D1 に保存します。
+- `Global Settings > Trust Config Export` は Agent Worker の Variables and Secrets に設定できる public-only `AGENT_CONTROL_PLANE_TRUST` JSON を出力します。出力には private key parameter `d`、private JWK、encrypted private JWK、生 JWT を含めません。
+- Agent Worker の監査識別子 hash は `AGENT_AUDIT_HASH_PEPPER` を使う HMAC で生成し、既知 user ID / email の辞書照合を防ぎます。
+- Rotation は新 key 追加、旧 key `retiring`、Agent health verification、旧 key `revoked` の順で進めます。Emergency revoke と break-glass recovery は Dashboard/API/Wrangler で Agent trust config を更新し、Health Check で確認します。
+
+## Self-host Deploy
+
+[Deploy Agent to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/Suzlun/cf-tamac/tree/deploy-agent)
+
+[Deploy Client to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/Suzlun/cf-tamac/tree/deploy-client)
+
+- Primary install path は Cloudflare Dashboard の Deploy flow です。利用者に repository clone、local `pnpm install`、local `wrangler` 操作を要求しません。
+- Agent Deploy Button を先に押し、`AI_AGENT` Durable Object、SQLite migration、`AGENT_BLOBS` R2、Workers AI `AI` binding、`AGENT_RPC_AUDIENCE` を持つ Agent Worker を deploy します。
+- Client Deploy Button を後に押し、`CLIENT_DB` D1、`AGENT_RPC_DEFAULT_ORIGIN`、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` を設定します。
+- Client private signing key は Worker Secret へ貼らず、Management Client が生成して Client D1 の encrypted signing key store に保存します。Agent Worker へ渡すのは public-only `AGENT_CONTROL_PLANE_TRUST` だけです。
+- `deploy-agent` と `deploy-client` は generated artifact branch です。source branch から CI が再生成し、branch root が self-contained Worker application になるよう維持します。
+- 手順の詳細は `docs/operations/self-host-deploy.md` を参照してください。
 
 ## Code Generation
 
@@ -54,6 +77,8 @@ pnpm gen:agent:proto
 pnpm gen:agent:rpc
 pnpm gen
 pnpm check:codegen
+pnpm gen:deploy-artifacts
+pnpm check:deploy-artifacts
 ```
 
 Command-owned generated outputs は手編集しません。
@@ -71,19 +96,19 @@ pnpm install
 
 ```bash
 pnpm dev:agent
-pnpm dev:management-client
+pnpm dev:client
 ```
 
 ```bash
 pnpm check:agent
-pnpm check:management-client
-pnpm build:foundation
+pnpm check:client
+pnpm build
 ```
 
 ```bash
 pnpm lint
 pnpm test:agent
-pnpm test:management-client
+pnpm test:client
 pnpm test:governance
 pnpm test:run
 ```

@@ -45,6 +45,34 @@ export const clientManagedAgentsTable = sqliteTable('client_managed_agents', {
   lastOpenedAtMs: integer('last_opened_at_ms'),
   createdAtMs: integer('created_at_ms').notNull(),
   updatedAtMs: integer('updated_at_ms').notNull(),
+  // managed Agent ごとの署名 identity metadata (migration 0002)。nullable であり、
+  // key 未選択状態では Agent RPC 呼び出し前に明示的な signing key selection を要求する。
+  signingIssuer: text('signing_issuer'),
+  signingKeyId: text('signing_key_id'),
+  signingPublicFingerprint: text('signing_public_fingerprint'),
+  signingLastVerifiedAtMs: integer('signing_last_verified_at_ms'),
+});
+
+/**
+ * Client Service signing key store を表す Drizzle ORM table 定義です。
+ *
+ * @remarks
+ * columns は `packages/client/src/server/db/migrations/0002_control_plane_signing_keys.sql` と一致させます。
+ * `private_jwk_ciphertext` には `CLIENT_CREDENTIAL_ENCRYPTION_KEY` で暗号化した private JWK envelope だけを保存し、
+ * 平文の秘密鍵 / raw shared secret / JWT body は一切保存しません。
+ * DDL は Wrangler D1 migration が source of truth で、repository code はこの table 定義を通じて DML だけを行います。
+ */
+export const clientSigningKeysTable = sqliteTable('client_signing_keys', {
+  issuer: text('issuer').notNull(),
+  keyId: text('key_id').notNull(),
+  publicJwk: text('public_jwk').notNull(),
+  publicFingerprint: text('public_fingerprint').notNull(),
+  privateJwkCiphertext: text('private_jwk_ciphertext').notNull(),
+  status: text('status').notNull(),
+  isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+  createdAtMs: integer('created_at_ms').notNull(),
+  updatedAtMs: integer('updated_at_ms').notNull(),
+  lastUsedAtMs: integer('last_used_at_ms'),
 });
 
 /**
@@ -100,6 +128,10 @@ export const clientManagedAgentsTableMetadata = {
     'last_opened_at_ms',
     'created_at_ms',
     'updated_at_ms',
+    'signing_issuer',
+    'signing_key_id',
+    'signing_public_fingerprint',
+    'signing_last_verified_at_ms',
   ],
 } as const satisfies ClientD1TableDefinition;
 
@@ -132,18 +164,54 @@ export const clientAgentCredentialRefsTableMetadata = {
  * tests はこの一覧を source として、Client D1 が Agent-domain snapshots を追加していないことを確認します。
  * 新しい table を追加する場合は migration、repository、boundary rationale を同時に更新する必要があります。
  */
+/**
+ * Client Service signing key store table の metadata descriptor です。
+ *
+ * @remarks
+ * columns list には `public_jwk` / `public_fingerprint` / `private_jwk_ciphertext` だけを含め、
+ * 平文の秘密鍵や raw JWT body を保持しないことを明示します。
+ * `private_jwk_ciphertext` は `CLIENT_CREDENTIAL_ENCRYPTION_KEY` による暗号化 envelope であり、
+ * 復号は server-only module 内だけで行われます。
+ */
+export const clientSigningKeysTableMetadata = {
+  tableName: 'client_signing_keys',
+  purpose: 'Encrypted Client Service signing key store for Agent RPC bearer JWTs',
+  columns: [
+    'issuer',
+    'key_id',
+    'public_jwk',
+    'public_fingerprint',
+    'private_jwk_ciphertext',
+    'status',
+    'is_default',
+    'created_at_ms',
+    'updated_at_ms',
+    'last_used_at_ms',
+  ],
+} as const satisfies ClientD1TableDefinition;
+
+/**
+ * Client D1 management ledger が所有する table metadata の完全な一覧です。
+ *
+ * @remarks
+ * tests はこの一覧を source として、Client D1 が managed Agent records、外部 credential references、
+ * encrypted Client Service signing key store だけを所有し、Agent-domain snapshots を追加していないことを確認します。
+ * 新しい table を追加する場合は migration、repository、boundary rationale を同時に更新する必要があります。
+ */
 export const clientD1Tables = [
   clientManagedAgentsTableMetadata,
   clientAgentCredentialRefsTableMetadata,
+  clientSigningKeysTableMetadata,
 ] as const;
 
 /**
  * Client D1 から意図的に除外する Agent-domain snapshot table 名です。
  *
  * @remarks
- * Client は managed Agent records と credential references だけを所有します。Events、Threads、Runs、Schedules、Tools、
- * Integrations、Compactions などの Agent-domain state は Agent Worker / Agent-owned storage から Server Actions 経由で読むため、
- * ここに列挙した table を Client D1 に追加してはいけません。
+ * Client は managed Agent records、外部 credential references、encrypted Client Service signing key store だけを所有します。
+ * Events、Threads、Runs、Schedules、Tools、Integrations、Compactions などの Agent-domain state は
+ * Agent Worker / Agent-owned storage から Server Actions 経由で読むため、ここに列挙した table を Client D1 に追加してはいけません。
+ * 平文の秘密鍵や JWT snapshot を保存する table も同様に禁止です。
  */
 export const forbiddenClientAgentSnapshotTables = [
   'agent_events',
@@ -154,4 +222,6 @@ export const forbiddenClientAgentSnapshotTables = [
   'agent_integration_installations',
   'agent_adapter_connections',
   'agent_compactions',
+  'client_signing_key_plaintext',
+  'agent_control_plane_trust_snapshot',
 ] as const;

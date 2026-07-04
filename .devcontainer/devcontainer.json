@@ -35,7 +35,7 @@
       }
     }
   },
-  "forwardPorts": [5173, 8787, 24282],
+  "forwardPorts": [5173, 8787, 24282, 4848],
   "portsAttributes": {
     "5173": {
       "label": "Vite Dev Server",
@@ -47,6 +47,10 @@
     },
     "24282": {
       "label": "Serena Dashboard",
+      "onAutoForward": "notify"
+    },
+    "4848": {
+      "label": "Agent Browser Dashboard",
       "onAutoForward": "notify"
     }
   },

@@ -1,6 +1,7 @@
 import { DataTable } from './data-table';
 import { EmptyState } from './empty-state';
 import { describeScheduleType } from './schedule-detail-content';
+import { Button } from './ui/button';
 
 interface ScheduleSummary {
   readonly scheduleId: string;
@@ -58,19 +59,21 @@ export function ScheduleTable({
         schedule.overlapPolicy ?? '—',
         schedule.nextFireAtUnixMs ?? '—',
         schedule.status,
-        <div key={`actions-${schedule.scheduleId}`} className="action-row">
-          <button
+        <div key={`actions-${schedule.scheduleId}`} className="flex flex-wrap gap-2">
+          <Button
             type="button"
-            className="nav-link"
+            variant="outline"
+            size="sm"
             onClick={() => {
               onView(schedule);
             }}
           >
             View
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="nav-link state-error"
+            variant="destructive"
+            size="sm"
             onClick={() => {
               onCancel(schedule.scheduleId);
             }}
@@ -78,7 +81,7 @@ export function ScheduleTable({
             aria-disabled={pending || terminalStatuses.has(schedule.status)}
           >
             Cancel
-          </button>
+          </Button>
         </div>,
       ])}
     />

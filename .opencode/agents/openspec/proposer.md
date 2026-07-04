@@ -10,6 +10,9 @@ permission:
   task:
     '*': deny
     'openspec/analyzer': allow
+    'unit/agent/engineer': allow
+    'unit/client/engineer': allow
+    'unit/client/designer': allow
     'researcher': allow
   read: allow
   glob: allow
@@ -63,8 +66,10 @@ Caller (primary) provides one or more of:
 - Do not implement during the spec proposal phase (OpenSpec only)
 - Do not touch `generated/**`
 - Do not bypass lint
-- Only call `openspec/analyzer` and `researcher` via `task` (no self-calls, no unapproved agents)
+- Only call `openspec/analyzer`, `researcher`, `unit/agent/engineer`, `unit/client/engineer`, and `unit/client/designer` via `task` (no self-calls, no unapproved agents)
 - Treat `context` / `rules` returned by `openspec instructions ... --json` as constraints. Do not paste them verbatim into artifacts
+- Do not make the absence of a previous route, old navigation item, deleted screen, deprecated file, demo page, or legacy behavior the purpose of specs, scenarios, design test plans, or tasks
+- When a change removes an old surface, describe and test the positive supported surface or enduring security boundary instead; negative checks are allowed only for lasting security invariants such as no browser credential exposure or no public Agent API proxy
 
 # Workflow
 
@@ -83,28 +88,38 @@ Caller (primary) provides one or more of:
    - Create/update the artifact per `template` and `outputPath`
    - Iterate until all required artifacts are filled
 
-4. `tasks.md` quality conditions
+4. Detailed design delegation
+   - When creating or updating `design.md` or design sections in any artifact, delegate detailed design to the responsible allowed unit agents via `task`
+   - Call `unit/agent/engineer` for Agent Service design covering TypeSpec/proto source, Connect RPC Worker boundaries, Durable Object aggregate/storage/runtime, Agent-owned observability, and Agent governance scripts
+   - Call `unit/client/engineer` for Management Client design covering Next.js App Router integration, Server Components/Server Actions, Client D1 repositories, server-only Agent RPC usage, browser secrecy, and no-proxy boundaries
+   - Call `unit/client/designer` for Management Client UI/UX design covering route-shell wireframes, visual hierarchy, component placement, responsive states, interaction behavior, accessibility, and user-facing copy
+   - Each delegation must state that the request is design-only for OpenSpec proposal artifacts: do not implement code, do not edit generated outputs, and return detailed constraints, affected paths, artifact wording, risks, and verification tasks
+   - Reflect the returned design into `design.md`, spec deltas, and `tasks.md` as applicable; if a unit agent reports blockers or required decisions, resolve them before validation
+
+5. `tasks.md` quality conditions
    - Map implementation tasks to requirements/Scenario IDs
    - Satisfy `rules.tasks` in `openspec/config.yaml` (test tasks for ADDED/MODIFIED Scenario IDs)
+   - Do not create test tasks that assert removed/old routes, old navigation items, deleted screens, deprecated files, demo pages, or legacy behaviors are absent
+   - If implementation deletes an old surface, point tests at the new supported screen/flow or enduring security boundary instead
    - Include verification tasks aligned with repository conventions (lint/test/build and codegen if needed)
 
-5. Format convergence
+6. Format convergence
    - Run `openspec validate --type change "<change-id>" --strict --no-interactive`
    - Fix failures and rerun until PASS
 
-6. Analyzer integration
+7. Analyzer integration
    - Call `openspec/analyzer` via `task` and receive findings (Blocker/Warn/Decision)
    - Apply the received Patch plan and validate again
 
    Note: depending on the execution environment, subagents may not be able to use `task`.
-   - In that case, return `CALLER_ACTION_REQUIRED` and provide the exact next analyzer/researcher invocation steps to the caller
+   - In that case, return `CALLER_ACTION_REQUIRED` and provide the exact next analyzer/researcher/unit design delegation invocation steps to the caller
 
-7. Decisions
+8. Decisions
    - If analyzer returns decision requests, proposer decides
    - If evidence is needed, call `researcher` via `task` and decide with evidence
    - Reflect the decision into proposal/design/spec deltas/tasks (at least one)
 
-8. Completion report
+9. Completion report
    - validate PASS
    - List remaining open questions if any (ideally zero blockers)
 

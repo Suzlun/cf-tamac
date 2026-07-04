@@ -344,3 +344,44 @@ export function assertProviderResultIdentity(
     });
   }
 }
+
+/**
+ * Tool result が waiting Run を再開してよいかを、Run/snapshot/catalog 世代で検証します。
+ *
+ * @param repositories Agent-owned storage repository set です。
+ * @param invocation Provider result が紐づく ToolInvocation 行です。
+ * @throws AgentDomainError Run が waiting ではない、snapshot と Tool catalog generation がずれる、または Tool が利用不可の場合に発生します。
+ */
+export function assertToolResultCanResumeRun(
+  repositories: AgentStorageRepositories,
+  invocation: AgentToolInvocationRow
+): void {
+  const run = repositories.pendingRuns.findRunById(invocation.runId);
+  const snapshot = repositories.pendingRuns.findRunInputSnapshot(invocation.runId);
+  const definition = repositories.tools.findDefinition(invocation.toolId);
+  if (run === undefined || snapshot === undefined || run.status !== 'waiting') {
+    throw createAgentDomainError({
+      kind: 'precondition',
+      message: 'Tool result is stale for the waiting Run.',
+      target: 'run_id',
+    });
+  }
+  if (snapshot.toolSetVersion !== invocation.toolSetVersion) {
+    throw createAgentDomainError({
+      kind: 'precondition',
+      message: 'Tool result catalog generation is stale.',
+      target: 'tool_set_version',
+    });
+  }
+  if (
+    definition === undefined ||
+    !['active', 'available'].includes(definition.status) ||
+    definition.toolSetVersion !== invocation.toolSetVersion
+  ) {
+    throw createAgentDomainError({
+      kind: 'precondition',
+      message: 'Tool result references an unavailable ToolDefinition.',
+      target: 'tool_id',
+    });
+  }
+}

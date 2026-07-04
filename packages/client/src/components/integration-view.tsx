@@ -290,13 +290,10 @@ function IntegrationViewContent({
   onConfirmUninstall,
 }: IntegrationViewContentProps) {
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="integrations"
-      agentId={agentId}
-      currentSection="integrations"
-    >
-      <p className="eyebrow">Integrations</p>
+    <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="integrations">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Integrations
+      </p>
       <h2>Integration installations</h2>
       <AgentToken agentId={agentId} />
 
@@ -435,7 +432,10 @@ function IntegrationInstallPanel({
         <ErrorAlert title="Integration mutation failed" message={error} />
       ) : null}
       {success !== undefined ? (
-        <div className="state-success readout" role="status">
+        <div
+          className="rounded-md border border-primary/50 bg-primary/10 px-3 py-2 text-sm"
+          role="status"
+        >
           {success}
         </div>
       ) : null}

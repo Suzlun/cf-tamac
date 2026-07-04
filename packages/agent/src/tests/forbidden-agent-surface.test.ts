@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
+import { createAgentRpcRouter } from '../rpc/router';
+
+import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
 import type { AgentWorkerEnv } from '../env';
@@ -26,7 +29,8 @@ const forbiddenSourcePatterns = [
 function createTestEnv(): AgentWorkerEnv {
   return {
     AGENT_BLOBS: {} as R2Bucket,
-    AGENT_CLIENT_JWT_PUBLIC_KEYS: 'test-client-key',
+    AGENT_AUDIT_HASH_PEPPER: 'test-audit-hash-pepper',
+    AGENT_CONTROL_PLANE_TRUST: testControlPlaneTrustConfig,
     AGENT_INTEGRATION_SIGNATURE_KEYS: 'test-integration-key',
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',
@@ -99,13 +103,26 @@ async function readErrorCode(response: Response): Promise<string> {
 }
 
 describe('Agent forbidden API surface', () => {
-  it('[AGENT-PLATFORM-S003] [AGENT-SECURITY-S009] [AGENT-HEALTH-S002] REST, DO, and Orval Agent surfaces are unreachable', async () => {
+  it('[AGENT-PLATFORM-S003] [AGENT-PLATFORM-S016] [AGENT-SECURITY-S009] [AGENT-HEALTH-S002] REST, DO, and Orval Agent surfaces are unreachable', async () => {
     const packageJson = JSON.parse(readFileSync(fileURLToPath(packageJsonPath.href), 'utf8')) as {
       readonly exports: Record<string, string>;
     };
 
     expect(collectForbiddenSurfaceIssues()).toEqual([]);
     expect(Object.keys(packageJson.exports)).toEqual(['.']);
+
+    // generated Protobuf service は Connect router に登録し、REST/OpenAPI/Orval では公開しません。
+    expect(
+      createAgentRpcRouter(createTestEnv()).handlers.map((handler) => handler.requestPath)
+    ).toEqual(
+      expect.arrayContaining([
+        '/cftamac.agent.v1.AgentModelPolicyService/UpsertModelPolicy',
+        '/cftamac.agent.v1.AgentModelPolicyService/GetModelPolicy',
+        '/cftamac.agent.v1.AgentModelPolicyService/ListModelPolicies',
+        '/cftamac.agent.v1.AgentModelPolicyService/ArchiveModelPolicy',
+        '/cftamac.agent.v1.AgentModelPolicyService/ValidateModelPolicy',
+      ])
+    );
 
     const getRestPath = await handleAgentConnectRequest(
       createAuthenticatedRestLikeRequest('/agents/agent-1/events', 'GET'),
@@ -118,6 +135,13 @@ describe('Agent forbidden API surface', () => {
       createTestEnv()
     );
     expect(await readErrorCode(postRestPath)).toBe('unimplemented');
+
+    // model policy も Protobuf RPC descriptor だけを公開し、REST 風 resource path は成功させません。
+    const modelPolicyRestPath = await handleAgentConnectRequest(
+      createAuthenticatedRestLikeRequest('/agents/agent-1/model-policies'),
+      createTestEnv()
+    );
+    expect(await readErrorCode(modelPolicyRestPath)).toBe('unimplemented');
 
     const publicDurableObjectLikePath = await handleAgentConnectRequest(
       createAuthenticatedRestLikeRequest('/cdn-cgi/ai-agent/agent-1/checkHealth'),

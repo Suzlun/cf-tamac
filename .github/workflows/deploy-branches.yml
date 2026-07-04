@@ -1,0 +1,82 @@
+name: Deploy Artifact Branches
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-artifact-branches-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate deploy artifacts
+        run: pnpm gen:deploy-artifacts
+
+      - name: Install generated Agent artifact dependencies
+        run: pnpm --dir .deploy/agent install --no-frozen-lockfile
+
+      - name: Smoke build generated Agent artifact
+        run: pnpm --dir .deploy/agent build
+
+      - name: Install generated Client artifact dependencies
+        run: pnpm --dir .deploy/client install --no-frozen-lockfile
+
+      - name: Smoke build generated Client artifact
+        run: pnpm --dir .deploy/client build
+
+      - name: Remove generated artifact dependency directories
+        run: rm -rf .deploy/agent/node_modules .deploy/client/node_modules
+
+      - name: Publish deploy-agent branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -rf ../deploy-agent-worktree
+          git worktree add --detach ../deploy-agent-worktree HEAD
+          git -C ../deploy-agent-worktree rm -r --ignore-unmatch .
+          cp -R .deploy/agent/. ../deploy-agent-worktree/
+          git -C ../deploy-agent-worktree add -A
+          git -C ../deploy-agent-worktree commit -m "chore: update deploy-agent artifact [skip ci]"
+          git -C ../deploy-agent-worktree push origin HEAD:refs/heads/deploy-agent --force
+
+      - name: Publish deploy-client branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -rf ../deploy-client-worktree
+          git worktree add --detach ../deploy-client-worktree HEAD
+          git -C ../deploy-client-worktree rm -r --ignore-unmatch .
+          cp -R .deploy/client/. ../deploy-client-worktree/
+          git -C ../deploy-client-worktree add -A
+          git -C ../deploy-client-worktree commit -m "chore: update deploy-client artifact [skip ci]"
+          git -C ../deploy-client-worktree push origin HEAD:refs/heads/deploy-client --force

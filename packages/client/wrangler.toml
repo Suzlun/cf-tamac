@@ -3,6 +3,13 @@ main = ".open-next/worker.js"
 compatibility_date = "2026-06-20"
 compatibility_flags = ["nodejs_compat"]
 
+[assets]
+# OpenNext が生成する Next.js static chunks を Workers Assets として配信し、
+# `/_next/static/**` が Worker SSR ではなく asset store から返るようにする。
+directory = ".open-next/assets"
+binding = "ASSETS"
+run_worker_first = false
+
 [[d1_databases]]
 binding = "CLIENT_DB"
 database_name = "cf-tamac-client-db"
@@ -10,10 +17,18 @@ database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "src/server/db/migrations"
 
 [vars]
+# Deploy Button users replace this with the deployed Agent Worker origin after Agent deployment.
 AGENT_RPC_DEFAULT_ORIGIN = "http://localhost:8787"
-CLIENT_CREDENTIAL_SECRET_REF = "CLIENT_CREDENTIAL_ENCRYPTION_KEY"
 CLIENT_ACTING_OPERATOR_ID = "client-management-operator"
 CLIENT_ACTING_SCOPES = "agent:read agent:write"
 
 # Required Client credential secrets are provisioned with `wrangler secret put`.
 # - CLIENT_CREDENTIAL_ENCRYPTION_KEY
+#   base64-encoded 32-byte AES-256 key material used to encrypt Ed25519 private
+#   JWKs persisted in the `client_signing_keys` table. This is the only signing
+#   material secret for Agent RPC bearer JWTs and must be provisioned as a Worker
+#   Secret before the Management Client signs any request. HS256 shared secrets,
+#   `AGENT_CREDENTIAL_*`, and `credentialRef` signing sources are not used.
+# - CLIENT_CONTROL_PLANE_PRIVATE_KEYS is intentionally unsupported; private JWKs
+#   are generated in the Management Client and encrypted into CLIENT_DB instead
+#   of being pasted into Worker Secrets.

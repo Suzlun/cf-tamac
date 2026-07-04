@@ -5,16 +5,23 @@ import { useRouter } from 'next/navigation';
 import { useState, type SyntheticEvent } from 'react';
 import { useForm, type FieldErrors, type UseFormReturn } from 'react-hook-form';
 
+import { RegistrationActions } from './agent-registration-actions';
 import { ControlRoomFrame } from './control-room-frame';
 import {
+  buildModelPolicyFieldNames,
+  ModelPolicyFields,
+  type ModelPolicyValidationStatus,
+} from './model-policy-fields';
+import {
+  buildRegistrationModelPolicyDefaults,
   REGISTRATION_FIELD_ORDER,
   registrationSchema,
   type RegistrationFieldName,
+  type RegistrationPolicyValidationResult,
   type RegistrationSubmitResult,
   type RegistrationValues,
 } from './schemas/agent-registration';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { Button } from './ui/button';
 import {
   Form,
   FormControl,
@@ -25,7 +32,9 @@ import {
   FormMessage,
 } from './ui/form';
 import { Input } from './ui/input';
-import { Select } from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
+import type { BrowserSafeModelPolicyWarning } from './schemas/model-policy';
 
 export { validateRegistrationValues } from './schemas/agent-registration';
 export type { RegistrationSubmitResult, RegistrationValues } from './schemas/agent-registration';
@@ -43,6 +52,9 @@ interface RegistrationFormProps {
     readonly status: string;
   };
   readonly onSubmit: (values: RegistrationValues) => Promise<RegistrationSubmitResult>;
+  readonly onValidateModelPolicy: (
+    values: RegistrationValues
+  ) => Promise<RegistrationPolicyValidationResult>;
 }
 
 /**
@@ -56,11 +68,17 @@ export function AgentRegistrationForm({
   initialAgent,
   initialCredential,
   onSubmit,
+  onValidateModelPolicy,
 }: RegistrationFormProps) {
   const router = useRouter();
   const isEdit = initialAgent !== undefined;
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
+  const [policyValidationStatus, setPolicyValidationStatus] =
+    useState<ModelPolicyValidationStatus>('idle');
+  const [policyWarnings, setPolicyWarnings] = useState<readonly BrowserSafeModelPolicyWarning[]>(
+    []
+  );
   const form = useForm<RegistrationValues>({
     resolver: zodResolver(registrationSchema),
     defaultValues: createInitialValues(initialAgent, initialCredential),
@@ -92,17 +110,54 @@ export function AgentRegistrationForm({
     focusFirstInvalidField(form, fieldErrors);
   };
 
+  const handleValidatePolicy = async (): Promise<void> => {
+    // policy validation でも Agent ID、RPC origin、credential reference が必要なため、Server Action 前に同じ form validation を走らせる。
+    const valid = await form.trigger(REGISTRATION_FIELD_ORDER);
+    if (!valid) {
+      setPolicyValidationStatus('invalid');
+      setFormError('Correct the highlighted fields before validating the policy.');
+      focusFirstInvalidField(form, form.formState.errors);
+      return;
+    }
+    setPending(true);
+    setPolicyValidationStatus('validating');
+    setFormError(undefined);
+    try {
+      const result = await onValidateModelPolicy(form.getValues());
+      if (result.ok) {
+        setPolicyWarnings(result.warnings);
+        setPolicyValidationStatus(result.warnings.length > 0 ? 'warning' : 'valid');
+        return;
+      }
+      setPolicyWarnings(result.warnings ?? []);
+      setPolicyValidationStatus('invalid');
+      setFormError(result.formError ?? 'The default model policy could not be validated.');
+      applyServerFieldErrors(form, result.fieldErrors);
+    } catch (error) {
+      setPolicyValidationStatus('unavailable');
+      setFormError(
+        error instanceof Error ? error.message : 'The default model policy could not be validated.'
+      );
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
     <ControlRoomFrame
       title={isEdit ? 'Agent registry › edit' : 'Agent registry › new'}
       signalLabel="registration"
-      currentSection="new"
     >
       <RegistrationFormContent
         form={form}
         isEdit={isEdit}
         pending={pending}
         formError={formError}
+        policyValidationStatus={policyValidationStatus}
+        policyWarnings={policyWarnings}
+        onValidatePolicy={() => {
+          void handleValidatePolicy();
+        }}
         onSubmit={(event) => {
           void form.handleSubmit(handleValidSubmit, handleInvalidSubmit)(event);
         }}
@@ -123,6 +178,7 @@ function createInitialValues(
     agentRpcOrigin: initialAgent?.agentRpcOrigin ?? '',
     displayName: initialAgent?.displayName ?? '',
     displayOrder: initialAgent !== undefined ? String(initialAgent.displayOrder) : '0',
+    modelPolicy: buildRegistrationModelPolicyDefaults(),
     referenceValue: '',
     keyId: initialCredential?.keyId ?? '',
     publicFingerprint: '',
@@ -137,7 +193,7 @@ function applyServerFieldErrors(
 ): void {
   let firstInvalidField: RegistrationFieldName | undefined;
   for (const fieldName of REGISTRATION_FIELD_ORDER) {
-    const message = getFieldValue(fieldErrors, fieldName);
+    const message = getServerFieldError(fieldErrors, fieldName);
     if (message !== undefined) {
       form.setError(fieldName, { type: 'server', message });
       firstInvalidField ??= fieldName;
@@ -153,7 +209,7 @@ function focusFirstInvalidField(
   fieldErrors: FieldErrors<RegistrationValues>
 ): void {
   for (const fieldName of REGISTRATION_FIELD_ORDER) {
-    if (getFieldValue(fieldErrors, fieldName) !== undefined) {
+    if (getFormFieldError(fieldErrors, fieldName) !== undefined) {
       form.setFocus(fieldName);
       return;
     }
@@ -165,6 +221,9 @@ interface RegistrationFormContentProps {
   readonly isEdit: boolean;
   readonly pending: boolean;
   readonly formError: string | undefined;
+  readonly policyValidationStatus: ModelPolicyValidationStatus;
+  readonly policyWarnings: readonly BrowserSafeModelPolicyWarning[];
+  readonly onValidatePolicy: () => void;
   readonly onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
   readonly onCancel: () => void;
 }
@@ -174,14 +233,19 @@ function RegistrationFormContent({
   isEdit,
   pending,
   formError,
+  policyValidationStatus,
+  policyWarnings,
+  onValidatePolicy,
   onSubmit,
   onCancel,
 }: RegistrationFormContentProps) {
   return (
     <>
-      <p className="eyebrow">Registration</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Registration
+      </p>
       <h2>Capture references, not secrets.</h2>
-      <p className="lead">
+      <p className="text-sm text-muted-foreground">
         Register a managed Agent by its ID and RPC origin. Credential references are stored as
         masked hints — never plaintext secrets.
       </p>
@@ -220,6 +284,15 @@ function RegistrationFormContent({
             helper="Lower numbers sort first within pin group."
             disabled={pending}
             inputMode="numeric"
+          />
+          <ModelPolicyFields
+            form={form}
+            names={buildModelPolicyFieldNames<RegistrationValues>('modelPolicy')}
+            mode="create"
+            disabled={pending}
+            validationStatus={policyValidationStatus}
+            warnings={policyWarnings}
+            onValidate={onValidatePolicy}
           />
           <CredentialReferenceSection form={form} pending={pending} />
           <RegistrationActions isEdit={isEdit} pending={pending} onCancel={onCancel} />
@@ -282,8 +355,10 @@ interface CredentialReferenceSectionProps {
 function CredentialReferenceSection({ form, pending }: CredentialReferenceSectionProps) {
   return (
     <details open>
-      <summary className="eyebrow">Credential reference</summary>
-      <p className="form-helper">
+      <summary className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Credential reference
+      </summary>
+      <p className="text-xs text-muted-foreground">
         The Client stores a reference, key ID, masked hint, and status. The secret itself is
         resolved server-side only.
       </p>
@@ -328,37 +403,28 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
         render={({ field }) => (
           <FormItem>
             <FormLabel>Status</FormLabel>
-            <FormControl>
-              <Select {...field} disabled={pending}>
-                <option value="active">active</option>
-                <option value="pending">pending</option>
-                <option value="rotating">rotating</option>
-              </Select>
-            </FormControl>
+            <Select
+              value={field.value}
+              onValueChange={field.onChange}
+              disabled={pending}
+              name={field.name}
+            >
+              <FormControl>
+                <SelectTrigger aria-label="Status">
+                  <SelectValue />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="active">active</SelectItem>
+                <SelectItem value="pending">pending</SelectItem>
+                <SelectItem value="rotating">rotating</SelectItem>
+              </SelectContent>
+            </Select>
             <FormMessage />
           </FormItem>
         )}
       />
     </details>
-  );
-}
-
-interface RegistrationActionsProps {
-  readonly isEdit: boolean;
-  readonly pending: boolean;
-  readonly onCancel: () => void;
-}
-
-function RegistrationActions({ isEdit, pending, onCancel }: RegistrationActionsProps) {
-  return (
-    <div className="action-row">
-      <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
-        Cancel
-      </Button>
-      <Button type="submit" variant="default" disabled={pending} aria-disabled={pending}>
-        {pending ? 'Registering…' : isEdit ? 'Save changes' : 'Register Agent'}
-      </Button>
-    </div>
   );
 }
 
@@ -392,22 +458,30 @@ function FormErrorSummary({ formError, fieldErrors }: FormErrorSummaryProps) {
 function collectFieldErrorSummaryItems(fieldErrors: FieldErrors<RegistrationValues>): string[] {
   const items: string[] = [];
   for (const fieldName of REGISTRATION_FIELD_ORDER) {
-    const message = getFieldValue(fieldErrors, fieldName)?.message;
+    const message = getFormFieldError(fieldErrors, fieldName)?.message;
     if (typeof message === 'string' && message !== '') {
-      items.push(`${getFieldLabel(fieldName)}: ${message}`);
+      items.push(`${getRegistrationFieldLabel(fieldName)}: ${message}`);
     }
   }
   return items;
 }
 
-function getFieldValue<TValue>(
-  fieldValues: Partial<Record<RegistrationFieldName, TValue>>,
+function getServerFieldError(
+  fieldValues: Partial<Record<RegistrationFieldName, string>>,
   fieldName: RegistrationFieldName
-): TValue | undefined {
+): string | undefined {
   if (fieldName === 'agentId') return fieldValues.agentId;
   if (fieldName === 'agentRpcOrigin') return fieldValues.agentRpcOrigin;
   if (fieldName === 'displayName') return fieldValues.displayName;
   if (fieldName === 'displayOrder') return fieldValues.displayOrder;
+  if (fieldName === 'modelPolicy.policyRef') return fieldValues['modelPolicy.policyRef'];
+  if (fieldName === 'modelPolicy.provider') return fieldValues['modelPolicy.provider'];
+  if (fieldName === 'modelPolicy.model') return fieldValues['modelPolicy.model'];
+  if (fieldName === 'modelPolicy.temperature') return fieldValues['modelPolicy.temperature'];
+  if (fieldName === 'modelPolicy.topP') return fieldValues['modelPolicy.topP'];
+  if (fieldName === 'modelPolicy.maxOutputTokens') {
+    return fieldValues['modelPolicy.maxOutputTokens'];
+  }
   if (fieldName === 'referenceValue') return fieldValues.referenceValue;
   if (fieldName === 'keyId') return fieldValues.keyId;
   if (fieldName === 'publicFingerprint') return fieldValues.publicFingerprint;
@@ -415,14 +489,41 @@ function getFieldValue<TValue>(
   return fieldValues.status;
 }
 
-function getFieldLabel(fieldName: RegistrationFieldName): string {
+function getRegistrationFieldLabel(fieldName: RegistrationFieldName): string {
   if (fieldName === 'agentId') return 'Agent ID';
   if (fieldName === 'agentRpcOrigin') return 'Agent RPC origin';
   if (fieldName === 'displayName') return 'Display name';
   if (fieldName === 'displayOrder') return 'Sort order';
+  if (fieldName === 'modelPolicy.policyRef') return 'Policy ref';
+  if (fieldName === 'modelPolicy.provider') return 'Provider';
+  if (fieldName === 'modelPolicy.model') return 'Model ID';
+  if (fieldName === 'modelPolicy.temperature') return 'Temperature';
+  if (fieldName === 'modelPolicy.topP') return 'Top P';
+  if (fieldName === 'modelPolicy.maxOutputTokens') return 'Max output tokens';
   if (fieldName === 'referenceValue') return 'Credential reference';
   if (fieldName === 'keyId') return 'Key ID';
   if (fieldName === 'publicFingerprint') return 'Public fingerprint';
   if (fieldName === 'maskedHint') return 'Masked hint';
   return 'Status';
+}
+
+function getFormFieldError(
+  fieldErrors: FieldErrors<RegistrationValues>,
+  fieldName: RegistrationFieldName
+) {
+  if (fieldName === 'agentId') return fieldErrors.agentId;
+  if (fieldName === 'agentRpcOrigin') return fieldErrors.agentRpcOrigin;
+  if (fieldName === 'displayName') return fieldErrors.displayName;
+  if (fieldName === 'displayOrder') return fieldErrors.displayOrder;
+  if (fieldName === 'modelPolicy.policyRef') return fieldErrors.modelPolicy?.policyRef;
+  if (fieldName === 'modelPolicy.provider') return fieldErrors.modelPolicy?.provider;
+  if (fieldName === 'modelPolicy.model') return fieldErrors.modelPolicy?.model;
+  if (fieldName === 'modelPolicy.temperature') return fieldErrors.modelPolicy?.temperature;
+  if (fieldName === 'modelPolicy.topP') return fieldErrors.modelPolicy?.topP;
+  if (fieldName === 'modelPolicy.maxOutputTokens') return fieldErrors.modelPolicy?.maxOutputTokens;
+  if (fieldName === 'referenceValue') return fieldErrors.referenceValue;
+  if (fieldName === 'keyId') return fieldErrors.keyId;
+  if (fieldName === 'publicFingerprint') return fieldErrors.publicFingerprint;
+  if (fieldName === 'maskedHint') return fieldErrors.maskedHint;
+  return fieldErrors.status;
 }

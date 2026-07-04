@@ -1,6 +1,6 @@
 ## Scope
 
-この設計は `agent-platform`、`management-client`、`workspace-governance` の foundation 仕様を、`docs/memo/仕様設計・アーキテクチャ設定.md` に沿った package 構成、TypeSpec-to-proto 生成、Connect facade、Worker 分離、guardrail に落とし込む。
+この設計は `agent-platform`、`client`、`workspace-governance` の foundation 仕様を、`docs/memo/仕様設計・アーキテクチャ設定.md` に沿った package 構成、TypeSpec-to-proto 生成、Connect facade、Worker 分離、guardrail に落とし込む。
 
 ### In Scope
 
@@ -104,11 +104,11 @@ cf-tamac
 │  │     ├─ tasks.md
 │  │     └─ specs
 │  │        ├─ agent-platform/spec.md
-│  │        ├─ management-client/spec.md
+│  │        ├─ client/spec.md
 │  │        └─ workspace-governance/spec.md
 │  └─ specs
 │     ├─ agent-platform/spec.md
-│     ├─ management-client/spec.md
+│     ├─ client/spec.md
 │     └─ workspace-governance/spec.md
 ├─ scripts
 │  ├─ codegen
@@ -303,9 +303,9 @@ cf-tamac
 | Update      | `openspec/changes/establish-agent-service-foundation/design.md`       | Directory Tree、ER、test plan、workflow governance、storage foundation を記録する。                                                                                                                |
 | Update      | `openspec/changes/establish-agent-service-foundation/tasks.md`        | implementation-ready checklist と verification tasks を記録する。                                                                                                                                  |
 | Add         | `openspec/specs/agent-platform/spec.md`                               | archive/sync 後に Agent platform foundation spec を main spec へ反映する。                                                                                                                         |
-| Add         | `openspec/specs/management-client/spec.md`                            | archive/sync 後に management Client foundation spec を main spec へ反映する。                                                                                                                      |
+| Add         | `openspec/specs/client/spec.md`                                       | archive/sync 後に management Client foundation spec を main spec へ反映する。                                                                                                                      |
 | Add         | `openspec/specs/workspace-governance/spec.md`                         | archive/sync 後に workspace governance foundation spec を main spec へ反映する。                                                                                                                   |
-| Update      | `package.json`                                                        | root scripts を `dev:agent`, `dev:management-client`, `gen:agent:proto`, `gen:agent:rpc`, `gen`, `check:codegen`, lint/test/build に再編する。                                                     |
+| Update      | `package.json`                                                        | root scripts を `dev:agent`, `dev:client`, `gen:agent:proto`, `gen:agent:rpc`, `gen`, `check:codegen`, lint/test/build に再編する。                                                                |
 | Update      | `pnpm-workspace.yaml`                                                 | workspace pattern を `packages/agent` / `packages/client` 中心にし、supply-chain guardrail を維持する。                                                                                            |
 | Update      | `pnpm-lock.yaml`                                                      | dependency 追加・更新後の lockfile を command-owned 差分として更新し、package manifests と整合させる。                                                                                             |
 | Update      | `tsconfig.base.json`                                                  | path aliases を `@cf-tamac/agent`、`@cf-tamac/client`、generated RPC paths に合わせる。                                                                                                            |

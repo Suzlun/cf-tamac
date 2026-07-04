@@ -138,6 +138,32 @@ Developer guidance は、TypeSpec-to-proto を Agent API contract path として
 - **THEN** Agent Worker、Client Worker、TypeSpec-to-proto generation、Protobuf-ES generation、OpenSpec scenario coverage commands が文書化されている
 - **AND** `hello` と `users` demonstration API routes は supported product APIs として文書化されていない
 
+### Requirement: Deploy Button artifact generation
+
+Workspace governance は、Agent Service と Management Client を Cloudflare Deploy Button から個別に導入できる self-contained artifact branch を生成 MUST。
+
+**Customer Context**
+
+利用者は repository clone、local package install、local Wrangler 操作なしで、Cloudflare Dashboard から Agent Worker と Management Client Worker を順番に導入したい。artifact branch に monorepo 前提や秘密鍵手貼り運用が残ると、導入時の失敗と credential exposure risk が増える。
+
+**Requirement**
+
+Root workspace scripts は `deploy-agent` branch root 用 Agent Worker artifact と `deploy-client` branch root 用 Management Client Worker artifact を生成 SHALL。
+
+Deploy artifact は runtime source、generated RPC descriptors、Worker config、binding descriptions、`.dev.vars.example`、artifact README を含む SHALL。
+
+Deploy artifact は package tests、TypeSpec source、monorepo parent `tsconfig` dependency を含めて MUST NOT。
+
+Deploy artifact generation は `AGENT_CONTROL_PLANE_TRUST` の public-only 運用、Client encrypted signing key store、Cloudflare Access post-install checklist、Agent health RPC verification を文書化 SHALL。
+
+#### Scenario: Deploy artifact generation creates self-contained Worker roots (WORKSPACE-GOVERNANCE-S014)
+
+- **GIVEN** repository source と generated Agent RPC descriptors が存在する
+- **WHEN** deploy artifact generation command を実行する
+- **THEN** Agent artifact root は Agent Worker source、`AI_AGENT` Durable Object binding、`AGENT_BLOBS` binding、`AGENT_CONTROL_PLANE_TRUST` example、local generated Agent RPC descriptors を含む
+- **AND** Client artifact root は Next.js App Router source、Client D1 migrations、`CLIENT_DB` binding、`AGENT_RPC_DEFAULT_ORIGIN` example、local generated Client Agent RPC descriptors を含む
+- **AND** artifact roots は package tests、TypeSpec source、parent monorepo `tsconfig` dependency、Client private signing key Worker Secret example を含まない
+
 ### Requirement: Supply-chain guardrail preservation
 
 Workspace package management は、foundation dependencies の導入中も release-age と build-script approval guardrails を維持 MUST。

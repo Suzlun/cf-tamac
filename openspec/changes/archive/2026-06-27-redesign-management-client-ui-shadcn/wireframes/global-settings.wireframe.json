@@ -1,0 +1,106 @@
+{
+  "name": "Global Settings (client-wide)",
+  "viewport": { "width": 1280, "height": 800 },
+  "root": {
+    "name": "App shell",
+    "direction": "vertical",
+    "children": [
+      { "name": "Skip link", "type": "link", "height": 32 },
+      {
+        "name": "Body",
+        "direction": "horizontal",
+        "grow": true,
+        "children": [
+          {
+            "name": "Side menu (no Agent selected, Global Settings active)",
+            "direction": "vertical",
+            "width": 256,
+            "padding": 16,
+            "gap": 16,
+            "children": [
+              {
+                "name": "Brand mark + product name",
+                "direction": "horizontal",
+                "gap": 8,
+                "align": "center",
+                "height": 32,
+                "children": [
+                  { "name": "Logo", "type": "icon", "width": 28, "height": 28 },
+                  { "name": "Product title", "type": "text", "variant": "heading", "height": 24 }
+                ]
+              },
+              {
+                "name": "Global navigation",
+                "direction": "vertical",
+                "gap": 4,
+                "children": [
+                  {
+                    "name": "Global nav group label",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 16
+                  },
+                  { "name": "Agents", "type": "link", "height": 36 },
+                  { "name": "Global Settings (active)", "type": "link", "height": 36 }
+                ]
+              },
+              {
+                "name": "No selected-Agent navigation here (client-wide scope only)",
+                "type": "text",
+                "variant": "caption",
+                "height": 16
+              }
+            ]
+          },
+          {
+            "name": "Main content",
+            "direction": "vertical",
+            "grow": true,
+            "padding": 32,
+            "gap": 24,
+            "children": [
+              {
+                "name": "Page header",
+                "direction": "vertical",
+                "gap": 4,
+                "children": [
+                  { "name": "Breadcrumb: Global Settings", "type": "link", "height": 20 },
+                  { "name": "Global Settings", "type": "text", "variant": "display", "height": 36 },
+                  {
+                    "name": "Lead: Client-wide preferences. Agent-scoped contexts live under each Agent.",
+                    "type": "text",
+                    "height": 20
+                  }
+                ]
+              },
+              {
+                "name": "Settings sections (client-wide only)",
+                "direction": "vertical",
+                "gap": 16,
+                "grow": true,
+                "children": [
+                  {
+                    "name": "Workspace preferences (locale, timezone, theme)",
+                    "type": "card",
+                    "height": 140
+                  },
+                  { "name": "Default display & ordering defaults", "type": "card", "height": 120 },
+                  {
+                    "name": "Client-wide credential vault references (masked)",
+                    "type": "card",
+                    "height": 140
+                  }
+                ]
+              },
+              {
+                "name": "Save preferences (server-side, client-wide)",
+                "type": "button",
+                "height": 40
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

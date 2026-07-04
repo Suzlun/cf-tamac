@@ -1,0 +1,231 @@
+{
+  "name": "Selected-Agent Overview",
+  "viewport": { "width": 1280, "height": 800 },
+  "root": {
+    "name": "App shell",
+    "direction": "vertical",
+    "children": [
+      { "name": "Skip link", "type": "link", "height": 32 },
+      {
+        "name": "Body",
+        "direction": "horizontal",
+        "grow": true,
+        "children": [
+          {
+            "name": "Side menu (persistent, w-64)",
+            "direction": "vertical",
+            "width": 256,
+            "padding": 16,
+            "gap": 16,
+            "children": [
+              {
+                "name": "Brand mark + product name",
+                "direction": "horizontal",
+                "gap": 8,
+                "align": "center",
+                "height": 32,
+                "children": [
+                  { "name": "Logo", "type": "icon", "width": 28, "height": 28 },
+                  { "name": "Product title", "type": "text", "variant": "heading", "height": 24 }
+                ]
+              },
+              {
+                "name": "Global navigation",
+                "direction": "vertical",
+                "gap": 4,
+                "children": [
+                  {
+                    "name": "Global nav group label",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 16
+                  },
+                  { "name": "Agents", "type": "link", "height": 36 },
+                  { "name": "Global Settings", "type": "link", "height": 36 }
+                ]
+              },
+              { "name": "Separator", "type": "divider" },
+              {
+                "name": "Selected-Agent context",
+                "direction": "vertical",
+                "gap": 8,
+                "children": [
+                  {
+                    "name": "Agent-scoped group label",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 16
+                  },
+                  {
+                    "name": "Agent identity header",
+                    "direction": "horizontal",
+                    "gap": 8,
+                    "align": "center",
+                    "children": [
+                      { "name": "Agent avatar", "type": "icon", "width": 32, "height": 32 },
+                      {
+                        "name": "Display name + Agent ID",
+                        "direction": "vertical",
+                        "gap": 2,
+                        "children": [
+                          { "name": "Display name", "type": "text", "height": 18 },
+                          {
+                            "name": "Agent ID (mono)",
+                            "type": "text",
+                            "variant": "caption",
+                            "height": 14
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "Agent-scoped navigation",
+                    "direction": "vertical",
+                    "gap": 2,
+                    "children": [
+                      { "name": "Overview (active)", "type": "link", "height": 34 },
+                      { "name": "Threads", "type": "link", "height": 34 },
+                      { "name": "Events", "type": "link", "height": 34 },
+                      { "name": "Runs", "type": "link", "height": 34 },
+                      { "name": "Schedules", "type": "link", "height": 34 },
+                      { "name": "Integrations", "type": "link", "height": 34 },
+                      { "name": "Settings", "type": "link", "height": 34 }
+                    ]
+                  }
+                ]
+              },
+              { "name": "Spacer", "grow": true },
+              {
+                "name": "Sidebar footer",
+                "direction": "vertical",
+                "gap": 4,
+                "children": [
+                  {
+                    "name": "Signed-in operator",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 16
+                  },
+                  { "name": "Build version", "type": "text", "variant": "caption", "height": 16 }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Main content",
+            "direction": "vertical",
+            "grow": true,
+            "padding": 32,
+            "gap": 24,
+            "children": [
+              {
+                "name": "Page header",
+                "direction": "horizontal",
+                "justify": "space-between",
+                "align": "flex-start",
+                "children": [
+                  {
+                    "name": "Title block",
+                    "direction": "vertical",
+                    "gap": 4,
+                    "children": [
+                      {
+                        "name": "Breadcrumb: Agents / [Display name] / Overview",
+                        "type": "link",
+                        "height": 20
+                      },
+                      {
+                        "name": "Display name",
+                        "type": "text",
+                        "variant": "display",
+                        "height": 36
+                      },
+                      {
+                        "name": "Lifecycle + capability summary line",
+                        "type": "text",
+                        "height": 20
+                      }
+                    ]
+                  },
+                  {
+                    "name": "Primary action (e.g. Rotate credential)",
+                    "type": "button",
+                    "height": 40
+                  }
+                ]
+              },
+              {
+                "name": "Profile row (identity + lifecycle, not nested cards)",
+                "direction": "horizontal",
+                "gap": 24,
+                "align": "stretch",
+                "children": [
+                  {
+                    "name": "Profile facts (definition list)",
+                    "type": "card",
+                    "grow": true,
+                    "height": 140
+                  },
+                  { "name": "Lifecycle state panel", "type": "card", "grow": true, "height": 140 },
+                  {
+                    "name": "Capability summary panel",
+                    "type": "card",
+                    "grow": true,
+                    "height": 140
+                  }
+                ]
+              },
+              {
+                "name": "Config + credential generation row",
+                "direction": "horizontal",
+                "gap": 24,
+                "children": [
+                  { "name": "Config version detail", "type": "card", "grow": true, "height": 160 },
+                  {
+                    "name": "Credential generation detail",
+                    "type": "card",
+                    "grow": true,
+                    "height": 160
+                  }
+                ]
+              },
+              {
+                "name": "Contextual Memory / Compaction summary (folded-in, no top-level Compactions nav)",
+                "direction": "vertical",
+                "gap": 12,
+                "grow": true,
+                "children": [
+                  {
+                    "name": "Section header row",
+                    "direction": "horizontal",
+                    "justify": "space-between",
+                    "align": "center",
+                    "children": [
+                      {
+                        "name": "Latest memory & compaction",
+                        "type": "text",
+                        "variant": "heading",
+                        "height": 24
+                      },
+                      { "name": "Open in Threads", "type": "link", "height": 20 }
+                    ]
+                  },
+                  {
+                    "name": "Compaction history list (contextual detail)",
+                    "direction": "vertical",
+                    "gap": 8,
+                    "children": [
+                      { "name": "Compaction entry 1", "type": "card", "height": 64 },
+                      { "name": "Compaction entry 2", "type": "card", "height": 64 }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

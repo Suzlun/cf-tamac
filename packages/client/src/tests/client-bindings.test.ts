@@ -6,13 +6,15 @@ import { describe, expect, it } from 'vitest';
 const wranglerConfigPath = new URL('../../wrangler.toml', import.meta.url);
 
 describe('Management Client Worker bindings', () => {
-  it('[MANAGEMENT-CLIENT-S005] Client Worker binding set is isolated from Agent runtime', () => {
+  it('[MANAGEMENT-CLIENT-SHELL-S005] Client Worker binding set is isolated from Agent runtime', () => {
     const config = readFileSync(fileURLToPath(wranglerConfigPath.href), 'utf8');
 
     expect(config).toContain('[[d1_databases]]');
     expect(config).toContain('binding = "CLIENT_DB"');
-    expect(config).toContain('CLIENT_CREDENTIAL_SECRET_REF');
     expect(config).toContain('CLIENT_CREDENTIAL_ENCRYPTION_KEY');
+    expect(config).toContain('[assets]');
+    expect(config).toContain('directory = ".open-next/assets"');
+    expect(config).toContain('binding = "ASSETS"');
 
     expect(config).not.toContain('AI_AGENT');
     expect(config).not.toContain('AGENT_BLOBS');

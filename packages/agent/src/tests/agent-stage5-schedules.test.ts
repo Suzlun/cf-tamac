@@ -65,6 +65,18 @@ describe('Agent Stage 5 Schedule implementation', () => {
     expect(aiAgent).toContain("reason: 'event_accepted'");
   });
 
+  it('[AGENT-SCHEDULE-S006] create_schedule decision preserves causation through fire', () => {
+    const decisionCommit = readSource(new URL('../runs/decision-commit.ts', import.meta.url));
+    const firing = readSource(firingPath);
+
+    expect(decisionCommit).toContain('createDecisionScheduleSpec(input, decision)');
+    expect(decisionCommit).toContain('causationEventId: input.snapshot.triggerEventId');
+    expect(decisionCommit).toContain('modelPolicyDigest: input.snapshot.resolvedModelPolicyDigest');
+    expect(decisionCommit).toContain("callbackIdentity: 'agent-run-decision'");
+    expect(firing).toContain('readScheduleCausationEventId(schedule.scheduleSpec)');
+    expect(firing).toContain('eventType: scheduleTriggeredEventType');
+  });
+
   it('[AGENT-SCHEDULE-S003] Overlap policy prevents duplicate interval work', () => {
     const repository = readSource(repositoryPath);
     const parsed = parseAgentScheduleSpec('every:60', 1_000);

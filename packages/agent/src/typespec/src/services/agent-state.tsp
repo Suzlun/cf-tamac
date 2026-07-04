@@ -18,6 +18,7 @@ model GetStateRequest {
 model GetStateResponse {
   @field(1) state: AgentStateSnapshot;
   @field(2) storage?: StorageThresholdStatus;
+  @field(3) model_execution?: ModelExecutionCapability;
 }
 
 @message
@@ -29,6 +30,7 @@ model GetConfigRequest {
 model GetConfigResponse {
   @field(1) config: AgentConfig;
   @field(2) updated_by?: PrincipalContext;
+  @field(3) default_model_policy?: AgentModelPolicySummary;
 }
 
 @message
@@ -44,4 +46,6 @@ model UpdateConfigResponse {
   @field(1) config: AgentConfig;
   @field(2) audit?: AgentAuditRecord;
   @field(3) replayed: boolean;
+  @field(4) default_model_policy?: AgentModelPolicySummary;
+  @field(5) validation?: AgentModelPolicyValidationResult;
 }

@@ -14,6 +14,9 @@ const lifecycleQueryActions = new Set([
   'integration.connection.list',
   'integration.get',
   'integration.list',
+  'model_policy.get',
+  'model_policy.list',
+  'model_policy.validate',
   'run.get',
   'run.list',
   'schedule.get',
@@ -59,9 +62,7 @@ export function decideAgentFinalAuthorization(
   const matchedScopes = input.requiredScopes.filter((scope) =>
     input.principal.scopes.includes(scope)
   );
-  const effectiveMatchedScopes = requiresScopedIntegrationToolResultGrant(input)
-    ? []
-    : matchedScopes;
+  const effectiveMatchedScopes = requiresScopedIntegrationScopedGrant(input) ? [] : matchedScopes;
   const matchedGrants = getMatchedScopedGrants(input);
   if (effectiveMatchedScopes.length === 0 && matchedGrants.length === 0) {
     return denyAgentAuthorization({
@@ -77,6 +78,21 @@ function requiresScopedIntegrationToolResultGrant(input: AgentFinalAuthorization
   return (
     input.operation.action === 'tool.result.publish' &&
     input.principal.principalType === 'INTEGRATION_INSTALLATION'
+  );
+}
+
+function requiresScopedIntegrationModelPolicyGrant(input: AgentFinalAuthorizationRequest): boolean {
+  // Integration が model policy override を要求する場合は、汎用 scope ではなく Installation/Connection/Policy に絞った grant を必須にします。
+  return (
+    input.operation.action === 'event.model_policy.override' &&
+    input.principal.principalType === 'INTEGRATION_INSTALLATION'
+  );
+}
+
+function requiresScopedIntegrationScopedGrant(input: AgentFinalAuthorizationRequest): boolean {
+  return (
+    requiresScopedIntegrationToolResultGrant(input) ||
+    requiresScopedIntegrationModelPolicyGrant(input)
   );
 }
 
@@ -97,7 +113,7 @@ function doesGrantScopeMatchCapability(
   input: AgentFinalAuthorizationRequest
 ): boolean {
   if (scopeRef === undefined || scopeRef === '')
-    return !requiresScopedIntegrationToolResultGrant(input);
+    return !requiresScopedIntegrationScopedGrant(input);
   const capability = input.capability;
   if (capability === undefined) return true;
   const acceptedScopeRefs = [
@@ -109,6 +125,13 @@ function doesGrantScopeMatchCapability(
     capability.installationId === undefined
       ? undefined
       : `installation:${capability.installationId}`,
+    capability.modelPolicyRef,
+    capability.modelPolicyRef === undefined
+      ? undefined
+      : `model_policy:${capability.modelPolicyRef}`,
+    capability.modelPolicyRef === undefined
+      ? undefined
+      : `agent.model_policy.override:${capability.modelPolicyRef}`,
     capability.adapterConnectionId,
     capability.adapterConnectionId === undefined
       ? undefined

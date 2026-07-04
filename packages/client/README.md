@@ -20,14 +20,14 @@
 corepack enable
 pnpm install
 pnpm dev:agent
-pnpm dev:management-client
+pnpm dev:client
 ```
 
 Useful local checks:
 
 ```bash
-pnpm check:management-client
-pnpm test:management-client
+pnpm check:client
+pnpm test:client
 pnpm lint
 ```
 
@@ -35,16 +35,26 @@ Use `AGENT_RPC_DEFAULT_ORIGIN` for local Agent RPC origin defaults. Client UI da
 
 ## Secret handling
 
-- `CLIENT_DB` stores managed Agent metadata and credential references only: Agent ID, RPC origin, display metadata, key ID, masked hint, status, and timestamps.
-- Store actual credential material outside D1 and resolve it only in server-side code.
+- `CLIENT_DB` stores managed Agent metadata, external credential references, and encrypted Client Service signing key records only: Agent ID, RPC origin, display metadata, signing issuer/kid/public fingerprint, key ID, masked hint, encrypted private JWK, status, and timestamps.
+- Store Provider or model credential material outside D1 and resolve it only in server-side code. Agent RPC Client Service signing uses the encrypted signing key store, not Provider credential references.
 - Provision Client secrets with `wrangler secret put --config packages/client/wrangler.toml CLIENT_CREDENTIAL_ENCRYPTION_KEY`.
-- Do not serialize raw Agent tokens, private keys, Provider secrets, Authorization headers, or signing material into HTML, browser bundles, actions results, local storage, or logs.
+- Do not serialize raw Agent tokens, private JWK, encrypted private JWK, Provider secrets, Authorization headers, raw JWT, or signing material into HTML, browser bundles, actions results, local storage, public Client routes, or logs.
+- Do not require operators to paste a Client private signing key JSON into Worker Secrets. `CLIENT_CREDENTIAL_ENCRYPTION_KEY` is the encryption root; Agent Worker receives only public-only `AGENT_CONTROL_PLANE_TRUST`.
+
+## Control-plane signing operations
+
+- `Global Settings > Signing Keys` generates Ed25519 key pairs even when there are no managed Agents. Server-side code encrypts the private JWK with `CLIENT_CREDENTIAL_ENCRYPTION_KEY` before writing Client D1.
+- `Global Settings > Trust Config Export` emits public-only `AGENT_CONTROL_PLANE_TRUST` JSON for Agent Worker Variables and Secrets. It must not include private key parameter `d`, private JWK plaintext, encrypted private JWK, or raw JWT.
+- Agent settings selects an existing global signing key and runs `AgentHealthService.Check` to verify issuer/kid/fingerprint and trust config fingerprint.
+- Rotation, emergency revoke, break-glass recovery, staging smoke, and private-key non-exposure checks are documented in `../../docs/operations/agent-control-plane-auth.md`.
 
 ## Deployment and Client D1 migration notes
 
+- Deploy Button 用 artifact は repository root の `pnpm gen:deploy-artifacts` から `.deploy/client` に生成され、`deploy-client` branch root へ CI が publish します。artifact branch は手編集しません。
 - Deploy the Management Client with `packages/client/wrangler.toml`; the Worker owns `CLIENT_DB` and credential references only, not `AI_AGENT` or Agent-owned storage.
+- Deploy Button users can start from `packages/client/.dev.vars.example`; it contains `AGENT_RPC_DEFAULT_ORIGIN` and `CLIENT_CREDENTIAL_ENCRYPTION_KEY`, not a Client private signing key secret.
 - Apply reviewed Client D1 migrations with `wrangler d1 execute --config packages/client/wrangler.toml --file packages/client/src/server/db/migrations/<migration>.sql`.
-- Migrations must stay limited to managed Agent registry and credential reference tables; do not add Agent-domain snapshot tables to Client D1.
+- Migrations must stay limited to managed Agent registry, external credential reference tables, and encrypted Client Service signing key store tables; do not add Agent-domain snapshot tables or plaintext secret/private JWK columns to Client D1.
 
 ## Provider interop profile
 

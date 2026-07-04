@@ -8,6 +8,7 @@ import {
   AgentIntegrationService,
   AgentHealthService,
   AgentLifecycleService,
+  AgentModelPolicyService,
   AgentRunService,
   AgentScheduleService,
   AgentStateService,
@@ -42,6 +43,7 @@ export interface ServerAgentRpcClientConfig {
  */
 export interface ServerAgentRpcClients {
   readonly lifecycle: Client<typeof AgentLifecycleService>;
+  readonly modelPolicies: Client<typeof AgentModelPolicyService>;
   readonly events: Client<typeof AgentEventService>;
   readonly threads: Client<typeof AgentThreadService>;
   readonly runs: Client<typeof AgentRunService>;
@@ -82,6 +84,7 @@ export function createServerAgentRpcClients(
 
   return {
     lifecycle: createClient(AgentLifecycleService, transport),
+    modelPolicies: createClient(AgentModelPolicyService, transport),
     events: createClient(AgentEventService, transport),
     threads: createClient(AgentThreadService, transport),
     runs: createClient(AgentRunService, transport),

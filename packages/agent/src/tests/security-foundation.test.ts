@@ -3,10 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createAgentDomainError } from '../domain/errors';
 import { decideAgentFinalAuthorization } from '../domain/final-authorization';
-import { encodeBase64UrlBytes, encodeBase64UrlJson } from '../domain/security/base64url';
 import { signBytesWithAgentKey, verifyBytesWithAgentKey } from '../domain/security/crypto';
 import { createRawBodyDigest } from '../domain/security/digest';
-import { verifyClientServiceJwt } from '../domain/security/jwt';
 import {
   buildIntegrationDeliverySignatureMetadata,
   buildIntegrationToolSignatureMetadata,
@@ -56,77 +54,6 @@ class MemoryNonceRepository implements AgentNonceRepository {
 }
 
 describe('Agent security foundation', () => {
-  it('[AGENT-SECURITY-S001] Valid Client Service JWT authenticates Agent RPC', async () => {
-    const token = await createHs256Jwt({
-      payload: {
-        acting_user_id: 'user-1',
-        agent_id: 'agent-alpha',
-        aud: ['agent-rpc', 'agent-observer'],
-        exp: nowUnixSeconds + 120,
-        iss: 'client-service',
-        jti: 'jwt-1',
-        nbf: nowUnixSeconds - 10,
-        scope: 'agent.rpc agent.health',
-        sub: 'client-service-principal',
-      },
-      secret: 'client-secret',
-    });
-
-    const result = await verifyClientServiceJwt(token, {
-      expectedAgentId: 'agent-alpha',
-      expectedAudience: 'agent-rpc',
-      expectedIssuer: 'client-service',
-      keyResolver: ({ keyId }) =>
-        keyId === 'client-key-1' ? { algorithm: 'HS256', key: 'client-secret', keyId } : undefined,
-      nowUnixSeconds,
-      requiredScopes: ['agent.rpc'],
-    });
-
-    expect(result.status).toBe('verified');
-    if (result.status !== 'verified') {
-      throw new Error('expected verified Client Service JWT');
-    }
-    expect(result.principal).toMatchObject({
-      actingUserId: 'user-1',
-      agentId: 'agent-alpha',
-      audience: 'agent-rpc',
-      issuer: 'client-service',
-      jwtId: 'jwt-1',
-      principalId: 'client-service-principal',
-      principalType: 'CLIENT_SERVICE',
-      scopes: ['agent.rpc', 'agent.health'],
-      subject: 'client-service-principal',
-    });
-  });
-
-  it('[AGENT-SECURITY-S002] Invalid Client JWT is rejected before mutation', async () => {
-    const expiredToken = await createHs256Jwt({
-      payload: {
-        acting_user_id: 'user-1',
-        agent_id: 'agent-alpha',
-        aud: 'agent-rpc',
-        exp: nowUnixSeconds - 120,
-        iss: 'client-service',
-        jti: 'jwt-expired',
-        nbf: nowUnixSeconds - 240,
-        scope: 'agent.rpc',
-        sub: 'client-service-principal',
-      },
-      secret: 'client-secret',
-    });
-
-    const result = await verifyClientServiceJwt(expiredToken, {
-      expectedAgentId: 'agent-alpha',
-      expectedAudience: 'agent-rpc',
-      expectedIssuer: 'client-service',
-      keyResolver: () => ({ algorithm: 'HS256', key: 'client-secret', keyId: 'client-key-1' }),
-      nowUnixSeconds,
-      requiredScopes: ['agent.rpc'],
-    });
-
-    expect(result).toMatchObject({ reason: 'expired', status: 'rejected' });
-  });
-
   it('[AGENT-SECURITY-S003] Valid Integration signature accepts ingress within grant', async () => {
     // Provider から届く Protobuf body を digest 化し、署名ベースへ固定します。
     const rawBodyDigest = await createRawBodyDigest(textEncoder.encode('publish-event-protobuf'));
@@ -296,17 +223,33 @@ describe('Agent security foundation', () => {
     const log = createAgentStructuredLogRecord({
       attributes: {
         Authorization: 'Bearer raw-token',
-        nested: { providerCredential: 'raw-secret', signatureBase: 'full-signature-base' },
+        keyMaterial: 'raw-key-material',
+        nested: {
+          hiddenReasoningSummary: 'chain-of-thought-summary',
+          providerCredential: 'raw-secret',
+          rawJwtSummary: 'header.payload.signature.summary',
+          signatureBase: 'full-signature-base',
+        },
+        publicJwk: { crv: 'Ed25519', kty: 'OKP', x: 'public-key-full-value' },
+        rawJwt: 'header.payload.signature',
         safe: 'kept',
       },
       fields: {
+        actingUserIdHash: 'hash-user-1',
         agentId: 'agent-alpha',
+        authFailureReason: 'invalid_signature',
         idempotencyKey: 'idem-1',
+        issuer: 'client-service',
+        jwtId: 'jwt-1',
+        keyFingerprint: 'sha256:fingerprint',
+        keyId: 'client-key-1',
         method: 'Check',
         principalId: 'principal-1',
         principalType: 'CLIENT_SERVICE',
         requestId: 'request-1',
+        scopes: ['agent:read'],
         service: 'cftamac.agent.v1.AgentHealthService',
+        subjectHash: 'hash-client-service-principal',
       },
       message: 'request completed',
       severity: 'info',
@@ -315,7 +258,11 @@ describe('Agent security foundation', () => {
     const audit = createAgentAuditRecord({
       action: 'IntegrationIngressService.PublishEvent',
       auditId: 'audit-1',
-      details: { privateKey: 'raw-private', token: 'raw-token' },
+      details: {
+        encryptedPrivateJwk: 'ciphertext',
+        privateKey: 'raw-private',
+        token: 'raw-token',
+      },
       fields: log.fields,
       outcome: 'denied',
       timestampUnixMs: nowUnixMs,
@@ -343,6 +290,11 @@ describe('Agent security foundation', () => {
     expect(serialized).not.toContain('raw-token');
     expect(serialized).not.toContain('raw-secret');
     expect(serialized).not.toContain('raw-private');
+    expect(serialized).not.toContain('raw-key-material');
+    expect(serialized).not.toContain('public-key-full-value');
+    expect(serialized).not.toContain('header.payload.signature');
+    expect(serialized).not.toContain('chain-of-thought-summary');
+    expect(serialized).not.toContain('ciphertext');
     expect(serialized).not.toContain('full-signature-base');
   });
 
@@ -410,21 +362,6 @@ describe('Agent security foundation', () => {
     await expectProviderSignatureToVerify(deliver, 'provider-secret');
   });
 });
-
-async function createHs256Jwt(input: {
-  readonly payload: Readonly<Record<string, unknown>>;
-  readonly secret: string;
-}): Promise<string> {
-  const encodedHeader = encodeBase64UrlJson({ alg: 'HS256', kid: 'client-key-1', typ: 'JWT' });
-  const encodedPayload = encodeBase64UrlJson(input.payload);
-  const signingInput = `${encodedHeader}.${encodedPayload}`;
-  const signature = await signBytesWithAgentKey({
-    algorithm: 'HS256',
-    data: textEncoder.encode(signingInput),
-    key: input.secret,
-  });
-  return `${signingInput}.${encodeBase64UrlBytes(signature)}`;
-}
 
 function invokeProviderBase(signingKey: {
   readonly algorithm: 'HS256';

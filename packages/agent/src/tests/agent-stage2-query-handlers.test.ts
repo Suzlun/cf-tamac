@@ -10,6 +10,7 @@ import type {
   AgentConfigRow,
   AgentEventRow,
   AgentGrantRow,
+  AgentModelPolicyRow,
   AgentProfileRow,
   AgentRunRow,
   AgentSchedulerWakeStateRow,
@@ -107,6 +108,7 @@ describe('Agent Stage 2 query handlers', () => {
       agentId,
       configVersion: 4,
       currentRunId: 'run-alpha-1',
+      defaultModelPolicy: { policyRef: 'model-policy-safe' },
       lifecycleStatus: 'active',
       schedulerStatus: 'pending',
       storageStatus: 'normal',
@@ -122,7 +124,9 @@ describe('Agent Stage 2 query handlers', () => {
       budgetPolicyRef: 'budget-policy-safe',
       configBodyRef: 'r2://agent-alpha/config/current',
       configVersion: 4,
+      defaultModelPolicy: { policyRef: 'model-policy-safe' },
       modelPolicyRef: 'model-policy-safe',
+      modelPolicyValidation: { ok: true, policyRef: 'model-policy-safe' },
     });
     expect(stringifySafe({ config, state })).not.toMatch(/secret|credential|token|payload body/i);
   });
@@ -220,6 +224,11 @@ function createQueryRepositories(): AgentStorageRepositories {
       upsertGrant: unusedRepositoryMethod,
     },
     idempotency: createUnusedIdempotencyRepository(),
+    modelPolicies: {
+      getActivePolicy: (policyRef: string) => createModelPolicy(policyRef),
+      getPolicy: (policyRef: string) => createModelPolicy(policyRef),
+      tableName: 'agent_model_policies',
+    },
     pendingRuns: createRunsRepository(runs),
     principals: createUnusedPrincipalsRepository(),
     profile: {
@@ -232,6 +241,36 @@ function createQueryRepositories(): AgentStorageRepositories {
     sections: createSectionsRepository(sections),
     threads: createThreadsRepository(threads),
   } as unknown as AgentStorageRepositories;
+}
+
+function createModelPolicy(policyRef: string): AgentModelPolicyRow {
+  return {
+    archivedAtMs: null,
+    budgetMetadataRef: null,
+    budgetMetadataSha256: null,
+    createdAtMs: 180,
+    createdByPrincipalId: principalId,
+    credentialRef: null,
+    decisionSchemaVersion: 'agent-decision-v1',
+    generationMaxOutputTokens: null,
+    generationParametersRef: null,
+    generationParametersSha256: null,
+    generationTemperature: null,
+    generationTopP: null,
+    modelId: '@cf/meta/llama-3.1-8b-instruct',
+    policyDigest: 'e'.repeat(64),
+    policyRef,
+    provider: 'workers-ai',
+    safeMetadataRef: null,
+    safeMetadataSha256: null,
+    safetyMetadataRef: null,
+    safetyMetadataSha256: null,
+    status: 'active',
+    updatedAtMs: 181,
+    updatedByPrincipalId: principalId,
+    validatedAtMs: 181,
+    version: 1,
+  };
 }
 
 function createThreadRows(): AgentThreadRow[] {

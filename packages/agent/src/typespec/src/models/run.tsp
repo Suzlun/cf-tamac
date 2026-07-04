@@ -20,6 +20,10 @@ model AgentRun {
   @field(14) integration_version?: string;
   @field(15) interrupt_reason?: string;
   @field(16) safe_error?: RpcErrorDetail;
+  @field(17) model_policy_snapshot?: RunModelPolicySnapshot;
+  @field(18) model_invocation_summary?: AgentModelInvocationSummary;
+  @field(19) decision_schema_version?: string;
+  @field(20) failure_category?: string;
 }
 
 @message
@@ -39,6 +43,8 @@ model AgentRunInput {
   @field(13) tool_set_version?: string;
   @field(14) integration_installation_version?: string;
   @field(15) state_snapshot_ref?: string;
+  @field(16) model_policy_snapshot?: RunModelPolicySnapshot;
+  @field(17) model_invocation_summary?: AgentModelInvocationSummary;
 }
 
 @message
@@ -49,4 +55,6 @@ model RunSnapshotReference {
   @field(4) run_id: string;
   @field(5) created_at_unix_ms: int64;
   @field(6) digest_sha256: string;
+  @field(7) model_policy_digest?: string;
+  @field(8) decision_schema_version?: string;
 }

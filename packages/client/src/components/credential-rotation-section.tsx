@@ -105,7 +105,10 @@ export function CredentialRotationSection({
   };
 
   return (
-    <section className="readout" aria-labelledby="credential-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="credential-heading"
+    >
       <strong id="credential-heading">Credential rotation</strong>
       <CurrentCredentialSummary credential={currentCredential} />
       <Button
@@ -160,7 +163,9 @@ function NewReferenceForm({ form, pending, onSave, onInvalid }: NewReferenceForm
 
   return (
     <div className="mt-4">
-      <p className="eyebrow">New reference</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        New reference
+      </p>
       <Form {...form}>
         <form
           onSubmit={(event) => {
@@ -232,16 +237,19 @@ function CredentialTextField({ form, name, label, helper, disabled }: Credential
 
 function CurrentCredentialSummary({ credential }: { readonly credential?: CurrentCredentialView }) {
   return (
-    <div className="readout mb-4" aria-label="Current credential">
+    <div
+      className="mb-4 rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-label="Current credential"
+    >
       <strong>Current credential</strong>
       <p>generation {credential?.generation ?? '—'}</p>
-      <p>
+      <div>
         status:{' '}
         <SignalBadge
           label={(credential?.status ?? 'unknown').toUpperCase()}
           variant={credential?.status === 'active' ? 'signal' : 'muted'}
         />
-      </p>
+      </div>
       <p>key id: {credential?.keyId ?? '—'}</p>
       <p>masked hint: {credential?.maskedHint ?? '—'}</p>
     </div>

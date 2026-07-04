@@ -22,4 +22,7 @@ model CheckHealthResponse {
   @field(5) checked_at_unix_ms: int64;
   @field(6) health?: AgentHealthSnapshot;
   @field(7) dependency_status_ref?: string;
+  @field(8) model_execution?: ModelExecutionCapability;
+  @field(9) trust_config?: TrustConfigDiagnostic;
+  @field(10) current_principal_trust?: AuthenticatedPrincipalTrustSummary;
 }

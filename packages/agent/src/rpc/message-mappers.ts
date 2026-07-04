@@ -14,6 +14,11 @@ import type {
   UpdateConfigResponseSchema,
 } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
+import {
+  mapAgentModelPolicySummary,
+  mapAgentModelPolicyValidation,
+} from './model-policy-message-mappers';
+
 import type {
   AgentConfigCommandInput,
   AgentConfigView,
@@ -68,6 +73,10 @@ export function mapInitializeAgentResponse(
     audit: mapAudit(result.audit),
     config: mapConfig(result.config),
     credential: mapCredential(result.credential),
+    defaultModelPolicy:
+      result.defaultModelPolicy === undefined
+        ? undefined
+        : mapAgentModelPolicySummary(result.defaultModelPolicy),
     threadKeyRule: {
       agentId: result.agent.agentId,
       caseSensitive: true,
@@ -92,6 +101,10 @@ export function mapGetAgentResponse(
     agent: mapProfile(result.agent),
     capabilitySummary: result.capabilitySummary,
     config: mapConfig(result.config),
+    defaultModelPolicy:
+      result.defaultModelPolicy === undefined
+        ? undefined
+        : mapAgentModelPolicySummary(result.defaultModelPolicy),
   };
 }
 
@@ -130,6 +143,11 @@ export function mapUpdateConfigResponse(
   return {
     audit: mapAudit(result.audit),
     config: mapConfig(result.config),
+    defaultModelPolicy:
+      result.config.defaultModelPolicy === undefined
+        ? undefined
+        : mapAgentModelPolicySummary(result.config.defaultModelPolicy),
+    validation: mapAgentModelPolicyValidation(result.config.modelPolicyValidation),
     replayed: result.replayed,
   };
 }
@@ -140,7 +158,14 @@ export function mapUpdateConfigResponse(
 export function mapGetConfigResponse(
   config: AgentConfigView
 ): MessageInitShape<typeof GetConfigResponseSchema> {
-  return { config: mapConfig(config), updatedBy: mapUpdatedBy(config) };
+  return {
+    config: mapConfig(config),
+    defaultModelPolicy:
+      config.defaultModelPolicy === undefined
+        ? undefined
+        : mapAgentModelPolicySummary(config.defaultModelPolicy),
+    updatedBy: mapUpdatedBy(config),
+  };
 }
 
 /**
@@ -149,7 +174,11 @@ export function mapGetConfigResponse(
 export function mapGetStateResponse(
   result: GetAgentStateResult
 ): MessageInitShape<typeof GetStateResponseSchema> {
-  return { state: mapState(result.state), storage: mapStorage(result.storage) };
+  return {
+    modelExecution: mapModelExecutionCapability(result.modelExecution),
+    state: mapState(result.state),
+    storage: mapStorage(result.storage),
+  };
 }
 
 /**
@@ -325,9 +354,14 @@ function mapConfig(config: AgentConfigView) {
     budgetPolicyRef: config.budgetPolicyRef,
     configBodyRef: mapRefOnly(config.configBodyRef),
     configVersion: String(config.configVersion),
+    defaultModelPolicy:
+      config.defaultModelPolicy === undefined
+        ? undefined
+        : mapAgentModelPolicySummary(config.defaultModelPolicy),
     displayName: config.displayName,
     memoryPolicyRef: config.memoryPolicyRef,
     modelPolicyRef: config.modelPolicyRef,
+    modelPolicyValidation: mapAgentModelPolicyValidation(config.modelPolicyValidation),
     schedulePolicyRef: config.schedulePolicyRef,
     toolPolicyRef: config.toolPolicyRef,
     updatedAtUnixMs: BigInt(config.updatedAtMs),
@@ -391,6 +425,11 @@ function mapEvent(event: AgentEventView) {
     occurredAtUnixMs: BigInt(event.occurredAtMs),
     payloadMetadata: mapPayload(event.payloadMetadata),
     payloadRef: event.payloadRef,
+    policyOverrideSource: event.policyOverrideSource,
+    modelPolicy:
+      event.modelPolicy === undefined ? undefined : mapAgentModelPolicySummary(event.modelPolicy),
+    modelPolicyValidation: mapAgentModelPolicyValidation(event.modelPolicyValidation),
+    requestedModelPolicyRef: event.requestedModelPolicyRef,
     runId: event.runId,
     sectionId: event.sectionId,
     source: event.source,
@@ -453,12 +492,44 @@ function mapState(state: AgentStateSnapshotView) {
     capabilitySummary: state.capabilitySummary,
     configVersion: String(state.configVersion),
     currentRunId: state.currentRunId,
+    defaultModelPolicy:
+      state.defaultModelPolicy === undefined
+        ? undefined
+        : mapAgentModelPolicySummary(state.defaultModelPolicy),
     lifecycleStatus: state.lifecycleStatus,
+    modelExecution: mapModelExecutionCapability(state.modelExecution),
     schedulerStatus: state.schedulerStatus,
     stateRef: state.stateRef,
     stateVersion: state.stateVersion,
     storageStatus: state.storageStatus,
     updatedAtUnixMs: BigInt(state.updatedAtMs),
+  };
+}
+
+function mapModelExecutionCapability(
+  capability:
+    | {
+        readonly bindingPresent: boolean;
+        readonly checkedAtMs: number;
+        readonly defaultPolicyDigest?: string;
+        readonly defaultPolicyRef?: string;
+        readonly modelId?: string;
+        readonly provider?: string;
+        readonly safeDetailRef?: string;
+        readonly status: string;
+      }
+    | undefined
+) {
+  if (capability === undefined) return undefined;
+  return {
+    bindingPresent: capability.bindingPresent,
+    checkedAtUnixMs: BigInt(capability.checkedAtMs),
+    defaultPolicyDigest: capability.defaultPolicyDigest,
+    defaultPolicyRef: capability.defaultPolicyRef,
+    modelId: capability.modelId,
+    provider: capability.provider,
+    safeDetailRef: capability.safeDetailRef,
+    status: capability.status,
   };
 }
 

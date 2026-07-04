@@ -16,12 +16,14 @@ import type { IntegrationDeliveryProviderClient } from './provider-client';
  */
 export interface IntegrationInstallationView {
   readonly agentId: string;
+  readonly allowedModelPolicyRefs: readonly string[];
   readonly grantSummaryRef?: string;
   readonly installedAtMs?: number;
   readonly installationId: string;
   readonly integrationId: string;
   readonly manifestDigestSha256?: string;
   readonly manifestRef?: string;
+  readonly modelPolicyGrantRef?: string;
   readonly providerBaseUrl?: string;
   readonly providerId?: string;
   readonly publicKeyRef?: string;
@@ -78,6 +80,7 @@ export interface IntegrationGrantView {
 export interface AdapterConnectionView {
   readonly adapterId: string;
   readonly agentId: string;
+  readonly allowedModelPolicyRefs: readonly string[];
   readonly connectionId: string;
   readonly connectionKey?: string;
   readonly createdAtMs: number;
@@ -87,6 +90,7 @@ export interface AdapterConnectionView {
   readonly grantSummaryRef?: string;
   readonly installationId: string;
   readonly metadataRef?: string;
+  readonly modelPolicyGrantRef?: string;
   readonly status: string;
 }
 
@@ -103,6 +107,8 @@ export interface DeliveryContextView {
   readonly expiresAtMs?: number;
   readonly installationId: string;
   readonly metadataRef?: string;
+  readonly modelPolicyDigest?: string;
+  readonly modelPolicyRef?: string;
   readonly status: string;
   readonly threadId: string;
 }
@@ -195,6 +201,7 @@ export interface PublishIntegrationEventCommand {
   readonly deliveryMetadataRef?: AgentPayloadMetadataView;
   readonly eventType: string;
   readonly installationId: string;
+  readonly modelPolicyRef?: string;
   readonly occurredAtMs?: number;
   readonly payload?: Uint8Array;
   readonly payloadContentType?: string;
@@ -299,6 +306,7 @@ export interface PublishIntegrationEventResult {
   readonly deliveryContext?: DeliveryContextView;
   readonly event: AgentEventView;
   readonly replayed: boolean;
+  readonly requestedModelPolicy?: AgentEventView['modelPolicy'];
   readonly thread: AgentThreadView;
 }
 
@@ -306,6 +314,7 @@ export interface PublishIntegrationEventResult {
 export interface PublishIntegrationDeliveryResult {
   readonly delivery?: AdapterDeliveryView;
   readonly replayed: boolean;
+  readonly resumeAction?: string;
   readonly result: {
     readonly agentId?: string;
     readonly connectionId?: string;
@@ -314,8 +323,11 @@ export interface PublishIntegrationDeliveryResult {
     readonly installationId?: string;
     readonly providerOperationId?: string;
     readonly providerMessage?: string;
+    readonly resumeAction?: string;
+    readonly runId?: string;
     readonly status: string;
   };
+  readonly safeMetadataRef?: AgentPayloadMetadataView;
 }
 
 /** Provider Delivery 実行結果です。 */

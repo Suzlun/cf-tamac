@@ -13,6 +13,7 @@ import { PaginationBar } from './pagination-bar';
 import { ScheduleCreateForm } from './schedule-create-form';
 import { ScheduleDetailContent } from './schedule-detail-content';
 import { ScheduleTable } from './schedule-table';
+import { Button } from './ui/button';
 
 interface PageInfo {
   readonly nextPageToken?: string;
@@ -311,13 +312,8 @@ function ScheduleListContent({
   onConfirmCancel,
 }: ScheduleListContentProps) {
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="schedules"
-      agentId={agentId}
-      currentSection="schedules"
-    >
-      <p className="eyebrow">Schedules</p>
+    <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="schedules">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Schedules</p>
       <h2>Agent-owned Schedules</h2>
       <AgentToken agentId={agentId} />
 
@@ -327,21 +323,24 @@ function ScheduleListContent({
         statusFilter={statusFilter}
       />
 
-      <div className="action-row">
-        <button
+      <div className="flex flex-wrap gap-2">
+        <Button
           type="button"
-          className="primary-action"
+          variant="default"
           onClick={onToggleCreate}
           disabled={pending}
           aria-expanded={showCreate}
         >
           {showCreate ? 'Hide form' : 'New Schedule'}
-        </button>
+        </Button>
       </div>
 
       {error !== undefined ? <ErrorAlert title="Schedule mutation failed" message={error} /> : null}
       {success !== undefined ? (
-        <div className="state-success readout" role="status">
+        <div
+          className="rounded-md border border-primary/50 bg-primary/10 px-3 py-2 text-sm"
+          role="status"
+        >
           {success}
         </div>
       ) : null}
@@ -458,12 +457,15 @@ function ScheduleFilterBar({
 }) {
   const statuses = ['all', 'active', 'pending', 'paused', 'cancelled', 'completed', 'failed'];
   return (
-    <section className="readout" aria-label="Schedule filters">
-      <div className="action-row" aria-live="polite">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-label="Schedule filters"
+    >
+      <div className="flex flex-wrap gap-2" aria-live="polite">
         {statuses.map((status) => (
           <Link
             key={status}
-            className={`nav-link${statusFilter === status ? ' state-pending' : ''}`}
+            className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent ${statusFilter === status ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}`}
             href={`/agents/${agentId}/schedules?status=${status}&thread=${threadFilter}`}
             aria-pressed={statusFilter === status}
           >
@@ -471,7 +473,9 @@ function ScheduleFilterBar({
           </Link>
         ))}
       </div>
-      <p className="eyebrow">Thread filter: {threadFilter === '' ? 'all' : threadFilter}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Thread filter: {threadFilter === '' ? 'all' : threadFilter}
+      </p>
     </section>
   );
 }

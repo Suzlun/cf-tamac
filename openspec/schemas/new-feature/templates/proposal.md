@@ -16,7 +16,7 @@
 <!-- TODO: List new Spec Units (<capability>) and a 1-line scope summary for each. -->
 <!-- Spec Units MUST be lasting capability/responsibility names, not change names or task names. -->
 <!-- Bad: `setup-project`, `migrate-template`, `cleanup-ui` -->
-<!-- Good: `agent-lifecycle`, `client-management`, `workspace-governance` -->
+<!-- Good: `agent-lifecycle`, `agent-management-ui`, `workspace-governance` -->
 
 - `<capability>`: <!-- TODO: Capability scope (screens, API, persistence, invariants, UX, security, errors, etc.) -->
 
@@ -28,7 +28,7 @@
 
 ## Naming
 
-<!-- TODO: Confirm the Scenario ID prefix derived from <capability> (e.g., AGENT-LIFECYCLE-S001, CLIENT-MANAGEMENT-S001). -->
+<!-- TODO: Confirm the Scenario ID prefix derived from <capability> (e.g., AGENT-LIFECYCLE-S001, AGENT-MANAGEMENT-UI-S001). -->
 
 ## Impact
 

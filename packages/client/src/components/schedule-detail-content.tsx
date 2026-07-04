@@ -1,3 +1,5 @@
+import { Button } from './ui/button';
+
 interface ScheduleSummary {
   readonly scheduleId: string;
   readonly status: string;
@@ -38,7 +40,9 @@ export function ScheduleDetailContent({
 }: ScheduleDetailContentProps) {
   return (
     <>
-      <p className="eyebrow">SCHEDULE DETAIL</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        SCHEDULE DETAIL
+      </p>
       <p>schedule_id: {schedule.scheduleId}</p>
       <p>thread: {schedule.threadKey ?? schedule.threadId ?? '—'}</p>
       <p>status: {schedule.status}</p>
@@ -47,7 +51,10 @@ export function ScheduleDetailContent({
       <p>next_fire_at: {schedule.nextFireAtUnixMs ?? '—'}</p>
       <p>last_fire_at: {schedule.lastFireAtUnixMs ?? '—'}</p>
       <p>cancelled_at: {schedule.cancelledAtUnixMs ?? '—'}</p>
-      <section className="readout" aria-label="Schedule server metadata">
+      <section
+        className="space-y-2 rounded-lg border bg-card p-5 text-sm leading-6"
+        aria-label="Schedule server metadata"
+      >
         <strong>SERVER METADATA</strong>
         <p>callback_identity: {schedule.callbackIdentity ?? '—'}</p>
         <p>installation_id: {schedule.installationId ?? '—'}</p>
@@ -56,17 +63,19 @@ export function ScheduleDetailContent({
       </section>
       <details>
         <summary>View schedule_spec</summary>
-        <pre className="form-control">{formatScheduleSpec(schedule.scheduleSpec)}</pre>
+        <pre className="h-9 w-full rounded-md border bg-transparent px-3 text-sm">
+          {formatScheduleSpec(schedule.scheduleSpec)}
+        </pre>
       </details>
-      <button
+      <Button
         type="button"
-        className="nav-link state-error"
+        variant="destructive"
         onClick={onCancel}
         disabled={pending || terminal}
         aria-disabled={pending || terminal}
       >
         Cancel Schedule
-      </button>
+      </Button>
     </>
   );
 }

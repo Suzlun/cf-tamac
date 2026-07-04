@@ -6,8 +6,13 @@ import {
   createEmptyCapabilitySummary,
 } from './agent-operation-utils';
 import { createAgentDomainError } from './errors';
+import { mapAgentModelPolicySummaryRow } from './model-policy-operations';
 
-import type { AgentScopedQuery, GetAgentStateResult } from './agent-core';
+import type {
+  AgentModelExecutionCapabilityView,
+  AgentScopedQuery,
+  GetAgentStateResult,
+} from './agent-core';
 import type { AgentStorageRepositories } from '../storage';
 
 /**
@@ -15,6 +20,7 @@ import type { AgentStorageRepositories } from '../storage';
  */
 export function getAgentStateFromStore(input: {
   readonly agentId: string;
+  readonly modelExecution?: AgentModelExecutionCapabilityView;
   readonly query: AgentScopedQuery;
   readonly repositories: AgentStorageRepositories;
   readonly storageUsageCurrentBytes?: number;
@@ -34,6 +40,11 @@ export function getAgentStateFromStore(input: {
   }
   const currentRun = input.repositories.pendingRuns.findCurrentRun();
   const wake = input.repositories.schedulerWakes.readWakeState();
+  const config = input.repositories.config.getLatestConfig();
+  const defaultModelPolicy =
+    config?.modelPolicyRef === null || config?.modelPolicyRef === undefined
+      ? undefined
+      : input.repositories.modelPolicies.getPolicy(config.modelPolicyRef);
   const storageSnapshot = createAgentStorageThresholdSnapshot({
     currentBytes: input.storageUsageCurrentBytes,
   });
@@ -52,12 +63,18 @@ export function getAgentStateFromStore(input: {
       capabilitySummary: createEmptyCapabilitySummary(input.agentId),
       configVersion: profile.configVersion,
       currentRunId: currentRun?.runId,
+      defaultModelPolicy:
+        defaultModelPolicy === undefined
+          ? undefined
+          : mapAgentModelPolicySummaryRow(input.agentId, defaultModelPolicy),
       lifecycleStatus: profile.lifecycleStatus,
+      modelExecution: input.modelExecution,
       schedulerStatus: wake?.wakeStatus ?? 'idle',
       stateVersion: `${String(profile.configVersion)}:${String(profile.updatedAtMs)}`,
       storageStatus: storageSnapshot.status,
       updatedAtMs: profile.updatedAtMs,
     },
+    modelExecution: input.modelExecution,
     storage,
   };
 }

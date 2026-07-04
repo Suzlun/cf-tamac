@@ -7,10 +7,21 @@ import { buildDestroyConfirmSchema } from '../components/schemas/agent-settings'
 
 const agentListPath = new URL('../components/agent-list.tsx', import.meta.url);
 const registrationFormPath = new URL('../components/agent-registration-form.tsx', import.meta.url);
+const registrationActionsPath = new URL(
+  '../components/agent-registration-actions.tsx',
+  import.meta.url
+);
+const modelPolicyFieldsPath = new URL('../components/model-policy-fields.tsx', import.meta.url);
+const modelPolicySummaryPath = new URL('../components/model-policy-summary.tsx', import.meta.url);
+const modelPolicySettingsSectionPath = new URL(
+  '../components/model-policy-settings-section.tsx',
+  import.meta.url
+);
 const registrationSchemaPath = new URL(
   '../components/schemas/agent-registration.ts',
   import.meta.url
 );
+const modelPolicySchemaPath = new URL('../components/schemas/model-policy.ts', import.meta.url);
 const dataTablePath = new URL('../components/data-table.tsx', import.meta.url);
 const formFieldPath = new URL('../components/ui/form.tsx', import.meta.url);
 const errorAlertPath = new URL('../components/error-alert.tsx', import.meta.url);
@@ -31,8 +42,14 @@ const agentSettingsPagePath = new URL(
   import.meta.url
 );
 const agentLifecycleActionPath = new URL('../server/actions/agent-lifecycle.ts', import.meta.url);
+const modelPolicyActionPath = new URL('../server/actions/model-policies.ts', import.meta.url);
+const modelPolicyViewModelsPath = new URL(
+  '../server/actions/model-policy-view-models.ts',
+  import.meta.url
+);
 const settingsFormPath = new URL('../components/agent-settings-form.tsx', import.meta.url);
 const configSectionPath = new URL('../components/agent-config-section.tsx', import.meta.url);
+const settingsDangerZonePath = new URL('../components/settings-danger-zone.tsx', import.meta.url);
 const credentialRotationPath = new URL(
   '../components/credential-rotation-section.tsx',
   import.meta.url
@@ -82,15 +99,17 @@ const agentThreadsPagePath = new URL(
 );
 const agentEventsPagePath = new URL('../../app/agents/[agentId]/events/page.tsx', import.meta.url);
 const agentRunsPagePath = new URL('../../app/agents/[agentId]/runs/page.tsx', import.meta.url);
+// タスク 2.6/3.5: standalone compactions route は廃止。Compaction context は threads 画面の文脈 detail。
 const agentCompactionsPagePath = new URL(
-  '../../app/agents/[agentId]/compactions/page.tsx',
+  '../../app/agents/[agentId]/threads/page.tsx',
   import.meta.url
 );
 const agentSchedulesPagePath = new URL(
   '../../app/agents/[agentId]/schedules/page.tsx',
   import.meta.url
 );
-const agentToolsPagePath = new URL('../../app/agents/[agentId]/tools/page.tsx', import.meta.url);
+// タスク 2.6/3.7: standalone tools route は廃止。Tool approval context は runs 画面の文脈 detail。
+const agentToolsPagePath = new URL('../../app/agents/[agentId]/runs/page.tsx', import.meta.url);
 const agentIntegrationsPagePath = new URL(
   '../../app/agents/[agentId]/integrations/page.tsx',
   import.meta.url
@@ -100,11 +119,10 @@ function read(filePath: URL): string {
   return readFileSync(fileURLToPath(filePath.href), 'utf8');
 }
 
-describe('Agent list page (CLIENT-MANAGEMENT-S001)', () => {
-  it('[CLIENT-MANAGEMENT-S001] Agent list displays registry fields from browser-safe data', () => {
+describe('Agent list page (AGENT-MANAGEMENT-UI-S001)', () => {
+  it('[AGENT-MANAGEMENT-UI-S001] Agent list displays registry fields from browser-safe data', () => {
     const agentList = read(agentListPath);
     const agentsPage = read(agentsPagePath);
-    const dataTable = read(dataTablePath);
     const managedAgents = read(managedAgentsPath);
 
     // The list page reads from the browser-safe registry action.
@@ -122,11 +140,13 @@ describe('Agent list page (CLIENT-MANAGEMENT-S001)', () => {
     expect(agentList).toContain('credentialStatus');
     expect(agentList).toContain('Connection');
     expect(agentList).toContain('Registry only');
-    expect(dataTable).toContain('aria-sort');
+
+    // タスク 3.1: list は table 偏重ではなく card/list composition を使う。
+    expect(agentList).toContain('Card');
+    expect(agentList).toContain('Sort by');
 
     // The list uses shadcn-style components, not bespoke low-level semantics.
     expect(agentList).toContain('ControlRoomFrame');
-    expect(agentList).toContain('DataTable');
     expect(agentList).toContain('EmptyState');
     expect(agentList).toContain('SignalBadge');
     expect(agentList).toContain('Button');
@@ -151,7 +171,7 @@ describe('Agent list page (CLIENT-MANAGEMENT-S001)', () => {
     expect(hintInterface).not.toContain('publicFingerprint');
   });
 
-  it('[CLIENT-MANAGEMENT-S001] Agent list uses shadcn-style UI primitives', () => {
+  it('[AGENT-MANAGEMENT-UI-S001] Agent list uses shadcn-style UI primitives', () => {
     const dataTable = read(dataTablePath);
     const signalBadge = read(signalBadgePath);
     const emptyState = read(emptyStatePath);
@@ -181,13 +201,15 @@ describe('Agent list page (CLIENT-MANAGEMENT-S001)', () => {
   });
 });
 
-describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
-  it('[CLIENT-MANAGEMENT-S002] Form provides accessible validation with aria-describedby', () => {
+describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form provides accessible validation with aria-describedby', () => {
     const formField = read(formFieldPath);
     const registrationForm = read(registrationFormPath);
     const registrationSchema = read(registrationSchemaPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+    const modelPolicySchema = read(modelPolicySchemaPath);
     const newAgentPage = read(newAgentPagePath);
-    const registrationSources = `${registrationForm}\n${registrationSchema}`;
+    const registrationSources = `${registrationForm}\n${registrationSchema}\n${modelPolicyFields}\n${modelPolicySchema}`;
 
     // FormField uses aria-describedby to link errors to inputs.
     expect(formField).toContain('aria-describedby');
@@ -206,22 +228,30 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(registrationSources).toContain('Key ID is required');
     expect(registrationSources).toContain('Public fingerprint is required');
     expect(registrationSources).toContain('Masked hint is required');
+    expect(registrationSources).toContain('Policy ref is required');
+    expect(registrationSources).toContain('Only workers-ai provider is available');
+    expect(registrationSources).toContain('Max output tokens must be between 1 and 8192');
+
+    const registrationActions = read(registrationActionsPath);
 
     // The form uses shadcn-style components.
     expect(registrationForm).toContain('ControlRoomFrame');
     expect(registrationForm).toContain('RhfFormField');
     expect(registrationForm).toContain('FormErrorSummary');
-    expect(registrationForm).toContain('Button');
+    expect(registrationActions).toContain('Button');
 
     // The form page uses one server-side submit action to avoid partial writes.
     expect(newAgentPage).toContain('submitManagedAgentRegistration');
+    expect(newAgentPage).toContain('validateManagedAgentRegistrationModelPolicy');
     expect(newAgentPage).toContain("'use server'");
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Server validation runs before writes and rolls back partial registration', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Server validation runs before writes and rolls back partial registration', () => {
     const registrationAction = read(registrationActionPath);
+    const managedAgents = read(managedAgentsPath);
 
     expect(registrationAction).toContain('validateManagedAgentRegistrationInput');
+    expect(registrationAction).toContain('validateRegistrationModelPolicyValues');
     expect(registrationAction).toContain('isValidHttpsUrl');
     expect(registrationAction).toContain('Agent ID is already registered.');
     expect(registrationAction).toContain('writeRegistrationRecords');
@@ -229,14 +259,29 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(registrationAction).toContain('upsertCredentialReference');
     expect(registrationAction).toContain('rollbackRegistrationWrite');
     expect(registrationAction).toContain('deleteManagedAgent');
+    expect(managedAgents).toContain('validateModelPolicyForRegistration');
+    expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
+
+    const submitStart = managedAgents.indexOf(
+      'export async function submitManagedAgentRegistration'
+    );
+    const validateActionStart = managedAgents.indexOf(
+      'export async function validateManagedAgentRegistrationModelPolicy'
+    );
+    const submitAction = managedAgents.slice(submitStart, validateActionStart);
+    expect(submitAction).not.toContain('validateModelPolicyForRegistration');
+    expect(submitAction.indexOf('persistManagedAgentRegistration')).toBeLessThan(
+      submitAction.indexOf('initializeAgentWithDefaultModelPolicy')
+    );
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Form has pending, success, and error states', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form has pending, success, and error states', () => {
     const registrationForm = read(registrationFormPath);
+    const registrationActions = read(registrationActionsPath);
 
     // Pending state.
     expect(registrationForm).toContain('pending');
-    expect(registrationForm).toContain('Registering');
+    expect(registrationActions).toContain('Registering Agent and seeding policy');
 
     // Error state.
     expect(registrationForm).toContain('formError');
@@ -249,7 +294,7 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(registrationForm).toContain('/agents/');
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Form does not persist client-side secrets', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form does not persist client-side secrets', () => {
     const registrationForm = read(registrationFormPath);
     const formField = read(formFieldPath);
     const managedAgents = read(managedAgentsPath);
@@ -275,7 +320,7 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
     expect(formField).not.toContain('privateKey');
   });
 
-  it('[CLIENT-MANAGEMENT-S002] Form errors are associated with inputs via aria-describedby', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Form errors are associated with inputs via aria-describedby', () => {
     const formField = read(formFieldPath);
 
     // The error node has an id that matches the aria-describedby pattern.
@@ -288,8 +333,8 @@ describe('Add/edit Agent form (CLIENT-MANAGEMENT-S002)', () => {
   });
 });
 
-describe('Agent overview page (CLIENT-MANAGEMENT-S003)', () => {
-  it('[CLIENT-MANAGEMENT-S003] Agent overview renders server-side profile and config data', () => {
+describe('Agent overview page (AGENT-MANAGEMENT-UI-S003)', () => {
+  it('[AGENT-MANAGEMENT-UI-S003] Agent overview renders server-side profile and config data', () => {
     const overviewPage = read(agentOverviewPagePath);
     const lifecycleActions = read(agentLifecycleActionPath);
 
@@ -321,7 +366,7 @@ describe('Agent overview page (CLIENT-MANAGEMENT-S003)', () => {
     expect(credentialInterface).not.toContain('secretReference');
   });
 
-  it('[CLIENT-MANAGEMENT-S003] Agent overview maps safe RPC error states', () => {
+  it('[AGENT-MANAGEMENT-UI-S003] Agent overview maps safe RPC error states', () => {
     const overviewPage = read(agentOverviewPagePath);
 
     expect(overviewPage).toContain('This Agent is not registered in the Client ledger.');
@@ -339,8 +384,8 @@ describe('Agent overview page (CLIENT-MANAGEMENT-S003)', () => {
   });
 });
 
-describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
-  it('[CLIENT-MANAGEMENT-S004] Settings uses Server Actions for config update and credential rotation', () => {
+describe('Agent settings page (AGENT-MANAGEMENT-UI-S004)', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] Settings uses Server Actions for config update and credential rotation', () => {
     const settingsPage = read(agentSettingsPagePath);
     const settingsForm = read(settingsFormPath);
     const configSection = read(configSectionPath);
@@ -390,7 +435,7 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     expect(lifecycleActions).toContain('revalidatePath(`/agents/${agentId}`)');
   });
 
-  it('[CLIENT-MANAGEMENT-S004] Settings browser components do not expose credential lookup payloads', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] Settings browser components do not expose credential lookup payloads', () => {
     const settingsForm = read(settingsFormPath);
     const credentialRotation = read(credentialRotationPath);
 
@@ -406,7 +451,7 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     }
   });
 
-  it('[CLIENT-MANAGEMENT-S004] ConfirmDialog traps focus and preserves pending state', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] ConfirmDialog traps focus and preserves pending state', () => {
     const confirmDialog = read(confirmDialogPath);
     const detailDrawer = read(detailDrawerPath);
     const toolView = read(toolViewPath);
@@ -426,7 +471,7 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
     expect(toolView).toContain('initialFocusSelector="[data-drawer-initial-focus=\'true\']"');
   });
 
-  it('[CLIENT-MANAGEMENT-S004] Destroy confirmation requires an exact Agent ID echo', () => {
+  it('[AGENT-MANAGEMENT-UI-S004] Destroy confirmation requires an exact Agent ID echo', () => {
     const schema = buildDestroyConfirmSchema('agent-alpha');
 
     // type-to-confirm は前後空白も許容せず、UI copy の「完全一致」を validation でも守る。
@@ -435,19 +480,85 @@ describe('Agent settings page (CLIENT-MANAGEMENT-S004)', () => {
   });
 });
 
-describe('Agent-owned history tabs (CLIENT-MANAGEMENT-S005)', () => {
-  it('[CLIENT-MANAGEMENT-S005] Thread Event Run and Compaction tabs show Agent-owned history', () => {
+describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MANAGEMENT-UI-S018)', () => {
+  it('[AGENT-MANAGEMENT-UI-S017] Agent creation flow sends initial model policy through server-side RPC', () => {
+    const registrationForm = read(registrationFormPath);
+    const newAgentPage = read(newAgentPagePath);
+    const managedAgents = read(managedAgentsPath);
+    const lifecycleActions = read(agentLifecycleActionPath);
+    const modelPolicyActions = read(modelPolicyActionPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+
+    expect(registrationForm).toContain('ModelPolicyFields');
+    expect(registrationForm).toContain('onValidateModelPolicy');
+    expect(modelPolicyFields).toContain('Default model policy');
+    expect(modelPolicyFields).toContain('Validate policy');
+    expect(newAgentPage).toContain('validateManagedAgentRegistrationModelPolicy');
+    expect(managedAgents).toContain('validateModelPolicyForRegistration');
+    expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
+    expect(lifecycleActions).toContain('clients.lifecycle.initializeAgent');
+    expect(lifecycleActions).toContain('initialModelPolicy');
+    expect(lifecycleActions).toContain('modelPolicyRef: modelPolicy.policyRef');
+    expect(modelPolicyActions).toContain('clients.modelPolicies.validateModelPolicy');
+    expect(modelPolicyActions).not.toContain('localStorage');
+    expect(modelPolicyActions).not.toContain('sessionStorage');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S018] Settings safely updates policy before config and renders safe metadata', () => {
+    const settingsPage = read(agentSettingsPagePath);
+    const settingsForm = read(settingsFormPath);
+    const settingsSection = read(modelPolicySettingsSectionPath);
+    const summary = read(modelPolicySummaryPath);
+    const operations = read(agentOperationsPath);
+    const viewModels = read(modelPolicyViewModelsPath);
+    const dangerZone = read(settingsDangerZonePath);
+
+    expect(settingsPage).toContain('getDefaultModelPolicyForManagedAgent');
+    expect(settingsPage).toContain('validateModelPolicyForManagedAgent');
+    expect(settingsPage).toContain('saveDefaultModelPolicy');
+    expect(settingsForm).toContain('ModelPolicySettingsSection');
+    expect(settingsSection).toContain('Save default policy');
+    expect(settingsSection).toContain('Upsert the Agent-owned policy first');
+    expect(settingsSection).toContain("result.errorCategory === 'permission_denied'");
+    expect(settingsSection).toContain('disabled={pending || permissionDenied}');
+    expect(summary).toContain('Policy ref');
+    expect(summary).toContain('Digest');
+    expect(summary).toContain('Provider');
+    expect(summary).toContain('Model');
+    expect(summary).toContain('Config version');
+    expect(operations).toContain('upsertModelPolicyForManagedAgent');
+    expect(operations).toContain('clients.state.updateConfig');
+    expect(operations.indexOf('upsertModelPolicyForManagedAgent')).toBeLessThan(
+      operations.indexOf('clients.state.updateConfig')
+    );
+    expect(viewModels).toContain('toBrowserSafeModelPolicyMetadata');
+    expect(viewModels).toContain('safeModelPolicyErrorMessage');
+    expect(dangerZone).toContain('Destroy Agent');
+    for (const source of [settingsSection, summary]) {
+      expect(source).not.toContain('@connectrpc/connect');
+      expect(source).not.toContain('@cf-tamac/client-agent-rpc');
+      expect(source).not.toContain('secretMaterial');
+      expect(source).not.toContain('Authorization');
+      expect(source).not.toContain('Bearer');
+    }
+  });
+});
+
+describe('Agent-owned history tabs (AGENT-MANAGEMENT-UI-S005)', () => {
+  it('[AGENT-MANAGEMENT-UI-S005] Thread Event Run and Compaction tabs show Agent-owned history', () => {
     const threadList = read(threadListPath);
     const eventList = read(eventListPath);
     const runList = read(runListPath);
     const compactionView = read(compactionViewPath);
     const queries = read(agentQueriesPath);
+    // タスク 2.6/3.5: standalone compactions route は廃止し、threads/runs/events が文脈 detail を持つ。
     const routeSources = [
       read(agentThreadsPagePath),
       read(agentEventsPagePath),
       read(agentRunsPagePath),
-      read(agentCompactionsPagePath),
     ].join('\n');
+    // Compaction context は threads 画面の文脈 detail として描画される。
+    expect(read(agentCompactionsPagePath)).toContain('CompactionView');
 
     expect(routeSources).toContain('listThreads');
     expect(routeSources).toContain('listEvents');
@@ -484,8 +595,8 @@ describe('Agent-owned history tabs (CLIENT-MANAGEMENT-S005)', () => {
   });
 });
 
-describe('Schedule management tab (CLIENT-MANAGEMENT-S006)', () => {
-  it('[CLIENT-MANAGEMENT-S006] Schedule tab creates and cancels schedules', () => {
+describe('Schedule management tab (AGENT-MANAGEMENT-UI-S006)', () => {
+  it('[AGENT-MANAGEMENT-UI-S006] Schedule tab creates and cancels schedules', () => {
     const schedulesPage = read(agentSchedulesPagePath);
     const scheduleList = read(scheduleListPath);
     const scheduleCreateForm = read(scheduleCreateFormPath);
@@ -526,8 +637,8 @@ describe('Schedule management tab (CLIENT-MANAGEMENT-S006)', () => {
   });
 });
 
-describe('Tool approval tab (CLIENT-MANAGEMENT-S007)', () => {
-  it('[CLIENT-MANAGEMENT-S007] Tool approval screen requires explicit action', () => {
+describe('Tool approval tab (AGENT-MANAGEMENT-UI-S007)', () => {
+  it('[AGENT-MANAGEMENT-UI-S007] Tool approval screen requires explicit action', () => {
     const toolsPage = read(agentToolsPagePath);
     const toolView = read(toolViewPath);
     const toolReviewContent = read(toolReviewContentPath);
@@ -555,8 +666,8 @@ describe('Tool approval tab (CLIENT-MANAGEMENT-S007)', () => {
   });
 });
 
-describe('Integration management tab (CLIENT-MANAGEMENT-S008)', () => {
-  it('[CLIENT-MANAGEMENT-S008] Integration screen installs lists and uninstalls generic Integration', () => {
+describe('Integration management tab (AGENT-MANAGEMENT-UI-S008)', () => {
+  it('[AGENT-MANAGEMENT-UI-S008] Integration screen installs lists and uninstalls generic Integration', () => {
     const integrationsPage = read(agentIntegrationsPagePath);
     const integrationView = read(integrationViewPath);
     const integrationPermissionControls = read(integrationPermissionControlsPath);
@@ -638,10 +749,15 @@ describe('Integration management tab (CLIENT-MANAGEMENT-S008)', () => {
   });
 });
 
-describe('Browser secrecy boundaries (CLIENT-MANAGEMENT-S009)', () => {
-  it('[CLIENT-MANAGEMENT-S009] Browser-visible components do not import server-only modules', () => {
+describe('Browser secrecy boundaries (AGENT-MANAGEMENT-UI-S009)', () => {
+  it('[AGENT-MANAGEMENT-UI-S009] Browser-visible components do not import server-only modules', () => {
     const agentList = read(agentListPath);
     const registrationForm = read(registrationFormPath);
+    const registrationActions = read(registrationActionsPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+    const modelPolicySummary = read(modelPolicySummaryPath);
+    const modelPolicySettingsSection = read(modelPolicySettingsSectionPath);
+    const settingsDangerZone = read(settingsDangerZonePath);
     const errorAlert = read(errorAlertPath);
     const signalBadge = read(signalBadgePath);
     const emptyState = read(emptyStatePath);
@@ -665,6 +781,11 @@ describe('Browser secrecy boundaries (CLIENT-MANAGEMENT-S009)', () => {
     const browserVisibleSources = [
       agentList,
       registrationForm,
+      registrationActions,
+      modelPolicyFields,
+      modelPolicySummary,
+      modelPolicySettingsSection,
+      settingsDangerZone,
       errorAlert,
       signalBadge,
       emptyState,
@@ -715,5 +836,185 @@ describe('Browser secrecy boundaries (CLIENT-MANAGEMENT-S009)', () => {
       expect(source).not.toContain('Authorization');
       expect(source).not.toContain('Bearer');
     }
+  });
+});
+
+/**
+ * Ed25519 signing key / trust config export / Agent key selection / health verification / rotation
+ * UI (AGENT-MANAGEMENT-UI-S003, S004, S010-S016, S019, S020)。
+ *
+ * @remarks feature component は server-only module を直接 import せず、page (Server Component)
+ * から action callback を受け取る。これらの tests は source 上の境界と UI 要素の存在を検査する。
+ */
+describe('Client Service signing key UI and server action boundary', () => {
+  const signingKeyManagementPath = new URL(
+    '../components/signing-key-management.tsx',
+    import.meta.url
+  );
+  const trustConfigExportPath = new URL('../components/trust-config-export.tsx', import.meta.url);
+  const agentSigningKeySelectPath = new URL(
+    '../components/agent-signing-key-select.tsx',
+    import.meta.url
+  );
+  const keyRotationGuidePath = new URL('../components/key-rotation-guide.tsx', import.meta.url);
+  const signingKeyActionPath = new URL('../server/actions/signing-keys.ts', import.meta.url);
+  const trustConfigActionPath = new URL('../server/actions/trust-config.ts', import.meta.url);
+  const agentHealthActionPath = new URL('../server/actions/agent-health.ts', import.meta.url);
+  const signingKeysPagePath = new URL(
+    '../../app/global-settings/signing-keys/page.tsx',
+    import.meta.url
+  );
+  const trustConfigExportPagePath = new URL(
+    '../../app/global-settings/trust-config-export/page.tsx',
+    import.meta.url
+  );
+  const keyRotationPagePath = new URL(
+    '../../app/global-settings/key-rotation/page.tsx',
+    import.meta.url
+  );
+  const globalSettingsNavPath = new URL('../components/management-nav-config.ts', import.meta.url);
+
+  it('[AGENT-MANAGEMENT-UI-S010] signing key management UI handles key lifecycle under Global Settings', () => {
+    const source = read(signingKeyManagementPath);
+    const page = read(signingKeysPagePath);
+
+    // Global Settings 配下で issuer / kid / public fingerprint / status / default / lifecycle 操作を扱う。
+    expect(source).toContain('Client Service Signing Keys');
+    expect(source).toContain('Public fingerprint');
+    expect(source).toContain('Set default');
+    expect(source).toContain('Disable');
+    expect(source).toContain('Delete');
+    expect(page).toContain('SigningKeyManagement');
+    // private material を一切表示しない。
+    expect(source).not.toContain('privateJwkCiphertext');
+    expect(source).not.toContain('privateJwk');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S011] browser never receives signing material from components', () => {
+    const sources = [
+      read(signingKeyManagementPath),
+      read(trustConfigExportPath),
+      read(agentSigningKeySelectPath),
+      read(keyRotationGuidePath),
+    ].join('\n');
+
+    expect(sources).not.toContain('privateJwkCiphertext');
+    expect(sources).not.toContain('privateJwk');
+    expect(sources).not.toContain('"d"');
+    expect(sources).not.toContain('Bearer ');
+    expect(sources).not.toContain('Authorization');
+    // feature component は server-only module を直接 import しない。
+    expect(sources).not.toContain('server/actions/signing-keys');
+    expect(sources).not.toContain('server/actions/trust-config');
+    expect(sources).not.toContain('server/actions/agent-health');
+    expect(sources).not.toContain('server/credentials');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S012] Agent settings detail shows issuer/kid/fingerprint and verification result', () => {
+    const source = read(agentSigningKeySelectPath);
+
+    expect(source).toContain('Selected issuer / kid / fingerprint (read-only)');
+    expect(source).toContain('Current Trust Match');
+    expect(source).toContain('Last Verified At');
+    expect(source).toContain('Safe diagnostic codes');
+    // 自由入力ではなく既存 global key selection。
+    expect(source).toContain('Select an existing Global signing key');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S013] trust config export produces public-only JSON under Global Settings', () => {
+    const source = read(trustConfigExportPath);
+    const page = read(trustConfigExportPagePath);
+    const action = read(trustConfigActionPath);
+
+    expect(page).toContain('TrustConfigExportView');
+    expect(source).toContain('AGENT_CONTROL_PLANE_TRUST');
+    expect(source).toContain('No private parameter');
+    // action は private parameter d を含まない公開 JSON を組み立てる。
+    expect(action).not.toMatch(/\.d\b/);
+    expect(action).toContain('TrustConfigExport');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S014] broad scope selection shows warning and schema validation together', () => {
+    const source = read(trustConfigExportPath);
+    const action = read(trustConfigActionPath);
+
+    // wireframe/spec は broad permission warning と schema validation result を同時表示することを要求する。
+    // 実装は両 Alert を独立描画する (early return しない)。
+    expect(source).toContain('Broad permission warning');
+    expect(source).toContain('Schema validation passed');
+    expect(source).toContain('Schema validation');
+    // Server Action は ok:true と broadPermissionWarning を同時に返せる。
+    expect(action).toContain('broadPermissionWarning');
+    expect(action).toContain('ok: true');
+    expect(action).toContain('resolveBroadPermissionWarning');
+    // ADMIN_OPERATOR は break-glass 専用で trust config export からは除外。
+    expect(action).not.toContain("principalType === 'ADMIN_OPERATOR'");
+    expect(action).toContain('High-privilege scopes');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S015] rotation guidance ties trust config and Agent verification together', () => {
+    const source = read(keyRotationGuidePath);
+    const page = read(keyRotationPagePath);
+
+    expect(page).toContain('KeyRotationGuide');
+    expect(source).toContain('Generate replacement key');
+    expect(source).toContain('Export trust config update');
+    expect(source).toContain('Switch managed Agent selection');
+    expect(source).toContain('Health verification before revoke');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S016] emergency revoke and break-glass recovery guidance is displayed', () => {
+    const source = read(keyRotationGuidePath);
+
+    expect(source).toContain('Emergency Revoke');
+    expect(source).toContain('Break-glass Recovery');
+    expect(source).toContain('ADMIN_OPERATOR');
+    expect(source).toContain('revoke');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S019] selected-Agent pages route through server-only Agent RPC after trust setup', () => {
+    const action = read(agentHealthActionPath);
+
+    // Health 成功後に selected-Agent pages の実データ表示へ繋げる revalidate と Agent RPC 呼び出し。
+    expect(action).toContain('verifyAgentHealth');
+    expect(action).toContain('loadAgentRpcClients');
+    expect(action).toContain('clients.health.check');
+    expect(action).toContain('markManagedAgentSigningVerified');
+    expect(action).toContain("'threads'");
+    expect(action).toContain("'events'");
+    expect(action).toContain("'runs'");
+    expect(action).toContain("'schedules'");
+    expect(action).toContain("'integrations'");
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S020] Agent-zero Global Settings signing operations are reachable', () => {
+    const nav = read(globalSettingsNavPath);
+
+    expect(nav).toContain('/global-settings/signing-keys');
+    expect(nav).toContain('/global-settings/trust-config-export');
+    expect(nav).toContain('/global-settings/key-rotation');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S003] Agent overview rendering excludes signing material and uses server RPC', () => {
+    const sources = [
+      read(signingKeyManagementPath),
+      read(trustConfigExportPath),
+      read(agentSigningKeySelectPath),
+    ].join('\n');
+
+    // overview / settings は server action callback 経由で server-side RPC を使う。
+    expect(sources).not.toContain('privateKey');
+    expect(sources).not.toContain('secretMaterial');
+    expect(sources).not.toContain('credentialRef');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S004] settings screen keeps signing key generation / trust export in Global Settings', () => {
+    const signingAction = read(signingKeyActionPath);
+    const trustAction = read(trustConfigActionPath);
+
+    // signing key generation と trust config export は Client-wide operation として Server Action に置く。
+    expect(signingAction).toContain('generateSigningKey');
+    expect(signingAction).toContain('setDefaultSigningKey');
+    expect(trustAction).toContain('buildTrustConfigExport');
   });
 });

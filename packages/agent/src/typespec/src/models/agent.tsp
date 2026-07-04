@@ -29,6 +29,8 @@ model AgentConfig {
   @field(9) updated_by_principal_id?: string;
   @field(10) updated_at_unix_ms?: int64;
   @field(11) config_body_ref?: BytePayloadReference;
+  @field(12) default_model_policy?: AgentModelPolicySummary;
+  @field(13) model_policy_validation?: AgentModelPolicyValidationResult;
 }
 
 @message
@@ -85,4 +87,5 @@ model AgentHealthSnapshot {
   @field(4) contract_package: string;
   @field(5) checked_at_unix_ms: int64;
   @field(6) dependency_status_ref?: string;
+  @field(7) model_execution?: ModelExecutionCapability;
 }

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { createE2eAgentId, registerManagedAgentThroughUi } from './managed-agent-fixture';
 
-test('[MANAGEMENT-CLIENT-S007] Management navigation excludes demo routes', async ({
+test('[MANAGEMENT-CLIENT-SHELL-S007] Management navigation excludes demo routes', async ({
   page,
 }, testInfo) => {
   const agentId = createE2eAgentId(testInfo);
@@ -10,23 +10,21 @@ test('[MANAGEMENT-CLIENT-S007] Management navigation excludes demo routes', asyn
   await registerManagedAgentThroughUi(page, agentId);
   await page.goto(`/agents/${agentId}`);
 
-  const sectionNavigation = page.getByRole('navigation', { name: 'Agent management sections' });
+  const sectionNavigation = page.getByRole('navigation', {
+    name: `Selected-Agent navigation for ${agentId}`,
+  });
 
   await expect(sectionNavigation.getByRole('link', { name: 'Overview' })).toBeVisible();
   await expect(sectionNavigation.getByRole('link', { name: 'Threads' })).toBeVisible();
   await expect(sectionNavigation.getByRole('link', { name: 'Events' })).toBeVisible();
   await expect(sectionNavigation.getByRole('link', { name: 'Runs' })).toBeVisible();
-  await expect(sectionNavigation.getByRole('link', { name: 'Compactions' })).toBeVisible();
   await expect(sectionNavigation.getByRole('link', { name: 'Schedules' })).toBeVisible();
-  await expect(sectionNavigation.getByRole('link', { name: 'Tools' })).toBeVisible();
   await expect(sectionNavigation.getByRole('link', { name: 'Integrations' })).toBeVisible();
   await expect(sectionNavigation.getByRole('link', { name: 'Settings' })).toBeVisible();
   await page.goto('/agents');
 
-  const registryNavigation = page.getByRole('navigation', { name: 'Agent management sections' });
-  await expect(
-    registryNavigation.getByRole('link', { name: 'Registry', exact: true })
-  ).toBeVisible();
-  await expect(registryNavigation.getByRole('link', { name: 'New' })).toBeVisible();
+  const globalNavigation = page.getByRole('navigation', { name: 'Global navigation' });
+  await expect(globalNavigation.getByRole('link', { name: 'Agents', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'New Agent', exact: true })).toBeVisible();
   await expect(page.getByText(/hello|users/i)).toHaveCount(0);
 });

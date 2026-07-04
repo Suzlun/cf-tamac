@@ -5,13 +5,13 @@ import { useState } from 'react';
 
 import { AgentToken } from './agent-token';
 import { ConfirmDialog } from './confirm-dialog';
-import { ControlRoomFrame } from './control-room-frame';
 import { DataTable } from './data-table';
 import { DetailDrawer } from './detail-drawer';
 import { EmptyState } from './empty-state';
 import { generateIdempotencyKey } from './generate-idempotency-key';
 import { PaginationBar } from './pagination-bar';
 import { ToolReviewContent } from './tool-review-content';
+import { Button } from './ui/button';
 
 interface PayloadReference {
   readonly ref: string;
@@ -244,25 +244,30 @@ function ToolViewContent({
   onConfirm,
 }: ToolViewContentProps) {
   return (
-    <ControlRoomFrame
-      title={`Agent registry › ${agentId}`}
-      signalLabel="tools"
-      agentId={agentId}
-      currentSection="tools"
-    >
-      <p className="eyebrow">Tools</p>
-      <h2>Tool catalog and approval queue</h2>
+    // page-level ControlRoomFrame は親 page が1つだけ提供する。ToolView は sub-section として描画する。
+    <section aria-label="Tool catalog and approval queue" className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Tool catalog and approval queue</h2>
+      </div>
       <AgentToken agentId={agentId} />
 
       <InvocationFilterBar agentId={agentId} statusFilter={statusFilter} />
 
-      {success !== undefined ? <div className="state-success readout">{success}</div> : null}
-      {error !== undefined ? <div className="state-error readout">{error}</div> : null}
+      {success !== undefined ? (
+        <div className="rounded-md border border-primary/50 bg-primary/10 px-3 py-2 text-sm">
+          {success}
+        </div>
+      ) : null}
+      {error !== undefined ? (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
+          {error}
+        </div>
+      ) : null}
 
       <ToolCatalogSection tools={tools} />
       <ApprovalQueueSection invocations={invocations} pending={pending} onReview={onReview} />
       <PaginationBar
-        basePath={`/agents/${agentId}/tools`}
+        basePath={`/agents/${agentId}/runs`}
         page={invocationPage}
         extraQuery={{ status: statusFilter }}
       />
@@ -309,7 +314,7 @@ function ToolViewContent({
             : `The invocation will transition to rejected. The Agent harness will receive a rejection result Event. Acting user: ${actingOperatorId}.`}
         </p>
       </ConfirmDialog>
-    </ControlRoomFrame>
+    </section>
   );
 }
 
@@ -343,13 +348,16 @@ function InvocationFilterBar({
     'all',
   ];
   return (
-    <section className="readout" aria-label="Tool invocation filters">
-      <div className="action-row" aria-live="polite">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-label="Tool invocation filters"
+    >
+      <div className="flex flex-wrap gap-2" aria-live="polite">
         {statuses.map((status) => (
           <Link
             key={status}
-            className={`nav-link${statusFilter === status ? ' state-pending' : ''}`}
-            href={`/agents/${agentId}/tools?status=${status}`}
+            className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm hover:bg-accent ${statusFilter === status ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}`}
+            href={`/agents/${agentId}/runs?status=${status}`}
             aria-pressed={statusFilter === status}
           >
             {status}
@@ -362,7 +370,10 @@ function InvocationFilterBar({
 
 function ToolCatalogSection({ tools }: { readonly tools: readonly ToolSummary[] }) {
   return (
-    <section className="readout" aria-labelledby="catalog-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="catalog-heading"
+    >
       <strong id="catalog-heading">Catalog</strong>
       {tools.length === 0 ? (
         <EmptyState
@@ -398,7 +409,10 @@ function ApprovalQueueSection({
   readonly onReview: (invocation: InvocationSummary) => void;
 }) {
   return (
-    <section className="readout" aria-labelledby="queue-heading">
+    <section
+      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      aria-labelledby="queue-heading"
+    >
       <strong id="queue-heading">Approval queue</strong>
       {invocations.length === 0 ? (
         <EmptyState
@@ -427,17 +441,18 @@ function ApprovalQueueSection({
             invocation.attemptCount ?? 0,
             invocation.riskLevel ?? '—',
             invocation.resultEventId ?? invocation.outputRef?.ref ?? '—',
-            <button
+            <Button
               key={`review-${invocation.invocationId}`}
               type="button"
-              className="nav-link"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 onReview(invocation);
               }}
               disabled={pending}
             >
               {TERMINAL_INVOCATION_STATUSES.has(invocation.status) ? 'View result' : 'Review'}
-            </button>,
+            </Button>,
           ])}
         />
       )}
