@@ -8,6 +8,7 @@ permission:
   edit:
     '*': deny
     'openspec/changes/**': allow
+    '*/openspec/changes/**': allow
   webfetch: deny
   task:
     '*': deny

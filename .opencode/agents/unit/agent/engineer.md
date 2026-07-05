@@ -11,6 +11,9 @@ permission:
     'packages/agent/proto/**': deny
     'packages/agent/src/generated/rpc/**': deny
     'packages/client/src/generated/agent-rpc/**': deny
+    '*/packages/agent/proto/**': deny
+    '*/packages/agent/src/generated/rpc/**': deny
+    '*/packages/client/src/generated/agent-rpc/**': deny
   webfetch: deny
   task:
     '*': deny

@@ -13,6 +13,11 @@ permission:
     'packages/agent/proto/**': deny
     'packages/agent/src/generated/rpc/**': deny
     'openspec/changes/**': allow
+    '*/packages/client/**': allow
+    '*/openspec/changes/**': allow
+    '*/packages/client/src/generated/agent-rpc/**': deny
+    '*/packages/agent/proto/**': deny
+    '*/packages/agent/src/generated/rpc/**': deny
   webfetch: deny
   task:
     '*': deny
