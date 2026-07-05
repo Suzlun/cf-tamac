@@ -67,6 +67,12 @@ Caller (primary) provides one or more of:
 - Do not touch `generated/**`
 - Do not bypass lint
 - Only call `openspec/analyzer`, `researcher`, `unit/agent/engineer`, `unit/client/engineer`, and `unit/client/designer` via `task` (no self-calls, no unapproved agents)
+- Proposer owns `specs/**/*.md`: create/update Spec Requirements and Scenarios before specialist detailed design delegation, and never ask engineers or designers to define or rewrite Requirements or Scenarios.
+- Delegate post-Spec detailed implementation design to the relevant unit specialist before finalizing `design.md` and implementation-ready tasks:
+  - Agent Service implementation design based on finalized Specs: `unit/agent/engineer`
+  - Management Client implementation design based on finalized Specs: `unit/client/engineer`
+  - Management Client UI/UX detailed design, layout, component placement, user-facing copy, and wireframes based on finalized Specs: `unit/client/designer`
+- Do not invent detailed designs that belong to those specialist domains when delegation is possible. Reflect specialist outputs into `design.md` and `tasks.md` only; keep `specs/**/*.md` limited to customer/user/external-contract visible behavior.
 - Treat `context` / `rules` returned by `openspec instructions ... --json` as constraints. Do not paste them verbatim into artifacts
 - Never write negative existence, non-adoption, removal, replacement, migration, or switching facts into OpenSpec artifacts. If an artifact names a thing only to say it is absent, unused, not adopted, removed, replaced, migrated away from, or switched away from, the artifact has reintroduced that thing into the product language.
 - OpenSpec artifacts must describe only the required positive end state: present capabilities, required behavior, accepted inputs/outputs, constraints, scenarios, verification, and implementation work that users or maintainers actually need.
@@ -91,13 +97,16 @@ Caller (primary) provides one or more of:
    - Create/update the artifact per `template` and `outputPath`
    - Iterate until all required artifacts are filled
 
-4. Detailed design delegation
-   - When creating or updating `design.md` or design sections in any artifact, delegate detailed design to the responsible allowed unit agents via `task`
-   - Call `unit/agent/engineer` for Agent Service design covering TypeSpec/proto source, Connect RPC Worker boundaries, Durable Object aggregate/storage/runtime, Agent-owned observability, and Agent governance scripts
-   - Call `unit/client/engineer` for Management Client design covering Next.js App Router integration, Server Components/Server Actions, Client D1 repositories, server-only Agent RPC usage, browser secrecy, and no-proxy boundaries
-   - Call `unit/client/designer` for Management Client UI/UX design covering route-shell wireframes, visual hierarchy, component placement, responsive states, interaction behavior, accessibility, and user-facing copy
-   - Each delegation must state that the request is design-only for OpenSpec proposal artifacts: do not implement code, do not edit generated outputs, and return detailed constraints, affected paths, artifact wording, risks, and verification tasks
-   - Reflect the returned design into `design.md`, spec deltas, and `tasks.md` as applicable; if a unit agent reports blockers or required decisions, resolve them before validation
+4. Specialist detailed design after Spec creation
+   - Before finalizing detailed design or implementation-ready tasks, ensure `specs/**/*.md` already describes the required positive external behavior and follows the Spec file restrictions
+   - When creating or updating `design.md`, delegate detailed design to the responsible allowed unit agents via `task`; each request must include the finalized `specs/**/*.md` paths and require the specialist to read those Specs before designing
+   - Call `unit/agent/engineer` for Agent Service design based on finalized Specs, covering TypeSpec/proto source, Connect RPC Worker boundaries, Durable Object aggregate/storage/runtime, Agent-owned observability, and Agent governance scripts
+   - Call `unit/client/engineer` for Management Client design based on finalized Specs, covering Next.js App Router integration, Server Components/Server Actions, Client D1 repositories, server-only Agent RPC usage, browser secrecy, and no-proxy boundaries
+   - Call `unit/client/designer` for Management Client UI/UX design based on finalized Specs, covering route-shell wireframes, visual hierarchy, component placement, responsive states, interaction behavior, accessibility, and user-facing copy
+   - Each delegation must state that the request is design-only for OpenSpec proposal artifacts: do not implement code, do not edit generated outputs, do not propose/define/rewrite Spec Requirements or Scenarios, and return detailed constraints, affected paths, risks, and verification tasks
+   - Reflect every substantive specialist output into `design.md` without omissions before validation. For a new-concept feature, expect impact coverage on the order of 150 changed files; for multi-domain expansion, expect impact coverage on the order of 300 changed files. `design.md` must cover affected layers, contracts, generated artifacts, persistence, UI surfaces, tests, configuration, security boundaries, and verification commands at that scale.
+   - If specialist output is too thin, omits affected domains, uses placeholders such as `TBD`/`etc`, or leaves implementation decisions implicit, ask the specialist for a corrected detailed design before finalizing `design.md`
+   - If a unit agent reports blockers or required decisions, resolve them before validation
 
 5. `tasks.md` quality conditions
    - Map implementation tasks to requirements/Scenario IDs

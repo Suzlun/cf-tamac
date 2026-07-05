@@ -111,12 +111,8 @@ If required inputs are missing, stop and list the missing items.
 # Work order (strict)
 
 0. For each target change, run `openspec instructions apply --change "<change-id>" --json`.
-1. Before delegating any task, inspect the change artifacts (`proposal.md`, `design.md`, `tasks.md`, and `specs/**/*.md`) for negative existence, non-adoption, removal, replacement, migration, or switching statements.
-   - If an artifact names a thing only to say it is absent, unused, not adopted, removed, replaced, migrated away from, or switched away from, return `BLOCKED` with exact file and line references.
-   - For `specs/**/*.md`, also return `BLOCKED` with exact file and line references if the file contains anything other than customer, user, or external-contract visible behavior, including non-existent features, non-adoption rules, old premises, deletion targets, implementation component names, internal structure names, file names, class names, function names, or library names.
-   - Do not implement, delegate implementation, mark tasks complete, or request review until the OpenSpec artifacts describe only the required positive end state.
-2. If the state is `blocked`, ask `@planner` for a concrete plan to create the missing artifacts.
-3. Route the plan by area:
+1. If the state is `blocked`, ask `@planner` for a concrete plan to create the missing artifacts.
+2. Route the plan by area:
    - Agent package, Agent TypeSpec/proto/codegen, Connect Worker, Durable Object, Agent storage, and Agent governance items -> `@unit/agent/engineer`
    - Client package, App Router, Client D1, server-only Agent RPC client, management route shell, and no-proxy items -> `@unit/client/engineer`
    - UI/UX specification or Client UI decisions -> `@unit/client/designer`
@@ -124,7 +120,7 @@ If required inputs are missing, stop and list the missing items.
    - If the plan contains independent tracks, dispatch them in parallel instead of waiting for one track to finish before starting the next
    - Re-run `openspec instructions apply ... --json` after each completion round
    - If it is still blocked, return `BLOCKED`
-4. If the state is `ready`, collapse `tasks` into a small track plan and execute it in dependency waves:
+3. If the state is `ready`, collapse `tasks` into a small track plan and execute it in dependency waves:
    - Wave 1, TypeSpec/contract/codegen: Agent TypeSpec source, proto generation, generated RPC refresh, generated descriptor checks -> `@unit/agent/engineer` when Agent contract source changes are needed; otherwise `@unit/build/builder` for command-only generation/checks
    - Wave 2, Agent Service: `packages/agent/**`, Agent Worker bindings, Connect RPC facade, Durable Object, Agent storage, Agent tests, Agent governance -> `@unit/agent/engineer`
    - Wave 2, Management Client: `packages/client/**`, App Router, Client D1, Server Actions, server-only Agent RPC, browser secrecy, no-proxy boundaries, management UI -> `@unit/client/engineer`
@@ -133,13 +129,13 @@ If required inputs are missing, stop and list the missing items.
    - Launch all Wave 2 tracks in parallel after the contract/codegen wave if their file ownership is independent.
    - Do not call `@unit/client/designer` as a separate applier-owned track by default. Put UI/UX expectations into the Client track and let `@unit/client/engineer` call the designer internally if its own rules require it.
    - Each track order must list all included task IDs and tell the implementer to update `tasks.md` for completed items.
-5. After the implementation wave, request one consolidated Agent review from `@unit/agent/reviewer` if any Agent-affecting files changed.
-6. After the implementation wave, request one consolidated Client review from `@unit/client/reviewer` if any Client-affecting files changed.
-7. If Agent and Client reviews are both needed, request them in parallel in the same turn.
-8. Re-run `openspec instructions apply ... --json` after each completed wave and repeat steps 4 to 7 only for incomplete or reviewer-blocked tracks until the state is `all_done`.
-9. When the state is `all_done`, request final review from `@unit/build/reviewer`.
-10. If `@unit/build/reviewer` blocks, send the feedback to the responsible implementer as one narrow fix track, rerun only the affected consolidated reviewer, and iterate.
-11. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
+4. After the implementation wave, request one consolidated Agent review from `@unit/agent/reviewer` if any Agent-affecting files changed.
+5. After the implementation wave, request one consolidated Client review from `@unit/client/reviewer` if any Client-affecting files changed.
+6. If Agent and Client reviews are both needed, request them in parallel in the same turn.
+7. Re-run `openspec instructions apply ... --json` after each completed wave and repeat steps 3 to 6 only for incomplete or reviewer-blocked tracks until the state is `all_done`.
+8. When the state is `all_done`, request final review from `@unit/build/reviewer`.
+9. If `@unit/build/reviewer` blocks, send the feedback to the responsible implementer as one narrow fix track, rerun only the affected consolidated reviewer, and iterate.
+10. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
 
 Note: if a commit is needed, delegate it to `@unit/build/builder` after the required reviews pass.
 
@@ -164,7 +160,6 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 - Do not hand-edit `generated/**`.
 - Do not hand-edit command-owned Agent outputs: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, or `packages/client/src/generated/agent-rpc/**`.
 - Do not route generated RPC output edits to implementers; route source/config/codegen command changes instead.
-- Do not implement or accept specs, scenarios, tasks, or tests that mention a thing only to say it is absent, unused, not adopted, removed, replaced, migrated away from, or switched away from. Required artifacts must describe only positive end-state behavior and constraints. Return `BLOCKED` with exact file and line references when this appears.
 - Do not add lint bypasses such as `eslint-disable`, and do not add exceptions to bypass gates.
 - Dependency changes, version changes, permission boundary changes, and destructive changes are ask-first items. Stop and report instead of executing them.
 - Only the following subagents may be called via `task`: `planner`, `unit/agent/engineer`, `unit/agent/reviewer`, `unit/client/engineer`, `unit/client/reviewer`, `unit/client/designer`, `unit/build/builder`, and `unit/build/reviewer`.
