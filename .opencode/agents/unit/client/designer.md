@@ -24,7 +24,7 @@ permission:
     'git diff*': allow
     'git log*': allow
     'npx impeccable *': allow
-    'node .opencode/skills/impeccable/scripts/*': allow
+    'node .opencode/skills/impeccable/scripts/**': allow
     'pnpm lint*': allow
     'pnpm test*': allow
     'pnpm build*': allow
