@@ -67,6 +67,9 @@ Caller (primary) provides one or more of:
 - Do not touch `generated/**`
 - Do not bypass lint
 - Only call `openspec/analyzer`, `researcher`, `unit/agent/engineer`, `unit/client/engineer`, and `unit/client/designer` via `task` (no self-calls, no unapproved agents)
+- Design requires a mandatory `researcher` task gate for external package opportunities before finalizing `design.md` or `tasks.md`; run it even when the expected outcome is no dependency change.
+- A package may be recommended or adopted only when Researcher verifies every criterion with evidence: GitHub stars >= 1,000, active maintenance, and direct security or maintainability improvement for the change. Package additions must also satisfy repository supply-chain constraints.
+- Do not mention rejected packages or non-adoption outcomes in OpenSpec artifacts. Reflect only qualifying selected package decisions and their implementation tasks; report no-qualifying-candidate outcomes only in the completion report.
 - Proposer owns `specs/**/*.md`: create/update Spec Requirements and Scenarios before specialist detailed design delegation, and never ask engineers or designers to define or rewrite Requirements or Scenarios.
 - Delegate post-Spec detailed implementation design to the relevant unit specialist before finalizing `design.md` and implementation-ready tasks:
   - Agent Service implementation design based on finalized Specs: `unit/agent/engineer`
@@ -98,7 +101,16 @@ Caller (primary) provides one or more of:
    - Create/update the artifact per `template` and `outputPath`
    - Iterate until all required artifacts are filled
 
-4. Specialist detailed design after Spec creation
+4. External package research gate before detailed design
+   - Before finalizing `design.md`, `tasks.md`, or specialist prompts, call `researcher` via `task` to investigate applicable external packages for the target domains and repository stack
+   - Provide Researcher with the change intent, finalized `specs/**/*.md`, current repository constraints, relevant existing dependency manifests, affected layers, and security/maintainability goals
+   - Require Researcher to return candidate packages with source URLs, GitHub stars, maintenance evidence, security/maintainability value, adoption recommendation, risks/tradeoffs, and confidence
+   - Treat a package as eligible only when all adoption criteria are satisfied: GitHub stars >= 1,000, active maintenance, and clear security or maintainability benefit for this change
+   - Reflect eligible selected packages into `design.md` and `tasks.md` with supply-chain, installation, integration, testing, and verification implications
+   - If no package satisfies all criteria, continue the design without adding package-related artifact statements and include that outcome in the completion report
+   - If Researcher cannot be called in the execution environment, return `CALLER_ACTION_REQUIRED` with the exact Researcher invocation prompt and do not finalize detailed design from assumption alone
+
+5. Specialist detailed design after Spec creation
    - Before finalizing detailed design or implementation-ready tasks, ensure `specs/**/*.md` already describes the required positive external behavior and follows the Spec file restrictions
    - When creating or updating `design.md`, delegate detailed design to the responsible allowed unit agents via `task`; each request must include the finalized `specs/**/*.md` paths and require the specialist to read those Specs before designing
    - Call `unit/agent/engineer` for Agent Service design based on finalized Specs, covering TypeSpec/proto source, Connect RPC Worker boundaries, Durable Object aggregate/storage/runtime, Agent-owned observability, and Agent governance scripts
@@ -113,31 +125,32 @@ Caller (primary) provides one or more of:
    - If specialist output is too thin, omits affected domains, uses placeholders such as `TBD`/`etc`, or leaves implementation decisions implicit, ask the specialist for a corrected detailed design before finalizing `design.md`
    - If a unit agent reports blockers or required decisions, resolve them before validation
 
-5. `tasks.md` quality conditions
+6. `tasks.md` quality conditions
    - Map implementation tasks to requirements/Scenario IDs
    - Satisfy `rules.tasks` in `openspec/config.yaml` (test tasks for ADDED/MODIFIED Scenario IDs)
    - Frame test tasks only around required positive end-state behavior or constraints; do not create tasks that prove negative existence, non-adoption, removal, replacement, migration, or switching facts
    - Include verification tasks aligned with repository conventions (lint/test/build and codegen if needed)
 
-6. Format convergence
+7. Format convergence
    - Run `openspec validate --type change "<change-id>" --strict --no-interactive`
    - Fix failures and rerun until PASS
 
-7. Analyzer integration
+8. Analyzer integration
    - Call `openspec/analyzer` via `task` and receive findings (Blocker/Warn/Decision)
    - Apply the received Patch plan and validate again
 
    Note: depending on the execution environment, subagents may not be able to use `task`.
    - In that case, return `CALLER_ACTION_REQUIRED` and provide the exact next analyzer/researcher/unit design delegation invocation steps to the caller
 
-8. Decisions
+9. Decisions
    - If analyzer returns decision requests, proposer decides
    - If evidence is needed, call `researcher` via `task` and decide with evidence
    - Reflect the decision into proposal/design/spec deltas/tasks (at least one)
 
-9. Completion report
-   - validate PASS
-   - List remaining open questions if any (ideally zero blockers)
+10. Completion report
+
+- validate PASS
+- List remaining open questions if any (ideally zero blockers)
 
 # Reporting
 
