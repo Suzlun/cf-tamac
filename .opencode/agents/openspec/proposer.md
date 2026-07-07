@@ -22,7 +22,6 @@ permission:
   skill:
     '*': deny
     'coding-guardian': allow
-    'generate-image': allow
     'orchestration-playbook': allow
     'openspec-*': allow
   bash:
@@ -106,13 +105,9 @@ Caller (primary) provides one or more of:
    - Call `unit/client/engineer` for Management Client design based on finalized Specs, covering Next.js App Router integration, Server Components/Server Actions, Client D1 repositories, server-only Agent RPC usage, browser secrecy, and no-proxy boundaries
    - Call `unit/client/designer` for Management Client UI/UX design based on finalized Specs, covering route-shell wireframes, visual hierarchy, component placement, responsive states, interaction behavior, accessibility, and user-facing copy
    - For UI-affecting changes, require `unit/client/designer` to return a page/screen inventory plus `.wireframe.json` and `.wireframe.html` artifacts for every materially distinct page/screen before `design.md` is finalized
-   - Before generating each mockup, inspect existing implementation design evidence that constrains visual consistency: relevant frontend routes/surfaces, shared UI packages/components, and design token or style entrypoints documented by the repository
-   - Convert that evidence into `generate-image` CLI form fields rather than one freeform prompt: `--prompt` for the first-line deliverable directive, then `--purpose`, `--canvas`, `--subject`, `--composition`, `--style`, `--details`, `--text`/`--typography` when needed, and repeated `--constraint` values
-   - For each UI page/screen, load `generate-image` via `skill` and create a raster mockup image with `.opencode/skills/generate-image/scripts/generate-image.mjs --template ui-mockup --prompt "<first-line directive>" --purpose "<purpose>" --canvas "<canvas>" --subject "<subject>" --composition "<composition>" --style "<style>" --details "<details>" --constraint "<constraint>" --wireframe <matching-wireframe>`; the wireframe file itself MUST be passed with `--wireframe` and MUST NOT be replaced by a prompt-only summary
-   - Save generated mockups under `openspec/changes/<change-id>/mockups/<screen-slug>.mockup.png`
-   - If `generate-image` cannot produce a usable mockup for a page/screen, use `agent-browser` to open the matching `.wireframe.html` preview and capture `openspec/changes/<change-id>/mockups/<screen-slug>.wireframe-screenshot.png` as the fallback mockup image
-   - Embed only raster image files in `design.md` under `## UI Mockups` using Markdown image syntax. Do not embed wireframe HTML with `<iframe>`
-   - Include every generated/fallback mockup image and its source wireframe artifacts in `design.md` Directory Tree and New / Changed Files
+   - For each UI page/screen, use `agent-browser` to open the matching `.wireframe.html` preview and capture `openspec/changes/<change-id>/wireframe-screenshots/<screen-slug>.wireframe-screenshot.png`
+   - Embed only wireframe screenshot image files in `design.md` under `## UI Wireframe Screenshots` using Markdown image syntax. Do not embed wireframe HTML with `<iframe>` and do not generate AI mockup images during the OpenSpec proposal workflow
+   - Include every wireframe screenshot image and its source wireframe artifacts in `design.md` Directory Tree and New / Changed Files
    - Each delegation must state that the request is design-only for OpenSpec proposal artifacts: do not implement code, do not edit generated outputs, do not propose/define/rewrite Spec Requirements or Scenarios, and return detailed constraints, affected paths, risks, and verification tasks
    - Reflect every substantive specialist output into `design.md` without omissions before validation. For a new-concept feature, expect impact coverage on the order of 150 changed files; for multi-domain expansion, expect impact coverage on the order of 300 changed files. `design.md` must cover affected layers, contracts, generated artifacts, persistence, UI surfaces, tests, configuration, security boundaries, and verification commands at that scale.
    - If specialist output is too thin, omits affected domains, uses placeholders such as `TBD`/`etc`, or leaves implementation decisions implicit, ask the specialist for a corrected detailed design before finalizing `design.md`
