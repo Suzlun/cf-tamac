@@ -179,7 +179,7 @@ OK例: Worker entrypoint -> RPC adapter/router/interceptors -> service modules -
 **Rule: Agent storage layer は domain/runtime/DO routing/RPC layer を import しない。**
 Summary: storage module は lower-level schema/persistence seam に閉じます。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`.
-NG例: `packages/agent/src/storage/schema.ts` から `../events`、`../AIAgent`、`../agent-routing`、`../rpc/**` を import する。
+NG例: `packages/agent/src/storage/schema/agent-storage.ts` から `../../events`、`../../AIAgent`、`../../agent-routing`、`../../rpc/**` を import する。
 OK例: storage module は schema/table constants と lower-level persistence helpers に閉じる。
 
 **Rule: Agent lower layers は framework/runtime imports と Worker network globals を使わない。**
@@ -208,7 +208,7 @@ OK例: empty `agent_id` は拒否し、same `agent_id` は same DO id/stub に�
 
 **Rule: Agent-local Queue は scheduler wake/coalescing boundary であり、Event/Run の source of truth ではない。**
 Summary: accepted Events、pending Runs、scheduler wake state は `AIAgent` Durable Object SQLite storage に保存します。
-Enforcement point: `pnpm test:agent` via `packages/agent/src/tests/agent-local-queue-wake.test.ts`, `packages/agent/src/AIAgent.ts`, `packages/agent/src/storage/table-initializer.ts`, and `packages/agent/src/storage/schema.ts`.
+Enforcement point: `pnpm test:agent` via `packages/agent/src/tests/agent-local-queue-wake.test.ts`, `packages/agent/src/AIAgent.ts`, `packages/agent/src/storage/initializers/agent-storage.ts`, and `packages/agent/src/storage/schema/agent-storage.ts`.
 NG例: Cloudflare Queues producer/consumer API を Event source of truth として使う、wake ごとに unbounded item を作る。
 OK例: Event append -> pending Run creation -> scheduler wake/coalescing state の順に DO SQLite storage へ保存する。
 

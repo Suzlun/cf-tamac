@@ -5,13 +5,20 @@ import {
   dispatchGetAgent,
   dispatchInitializeAgent,
   dispatchRotateAgentCredential,
-} from '../do-router';
+} from '../dispatch/lifecycle';
 
 import type { AgentWorkerEnv } from '../../env';
 import type { ServiceImpl } from '@connectrpc/connect';
 
 /**
- * Create the implemented lifecycle service for the Agent Connect facade.
+ * `createAgentLifecycleService` は Agent Service の内部境界で利用する exported 関数です。
+ *
+ * @remarks
+ * この関数は Agent-owned Durable Object / storage / RPC adapter の責務内で呼び出されます。
+ * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
+ * @param env Agent Worker の binding と Durable Object routing を含む環境です。
+ * @returns Agent lifecycle RPC の unary handler 群を含む Connect service 実装断片です。
+ * @throws この関数自体は Connect service object を組み立てるだけのため例外を投げません。
  */
 export function createAgentLifecycleService(
   env: AgentWorkerEnv

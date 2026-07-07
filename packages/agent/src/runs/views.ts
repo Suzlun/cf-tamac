@@ -1,7 +1,7 @@
 import { mapAgentRunRow } from '../domain/agent-operation-utils';
 import { computeSha256Hex } from '../domain/security';
 
-import { assertRunStatus, isTerminalRunStatus } from './foundation';
+import { assertRunStatus, isTerminalRunStatus } from './run-status';
 
 import type { AgentAuditView, AgentPageView, AgentRunView } from '../domain';
 import type {
@@ -13,7 +13,11 @@ import type {
 } from '../storage';
 
 /**
- * Safe error metadata attached to an AgentRun without exposing secrets.
+ * AgentRun に添付する secret-free な error metadata です。
+ *
+ * @remarks
+ * Provider の raw error body や credential ではなく、RPC view に返してよい code、message、retryable、
+ * correlation 情報だけを保持します。
  */
 export interface AgentRunSafeErrorView {
   readonly code: string;
@@ -25,7 +29,11 @@ export interface AgentRunSafeErrorView {
 }
 
 /**
- * Detailed AgentRun view returned by Run query and cancellation operations.
+ * Run query と cancellation operation が返す詳細な AgentRun view です。
+ *
+ * @remarks
+ * storage row に model policy snapshot、safe error、interrupt、invocation summary を合成します。
+ * raw payload、Provider secret、model 入出力 body は含めません。
  */
 export interface AgentRunDetailView extends AgentRunView {
   readonly configVersion?: number;
@@ -43,7 +51,11 @@ export interface AgentRunDetailView extends AgentRunView {
 }
 
 /**
- * Immutable AgentRun input snapshot exposed through GetRun.
+ * GetRun で公開する immutable AgentRun input snapshot view です。
+ *
+ * @remarks
+ * Run 開始時点で固定した Event 範囲と policy/tool/memory 世代を示します。snapshot body そのものではなく、
+ * 参照や version metadata だけを返します。
  */
 export interface AgentRunInputView {
   readonly agentId: string;
@@ -66,6 +78,10 @@ export interface AgentRunInputView {
 
 /**
  * Run snapshot に固定された model policy identity の安全な view です。
+ *
+ * @remarks
+ * resolved policy ref/digest、provider、model ID、version だけを返します。credential reference や
+ * provider secret は含めず、Run replay / audit に必要な policy identity に限定します。
  */
 export interface AgentRunModelPolicySnapshotView {
   readonly configVersion: string;
@@ -86,6 +102,9 @@ export interface AgentRunModelPolicySnapshotView {
 
 /**
  * Model invocation ledger の安全な summary view です。
+ *
+ * @remarks
+ * token count、latency、status、digest だけを返し、prompt/response の raw body は返しません。
  */
 export interface AgentModelInvocationSummaryView {
   readonly attempt: number;
@@ -107,6 +126,9 @@ export interface AgentModelInvocationSummaryView {
 
 /**
  * Run query が返す raw body を含まない digest view です。
+ *
+ * @remarks
+ * byte length と SHA-256 digest だけを公開し、model request/response body を RPC payload へ載せません。
  */
 export interface AgentRunDigestView {
   readonly algorithm: 'sha-256';
@@ -115,7 +137,10 @@ export interface AgentRunDigestView {
 }
 
 /**
- * Immutable Run snapshot reference metadata returned by GetRun.
+ * GetRun が返す immutable Run snapshot の参照 metadata です。
+ *
+ * @remarks
+ * snapshotRef、digest、作成時刻、Agent/Thread/Run identity だけを公開し、snapshot body は blob 参照に閉じます。
  */
 export interface RunSnapshotReferenceView {
   readonly agentId: string;
@@ -127,7 +152,10 @@ export interface RunSnapshotReferenceView {
 }
 
 /**
- * GetRun result with immutable input and snapshot reference metadata.
+ * GetRun operation の domain result です。
+ *
+ * @remarks
+ * 詳細 Run view に、存在する場合だけ immutable input view と snapshot reference を添えて返します。
  */
 export interface GetAgentRunResult {
   readonly input?: AgentRunInputView;
@@ -136,7 +164,10 @@ export interface GetAgentRunResult {
 }
 
 /**
- * ListRuns result with Agent-scoped pagination metadata.
+ * ListRuns operation の domain result です。
+ *
+ * @remarks
+ * Agent-scoped cursor page と safe Run detail view の配列だけを含みます。
  */
 export interface ListAgentRunsResult {
   readonly page: AgentPageView;
@@ -144,7 +175,10 @@ export interface ListAgentRunsResult {
 }
 
 /**
- * CancelRun result with idempotency replay status.
+ * CancelRun operation の domain result です。
+ *
+ * @remarks
+ * 取消後の Run view、任意の audit、idempotency replay 有無を返します。
  */
 export interface CancelAgentRunResult {
   readonly audit?: AgentAuditView;
@@ -153,7 +187,15 @@ export interface CancelAgentRunResult {
 }
 
 /**
- * Build a GetRun response view from Run and immutable snapshot rows.
+ * Run row と immutable snapshot row から GetRun 用の安全な response view を組み立てます。
+ *
+ * @param input Agent ID、Agent-owned repository set、対象 Run row です。
+ * @returns Run detail、任意の input snapshot view、任意の snapshot reference を含む GetRun result です。
+ * @throws snapshot digest 計算または repository 読み取りで失敗した場合に呼び出し元へ伝播します。
+ * @example
+ * ```ts
+ * const result = await createGetRunResult({ agentId, repositories, run });
+ * ```
  */
 export async function createGetRunResult(input: {
   readonly agentId: string;
@@ -170,7 +212,17 @@ export async function createGetRunResult(input: {
 }
 
 /**
- * Convert a Run row into the detailed safe Run view used by RPC handlers.
+ * Run row を RPC handler が返す詳細な safe Run view へ変換します。
+ *
+ * @param agentId Durable Object instance が所有する Agent ID です。
+ * @param repositories snapshot、interrupt、Event、budget ledger を読む Agent-owned repository set です。
+ * @param row 変換対象の Run row です。
+ * @returns secret-free な AgentRunDetailView です。
+ * @throws 保存済み Run status が未知の場合、または repository 読み取りが失敗した場合に発生します。
+ * @example
+ * ```ts
+ * const view = mapAgentRunDetailRow(agentId, repositories, row);
+ * ```
  */
 export function mapAgentRunDetailRow(
   agentId: string,

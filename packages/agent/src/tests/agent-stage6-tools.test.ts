@@ -29,22 +29,27 @@ import type {
 } from '../storage';
 import type { IntegrationToolProviderClient } from '../tools/provider-client';
 
-const aiAgentPath = new URL('../AIAgent.ts', import.meta.url);
 const catalogPath = new URL('../tools/catalog.ts', import.meta.url);
-const foundationPath = new URL('../tools/foundation.ts', import.meta.url);
+const commandsPath = new URL('../tools/commands.ts', import.meta.url);
+const eventRunToolHandlersPath = new URL(
+  '../durable-object/event-run-tool-handlers.ts',
+  import.meta.url
+);
+const toolStatusPath = new URL('../tools/tool-status.ts', import.meta.url);
 const guardsPath = new URL('../tools/operation-guards.ts', import.meta.url);
 const operationProviderPath = new URL('../tools/operation-provider.ts', import.meta.url);
-const operationsPath = new URL('../tools/operations.ts', import.meta.url);
+const providerOperationsPath = new URL('../tools/provider-operations.ts', import.meta.url);
 const providerClientPath = new URL('../rpc/tool-provider-client.ts', import.meta.url);
-const repositoryPath = new URL('../storage/tools-repository.ts', import.meta.url);
-const routerPath = new URL('../rpc/tool-do-router.ts', import.meta.url);
+const repositoryPath = new URL('../storage/repositories/tools-repository.ts', import.meta.url);
+const resultsPath = new URL('../tools/results.ts', import.meta.url);
+const dispatchPath = new URL('../rpc/dispatch/tools.ts', import.meta.url);
 const servicePath = new URL('../rpc/services/tools.ts', import.meta.url);
-const tableInitializerPath = new URL('../storage/tool-table-initializer.ts', import.meta.url);
+const tableInitializerPath = new URL('../storage/initializers/tool.ts', import.meta.url);
 
 describe('Agent Stage 6 Tool implementation', () => {
   it('[AGENT-TOOL-S001] ListTools returns an Agent-local versioned catalog', () => {
     const catalog = readSource(catalogPath);
-    const router = readSource(routerPath);
+    const dispatch = readSource(dispatchPath);
     const service = readSource(servicePath);
 
     expect(agentFoundationTables).toEqual(
@@ -53,54 +58,55 @@ describe('Agent Stage 6 Tool implementation', () => {
     expect(agentStorageRepositoryNames).toEqual(expect.arrayContaining(['AgentToolsRepository']));
     expect(catalog).toContain('builtInToolDefinitions');
     expect(catalog).toContain('getNextToolSetVersion()');
-    expect(router).toContain('listTools({');
+    expect(dispatch).toContain('listTools({');
     expect(service).toContain('dispatchListTools(env, request)');
   });
 
   it('[AGENT-TOOL-S002] Disabled Integration Tools are excluded from new invocations', () => {
-    const foundation = readSource(foundationPath);
+    const commands = readSource(commandsPath);
+    const toolStatus = readSource(toolStatusPath);
     const guards = readSource(guardsPath);
-    const operations = readSource(operationsPath);
     const repository = readSource(repositoryPath);
 
-    expect(foundation).toContain("'disabled'");
+    expect(toolStatus).toContain("'disabled'");
     expect(repository).toContain(
       "input.includeUnavailable === true ? undefined : eq(table.status, 'active')"
     );
-    expect(operations).toContain('assertInvokableDefinition(definition, input.command.toolId)');
+    expect(commands).toContain('assertInvokableDefinition(definition, input.command.toolId)');
     expect(guards).toContain("definition.status !== 'active'");
   });
 
   it('[AGENT-TOOL-S003] Approval-required ToolInvocation waits before Provider execution', () => {
-    const operations = readSource(operationsPath);
-    const router = readSource(routerPath);
+    const commands = readSource(commandsPath);
+    const dispatch = readSource(dispatchPath);
+    const providerOperations = readSource(providerOperationsPath);
 
-    expect(operations).toContain(
+    expect(commands).toContain(
       "status: definition.approvalRequired ? 'pending_approval' : 'approved'"
     );
-    expect(operations).toContain('executeToolInvocationWithProvider');
-    expect(operations).toContain("assertTransition(invocation.status, 'running')");
-    expect(router).toContain('getToolInvocation({');
+    expect(providerOperations).toContain('executeToolInvocationWithProvider');
+    expect(providerOperations).toContain("assertTransition(invocation.status, 'running')");
+    expect(dispatch).toContain('getToolInvocation({');
   });
 
   it('[AGENT-TOOL-S004] Approval RPCs capture actor, rationale, audit, and state transition', () => {
-    const operations = readSource(operationsPath);
+    const commands = readSource(commandsPath);
     const service = readSource(servicePath);
 
     expect(service).toContain('approveInvocation(request)');
     expect(service).toContain('rejectInvocation(request)');
-    expect(operations).toContain('tool.approval.decide');
+    expect(commands).toContain('tool.approval.decide');
     // 実装の改行や Prettier 整形に依存せず、acting user を優先して actorId に記録する意図だけを検証します。
-    expect(operations).toMatch(
+    expect(commands).toMatch(
       /actorId:\s*input\.command\.context\.principal\.actingUserId\s*\?\?\s*input\.command\.context\.principal\.principalId/u
     );
-    expect(operations).toContain('reason: input.command.reason');
-    expect(operations).toContain('recordToolAudit(');
+    expect(commands).toContain('reason: input.command.reason');
+    expect(commands).toContain('recordToolAudit(');
   });
 
   it('[AGENT-TOOL-S005] Provider Tool calls use signed binary Protobuf RPC metadata', () => {
+    const operationProvider = readSource(operationProviderPath);
     const providerClient = readSource(providerClientPath);
-    const operations = readSource(operationsPath);
 
     expect(providerClient).toContain('IntegrationToolService.method.invokeTool.name');
     expect(providerClient).toContain('toBinary(InvokeToolRequestSchema');
@@ -109,53 +115,56 @@ describe('Agent Stage 6 Tool implementation', () => {
     expect(providerClient).toContain('buildIntegrationToolSignatureMetadata');
     expect(providerClient).toContain('rawBodyDigest');
     expect(providerClient).not.toContain('JSON.stringify');
-    expect(operations).toContain('insertOutgoingRequest({');
+    expect(operationProvider).toContain('insertOutgoingRequest({');
   });
 
   it('[AGENT-TOOL-S006] Tool result Events append to the same Thread and wake Run work', () => {
-    const aiAgent = readSource(aiAgentPath);
-    const operations = readSource(operationsPath);
+    const eventRunToolHandlers = readSource(eventRunToolHandlersPath);
+    const results = readSource(resultsPath);
 
-    expect(operations).toContain('appendAgentEventToThreadInRepositories({');
-    expect(operations).toContain('toolInvocationSucceededEventType');
-    expect(operations).toContain('toolInvocationFailedEventType');
-    expect(operations).toContain("source: 'agent.tool'");
-    expect(aiAgent).toContain('requestWakeAfterToolResult(result, command.context.requestedAtMs)');
+    expect(results).toContain('appendAgentEventToThreadInRepositories({');
+    expect(results).toContain('toolInvocationSucceededEventType');
+    expect(results).toContain('toolInvocationFailedEventType');
+    expect(results).toContain("source: 'agent.tool'");
+    expect(eventRunToolHandlers).toContain(
+      'requestWakeAfterToolResult(result, command.context.requestedAtMs)'
+    );
   });
 
   it('[AGENT-TOOL-S010] Tool result resumes waiting Run and rejects stale generations', () => {
     const guards = readSource(guardsPath);
-    const operations = readSource(operationsPath);
+    const results = readSource(resultsPath);
 
-    expect(operations).toContain('assertToolResultCanResumeRun(repositories, invocation)');
-    expect(operations).toContain("fromStatus: 'waiting'");
-    expect(operations).toContain("toStatus: 'pending'");
+    expect(results).toContain('assertToolResultCanResumeRun(repositories, invocation)');
+    expect(results).toContain("fromStatus: 'waiting'");
+    expect(results).toContain("toStatus: 'pending'");
     expect(guards).toContain('Tool result catalog generation is stale.');
     expect(guards).toContain('Tool result is stale for the waiting Run.');
-    expect(operations).toContain('findResultEventByInvocation(invocation.invocationId)');
+    expect(results).toContain('findResultEventByInvocation(invocation.invocationId)');
   });
 
   it('[AGENT-TOOL-S007] outcome_unknown invocations reconcile through GetOperation without duplicate results', () => {
-    const operations = readSource(operationsPath);
     const operationProvider = readSource(operationProviderPath);
+    const providerOperations = readSource(providerOperationsPath);
     const providerClient = readSource(providerClientPath);
+    const results = readSource(resultsPath);
 
     expect(operationProvider).toContain("status: 'outcome_unknown'");
-    expect(operations).toContain('providerClient.getOperation({');
-    expect(operations).toContain('findResultEventByInvocation(invocation.invocationId)');
-    expect(operations).toContain('suppressedDuplicate: 0');
+    expect(providerOperations).toContain('providerClient.getOperation({');
+    expect(results).toContain('findResultEventByInvocation(invocation.invocationId)');
+    expect(results).toContain('suppressedDuplicate: 0');
     expect(providerClient).toContain('IntegrationToolService.method.getOperation.name');
   });
 
   it('[AGENT-TOOL-S008] cancellation propagates to Provider CancelOperation when supported', () => {
-    const operations = readSource(operationsPath);
     const operationProvider = readSource(operationProviderPath);
+    const providerOperations = readSource(providerOperationsPath);
     const providerClient = readSource(providerClientPath);
     const tableInitializer = readSource(tableInitializerPath);
 
     expect(operationProvider).toContain('providerClient.cancelOperation({');
-    expect(operations).toContain('markProviderOperationCancellation({');
-    expect(operations).toContain("cancelled.response.cancellationStatus === 'cancelled'");
+    expect(providerOperations).toContain('markProviderOperationCancellation({');
+    expect(providerOperations).toContain("cancelled.response.cancellationStatus === 'cancelled'");
     expect(providerClient).toContain('IntegrationToolService.method.cancelOperation.name');
     expect(tableInitializer).toContain('cancellation_requested_at_ms INTEGER');
   });

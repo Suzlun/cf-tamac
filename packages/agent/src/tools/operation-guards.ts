@@ -6,7 +6,7 @@ import {
 import { createAgentDomainError } from '../domain/errors';
 
 import { mapToolDefinitionRow } from './catalog';
-import { assertToolInvocationStatus, assertToolInvocationStatusTransition } from './foundation';
+import { assertToolInvocationStatus, assertToolInvocationStatusTransition } from './tool-status';
 
 import type { AgentCoreRequestContext } from '../domain';
 import type {
@@ -15,8 +15,8 @@ import type {
   AgentToolInvocationRow,
 } from '../storage';
 import type { AgentToolDefinitionView } from './catalog';
-import type { ToolInvocationStatus } from './foundation';
 import type { ToolInvocationMutationResult } from './operation-types';
+import type { ToolInvocationStatus } from './tool-status';
 
 /**
  * Provider-backed ToolDefinition を必須条件として取得します。
@@ -96,6 +96,7 @@ export function requireProviderOperationForInvocation(
  *
  * @param definition catalog assembly から得た ToolDefinition view です。
  * @param toolId エラー説明に含める要求 Tool ID です。
+ * @returns 検証成功時は `definition` を invocation 可能な ToolDefinition view として narrow します。
  * @throws definition 不在、または status が active でない場合に domain error を投げます。
  * @example
  * ```ts
@@ -123,6 +124,7 @@ export function assertInvokableDefinition(
  *
  * @param from 現在の ToolInvocation status です。
  * @param to 遷移先の ToolInvocation status です。
+ * @returns 許可された遷移では値を返さず、呼び出し元の mutation を継続させます。
  * @throws 不明な status、または不正遷移の場合に domain error を投げます。
  * @example
  * ```ts
@@ -225,6 +227,11 @@ export function createProviderNonce(
  * @param context Agent RPC command context です。
  * @param operationName idempotency record に保存する stable operation 名です。
  * @returns replay 可能な保存済み response、または新規 command の場合は `undefined` です。
+ * @throws body digest conflict または nonce replay が検出された場合に domain error を投げます。
+ * @example
+ * ```ts
+ * const replay = beginToolMutationCommand(repositories, context, toolOperationNames.createInvocation);
+ * ```
  */
 export function beginToolMutationCommand(
   repositories: AgentStorageRepositories,
@@ -251,6 +258,11 @@ export function beginToolMutationCommand(
  * @param operationName idempotency record に保存する stable operation 名です。
  * @param result 永続化済み mutation result です。
  * @returns 入力 result をそのまま返します。
+ * @throws idempotency response の保存に失敗した場合に呼び出し元へ伝播します。
+ * @example
+ * ```ts
+ * return recordToolMutationResult(repositories, context, operationName, result);
+ * ```
  */
 export function recordToolMutationResult(
   repositories: AgentStorageRepositories,
@@ -268,7 +280,12 @@ export function recordToolMutationResult(
  *
  * @param invocation ToolInvocation の永続行です。
  * @param operation Provider operation ledger 行です。
+ * @returns identity が一致した場合は値を返さず、呼び出し元の Provider operation 処理を継続させます。
  * @throws invocation / tool / installation identity が一致しない場合に precondition domain error を投げます。
+ * @example
+ * ```ts
+ * assertProviderOperationBelongsToInvocation(invocation, operation);
+ * ```
  */
 export function assertProviderOperationBelongsToInvocation(
   invocation: AgentToolInvocationRow,
@@ -310,7 +327,12 @@ export function assertProviderOperationBelongsToInvocation(
  * @param repositories Agent-owned repository set です。
  * @param invocation result 対象 ToolInvocation 行です。
  * @param providerOperationId Provider から渡された operation identity です。
+ * @returns identity が一致した場合は値を返さず、Tool result の保存処理を継続させます。
  * @throws 登録済み Provider operation と一致しない場合に precondition domain error を投げます。
+ * @example
+ * ```ts
+ * assertProviderResultIdentity(repositories, invocation, command.providerOperationId);
+ * ```
  */
 export function assertProviderResultIdentity(
   repositories: AgentStorageRepositories,
@@ -350,7 +372,12 @@ export function assertProviderResultIdentity(
  *
  * @param repositories Agent-owned storage repository set です。
  * @param invocation Provider result が紐づく ToolInvocation 行です。
+ * @returns Run 再開条件を満たす場合は値を返さず、result Event append を継続させます。
  * @throws AgentDomainError Run が waiting ではない、snapshot と Tool catalog generation がずれる、または Tool が利用不可の場合に発生します。
+ * @example
+ * ```ts
+ * assertToolResultCanResumeRun(repositories, invocation);
+ * ```
  */
 export function assertToolResultCanResumeRun(
   repositories: AgentStorageRepositories,

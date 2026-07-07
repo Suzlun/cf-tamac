@@ -116,6 +116,8 @@ const agentNoClientOrRestRule = {
       group: [
         '@cf-tamac/client',
         '@cf-tamac/client/**',
+        '@cf-tamac/client-agent-rpc',
+        '@cf-tamac/client-agent-rpc/**',
         'packages/client/**',
         '../client/**',
         '../../client/**',
@@ -150,9 +152,57 @@ const generatedSourceGlobs = [
   'packages/client/src/generated/**/*.{ts,tsx}',
 ];
 
+// Agent 新レイヤーの import 制約は ESLint の raw specifier に対して評価されるため、
+// src 配下の複数階層から同じ境界へ届く相対 import を同じ手順で列挙する。
+const agentLayerImportPatterns = (...targets) =>
+  targets.flatMap((target) =>
+    ['..', '../..', '../../..', '../../../..'].flatMap((prefix) => [
+      `${prefix}/${target}`,
+      `${prefix}/${target}.ts`,
+      `${prefix}/${target}/**`,
+    ])
+  );
+
+// Phase 0 時点で domain から storage repository 型を受け取る既存ファイルだけを狭く許可し、
+// 新規 domain ファイルへ storage 依存の例外が広がらないようにする。
+const agentDomainStorageImportExceptionFiles = [
+  'packages/agent/src/domain/agent-operation-utils.ts',
+  'packages/agent/src/domain/lifecycle-audit.ts',
+  'packages/agent/src/domain/lifecycle-operations.ts',
+  'packages/agent/src/domain/model-policy-operations.ts',
+  'packages/agent/src/domain/state-operations.ts',
+];
+
+const agentApplicationImportPatterns = agentLayerImportPatterns('application');
+const agentDomainImportPatterns = agentLayerImportPatterns('domain');
+const agentLegacyDurableObjectImportPatterns = [
+  ...agentLayerImportPatterns('AIAgent'),
+  ...['..', '../..', '../../..', '../../../..'].map((prefix) => `${prefix}/AIAgent*`),
+];
+const agentDurableObjectImportPatterns = [
+  ...agentLayerImportPatterns('durable-object'),
+  ...agentLegacyDurableObjectImportPatterns,
+];
+const agentGeneratedRpcImportPatterns = [
+  '@cf-tamac/agent-rpc',
+  '@cf-tamac/agent-rpc/**',
+  '@cf-tamac/client-agent-rpc',
+  '@cf-tamac/client-agent-rpc/**',
+  ...agentLayerImportPatterns('generated/rpc'),
+];
+const agentRoutingImportPatterns = agentLayerImportPatterns('agent-routing');
+const agentRpcAdapterImportPatterns = agentLayerImportPatterns('rpc/connect-worker-adapter');
+const agentRpcImportPatterns = agentLayerImportPatterns('rpc');
+const agentRpcInterceptorImportPatterns = agentLayerImportPatterns('rpc/interceptors');
+const agentRpcRouterImportPatterns = agentLayerImportPatterns('rpc/router');
+const agentRpcServiceImportPatterns = agentLayerImportPatterns('rpc/services');
+const agentStorageImportPatterns = agentLayerImportPatterns('storage');
+const agentWorkerEntrypointImportPatterns = agentLayerImportPatterns('index', 'worker');
+
 const agentProductionIgnores = [...generatedSourceGlobs, ...packageTestGlobs];
 
 const agentFoundationLayerFiles = [
+  'packages/agent/src/application/**/*.{ts,tsx}',
   'packages/agent/src/domain/**/*.{ts,tsx}',
   'packages/agent/src/harness/**/*.{ts,tsx}',
   'packages/agent/src/threads/**/*.{ts,tsx}',
@@ -187,6 +237,27 @@ const frameworkRuntimeImportPatterns = [
     ],
     message:
       'Agent foundation lower layers must not import framework, transport, persistence, or platform runtime packages.',
+  },
+];
+
+const storageFrameworkRuntimeImportPatterns = [
+  {
+    group: [
+      'hono',
+      'hono/**',
+      '@hono/zod-openapi',
+      '@connectrpc/connect',
+      '@connectrpc/connect/**',
+      'next',
+      'next/**',
+      'react',
+      'react/**',
+      'server-only',
+      '@cloudflare/**',
+      'cloudflare:*',
+    ],
+    message:
+      'Agent storage persistence must not import framework, transport, or platform runtime packages; keep storage imports to persistence seams.',
   },
 ];
 
@@ -227,6 +298,7 @@ export default tseslint.config(
       '**/next-env.d.ts',
       // OpenCode 配布スキルの実行スクリプトは外部ツールの同梱物であり、
       // 本リポジトリの TypeScript project service や境界ルールでは解析しない。
+      '**/.opencode/skills/generate-image/scripts/**',
       '**/.opencode/skills/impeccable/scripts/**',
     ],
   },
@@ -490,20 +562,123 @@ export default tseslint.config(
             ...frameworkRuntimeImportPatterns,
             {
               group: [
-                '../rpc/**',
-                '../../rpc/**',
-                '../worker',
-                '../worker.ts',
-                '../index',
-                '../index.ts',
-                '../AIAgent',
-                '../AIAgent.ts',
-                '../agent-routing',
-                '../agent-routing.ts',
-                '@cf-tamac/agent-rpc/**',
+                ...agentRpcImportPatterns,
+                ...agentWorkerEntrypointImportPatterns,
+                ...agentDurableObjectImportPatterns,
+                ...agentRoutingImportPatterns,
+                ...agentGeneratedRpcImportPatterns,
               ],
               message:
                 'Agent runtime/domain/storage layers must not import Worker, RPC facade, DO routing, or generated descriptor layers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/agent/src/durable-object/**/*.{ts,tsx}'],
+    ignores: packageTestGlobs,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...agentNoClientOrRestRule,
+          patterns: [
+            ...agentNoClientOrRestRule.patterns,
+            {
+              group: [
+                ...agentRpcServiceImportPatterns,
+                ...agentRpcRouterImportPatterns,
+                ...agentRpcInterceptorImportPatterns,
+                ...agentWorkerEntrypointImportPatterns,
+                ...agentGeneratedRpcImportPatterns,
+              ],
+              message:
+                'Agent durable-object layer must not import RPC services, router, interceptors, Worker entrypoints, or generated descriptor layers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/agent/src/application/**/*.{ts,tsx}'],
+    ignores: packageTestGlobs,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...agentNoClientOrRestRule,
+          patterns: [
+            ...agentNoClientOrRestRule.patterns,
+            ...frameworkRuntimeImportPatterns,
+            {
+              group: [
+                ...agentRpcImportPatterns,
+                ...agentWorkerEntrypointImportPatterns,
+                ...agentRoutingImportPatterns,
+                ...agentDurableObjectImportPatterns,
+                ...agentGeneratedRpcImportPatterns,
+              ],
+              message:
+                'Agent application layer must not import RPC, Worker entrypoints, routing, Durable Object, or generated descriptor layers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/agent/src/domain/**/*.{ts,tsx}'],
+    ignores: [...packageTestGlobs, ...agentDomainStorageImportExceptionFiles],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...agentNoClientOrRestRule,
+          patterns: [
+            ...agentNoClientOrRestRule.patterns,
+            ...frameworkRuntimeImportPatterns,
+            {
+              group: [
+                ...agentApplicationImportPatterns,
+                ...agentDurableObjectImportPatterns,
+                ...agentRpcImportPatterns,
+                ...agentWorkerEntrypointImportPatterns,
+                ...agentRoutingImportPatterns,
+                ...agentGeneratedRpcImportPatterns,
+                ...agentStorageImportPatterns,
+              ],
+              message:
+                'Agent domain layer must not import application, Durable Object, RPC, Worker, routing, generated descriptor, or storage layers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: agentDomainStorageImportExceptionFiles,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...agentNoClientOrRestRule,
+          patterns: [
+            ...agentNoClientOrRestRule.patterns,
+            ...frameworkRuntimeImportPatterns,
+            {
+              group: [
+                ...agentApplicationImportPatterns,
+                ...agentDurableObjectImportPatterns,
+                ...agentRpcImportPatterns,
+                ...agentWorkerEntrypointImportPatterns,
+                ...agentRoutingImportPatterns,
+                ...agentGeneratedRpcImportPatterns,
+              ],
+              message:
+                'Agent domain storage exception files must not import application, Durable Object, RPC, Worker, routing, or generated descriptor layers.',
             },
           ],
         },
@@ -517,36 +692,43 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
+          ...agentNoClientOrRestRule,
           patterns: [
+            ...agentNoClientOrRestRule.patterns,
+            ...storageFrameworkRuntimeImportPatterns,
             {
               group: [
-                '../domain/**',
+                ...agentDomainImportPatterns,
+                ...agentApplicationImportPatterns,
+                ...agentDurableObjectImportPatterns,
                 '../harness/**',
+                '../../harness/**',
                 '../threads/**',
+                '../../threads/**',
                 '../events/**',
+                '../../events/**',
                 '../runs/**',
+                '../../runs/**',
                 '../compactions/**',
+                '../../compactions/**',
                 '../schedules/**',
+                '../../schedules/**',
                 '../tools/**',
+                '../../tools/**',
                 '../integrations/**',
+                '../../integrations/**',
                 '../adapters/**',
-                '../AIAgent',
-                '../AIAgent.ts',
-                '../agent-routing',
-                '../agent-routing.ts',
+                '../../adapters/**',
+                ...agentRoutingImportPatterns,
               ],
               message:
-                'Agent storage is the lower layer and must not import Agent domain/runtime modules.',
+                'Agent storage layer must not import Agent domain, application, Durable Object, runtime, or routing layers.',
             },
             {
               group: [
-                '../rpc/**',
-                '../../rpc/**',
-                '../worker',
-                '../worker.ts',
-                '../index',
-                '../index.ts',
-                '@cf-tamac/agent-rpc/**',
+                ...agentRpcImportPatterns,
+                ...agentWorkerEntrypointImportPatterns,
+                ...agentGeneratedRpcImportPatterns,
               ],
               message:
                 'Agent storage must not import Worker, RPC facade, or generated descriptor layers.',
@@ -572,14 +754,55 @@ export default tseslint.config(
             ...agentNoClientOrRestRule.patterns,
             {
               group: [
-                '../router',
-                '../router.ts',
-                '../connect-worker-adapter',
-                '../connect-worker-adapter.ts',
-                '../interceptors/**',
+                ...agentRpcRouterImportPatterns,
+                ...agentRpcAdapterImportPatterns,
+                ...agentRpcInterceptorImportPatterns,
               ],
               message:
                 'Agent RPC service modules must not import router, adapter, or interceptor layers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/agent/src/rpc/dispatch/**/*.{ts,tsx}'],
+    ignores: packageTestGlobs,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...agentNoClientOrRestRule,
+          patterns: [
+            ...agentNoClientOrRestRule.patterns,
+            {
+              group: agentWorkerEntrypointImportPatterns,
+              message: 'Agent RPC dispatch modules must not import Worker entrypoints.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/agent/src/rpc/mappers/**/*.{ts,tsx}'],
+    ignores: packageTestGlobs,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...agentNoClientOrRestRule,
+          patterns: [
+            ...agentNoClientOrRestRule.patterns,
+            {
+              group: [
+                ...agentDurableObjectImportPatterns,
+                ...agentRoutingImportPatterns,
+                ...agentWorkerEntrypointImportPatterns,
+              ],
+              message:
+                'Agent RPC mapper modules must not import Durable Object, routing, or Worker entrypoint layers.',
             },
           ],
         },

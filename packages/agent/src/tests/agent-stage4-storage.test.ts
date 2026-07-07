@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest';
 
 import { agentFoundationTables, agentStorageRepositoryNames } from '../storage';
 
-const storageRoot = new URL('../storage/', import.meta.url);
-const schemaPath = new URL('../storage/schema.ts', import.meta.url);
-const memorySchemaPath = new URL('../storage/memory-schema.ts', import.meta.url);
-const repositoriesPath = new URL('../storage/repositories.ts', import.meta.url);
-const tableInitializerPath = new URL('../storage/table-initializer.ts', import.meta.url);
+const storageRoot = new URL('../storage/repositories/', import.meta.url);
+const schemaPath = new URL('../storage/schema/agent-storage.ts', import.meta.url);
+const memorySchemaPath = new URL('../storage/schema/memory.ts', import.meta.url);
+const repositoriesPath = new URL('../storage/repositories/factory.ts', import.meta.url);
+const tableInitializerPath = new URL('../storage/initializers/agent-storage.ts', import.meta.url);
 
 const requiredStage4Tables = [
   'agent_thread_compactions',

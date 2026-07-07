@@ -28,7 +28,7 @@ description: Enforce this repository's real Agent/Client foundation, TypeSpec-to
 特に重要な enforcement entrypoint:
 
 - root flow: `package.json`, `.github/workflows/ci.yml`, `.husky/pre-commit`, `.husky/commit-msg`, `.lintstagedrc.json`, `commitlint.config.js`, `eslint.config.js`
-- Agent foundation: `packages/agent/package.json`, `packages/agent/wrangler.toml`, `packages/agent/src/index.ts`, `packages/agent/src/AIAgent.ts`, `packages/agent/src/rpc/**`, `packages/agent/src/storage/schema.ts`
+- Agent foundation: `packages/agent/package.json`, `packages/agent/wrangler.toml`, `packages/agent/src/index.ts`, `packages/agent/src/AIAgent.ts`, `packages/agent/src/rpc/**`, `packages/agent/src/storage/schema/agent-storage.ts`
 - Agent TypeSpec / proto / RPC codegen: `packages/agent/src/typespec/main.tsp`, `packages/agent/src/typespec/tspconfig.yaml`, `packages/agent/buf.yaml`, `packages/agent/buf.gen.yaml`, `scripts/codegen/check-agent-codegen-drift.mjs`
 - Client foundation: `packages/client/package.json`, `packages/client/wrangler.toml`, `packages/client/next.config.ts`, `packages/client/open-next.config.ts`, `packages/client/app/**`, `packages/client/src/server/**`
 - Governance: `scripts/governance/verify-agent-surface.mjs`, `scripts/governance/verify-package-boundaries.mjs`, `scripts/security/verify-pnpm-supply-chain.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`

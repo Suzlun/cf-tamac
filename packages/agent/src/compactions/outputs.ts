@@ -2,7 +2,7 @@ import { createAgentDomainError } from '../domain/errors';
 import { encodeBase64UrlBytes } from '../domain/security/base64url';
 import { computeSha256Hex } from '../domain/security/digest';
 
-import { assertCompactionStatus, assertCompactionStatusTransition } from './foundation';
+import { assertCompactionStatus, assertCompactionStatusTransition } from './compaction-status';
 import {
   recordThreadHistoryBodyReference,
   storeThreadHistoryBody,

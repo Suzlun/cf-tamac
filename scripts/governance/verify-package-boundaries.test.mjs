@@ -126,7 +126,7 @@ export const inverted = createAgentRpcRouter;
         '/packages/agent/src/domain/inverted.ts: Agent runtime/domain/storage layer must not import RPC, Worker, or generated descriptor layers',
         '/packages/agent/src/events/direct-network.ts: Agent runtime/domain/storage layer must not use Worker network globals directly',
         '/packages/agent/src/rpc/services/inverted.ts: Agent RPC service modules must not import router, adapter, or interceptor layers',
-        '/packages/agent/src/storage/inverted.ts: Agent storage layer must not import Agent domain/runtime layers',
+        '/packages/agent/src/storage/inverted.ts: Agent storage layer must not import Agent domain, application, Durable Object, runtime, or routing layers',
       ]);
 
       writeFixture(
@@ -170,6 +170,109 @@ export const leaked = createServerAgentRpcClients;
         '/packages/client/src/components/browser-visible.tsx: Client browser-visible modules must not contain Agent RPC credential or Client D1 access seams',
         '/packages/client/src/server/agent-rpc/create-client.ts: Client Agent RPC modules must import server-only',
       ]);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S004] Lint enforces proposed Agent layer directories', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'agent-layer-boundary-fixtures-'));
+
+    try {
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/durable-object/shell.ts',
+        `import { AgentLifecycleService } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
+import { createAuthenticationInterceptor } from '../rpc/interceptors/authentication';
+import { createAgentRpcRouter } from '../rpc/router';
+import { createHealthService } from '../rpc/services/health';
+
+export const durableObjectLeak = [
+  AgentLifecycleService,
+  createAuthenticationInterceptor,
+  createAgentRpcRouter,
+  createHealthService,
+];
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/application/orchestration.ts',
+        `import { routeAgentIdToDurableObject } from '../agent-routing';
+import { AIAgent } from '../AIAgent';
+import { dispatchAgentHealthCheck } from '../rpc/do-router';
+
+export const applicationLeak = [routeAgentIdToDurableObject, AIAgent, dispatchAgentHealthCheck];
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/domain/new-rule.ts',
+        `import type { AgentStorageRepositories } from '../storage';
+
+export type ForbiddenDomainStorage = AgentStorageRepositories;
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/domain/state-operations.ts',
+        `import type { AgentStorageRepositories } from '../storage';
+
+export type ExistingDomainStorageException = AgentStorageRepositories;
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/storage/inverted-new.ts',
+        `import { routeAgentIdToDurableObject } from '../agent-routing';
+import type { ApplicationCommand } from '../application/commands';
+import type { DomainRule } from '../domain/rules';
+import type { DurableObjectShell } from '../durable-object/shell';
+import { createAgentRpcRouter } from '../rpc/router';
+
+export const storageLeak = [
+  routeAgentIdToDurableObject,
+  createAgentRpcRouter,
+];
+export type StorageLeak = ApplicationCommand | DomainRule | DurableObjectShell;
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/rpc/dispatch/worker-import.ts',
+        `import worker from '../../index';
+
+export const dispatchLeak = worker;
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/rpc/mappers/do-import.ts',
+        `import { routeAgentIdToDurableObject } from '../../agent-routing';
+import type { DurableObjectShell } from '../../durable-object/shell';
+
+export const mapperLeak = routeAgentIdToDurableObject;
+export type MapperLeak = DurableObjectShell;
+`
+      );
+
+      const issues = collectAgentLayerIssues(fixtureRoot);
+
+      expect(issues).toEqual(
+        expect.arrayContaining([
+          '/packages/agent/src/application/orchestration.ts: Agent runtime/domain/storage layer must not import RPC, Worker, or generated descriptor layers',
+          '/packages/agent/src/application/orchestration.ts: Agent application layer must not import routing or Durable Object layers',
+          '/packages/agent/src/domain/new-rule.ts: Agent domain layer must not import application, Durable Object, routing, or storage layers',
+          '/packages/agent/src/durable-object/shell.ts: Agent durable-object layer must not import RPC services, router, interceptors, Worker entrypoints, or generated descriptor layers',
+          '/packages/agent/src/rpc/dispatch/worker-import.ts: Agent RPC dispatch modules must not import Worker entrypoints',
+          '/packages/agent/src/rpc/mappers/do-import.ts: Agent RPC mapper modules must not import Durable Object, routing, or Worker entrypoint layers',
+          '/packages/agent/src/storage/inverted-new.ts: Agent storage layer must not import Agent domain, application, Durable Object, runtime, or routing layers',
+          '/packages/agent/src/storage/inverted-new.ts: Agent storage must not import Worker, RPC facade, or generated descriptor layers',
+        ])
+      );
+      expect(issues.some((issue) => issue.includes('/packages/agent/src/domain/state-operations.ts'))).toBe(
+        false
+      );
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }

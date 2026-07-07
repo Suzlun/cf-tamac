@@ -6,13 +6,18 @@ import { describe, expect, it } from 'vitest';
 import { agentFoundationTableDefinitions } from '../storage';
 
 const aiAgentSourcePath = new URL('../AIAgent.ts', import.meta.url);
-const foundationEventsPath = new URL('../AIAgent.foundation-events.ts', import.meta.url);
-const integrationTableInitializerPath = new URL(
-  '../storage/integration-table-initializer.ts',
+const eventRunToolHandlersPath = new URL(
+  '../durable-object/event-run-tool-handlers.ts',
   import.meta.url
 );
-const tableInitializerPath = new URL('../storage/table-initializer.ts', import.meta.url);
-const toolTableInitializerPath = new URL('../storage/tool-table-initializer.ts', import.meta.url);
+const foundationEventsPath = new URL('../AIAgent.foundation-events.ts', import.meta.url);
+const schedulerWakePath = new URL('../durable-object/scheduler-wake.ts', import.meta.url);
+const integrationTableInitializerPath = new URL(
+  '../storage/initializers/integration.ts',
+  import.meta.url
+);
+const tableInitializerPath = new URL('../storage/initializers/agent-storage.ts', import.meta.url);
+const toolTableInitializerPath = new URL('../storage/initializers/tool.ts', import.meta.url);
 const wranglerConfigPath = new URL('../../wrangler.toml', import.meta.url);
 
 describe('Agent-local Queue wake foundation', () => {
@@ -22,12 +27,17 @@ describe('Agent-local Queue wake foundation', () => {
       (table) => table.tableName === 'agent_scheduler_wake_state'
     );
     const aiAgentSource = readFileSync(fileURLToPath(aiAgentSourcePath.href), 'utf8');
+    const eventRunToolHandlersSource = readFileSync(
+      fileURLToPath(eventRunToolHandlersPath.href),
+      'utf8'
+    );
     const foundationEventsSource = readFileSync(fileURLToPath(foundationEventsPath.href), 'utf8');
     const integrationTableInitializer = readFileSync(
       fileURLToPath(integrationTableInitializerPath.href),
       'utf8'
     );
     const tableInitializer = readFileSync(fileURLToPath(tableInitializerPath.href), 'utf8');
+    const schedulerWakeSource = readFileSync(fileURLToPath(schedulerWakePath.href), 'utf8');
     const toolTableInitializer = readFileSync(fileURLToPath(toolTableInitializerPath.href), 'utf8');
     const initializerSources = `${tableInitializer}\n${toolTableInitializer}\n${integrationTableInitializer}`;
     const wranglerConfig = readFileSync(fileURLToPath(wranglerConfigPath.href), 'utf8');
@@ -62,8 +72,9 @@ describe('Agent-local Queue wake foundation', () => {
     expect(aiAgentSource).toContain('requestSchedulerWake(payload: AgentLocalQueueWakePayload)');
     expect(aiAgentSource).toContain('processPendingRuns(');
     expect(aiAgentSource).toContain('payload: AgentLocalQueueProcessPayload');
-    expect(aiAgentSource).toContain("this.queue('processPendingRuns'");
-    expect(aiAgentSource).toContain("reason: 'event_accepted'");
+    expect(schedulerWakeSource).toContain("input.queue('processPendingRuns'");
+    expect(schedulerWakeSource).toContain('createAgentLocalQueueProcessPayload');
+    expect(eventRunToolHandlersSource).toContain("reason: 'event_accepted'");
     expect(tableInitializer).toContain('pending_since_ms INTEGER NOT NULL');
     expect(tableInitializer).toContain('last_served_at_ms INTEGER');
 

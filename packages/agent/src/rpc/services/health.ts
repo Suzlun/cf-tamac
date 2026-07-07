@@ -2,7 +2,7 @@ import { Code, ConnectError, type ServiceImpl } from '@connectrpc/connect';
 
 import { type AgentHealthService } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
-import { dispatchAgentHealthCheck } from '../do-router';
+import { dispatchAgentHealthCheck } from '../dispatch/health';
 
 import type { AgentWorkerEnv } from '../../env';
 
@@ -11,6 +11,7 @@ import type { AgentWorkerEnv } from '../../env';
  *
  * @param env Agent Worker env。trust config diagnostic と Durable Object routing に使用します。
  * @returns generated `AgentHealthService` の `Check` 実装です。
+ * @throws この関数自体は service object を組み立てるだけのため例外を投げません。
  */
 export function createAgentHealthService(
   env: AgentWorkerEnv

@@ -4,7 +4,7 @@ import {
   assertCompactionStatus,
   assertCompactionStatusTransition,
   type CompactionStatus,
-} from './foundation';
+} from './compaction-status';
 
 import type {
   AgentSectionRow,

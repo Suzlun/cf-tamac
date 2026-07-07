@@ -8,7 +8,7 @@ import {
   dispatchListAdapterConnections,
   dispatchListInstallations,
   dispatchUninstallIntegration,
-} from '../integration-do-router';
+} from '../dispatch/integrations';
 
 import type { AgentWorkerEnv } from '../../env';
 import type { ServiceImpl } from '@connectrpc/connect';
@@ -18,6 +18,7 @@ import type { ServiceImpl } from '@connectrpc/connect';
  *
  * @param env Agent Worker の Durable Object binding と secret binding を含む環境です。
  * @returns Connect router に登録する AgentIntegrationService 実装です。
+ * @throws この関数自体は service object を組み立てるだけのため例外を投げません。
  */
 export function createAgentIntegrationService(
   env: AgentWorkerEnv

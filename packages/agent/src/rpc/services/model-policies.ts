@@ -8,7 +8,7 @@ import {
   dispatchListModelPolicies,
   dispatchUpsertModelPolicy,
   dispatchValidateModelPolicy,
-} from '../model-policy-do-router';
+} from '../dispatch/model-policies';
 
 import type { AgentWorkerEnv } from '../../env';
 

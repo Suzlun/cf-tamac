@@ -6,7 +6,7 @@ import {
   dispatchListInvocations,
   dispatchListTools,
   dispatchRejectInvocation,
-} from '../tool-do-router';
+} from '../dispatch/tools';
 
 import type { AgentWorkerEnv } from '../../env';
 import type { ServiceImpl } from '@connectrpc/connect';

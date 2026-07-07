@@ -19,7 +19,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/agent/src/AIAgent.ts`: Cloudflare Agents SDK Durable Object foundation
 - `packages/agent/src/env.ts`: Agent binding types and no-Client-D1 boundary
 - `packages/agent/src/rpc/**`: Connect Worker adapter, router, fail-closed service modules, interceptors, and Durable Object dispatcher
-- `packages/agent/src/storage/schema.ts`: Agent-owned DO SQLite foundation constants
+- `packages/agent/src/storage/schema/agent-storage.ts`: Agent-owned DO SQLite schema constants
 - `packages/agent/src/tests/*.test.ts`: `AGENT-PLATFORM-*` Scenario ID coverage
 
 ## Agent TypeSpec, proto, and RPC codegen

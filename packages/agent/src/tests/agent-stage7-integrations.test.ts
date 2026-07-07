@@ -5,33 +5,64 @@ import { describe, expect, it } from 'vitest';
 
 import { agentFoundationTables, agentStorageRepositoryNames } from '../storage';
 
-const aiAgentPath = new URL('../AIAgent.ts', import.meta.url);
+const aiAgentIntegrationHandlersPath = new URL(
+  '../durable-object/integration-handlers.ts',
+  import.meta.url
+);
+const schedulerWakePath = new URL('../durable-object/scheduler-wake.ts', import.meta.url);
 const adapterNormalizationPath = new URL('../adapters/normalization.ts', import.meta.url);
 const deliveryProviderClientPath = new URL(
   '../rpc/integration-delivery-provider-client.ts',
   import.meta.url
 );
-const integrationDoRouterPath = new URL('../rpc/integration-do-router.ts', import.meta.url);
-const integrationManifestPath = new URL('../integrations/manifest.ts', import.meta.url);
-const integrationIngressDeliveryPath = new URL(
-  '../integrations/operations-ingress-delivery.ts',
+const integrationDispatchPath = new URL('../rpc/dispatch/integrations.ts', import.meta.url);
+const integrationIngressDispatchPath = new URL(
+  '../rpc/dispatch/integration-ingress.ts',
   import.meta.url
 );
-const integrationOperationsPath = new URL('../integrations/operations.ts', import.meta.url);
+const integrationIngressSignaturePath = new URL(
+  '../rpc/dispatch/integration-ingress-signature.ts',
+  import.meta.url
+);
+const integrationManifestPath = new URL('../integrations/manifest.ts', import.meta.url);
+const integrationDeliveryClassificationPath = new URL(
+  '../integrations/delivery-classification.ts',
+  import.meta.url
+);
+const integrationDeliveryOperationsPath = new URL(
+  '../integrations/operations-delivery.ts',
+  import.meta.url
+);
+const integrationIngressOperationsPath = new URL(
+  '../integrations/operations-ingress.ts',
+  import.meta.url
+);
+const integrationConnectionOperationsPath = new URL(
+  '../integrations/operations-connections.ts',
+  import.meta.url
+);
+const integrationInstallOperationsPath = new URL(
+  '../integrations/operations-install.ts',
+  import.meta.url
+);
+const integrationUninstallOperationsPath = new URL(
+  '../integrations/operations-uninstall.ts',
+  import.meta.url
+);
 const integrationSecurityPath = new URL('../integrations/security.ts', import.meta.url);
 const integrationServicePath = new URL('../rpc/services/integrations.ts', import.meta.url);
 const ingressServicePath = new URL('../rpc/services/agent-adapter.ts', import.meta.url);
-const repositoryPath = new URL('../storage/integrations-repository.ts', import.meta.url);
-const schemaPath = new URL('../storage/integration-schema.ts', import.meta.url);
-const tableInitializerPath = new URL(
-  '../storage/integration-table-initializer.ts',
+const repositoryPath = new URL(
+  '../storage/repositories/integrations-repository.ts',
   import.meta.url
 );
+const schemaPath = new URL('../storage/schema/integration.ts', import.meta.url);
+const tableInitializerPath = new URL('../storage/initializers/integration.ts', import.meta.url);
 
 describe('Agent Stage 7 Integration implementation', () => {
   it('[AGENT-INTEGRATION-S001] InstallIntegration verifies signed manifest before activation', () => {
     const manifest = readSource(integrationManifestPath);
-    const operations = readSource(integrationOperationsPath);
+    const operations = readSource(integrationInstallOperationsPath);
 
     expect(manifest).toContain('resolveAndVerifyIntegrationManifest');
     expect(manifest).toContain('verifyManifestSignature');
@@ -49,7 +80,7 @@ describe('Agent Stage 7 Integration implementation', () => {
   it('[AGENT-INTEGRATION-S002] Successful install persists grants, adapters, tools, delivery, and trust key', () => {
     const schema = readSource(schemaPath);
     const repository = readSource(repositoryPath);
-    const operations = readSource(integrationOperationsPath);
+    const operations = readSource(integrationInstallOperationsPath);
     const tableInitializer = readSource(tableInitializerPath);
 
     expect(agentFoundationTables).toEqual(
@@ -75,7 +106,7 @@ describe('Agent Stage 7 Integration implementation', () => {
 
   it('[AGENT-INTEGRATION-S003] Installation can remain pending external setup without exposing secrets', () => {
     const manifest = readSource(integrationManifestPath);
-    const operations = readSource(integrationOperationsPath);
+    const operations = readSource(integrationInstallOperationsPath);
 
     expect(manifest).toContain('setupRequired');
     expect(manifest).toContain('setupInstructionsRef');
@@ -86,8 +117,8 @@ describe('Agent Stage 7 Integration implementation', () => {
 
   it('[AGENT-INTEGRATION-S004] Adapter Connection lifecycle is Agent-local and scoped', () => {
     const adapterNormalization = readSource(adapterNormalizationPath);
-    const doRouter = readSource(integrationDoRouterPath);
-    const operations = readSource(integrationOperationsPath);
+    const integrationDispatch = readSource(integrationDispatchPath);
+    const operations = readSource(integrationConnectionOperationsPath);
     const service = readSource(integrationServicePath);
 
     expect(adapterNormalization).toContain('normalizeAdapterConnectionInput');
@@ -95,14 +126,17 @@ describe('Agent Stage 7 Integration implementation', () => {
     expect(operations).toContain('deleteAdapterConnectionInStore');
     expect(operations).toContain('listAdapterConnectionsFromStore');
     expect(operations).toContain("status: 'disabled'");
-    expect(doRouter).toContain('createAdapterConnection({');
+    expect(integrationDispatch).toContain('dispatchCreateAdapterConnection');
+    expect(integrationDispatch).toContain('createAdapterConnection({');
+    expect(service).toContain("from '../dispatch/integrations'");
     expect(service).toContain('dispatchCreateAdapterConnection(env, request)');
   });
 
   it('[AGENT-INTEGRATION-S005] Signed Integration ingress appends Event and DeliveryContext', () => {
-    const aiAgent = readSource(aiAgentPath);
-    const operations = `${readSource(integrationOperationsPath)}\n${readSource(integrationIngressDeliveryPath)}`;
-    const doRouter = readSource(integrationDoRouterPath);
+    const aiAgentIntegrationHandlers = readSource(aiAgentIntegrationHandlersPath);
+    const operations = readSource(integrationIngressOperationsPath);
+    const ingressDispatch = readSource(integrationIngressDispatchPath);
+    const ingressSignature = readSource(integrationIngressSignaturePath);
     const security = readSource(integrationSecurityPath);
     const ingressService = readSource(ingressServicePath);
 
@@ -111,16 +145,16 @@ describe('Agent Stage 7 Integration implementation', () => {
     expect(operations).toContain('publishIntegrationEventInStore');
     expect(operations).toContain('publishEventInStore({');
     expect(operations).toContain('createDeliveryContext({');
-    expect(doRouter).toContain('createUnsignedIngressBodyDigest');
-    expect(doRouter).toContain('stripIngressSignatureMetadata');
+    expect(ingressDispatch).toContain('createUnsignedIngressBodyDigest');
+    expect(ingressSignature).toContain('stripIngressSignatureMetadata');
     expect(security).toContain('canonicalBodyDigest');
-    expect(aiAgent).toContain("reason: 'event_accepted'");
+    expect(aiAgentIntegrationHandlers).toContain("reason: 'event_accepted'");
     expect(ingressService).toContain('dispatchPublishIntegrationEvent(env, request)');
   });
 
   it('[AGENT-INTEGRATION-S006] Delivery uses signed generated binary Provider RPC', () => {
     const deliveryProviderClient = readSource(deliveryProviderClientPath);
-    const operations = `${readSource(integrationOperationsPath)}\n${readSource(integrationIngressDeliveryPath)}`;
+    const operations = readSource(integrationDeliveryOperationsPath);
 
     expect(deliveryProviderClient).toContain('IntegrationDeliveryService.method.deliver.name');
     expect(deliveryProviderClient).toContain('toBinary(DeliverRequestSchema');
@@ -139,7 +173,7 @@ describe('Agent Stage 7 Integration implementation', () => {
   });
 
   it('[AGENT-INTEGRATION-S007] Uninstall disables capabilities and preserves ledgers', () => {
-    const operations = readSource(integrationOperationsPath);
+    const operations = readSource(integrationUninstallOperationsPath);
     const repository = readSource(repositoryPath);
 
     expect(operations).toContain("status: 'uninstalling'");
@@ -155,7 +189,7 @@ describe('Agent Stage 7 Integration implementation', () => {
   it('[AGENT-INTEGRATION-S008] Generic Provider boundary avoids platform-specific protocol leakage', () => {
     const adapterNormalization = readSource(adapterNormalizationPath);
     const manifest = readSource(integrationManifestPath);
-    const operations = readSource(integrationOperationsPath);
+    const operations = readSource(integrationInstallOperationsPath);
 
     expect(adapterNormalization).toContain('Provider 種別に依存する意味付けはしません');
     expect(manifest).toContain('delivery_capabilities');
@@ -168,10 +202,10 @@ describe('Agent Stage 7 Integration implementation', () => {
 
   it('[AGENT-INTEGRATION-S009] Connection allowlist accepts only granted model policy overrides', () => {
     const manifest = readSource(integrationManifestPath);
-    const operations = readSource(integrationOperationsPath);
-    const ingress = readSource(integrationIngressDeliveryPath);
-    const mapper = readSource(new URL('../rpc/integration-message-mappers.ts', import.meta.url));
-    const doRouter = readSource(integrationDoRouterPath);
+    const operations = `${readSource(integrationInstallOperationsPath)}\n${readSource(integrationConnectionOperationsPath)}`;
+    const ingress = readSource(integrationIngressOperationsPath);
+    const mapper = readSource(new URL('../rpc/mappers/integrations.ts', import.meta.url));
+    const ingressDispatch = readSource(integrationIngressDispatchPath);
 
     expect(manifest).toContain('allowedModelPolicyRefs');
     expect(operations).toContain('allowedModelPolicyRefs: manifest.allowedModelPolicyRefs');
@@ -184,25 +218,29 @@ describe('Agent Stage 7 Integration implementation', () => {
       'Integration model policy override is outside the Adapter Connection allowlist.'
     );
     expect(ingress).toContain('repositories.modelPolicies.getActivePolicy(policyRef)');
-    expect(doRouter).toContain('modelPolicyRef: event?.modelPolicyRef');
+    expect(ingressDispatch).toContain('modelPolicyRef: event?.modelPolicyRef');
     expect(mapper).toContain('allowedModelPolicyRefs: [...connection.allowedModelPolicyRefs]');
   });
 
   it('[AGENT-INTEGRATION-S010] Delivery result classifies resume failure follow-up and stale callbacks', () => {
-    const aiAgent = readSource(aiAgentPath);
-    const ingress = readSource(integrationIngressDeliveryPath);
-    const mapper = readSource(new URL('../rpc/integration-message-mappers.ts', import.meta.url));
+    const aiAgentIntegrationHandlers = readSource(aiAgentIntegrationHandlersPath);
+    const schedulerWake = readSource(schedulerWakePath);
+    const delivery = `${readSource(integrationDeliveryOperationsPath)}\n${readSource(integrationDeliveryClassificationPath)}`;
+    const mapper = readSource(new URL('../rpc/mappers/integrations.ts', import.meta.url));
 
-    expect(ingress).toContain('classifyDeliveryResult');
-    expect(ingress).toContain("'resume'");
-    expect(ingress).toContain("'terminal_failure'");
-    expect(ingress).toContain("'follow_up_event'");
-    expect(ingress).toContain("'stale_callback'");
-    expect(ingress).toContain('Delivery result provider operation identity does not match.');
-    expect(ingress).toContain("fromStatus: 'waiting'");
-    expect(ingress).toContain("toStatus: 'pending'");
-    expect(ingress).toContain('appendDeliveryFollowUpEvent');
-    expect(aiAgent).toContain("['follow_up_event', 'resume']");
+    expect(delivery).toContain('classifyDeliveryResult');
+    expect(delivery).toContain("'resume'");
+    expect(delivery).toContain("'terminal_failure'");
+    expect(delivery).toContain("'follow_up_event'");
+    expect(delivery).toContain("'stale_callback'");
+    expect(delivery).toContain('Delivery result provider operation identity does not match.');
+    expect(delivery).toContain("fromStatus: 'waiting'");
+    expect(delivery).toContain("toStatus: 'pending'");
+    expect(delivery).toContain('appendDeliveryFollowUpEvent');
+    expect(schedulerWake).toContain("['follow_up_event', 'resume']");
+    expect(schedulerWake).toContain('shouldRequestDeliveryResumeWake');
+    expect(aiAgentIntegrationHandlers).toContain('shouldRequestDeliveryResumeWake(deliveryResult)');
+    expect(aiAgentIntegrationHandlers).toContain('context.requestSchedulerWake({');
     expect(mapper).toContain('resumeAction: result.resumeAction');
   });
 });

@@ -1,11 +1,11 @@
 import { appendAgentEventToThreadInRepositories } from '../events/mailbox';
 
-import { scheduleTriggeredEventType } from './foundation';
 import {
   decideScheduleFire,
   normalizeScheduleOverlapPolicy,
   normalizeScheduleStatus,
 } from './overlap';
+import { scheduleTriggeredEventType } from './schedule-status';
 import { mapScheduleRow } from './views';
 
 import type { AgentScheduleRow, AgentStorageRepositories } from '../storage';

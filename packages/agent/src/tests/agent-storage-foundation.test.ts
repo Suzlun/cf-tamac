@@ -10,23 +10,24 @@ import {
 } from '../storage';
 
 const sourceRoot = new URL('../', import.meta.url);
-const storageRoot = new URL('../storage/', import.meta.url);
+const storageRoot = new URL('../storage/repositories/', import.meta.url);
 const aiAgentSourcePath = new URL('../AIAgent.ts', import.meta.url);
 const foundationEventsPath = new URL('../AIAgent.foundation-events.ts', import.meta.url);
+const schedulerWakePath = new URL('../durable-object/scheduler-wake.ts', import.meta.url);
 const databaseAdapterPath = new URL('../storage/database.ts', import.meta.url);
-const drizzleSchemaPath = new URL('../storage/schema.ts', import.meta.url);
-const integrationSchemaPath = new URL('../storage/integration-schema.ts', import.meta.url);
+const drizzleSchemaPath = new URL('../storage/schema/agent-storage.ts', import.meta.url);
+const integrationSchemaPath = new URL('../storage/schema/integration.ts', import.meta.url);
 const integrationTableInitializerPath = new URL(
-  '../storage/integration-table-initializer.ts',
+  '../storage/initializers/integration.ts',
   import.meta.url
 );
-const memorySchemaPath = new URL('../storage/memory-schema.ts', import.meta.url);
-const modelInvocationSchemaPath = new URL('../storage/model-invocation-schema.ts', import.meta.url);
-const modelPolicySchemaPath = new URL('../storage/model-policy-schema.ts', import.meta.url);
-const scheduleSchemaPath = new URL('../storage/schedule-schema.ts', import.meta.url);
-const toolSchemaPath = new URL('../storage/tool-schema.ts', import.meta.url);
-const repositoriesPath = new URL('../storage/repositories.ts', import.meta.url);
-const tableInitializerPath = new URL('../storage/table-initializer.ts', import.meta.url);
+const memorySchemaPath = new URL('../storage/schema/memory.ts', import.meta.url);
+const modelInvocationSchemaPath = new URL('../storage/schema/model-invocation.ts', import.meta.url);
+const modelPolicySchemaPath = new URL('../storage/schema/model-policy.ts', import.meta.url);
+const scheduleSchemaPath = new URL('../storage/schema/schedule.ts', import.meta.url);
+const toolSchemaPath = new URL('../storage/schema/tool.ts', import.meta.url);
+const repositoriesPath = new URL('../storage/repositories/factory.ts', import.meta.url);
+const tableInitializerPath = new URL('../storage/initializers/agent-storage.ts', import.meta.url);
 
 const requiredStorageSeams = [
   {
@@ -119,6 +120,7 @@ describe('Agent DO SQLite storage foundation', () => {
     const tableInitializer = readFileSync(fileURLToPath(tableInitializerPath.href), 'utf8');
     const aiAgentSource = readFileSync(fileURLToPath(aiAgentSourcePath.href), 'utf8');
     const foundationEventsSource = readFileSync(fileURLToPath(foundationEventsPath.href), 'utf8');
+    const schedulerWakeSource = readFileSync(fileURLToPath(schedulerWakePath.href), 'utf8');
 
     expect(tableNames).toEqual(expect.arrayContaining([...agentFoundationTables]));
     expect(repositoryNames).toEqual(expect.arrayContaining([...agentStorageRepositoryNames]));
@@ -153,7 +155,7 @@ describe('Agent DO SQLite storage foundation', () => {
     expect(aiAgentSource).toContain('createAgentStorageRepositories(this.name, ctx.storage)');
     expect(foundationEventsSource).toContain('repositories.events.appendEvent(');
     expect(foundationEventsSource).toContain('repositories.pendingRuns.insertPendingRun(');
-    expect(aiAgentSource).toContain('this.repositories.schedulerWakes.recordWake(');
+    expect(schedulerWakeSource).toContain('input.repositories.schedulerWakes.recordWake(');
   });
 
   it('[AGENT-SECURITY-S009] keeps Worker-internal Durable Object RPC methods behind the Connect facade', () => {

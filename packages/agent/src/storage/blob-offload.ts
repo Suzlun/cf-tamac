@@ -1,7 +1,6 @@
 import { agentInlineBodyLimitBytes } from './storage-thresholds';
 
-import type { AgentR2ObjectReferenceRow } from './archive-repository';
-import type { AgentStorageRepositories } from './repositories';
+import type { AgentR2ObjectReferenceRow, AgentStorageRepositories } from './repositories';
 
 /**
  * Agent-owned blob storage の binding 名です。
@@ -29,7 +28,11 @@ export const agentImmutableBlobOwnerKinds = [
 ] as const;
 
 /**
- * Agent-owned immutable R2 object の owner 種別です。
+ * `AgentImmutableBlobOwnerKind` は Agent Service の内部境界で共有する exported 型です。
+ *
+ * @remarks
+ * この宣言は Agent-owned Durable Object / storage / RPC adapter の型安全な接続点を表します。
+ * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
  */
 export type AgentImmutableBlobOwnerKind = (typeof agentImmutableBlobOwnerKinds)[number];
 
@@ -82,7 +85,11 @@ export interface AgentStoredImmutableBlobDescriptor {
 }
 
 /**
- * R2 write と DO SQLite object reference index をまとめて作成する入力です。
+ * `StoreAgentImmutableBlobInput` は Agent Service の内部境界で共有する exported インターフェースです。
+ *
+ * @remarks
+ * この宣言は Agent-owned Durable Object / storage / RPC adapter の型安全な接続点を表します。
+ * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
  */
 export interface StoreAgentImmutableBlobInput {
   readonly agentId: string;
@@ -100,7 +107,11 @@ export interface StoreAgentImmutableBlobInput {
 }
 
 /**
- * R2 write のみを行う入力です。
+ * `WriteAgentImmutableBlobInput` は Agent Service の内部境界で共有する exported インターフェースです。
+ *
+ * @remarks
+ * この宣言は Agent-owned Durable Object / storage / RPC adapter の型安全な接続点を表します。
+ * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
  */
 export interface WriteAgentImmutableBlobInput {
   readonly agentId: string;
@@ -113,7 +124,11 @@ export interface WriteAgentImmutableBlobInput {
 }
 
 /**
- * SQLite object reference index を作成する入力です。
+ * `RecordAgentImmutableBlobReferenceInput` は Agent Service の内部境界で共有する exported インターフェースです。
+ *
+ * @remarks
+ * この宣言は Agent-owned Durable Object / storage / RPC adapter の型安全な接続点を表します。
+ * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
  */
 export interface RecordAgentImmutableBlobReferenceInput {
   readonly descriptor: AgentStoredImmutableBlobDescriptor;
@@ -227,6 +242,7 @@ export function recordAgentImmutableBlobReference(
  *
  * @param objectKey Agent-owned R2 bucket 内の object key です。
  * @returns `r2://` scheme の object reference を返します。
+ * @throws この関数は文字列連結だけを行うため例外を投げません。
  */
 export function createAgentBlobObjectRef(objectKey: string): string {
   return `r2://${objectKey}`;
@@ -240,6 +256,7 @@ export function createAgentBlobObjectRef(objectKey: string): string {
  * @param ownerId body を所有する Event/History/Tool/Archive などの ID です。
  * @param sha256 body の SHA-256 digest です。
  * @returns Agent-owned R2 bucket 内の object key を返します。
+ * @throws `encodeURIComponent` が入力文字列を処理できない場合は runtime 例外が発生します。
  */
 export function createAgentBlobObjectKey(
   agentId: string,
@@ -258,6 +275,7 @@ export function createAgentBlobObjectKey(
  *
  * @param bytes digest 対象 byte 列です。
  * @returns 64 文字の lowercase hex digest を返します。
+ * @throws Web Crypto の digest 計算が失敗した場合に呼び出し元へ伝播します。
  */
 export async function computeAgentBlobSha256Hex(bytes: Uint8Array): Promise<string> {
   // Web Crypto の結果を byte 配列へ変換し、各 byte を 2 桁 hex に揃えます。
@@ -333,6 +351,7 @@ function verifyAgentBlobIndex(input: {
  *
  * @param byteSize body の byte 数です。
  * @returns 64 KiB を超える場合に true を返します。
+ * @throws この関数は数値比較だけを行うため例外を投げません。
  */
 export function isAgentLargeBody(byteSize: number): boolean {
   return byteSize > agentInlineBodyLimitBytes;

@@ -9,16 +9,22 @@ import type { AgentCoreRequestContext } from '../domain';
 import type { AgentStorageRepositories } from '../storage';
 
 const aiAgentPath = new URL('../AIAgent.ts', import.meta.url);
+const blobPayloadWriterPath = new URL('../durable-object/blob-payload-writer.ts', import.meta.url);
+const eventRunToolHandlersPath = new URL(
+  '../durable-object/event-run-tool-handlers.ts',
+  import.meta.url
+);
 const foundationEventsPath = new URL('../AIAgent.foundation-events.ts', import.meta.url);
-const tableInitializerPath = new URL('../storage/table-initializer.ts', import.meta.url);
+const tableInitializerPath = new URL('../storage/initializers/agent-storage.ts', import.meta.url);
 const lifecycleAuditPath = new URL('../domain/lifecycle-audit.ts', import.meta.url);
 const lifecycleOperationsPath = new URL('../domain/lifecycle-operations.ts', import.meta.url);
-const eventOperationsPath = new URL('../events/operations.ts', import.meta.url);
+const eventPublishOperationsPath = new URL('../events/operations-publish.ts', import.meta.url);
+const eventQueryOperationsPath = new URL('../events/operations-query.ts', import.meta.url);
 const eventMailboxPath = new URL('../events/mailbox.ts', import.meta.url);
 const finalAuthorizationPath = new URL('../domain/final-authorization.ts', import.meta.url);
 const operationUtilsPath = new URL('../domain/agent-operation-utils.ts', import.meta.url);
-const doRouterPath = new URL('../rpc/do-router.ts', import.meta.url);
-const messageMappersPath = new URL('../rpc/message-mappers.ts', import.meta.url);
+const lifecycleDispatchPath = new URL('../rpc/dispatch/lifecycle.ts', import.meta.url);
+const messageMappersPath = new URL('../rpc/mappers/core.ts', import.meta.url);
 
 function readSource(path: URL): string {
   return readFileSync(fileURLToPath(path.href), 'utf8');
@@ -30,7 +36,7 @@ describe('Agent Stage 2 core implementation', () => {
     const lifecycleAudit = readSource(lifecycleAuditPath);
     const lifecycle = readSource(lifecycleOperationsPath);
     const schema = readSource(tableInitializerPath);
-    const router = readSource(doRouterPath);
+    const lifecycleDispatch = readSource(lifecycleDispatchPath);
 
     expect(aiAgent).toContain('initializeAgent(command: InitializeAgentCommand)');
     expect(aiAgent).toContain('destroyAgent(command: DestroyAgentCommand)');
@@ -42,8 +48,8 @@ describe('Agent Stage 2 core implementation', () => {
     expect(lifecycle).toContain("lifecycleStatus: 'destroyed'");
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS agent_config_versions');
     expect(schema).toContain('secret_reference TEXT');
-    expect(router).toContain('dispatchInitializeAgent');
-    expect(router).toContain('dispatchRotateAgentCredential');
+    expect(lifecycleDispatch).toContain('dispatchInitializeAgent');
+    expect(lifecycleDispatch).toContain('dispatchRotateAgentCredential');
   });
 
   it('[AGENT-LIFECYCLE-S005] [AGENT-LIFECYCLE-S006] rejects unsafe credential state and versions config changes', () => {
@@ -92,9 +98,10 @@ describe('Agent Stage 2 core implementation', () => {
   });
 
   it('[AGENT-EVENTING-S001] [AGENT-EVENTING-S002] [AGENT-EVENTING-S004] [AGENT-EVENTING-S005] appends Events after Thread and Section resolution', () => {
-    const events = readSource(eventOperationsPath);
+    const events = readSource(eventPublishOperationsPath);
     const mailbox = readSource(eventMailboxPath);
-    const aiAgent = readSource(aiAgentPath);
+    const eventRunToolHandlers = readSource(eventRunToolHandlersPath);
+    const blobPayloadWriter = readSource(blobPayloadWriterPath);
     const foundationEvents = readSource(foundationEventsPath);
     const schema = readSource(tableInitializerPath);
 
@@ -108,8 +115,14 @@ describe('Agent Stage 2 core implementation', () => {
     expect(mailbox.indexOf('repositories.events.appendEvent({')).toBeLessThan(
       mailbox.indexOf('repositories.pendingRuns.upsertPendingRunForThread({')
     );
-    expect(aiAgent).toContain('if (!result.replayed)');
-    expect(aiAgent).toContain("reason: 'event_accepted'");
+    expect(eventRunToolHandlers).toContain('if (!result.replayed)');
+    expect(eventRunToolHandlers).toContain(
+      'blobWriter: createAgentBlobPayloadWriter(context.env.AGENT_BLOBS)'
+    );
+    expect(blobPayloadWriter).toContain('input.bucket.put(');
+    expect(blobPayloadWriter).toContain('customMetadata: { sha256: input.blob.sha256 }');
+    expect(blobPayloadWriter).toContain('httpMetadata: { contentType: input.blob.contentType }');
+    expect(eventRunToolHandlers).toContain("reason: 'event_accepted'");
     expect(foundationEvents.indexOf('appendEvent(')).toBeLessThan(
       foundationEvents.indexOf('createPendingRun(')
     );
@@ -119,14 +132,15 @@ describe('Agent Stage 2 core implementation', () => {
   });
 
   it('[AGENT-EVENTING-S006] [AGENT-EVENTING-S007] [AGENT-EVENTING-S008] stores replay responses payload metadata and scoped pagination', () => {
-    const events = readSource(eventOperationsPath);
+    const eventPublishOperations = readSource(eventPublishOperationsPath);
+    const eventQueryOperations = readSource(eventQueryOperationsPath);
     const payload = readSource(new URL('../events/payload.ts', import.meta.url));
     const schema = readSource(tableInitializerPath);
 
-    expect(events).toContain('checkAgentIdempotency<PublishAgentEventResult>');
-    expect(events).toContain('recordAgentIdempotency({');
-    expect(events).toContain('pageSize + 1');
-    expect(events).toContain('cursorScope: `${agentId}:${threadId}`');
+    expect(eventPublishOperations).toContain('checkAgentIdempotency<PublishAgentEventResult>');
+    expect(eventPublishOperations).toContain('recordAgentIdempotency({');
+    expect(eventQueryOperations).toContain('pageSize + 1');
+    expect(eventQueryOperations).toContain('cursorScope: `${agentId}:${threadId}`');
     expect(payload).toContain('inlineEventPayloadLimitBytes = agentInlineBodyLimitBytes');
     expect(payload).toContain("storageClass: 'r2'");
     expect(schema).toContain('payload_inline_base64 TEXT');

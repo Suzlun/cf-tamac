@@ -32,17 +32,21 @@ import type {
 } from '../storage';
 
 const aiAgentPath = new URL('../AIAgent.ts', import.meta.url);
+const runtimeSchedulePath = new URL('../durable-object/runtime-schedule.ts', import.meta.url);
+const scheduleHandlersPath = new URL('../durable-object/schedule-handlers.ts', import.meta.url);
+const cancelOperationsPath = new URL('../schedules/operations-cancel.ts', import.meta.url);
+const createOperationsPath = new URL('../schedules/operations-create.ts', import.meta.url);
 const firingPath = new URL('../schedules/firing.ts', import.meta.url);
-const operationsPath = new URL('../schedules/operations.ts', import.meta.url);
+const sharedOperationsPath = new URL('../schedules/operations-shared.ts', import.meta.url);
 const overlapPath = new URL('../schedules/overlap.ts', import.meta.url);
-const repositoryPath = new URL('../storage/schedules-repository.ts', import.meta.url);
-const routerPath = new URL('../rpc/schedule-do-router.ts', import.meta.url);
+const repositoryPath = new URL('../storage/repositories/schedules-repository.ts', import.meta.url);
+const dispatchPath = new URL('../rpc/dispatch/schedules.ts', import.meta.url);
 const servicePath = new URL('../rpc/services/schedules.ts', import.meta.url);
-const tableInitializerPath = new URL('../storage/table-initializer.ts', import.meta.url);
+const tableInitializerPath = new URL('../storage/initializers/agent-storage.ts', import.meta.url);
 
 describe('Agent Stage 5 Schedule implementation', () => {
   it('[AGENT-SCHEDULE-S001] CreateSchedule requires a Thread context', () => {
-    const operations = readSource(operationsPath);
+    const operations = readSource(createOperationsPath);
     const service = readSource(servicePath);
 
     expect(operations).toContain('assertScheduleThreadContext(input.command)');
@@ -53,6 +57,8 @@ describe('Agent Stage 5 Schedule implementation', () => {
 
   it('[AGENT-SCHEDULE-S002] Schedule firing appends a schedule.triggered Event', () => {
     const aiAgent = readSource(aiAgentPath);
+    const runtimeSchedule = readSource(runtimeSchedulePath);
+    const scheduleHandlers = readSource(scheduleHandlersPath);
     const firing = readSource(firingPath);
     const parsed = parseAgentScheduleSpec('delay:30', 1_000);
 
@@ -62,7 +68,10 @@ describe('Agent Stage 5 Schedule implementation', () => {
     expect(firing).toContain('appendAgentEventToThreadInRepositories({');
     expect(firing).toContain("source: 'agent.schedule'");
     expect(aiAgent).toContain('handleAgentScheduleCallback(payload: AgentScheduleCallbackPayload)');
-    expect(aiAgent).toContain("reason: 'event_accepted'");
+    expect(runtimeSchedule).toContain("'handleAgentScheduleCallback' as const");
+    expect(runtimeSchedule).toContain('input.scheduleEvery(');
+    expect(runtimeSchedule).toContain('input.schedule(input.result.runtimePlan.when');
+    expect(scheduleHandlers).toContain("reason: 'event_accepted'");
   });
 
   it('[AGENT-SCHEDULE-S006] create_schedule decision preserves causation through fire', () => {
@@ -101,17 +110,22 @@ describe('Agent Stage 5 Schedule implementation', () => {
 
   it('[AGENT-SCHEDULE-S004] CancelSchedule prevents future firing', () => {
     const aiAgent = readSource(aiAgentPath);
-    const operations = readSource(operationsPath);
+    const scheduleHandlers = readSource(scheduleHandlersPath);
+    const operations = readSource(cancelOperationsPath);
     const overlap = readSource(overlapPath);
 
     expect(operations).toContain('cancelScheduleInStore');
     expect(operations).toContain("status: 'cancelled'");
     expect(overlap).toContain("fireStatus: 'suppressed_inactive'");
-    expect(aiAgent).toContain('await this.cancelSchedule(result.runtimeScheduleId)');
+    expect(aiAgent).toContain('cancelRuntimeSchedule: async (runtimeScheduleId)');
+    expect(scheduleHandlers).toContain(
+      'await context.cancelRuntimeSchedule(result.runtimeScheduleId)'
+    );
   });
 
   it('[AGENT-SCHEDULE-S005] Integration uninstall cancels its active Schedules', () => {
-    const operations = readSource(operationsPath);
+    const operations = readSource(cancelOperationsPath);
+    const sharedOperations = readSource(sharedOperationsPath);
     const tableInitializer = readSource(tableInitializerPath);
 
     expect(agentFoundationTables).toEqual(
@@ -124,18 +138,18 @@ describe('Agent Stage 5 Schedule implementation', () => {
     expect(operations).toContain('cleanupInstallationSchedulesInStore');
     expect(operations).toContain('cancelSchedulesByInstallation({');
     expect(operations).toContain('agent.schedule.installation_cleanup');
-    expect(operations).toContain('appendScheduleAuditEvent(');
+    expect(sharedOperations).toContain('appendScheduleAuditEvent(');
   });
 
   it('wires Schedule RPC handlers without changing TypeSpec or generated outputs', () => {
-    const router = readSource(routerPath);
+    const dispatch = readSource(dispatchPath);
     const service = readSource(servicePath);
 
-    expect(router).toContain('createAgentCoreContext({');
-    expect(router).toContain('createAgentSchedule({');
-    expect(router).toContain('getAgentSchedule({');
-    expect(router).toContain('listAgentSchedules({');
-    expect(router).toContain('cancelAgentSchedule({');
+    expect(dispatch).toContain('createAgentCoreContext({');
+    expect(dispatch).toContain('createAgentSchedule({');
+    expect(dispatch).toContain('getAgentSchedule({');
+    expect(dispatch).toContain('listAgentSchedules({');
+    expect(dispatch).toContain('cancelAgentSchedule({');
     expect(service).toContain('createAgentScheduleService');
   });
 

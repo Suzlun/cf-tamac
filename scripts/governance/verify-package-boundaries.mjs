@@ -24,6 +24,16 @@ const generatedPolicyPaths = [
   'packages/client/src/generated/agent-rpc/**',
 ];
 
+// 既存 domain の storage 依存は Phase 0 の開始時点でこの 5 ファイルに閉じているため、
+// 新規 domain ファイルへ同じ例外が広がらないよう normalized path で固定する。
+const agentDomainStorageImportExceptionPaths = new Set([
+  '/packages/agent/src/domain/agent-operation-utils.ts',
+  '/packages/agent/src/domain/lifecycle-audit.ts',
+  '/packages/agent/src/domain/lifecycle-operations.ts',
+  '/packages/agent/src/domain/model-policy-operations.ts',
+  '/packages/agent/src/domain/state-operations.ts',
+]);
+
 /**
  * Collect Agent/Client runtime coupling, binding, and workflow boundary issues.
  */
@@ -46,7 +56,11 @@ export function collectRuntimeCouplingIssues(root) {
       continue;
     }
     const content = readFileSync(filePath, 'utf8');
-    if (/from ["']@cf-tamac\/client["'/]|packages\/client\/src|\.\.\/client\//.test(content)) {
+    if (
+      /from ["'](?:@cf-tamac\/client(?:["'/]|-agent-rpc)|@cf-tamac\/client-agent-rpc)|packages\/client\/src|\.\.\/client\//.test(
+        content
+      )
+    ) {
       issues.push(`${normalizedPath}: Agent runtime must not import Client runtime`);
     }
   }
@@ -77,8 +91,13 @@ export function collectAgentLayerIssues(root) {
     const content = readFileSync(filePath, 'utf8');
 
     issues.push(...collectAgentFoundationLayerImportIssues(normalizedPath, imports, content));
+    issues.push(...collectAgentDurableObjectLayerIssues(normalizedPath, imports));
+    issues.push(...collectAgentApplicationLayerIssues(normalizedPath, imports));
+    issues.push(...collectAgentDomainLayerIssues(normalizedPath, imports));
     issues.push(...collectAgentStorageLayerIssues(normalizedPath, imports));
     issues.push(...collectAgentRpcServiceLayerIssues(normalizedPath, imports, content));
+    issues.push(...collectAgentRpcDispatchLayerIssues(normalizedPath, imports));
+    issues.push(...collectAgentRpcMapperLayerIssues(normalizedPath, imports));
   }
   return [...new Set(issues)];
 }
@@ -92,7 +111,7 @@ function collectAgentFoundationLayerImportIssues(normalizedPath, imports, conten
     if (
       isAgentRpcPath(importedPath) ||
       isAgentWorkerEntrypointPath(importedPath) ||
-      importedPath.startsWith('@cf-tamac/agent-rpc')
+      isAgentGeneratedRpcPath(importedPath)
     ) {
       issues.push(
         `${normalizedPath}: Agent runtime/domain/storage layer must not import RPC, Worker, or generated descriptor layers`
@@ -112,17 +131,90 @@ function collectAgentFoundationLayerImportIssues(normalizedPath, imports, conten
   return issues;
 }
 
-function collectAgentStorageLayerIssues(normalizedPath, imports) {
-  if (!normalizedPath.startsWith('/packages/agent/src/storage/')) {
+function collectAgentDurableObjectLayerIssues(normalizedPath, imports) {
+  if (!isAgentDurableObjectLayerPath(normalizedPath)) {
     return [];
   }
-  return imports
-    .filter(
-      (importedPath) => isAgentDomainRuntimePath(importedPath) || isAgentDoRuntimePath(importedPath)
-    )
-    .map(
-      () => `${normalizedPath}: Agent storage layer must not import Agent domain/runtime layers`
-    );
+  const issues = [];
+  for (const importedPath of imports) {
+    if (
+      isAgentRpcServicePath(importedPath) ||
+      isAgentRpcRouterPath(importedPath) ||
+      isAgentRpcInterceptorPath(importedPath) ||
+      isAgentWorkerEntrypointPath(importedPath) ||
+      isAgentGeneratedRpcPath(importedPath)
+    ) {
+      issues.push(
+        `${normalizedPath}: Agent durable-object layer must not import RPC services, router, interceptors, Worker entrypoints, or generated descriptor layers`
+      );
+    }
+  }
+  return issues;
+}
+
+function collectAgentApplicationLayerIssues(normalizedPath, imports) {
+  if (!isAgentApplicationPath(normalizedPath)) {
+    return [];
+  }
+  const issues = [];
+  for (const importedPath of imports) {
+    if (isAgentRoutingPath(importedPath) || isAgentDurableObjectPath(importedPath)) {
+      issues.push(
+        `${normalizedPath}: Agent application layer must not import routing or Durable Object layers`
+      );
+    }
+  }
+  return issues;
+}
+
+function collectAgentDomainLayerIssues(normalizedPath, imports) {
+  if (!isAgentDomainPath(normalizedPath)) {
+    return [];
+  }
+  const issues = [];
+  const allowsExistingStorageImport = agentDomainStorageImportExceptionPaths.has(normalizedPath);
+  for (const importedPath of imports) {
+    if (
+      isAgentApplicationPath(importedPath) ||
+      isAgentDurableObjectPath(importedPath) ||
+      isAgentRoutingPath(importedPath) ||
+      (isAgentStoragePath(importedPath) && !allowsExistingStorageImport)
+    ) {
+      issues.push(
+        `${normalizedPath}: Agent domain layer must not import application, Durable Object, routing, or storage layers`
+      );
+    }
+  }
+  return issues;
+}
+
+function collectAgentStorageLayerIssues(normalizedPath, imports) {
+  if (!isAgentStoragePath(normalizedPath)) {
+    return [];
+  }
+  const issues = [];
+  for (const importedPath of imports) {
+    if (
+      isAgentDomainRuntimePath(importedPath) ||
+      isAgentApplicationPath(importedPath) ||
+      isAgentDurableObjectPath(importedPath) ||
+      isAgentRoutingPath(importedPath)
+    ) {
+      issues.push(
+        `${normalizedPath}: Agent storage layer must not import Agent domain, application, Durable Object, runtime, or routing layers`
+      );
+    }
+    if (
+      isAgentRpcPath(importedPath) ||
+      isAgentWorkerEntrypointPath(importedPath) ||
+      isAgentGeneratedRpcPath(importedPath)
+    ) {
+      issues.push(
+        `${normalizedPath}: Agent storage must not import Worker, RPC facade, or generated descriptor layers`
+      );
+    }
+  }
+  return issues;
 }
 
 function collectAgentRpcServiceLayerIssues(normalizedPath, imports, content) {
@@ -143,6 +235,34 @@ function collectAgentRpcServiceLayerIssues(normalizedPath, imports, content) {
     issues.push(
       `${normalizedPath}: Agent RPC service modules must not use Worker network globals directly`
     );
+  }
+  return issues;
+}
+
+function collectAgentRpcDispatchLayerIssues(normalizedPath, imports) {
+  if (!isAgentRpcDispatchPath(normalizedPath)) {
+    return [];
+  }
+  return imports
+    .filter((importedPath) => isAgentWorkerEntrypointPath(importedPath))
+    .map(() => `${normalizedPath}: Agent RPC dispatch modules must not import Worker entrypoints`);
+}
+
+function collectAgentRpcMapperLayerIssues(normalizedPath, imports) {
+  if (!isAgentRpcMapperPath(normalizedPath)) {
+    return [];
+  }
+  const issues = [];
+  for (const importedPath of imports) {
+    if (
+      isAgentDurableObjectPath(importedPath) ||
+      isAgentRoutingPath(importedPath) ||
+      isAgentWorkerEntrypointPath(importedPath)
+    ) {
+      issues.push(
+        `${normalizedPath}: Agent RPC mapper modules must not import Durable Object, routing, or Worker entrypoint layers`
+      );
+    }
   }
   return issues;
 }
@@ -415,10 +535,31 @@ function resolveImportSpecifier(root, filePath, specifier) {
 
 function isAgentRuntimeFoundationPath(normalizedPath) {
   return (
+    isAgentApplicationPath(normalizedPath) ||
     isAgentDomainRuntimePath(normalizedPath) ||
-    normalizedPath.startsWith('/packages/agent/src/storage/') ||
+    isAgentStoragePath(normalizedPath) ||
     normalizedPath.startsWith('/packages/agent/src/observability/')
   );
+}
+
+function isAgentApplicationPath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/application/');
+}
+
+function isAgentDomainPath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/domain/');
+}
+
+function isAgentStoragePath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/storage/');
+}
+
+function isAgentDurableObjectLayerPath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/durable-object/');
+}
+
+function isAgentDurableObjectPath(normalizedPath) {
+  return isAgentDurableObjectLayerPath(normalizedPath) || isAgentDoRuntimePath(normalizedPath);
 }
 
 function isAgentDomainRuntimePath(normalizedPath) {
@@ -433,29 +574,71 @@ function isAgentDomainRuntimePath(normalizedPath) {
     '/packages/agent/src/tools/',
     '/packages/agent/src/integrations/',
     '/packages/agent/src/adapters/',
-  ].some((prefix) => normalizedPath === prefix.slice(0, -1) || normalizedPath.startsWith(prefix));
+  ].some((prefix) => hasPathPrefix(normalizedPath, prefix));
 }
 
 function isAgentDoRuntimePath(normalizedPath) {
   return (
     normalizedPath === '/packages/agent/src/AIAgent' ||
     normalizedPath === '/packages/agent/src/AIAgent.ts' ||
-    normalizedPath === '/packages/agent/src/agent-routing' ||
-    normalizedPath === '/packages/agent/src/agent-routing.ts'
+    normalizedPath.startsWith('/packages/agent/src/AIAgent.')
   );
 }
 
 function isAgentRpcPath(normalizedPath) {
-  return normalizedPath.startsWith('/packages/agent/src/rpc/');
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/rpc/');
 }
 
 function isAgentRpcFacadePath(normalizedPath) {
+  return isAgentRpcRouterPath(normalizedPath) || isAgentRpcAdapterPath(normalizedPath);
+}
+
+function isAgentRpcServicePath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/rpc/services/');
+}
+
+function isAgentRpcRouterPath(normalizedPath) {
   return [
     '/packages/agent/src/rpc/router',
     '/packages/agent/src/rpc/router.ts',
+  ].includes(normalizedPath);
+}
+
+function isAgentRpcAdapterPath(normalizedPath) {
+  return [
     '/packages/agent/src/rpc/connect-worker-adapter',
     '/packages/agent/src/rpc/connect-worker-adapter.ts',
   ].includes(normalizedPath);
+}
+
+function isAgentRpcInterceptorPath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/rpc/interceptors/');
+}
+
+function isAgentRpcDispatchPath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/rpc/dispatch/');
+}
+
+function isAgentRpcMapperPath(normalizedPath) {
+  return hasPathPrefix(normalizedPath, '/packages/agent/src/rpc/mappers/');
+}
+
+function isAgentRoutingPath(normalizedPath) {
+  return [
+    '/packages/agent/src/agent-routing',
+    '/packages/agent/src/agent-routing.ts',
+  ].includes(normalizedPath);
+}
+
+function isAgentGeneratedRpcPath(normalizedPath) {
+  return (
+    normalizedPath === '@cf-tamac/agent-rpc' ||
+    normalizedPath.startsWith('@cf-tamac/agent-rpc/') ||
+    normalizedPath === '@cf-tamac/client-agent-rpc' ||
+    normalizedPath.startsWith('@cf-tamac/client-agent-rpc/') ||
+    hasPathPrefix(normalizedPath, '/packages/agent/src/generated/rpc/') ||
+    hasPathPrefix(normalizedPath, '/packages/client/src/generated/agent-rpc/')
+  );
 }
 
 function isAgentWorkerEntrypointPath(normalizedPath) {
@@ -465,6 +648,10 @@ function isAgentWorkerEntrypointPath(normalizedPath) {
     '/packages/agent/src/worker',
     '/packages/agent/src/worker.ts',
   ].includes(normalizedPath);
+}
+
+function hasPathPrefix(normalizedPath, prefix) {
+  return normalizedPath === prefix.slice(0, -1) || normalizedPath.startsWith(prefix);
 }
 
 function isForbiddenAgentLowerLayerExternal(normalizedPath, importedPath) {

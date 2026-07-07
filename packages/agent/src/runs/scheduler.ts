@@ -1,4 +1,4 @@
-import { assertAgentRunStatusTransition, assertRunStatus, isActiveRunStatus } from './foundation';
+import { assertAgentRunStatusTransition, assertRunStatus, isActiveRunStatus } from './run-status';
 
 import type {
   AgentEventRow,
@@ -8,7 +8,11 @@ import type {
 } from '../storage';
 
 /**
- * Input for one bounded AgentRun scheduler batch.
+ * bounded な AgentRun scheduler batch を 1 回実行するための入力です。
+ *
+ * @remarks
+ * Agent ID、処理上限、観測時刻、Agent-owned repository set だけを受け取り、Queue や Worker binding へ
+ * 直接依存しません。pending Run の source of truth は Durable Object SQLite に残します。
  */
 export interface AgentRunSchedulerBatchInput {
   readonly agentId: string;
@@ -18,7 +22,10 @@ export interface AgentRunSchedulerBatchInput {
 }
 
 /**
- * AgentRun started by one scheduler batch.
+ * scheduler batch が開始した AgentRun と固定 snapshot の対応です。
+ *
+ * @remarks
+ * 呼び出し元が実行開始後の Run ID、Thread ID、immutable input snapshot を観測できるようにします。
  */
 export interface AgentRunSchedulerStartedRun {
   readonly runId: string;
@@ -27,7 +34,11 @@ export interface AgentRunSchedulerStartedRun {
 }
 
 /**
- * Result of one bounded AgentRun scheduler batch.
+ * bounded scheduler batch の処理結果です。
+ *
+ * @remarks
+ * active slot によるブロック、idle、処理済みの状態と、再 wake が必要かどうかを返します。
+ * payload body や model provider secret は含めず、Queue callback の観測に必要な metadata だけを持ちます。
  */
 export interface AgentRunSchedulerBatchResult {
   readonly activeRunId?: string;
@@ -42,7 +53,15 @@ export interface AgentRunSchedulerBatchResult {
 }
 
 /**
- * Process pending AgentRun work with one active Run slot and bounded batch size.
+ * pending AgentRun を単一 active slot と batch 上限に従って処理します。
+ *
+ * @param input Agent ID、処理上限、現在時刻、Agent-owned repository set です。
+ * @returns 開始した Run、remaining pending 数、reenqueue 要否、batch status を含む結果です。
+ * @throws repository 操作、保存済み status 検証、snapshot 作成が失敗した場合に呼び出し元へ伝播します。
+ * @example
+ * ```ts
+ * const batch = processAgentRunSchedulerBatch({ agentId, maxRuns: 1, nowMs, repositories });
+ * ```
  */
 export function processAgentRunSchedulerBatch(
   input: AgentRunSchedulerBatchInput
@@ -113,6 +132,11 @@ export function processAgentRunSchedulerBatch(
  *
  * @param input Agent ID、現在時刻、repository set、対象 Run を含む入力です。
  * @returns trigger Event 範囲、latest ready Compaction、active ThreadMemory version を固定した snapshot を返します。
+ * @throws trigger Event が存在しない場合、または repository 書き込みが失敗した場合に発生します。
+ * @example
+ * ```ts
+ * const snapshot = createImmutableRunSnapshot({ agentId, nowMs, repositories, run });
+ * ```
  */
 export function createImmutableRunSnapshot(input: {
   readonly agentId: string;
