@@ -89,6 +89,20 @@ const integrationDetailPath = new URL(
 const integrationTablePath = new URL('../components/integration-table.tsx', import.meta.url);
 const agentQueriesPath = new URL('../server/actions/agent-queries.ts', import.meta.url);
 const agentOperationsPath = new URL('../server/actions/agent-operations.ts', import.meta.url);
+const agentQueryActionPaths = [
+  agentQueriesPath,
+  new URL('../server/actions/agent-queries/events.ts', import.meta.url),
+  new URL('../server/actions/agent-queries/runs.ts', import.meta.url),
+  new URL('../server/actions/agent-queries/threads.ts', import.meta.url),
+  new URL('../server/actions/agent-queries/view-models.ts', import.meta.url),
+];
+const agentOperationActionPaths = [
+  agentOperationsPath,
+  new URL('../server/actions/agent-operations/default-model-policy.ts', import.meta.url),
+  new URL('../server/actions/agent-operations/integrations.ts', import.meta.url),
+  new URL('../server/actions/agent-operations/schedules.ts', import.meta.url),
+  new URL('../server/actions/agent-operations/tools.ts', import.meta.url),
+];
 const agentOperationViewModelsPath = new URL(
   '../server/actions/agent-operation-view-models.ts',
   import.meta.url
@@ -117,6 +131,10 @@ const agentIntegrationsPagePath = new URL(
 
 function read(filePath: URL): string {
   return readFileSync(fileURLToPath(filePath.href), 'utf8');
+}
+
+function readAll(filePaths: readonly URL[]): string {
+  return filePaths.map(read).join('\n');
 }
 
 describe('Agent list page (AGENT-MANAGEMENT-UI-S001)', () => {
@@ -509,7 +527,7 @@ describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MA
     const settingsForm = read(settingsFormPath);
     const settingsSection = read(modelPolicySettingsSectionPath);
     const summary = read(modelPolicySummaryPath);
-    const operations = read(agentOperationsPath);
+    const operations = readAll(agentOperationActionPaths);
     const viewModels = read(modelPolicyViewModelsPath);
     const dangerZone = read(settingsDangerZonePath);
 
@@ -550,7 +568,7 @@ describe('Agent-owned history tabs (AGENT-MANAGEMENT-UI-S005)', () => {
     const eventList = read(eventListPath);
     const runList = read(runListPath);
     const compactionView = read(compactionViewPath);
-    const queries = read(agentQueriesPath);
+    const queries = readAll(agentQueryActionPaths);
     // タスク 2.6/3.5: standalone compactions route は廃止し、threads/runs/events が文脈 detail を持つ。
     const routeSources = [
       read(agentThreadsPagePath),
@@ -602,7 +620,7 @@ describe('Schedule management tab (AGENT-MANAGEMENT-UI-S006)', () => {
     const scheduleCreateForm = read(scheduleCreateFormPath);
     const scheduleCreateSchema = read(scheduleCreateSchemaPath);
     const scheduleCreateSources = `${scheduleCreateForm}\n${scheduleCreateSchema}`;
-    const operations = read(agentOperationsPath);
+    const operations = readAll(agentOperationActionPaths);
 
     expect(schedulesPage).toContain('listSchedules');
     expect(schedulesPage).toContain('createSchedule');
@@ -642,7 +660,7 @@ describe('Tool approval tab (AGENT-MANAGEMENT-UI-S007)', () => {
     const toolsPage = read(agentToolsPagePath);
     const toolView = read(toolViewPath);
     const toolReviewContent = read(toolReviewContentPath);
-    const operations = read(agentOperationsPath);
+    const operations = readAll(agentOperationActionPaths);
     const operationViewModels = read(agentOperationViewModelsPath);
 
     expect(toolsPage).toContain('listTools');
@@ -676,7 +694,7 @@ describe('Integration management tab (AGENT-MANAGEMENT-UI-S008)', () => {
     const integrationInstallSources = `${integrationInstallForm}\n${integrationInstallSchema}`;
     const integrationDetail = read(integrationDetailPath);
     const integrationTable = read(integrationTablePath);
-    const operations = read(agentOperationsPath);
+    const operations = readAll(agentOperationActionPaths);
     const integrationMutations = read(
       new URL('../components/integration-view-mutations.ts', import.meta.url)
     );

@@ -18,6 +18,10 @@ function readSource(path: URL): string {
   return readFileSync(fileURLToPath(path.href), 'utf8');
 }
 
+function readSources(paths: readonly URL[]): string {
+  return paths.map(readSource).join('\n');
+}
+
 describe('Browser-safe helper type conversions', () => {
   it('[CLIENT-REGISTRY-S003] toSafeString returns string values and fallback for non-strings', () => {
     expect(toSafeString('hello')).toBe('hello');
@@ -335,20 +339,23 @@ describe('Server Action credential resolver integration', () => {
     expect(source).not.toContain('secretMaterial');
   });
 
-  it('[CLIENT-REGISTRY-S005] Server Actions do not accept actingUser parameter from browser', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { fileURLToPath } = await import('node:url');
-
+  it('[CLIENT-REGISTRY-S005] Server Actions do not accept actingUser parameter from browser', () => {
     const lifecyclePath = new URL('../server/actions/agent-lifecycle.ts', import.meta.url);
-    const queriesPath = new URL('../server/actions/agent-queries.ts', import.meta.url);
-    const operationsPath = new URL('../server/actions/agent-operations.ts', import.meta.url);
+    const queryActionPaths = [
+      new URL('../server/actions/agent-queries.ts', import.meta.url),
+      new URL('../server/actions/agent-queries/events.ts', import.meta.url),
+      new URL('../server/actions/agent-queries/runs.ts', import.meta.url),
+      new URL('../server/actions/agent-queries/threads.ts', import.meta.url),
+    ];
+    const operationActionPaths = [
+      new URL('../server/actions/agent-operations.ts', import.meta.url),
+      new URL('../server/actions/agent-operations/default-model-policy.ts', import.meta.url),
+      new URL('../server/actions/agent-operations/integrations.ts', import.meta.url),
+      new URL('../server/actions/agent-operations/schedules.ts', import.meta.url),
+      new URL('../server/actions/agent-operations/tools.ts', import.meta.url),
+    ];
 
-    const allSources =
-      readFileSync(fileURLToPath(lifecyclePath.href), 'utf8') +
-      '\n' +
-      readFileSync(fileURLToPath(queriesPath.href), 'utf8') +
-      '\n' +
-      readFileSync(fileURLToPath(operationsPath.href), 'utf8');
+    const allSources = readSources([lifecyclePath, ...queryActionPaths, ...operationActionPaths]);
 
     expect(allSources).not.toContain('actingUser?: ActingUserContext');
     expect(allSources).not.toContain('actingUser: ActingUserContext');
