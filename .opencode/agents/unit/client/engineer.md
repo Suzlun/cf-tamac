@@ -2,7 +2,7 @@
 description: Management Client implementation specialist for packages/client, Next.js App Router, Server Actions, Client D1, server-only Agent RPC, browser boundary work, and Impeccable/design-audit UI gate evidence.
 mode: subagent
 hidden: true
-model: openai/gpt-5.6-terra
+model: openai/gpt-5.5
 reasoningEffort: 'xhigh'
 temperature: 0.1
 permission:
