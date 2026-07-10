@@ -2,7 +2,7 @@
 description: Agent Service review subagent for packages/agent, Agent TypeSpec/proto/codegen, Connect RPC, Durable Objects, Agent storage, and governance work.
 mode: subagent
 hidden: true
-model: openai/gpt-5.5
+model: openai/gpt-5.6-terra
 reasoningEffort: 'xhigh'
 temperature: 0.1
 permission:

@@ -1,7 +1,7 @@
 ---
 description: Researches the web, repository, specs/standards, best practices, and policies/laws; answers with evidence-backed takeaways and recommendations.
 mode: subagent
-model: openai/gpt-5.5
+model: openai/gpt-5.6-terra
 reasoningEffort: 'xhigh'
 temperature: 0.1
 permission:
