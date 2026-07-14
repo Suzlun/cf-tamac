@@ -2,7 +2,7 @@
 description: Agent Service implementation specialist for packages/agent, TypeSpec-to-proto, Agent/Client/SDK RPC descriptor codegen, Connect RPC, Durable Objects, Agent-owned storage, and governance scripts.
 mode: subagent
 hidden: true
-model: openai/gpt-5.6-terra
+model: openai/gpt-5.6-luna
 reasoningEffort: 'xhigh'
 temperature: 0.1
 permission:
