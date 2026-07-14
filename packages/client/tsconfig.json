@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "../..",
     "outDir": "dist",
     "jsx": "preserve",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
@@ -18,5 +18,5 @@
     "tailwind.config.ts",
     "postcss.config.mjs"
   ],
-  "exclude": ["src/generated/**", ".next", ".open-next", "dist", "node_modules"]
+  "exclude": [".next", ".open-next", "dist", "node_modules"]
 }

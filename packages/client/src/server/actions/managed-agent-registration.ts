@@ -30,7 +30,11 @@ type RegistrationFieldName =
 type RegistrationFieldErrors = Partial<Record<RegistrationFieldName, string>>;
 
 /**
- * Normalized, server-validated Agent registration input.
+ * Server Action が正規化・検証した Agent 登録入力です。
+ *
+ * @remarks
+ * Client D1 へ書き込む直前の値だけを表します。`agentRpcOrigin` は呼び出し元で allowlist と照合済みの
+ * canonical HTTPS origin に差し替えられ、credential は参照 metadata だけを保持します。
  */
 export interface NormalizedManagedAgentRegistrationInput {
   readonly agentId: string;
@@ -46,7 +50,11 @@ export interface NormalizedManagedAgentRegistrationInput {
 }
 
 /**
- * Browser-submitted Agent registration input using browser-safe field names.
+ * Browser から Server Action へ渡す安全なフィールド名の Agent 登録入力です。
+ *
+ * @remarks
+ * この型は平文 secret や署名鍵を含みません。Server Action は正規化後に allowlist、Client D1、
+ * server-only SDK adapter へ順番に渡します。
  */
 export interface ManagedAgentRegistrationInput {
   readonly agentId: string;
@@ -62,14 +70,20 @@ export interface ManagedAgentRegistrationInput {
 }
 
 /**
- * Options for registration persistence, including edit-mode identity.
+ * 編集対象の identity を含む、登録永続化の任意設定です。
+ *
+ * @remarks
+ * `existingAgentId` を指定した場合は既存 record の更新として扱い、新規 record を暗黙に作成しません。
  */
 export interface ManagedAgentRegistrationOptions {
   readonly existingAgentId?: string;
 }
 
 /**
- * Server Action result for Agent registration submissions.
+ * 検証済み Agent 登録永続化の内部結果です。
+ *
+ * @remarks
+ * この内部結果は Server Action が Browser-safe four-field result へ写像する前にだけ使います。
  */
 export type ManagedAgentRegistrationResult =
   | { readonly ok: true; readonly agentId: string }
@@ -80,7 +94,10 @@ export type ManagedAgentRegistrationResult =
     };
 
 /**
- * Repositories needed to persist a validated managed Agent registration.
+ * 検証済みの管理対象 Agent 登録を保存するための Client D1 repository 集合です。
+ *
+ * @remarks
+ * Agent domain snapshot や秘密情報を保存する repository は含めません。
  */
 export interface RegistrationRepositories {
   readonly agents: ManagedAgentRepository;
@@ -88,14 +105,22 @@ export interface RegistrationRepositories {
 }
 
 /**
- * Result of server-side registration validation before any Client D1 write.
+ * Client D1 書き込み前に行う Server Action 登録検証の結果です。
+ *
+ * @remarks
+ * 失敗時は Browser フィールド名と安全な案内文だけを保持し、raw error や credential 情報は含めません。
  */
 export type ManagedAgentRegistrationValidationResult =
   | { readonly ok: true; readonly value: NormalizedManagedAgentRegistrationInput }
   | { readonly ok: false; readonly fieldErrors: RegistrationFieldErrors };
 
 /**
- * Validate managed Agent registration fields without touching Client D1.
+ * Client D1 に触れずに管理対象 Agent 登録フィールドを検証します。
+ *
+ * @param input - Browser-safe field 名で受け取った未正規化の登録入力です。
+ * @returns 成功時は正規化値、失敗時はフィールドごとの安全な案内文を返します。
+ * @remarks
+ * origin allowlist との照合は、env を読む `submitManagedAgentRegistration` で永続化直前に行います。
  */
 export function validateManagedAgentRegistrationInput(
   input: ManagedAgentRegistrationInput
@@ -109,7 +134,14 @@ export function validateManagedAgentRegistrationInput(
 }
 
 /**
- * Persist a validated registration through injected repositories.
+ * 検証済みの登録を注入された Client D1 repository で永続化します。
+ *
+ * @param input - 正規化済みで、呼び出し元が origin policy を確認した登録入力です。
+ * @param repositories - managed Agent record と credential reference を保存する Client D1 repository です。
+ * @param options - 新規登録または編集登録を決める任意の identity 設定です。
+ * @returns 成功時は Agent ID、失敗時は安全な field error を返します。
+ * @remarks
+ * 部分書き込みを防ぐため、credential 保存が失敗した場合は登録 record を rollback します。
  */
 export async function persistManagedAgentRegistration(
   input: NormalizedManagedAgentRegistrationInput,
@@ -174,10 +206,10 @@ function collectRegistrationFieldErrors(
   addModelPolicyErrors(errors, input.modelPolicy);
   addCredentialLookupErrors(errors, input);
   if (rawDisplayOrder.trim() !== '' && !/^\d+$/.test(rawDisplayOrder.trim())) {
-    errors.displayOrder = 'Sort order must be a non-negative integer.';
+    errors.displayOrder = '表示順は0以上の整数で入力してください。';
   }
   if (!isValidCredentialStatus(input.status)) {
-    errors.status = 'Status must be active, pending, or rotating.';
+    errors.status = '状態はactive、pending、rotatingのいずれかを選択してください。';
   }
   return errors;
 }
@@ -204,15 +236,17 @@ function addAgentIdentityErrors(
   input: NormalizedManagedAgentRegistrationInput
 ): void {
   if (input.agentId === '') {
-    errors.agentId = 'Agent ID is required.';
+    errors.agentId = 'Agent IDを入力してください。';
   } else if (!AGENT_ID_PATTERN.test(input.agentId)) {
-    errors.agentId = 'Agent ID must be lowercase kebab-case (max 63 chars).';
+    errors.agentId = 'Agent IDは63文字以内の小文字kebab-caseで入力してください。';
   }
   if (!isValidHttpsUrl(input.agentRpcOrigin) || input.agentRpcOrigin.length > 2048) {
-    errors.agentRpcOrigin = 'RPC origin must be a valid https:// URL.';
+    errors.agentRpcOrigin = '有効なHTTPS Agent RPC originを入力してください。';
+  } else if (!hasOriginComponentsOnly(input.agentRpcOrigin)) {
+    errors.agentRpcOrigin = 'scheme、host、任意のportで構成されたoriginを入力してください。';
   }
   if (input.displayName === '' || input.displayName.length > 80) {
-    errors.displayName = 'Display name is required (max 80 characters).';
+    errors.displayName = '表示名を1〜80文字で入力してください。';
   }
 }
 
@@ -221,16 +255,16 @@ function addCredentialLookupErrors(
   input: NormalizedManagedAgentRegistrationInput
 ): void {
   if (input.referenceValue === '' || input.referenceValue.length > 512) {
-    errors.referenceValue = 'Credential reference is required.';
+    errors.referenceValue = 'credential参照を1〜512文字で入力してください。';
   }
   if (input.keyId === '' || input.keyId.length > 128) {
-    errors.keyId = 'Key ID is required.';
+    errors.keyId = 'キーIDを1〜128文字で入力してください。';
   }
   if (input.publicFingerprint === '' || input.publicFingerprint.length > 128) {
-    errors.publicFingerprint = 'Public fingerprint is required.';
+    errors.publicFingerprint = '公開フィンガープリントを1〜128文字で入力してください。';
   }
   if (input.maskedHint === '' || input.maskedHint.length > 64) {
-    errors.maskedHint = 'Masked hint is required.';
+    errors.maskedHint = 'マスク済みヒントを1〜64文字で入力してください。';
   }
 }
 
@@ -250,6 +284,22 @@ function isValidHttpsUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function hasOriginComponentsOnly(value: string): boolean {
+  try {
+    const url = new URL(value);
+    // Browser schema と Server Action の前段検証を揃え、path、query、fragment、userinfo を拒否します。
+    return (
+      url.username === '' &&
+      url.password === '' &&
+      url.pathname === '/' &&
+      url.search === '' &&
+      url.hash === ''
+    );
   } catch {
     return false;
   }

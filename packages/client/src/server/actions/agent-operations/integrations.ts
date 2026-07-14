@@ -4,6 +4,12 @@ import { revalidatePath } from 'next/cache';
 
 import { loadAgentRpcClients } from '../../agent-rpc/agent-loader';
 import {
+  createBrowserSafeAgentRpcActionFailure,
+  createBrowserSafeAgentRpcActionSuccess,
+  executeBrowserSafeAgentRpcQuery,
+  type BrowserSafeAgentRpcActionResult,
+} from '../../agent-rpc/safe-results';
+import {
   toBrowserSafeAdapterConnection,
   toBrowserSafeCleanupResult,
   toBrowserSafeInstallationSummary,
@@ -18,6 +24,16 @@ import {
 } from '../browser-safe-helpers';
 
 /**
+ * Integration installation 一覧 query が Browser へ返す allowlisted display DTO です。
+ *
+ * @remarks
+ * installation、adapter connection、Tool、cursor は各 Browser-safe mapper が許可した metadata だけを持ちます。
+ * Provider credential、manifest body、generated SDK response は含めません。
+ */
+export type BrowserSafeInstallationListDisplayData =
+  BrowserSafePagedResult<BrowserSafeInstallationSummary>;
+
+/**
  * AgentIntegrationService.ListInstallations を detail enrichment 付きで呼び出す。
  *
  * @param agentId - Integration installation を読み出す Agent aggregate の ID。
@@ -28,22 +44,34 @@ import {
 export async function listInstallations(
   agentId: string,
   options: ListInstallationsOptions = {}
-): Promise<BrowserSafePagedResult<BrowserSafeInstallationSummary>> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.integrations.listInstallations({
-      agentId,
-      page: buildScopedPageRequest(agentId, 'integrations', options.page),
-      status: options.status,
-    })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeInstallationListDisplayData>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // Installation list と detail enrichment に使う SDK client は server-only callback 内に閉じます。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.integrations.listInstallations({
+          agentId,
+          page: buildScopedPageRequest(agentId, 'integrations', options.page),
+          status: options.status,
+        })
+      );
+      return { correlationId: clients.invocation.correlationId, response: { clients, response } };
+    },
+    async ({ clients, response }) => {
+      // enrichment response も mapper 内で安全化し、Provider raw data を display DTO に混入させません。
+      const items = await Promise.all(
+        response.installations.map(async (installation) =>
+          enrichInstallationSummary(agentId, installation, clients)
+        )
+      );
+      return { items, page: toBrowserSafePageInfo(response.page) };
+    },
+    'Integration一覧を取得しました',
+    'Integrationの安全な一覧情報を表示しています。',
+    'Integration一覧を確認してください',
+    'Integration一覧を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  const items = await Promise.all(
-    response.installations.map(async (installation) =>
-      enrichInstallationSummary(agentId, installation, clients)
-    )
-  );
-  return { items, page: toBrowserSafePageInfo(response.page) };
 }
 
 /**
@@ -63,20 +91,34 @@ export async function installIntegration(
   integrationId: string,
   manifestRef: string,
   requestedGrants: readonly string[]
-): Promise<BrowserSafeInstallationSummary> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.integrations.installIntegration({
-      agentId,
-      idempotencyKey,
-      integrationId,
-      manifestRef,
-      requestedGrants: [...requestedGrants],
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeInstallationSummary>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const response = await clients.withErrorNormalization(() =>
+      clients.integrations.installIntegration({
+        agentId,
+        idempotencyKey,
+        integrationId,
+        manifestRef,
+        requestedGrants: [...requestedGrants],
+      })
+    );
 
-  revalidatePath(`/agents/${agentId}/integrations`);
-  return toBrowserSafeInstallationSummary(response.installation, response);
+    revalidatePath(`/agents/${agentId}/integrations`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      toBrowserSafeInstallationSummary(response.installation, response),
+      'Integrationをインストールしました',
+      'Integrationを管理対象Agentへ追加しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'Integrationを確認してください',
+      'Integrationの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
+  }
 }
 
 /**
@@ -94,23 +136,37 @@ export async function uninstallIntegration(
   installationId: string,
   idempotencyKey: string,
   reason: string
-): Promise<BrowserSafeInstallationSummary> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.integrations.uninstallIntegration({
-      agentId,
-      idempotencyKey,
-      installationId,
-      reason: reason === '' ? undefined : reason,
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeInstallationSummary>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const response = await clients.withErrorNormalization(() =>
+      clients.integrations.uninstallIntegration({
+        agentId,
+        idempotencyKey,
+        installationId,
+        reason: reason === '' ? undefined : reason,
+      })
+    );
 
-  const disabledConnections = response.disabledConnections.map(toBrowserSafeAdapterConnection);
-  revalidatePath(`/agents/${agentId}/integrations`);
-  return toBrowserSafeInstallationSummary(response.installation, response, {
-    adapterConnections: disabledConnections,
-    cleanupResult: toBrowserSafeCleanupResult(response, disabledConnections.length),
-  });
+    const disabledConnections = response.disabledConnections.map(toBrowserSafeAdapterConnection);
+    revalidatePath(`/agents/${agentId}/integrations`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      toBrowserSafeInstallationSummary(response.installation, response, {
+        adapterConnections: disabledConnections,
+        cleanupResult: toBrowserSafeCleanupResult(response, disabledConnections.length),
+      }),
+      'Integrationをアンインストールしました',
+      'Integrationを管理対象Agentから削除しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'Integrationを確認してください',
+      'Integrationの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
+  }
 }
 
 async function enrichInstallationSummary(

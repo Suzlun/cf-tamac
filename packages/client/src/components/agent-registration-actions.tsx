@@ -11,6 +11,9 @@ import { Button } from './ui/button';
  */
 export interface RegistrationActionsProps {
   readonly isEdit: boolean;
+  /** ポリシー検証を含む、action row 全体を操作不可にする状態です。 */
+  readonly disabled: boolean;
+  /** 登録または変更保存そのものが進行中である状態です。 */
   readonly pending: boolean;
   readonly onCancel: () => void;
 }
@@ -21,20 +24,37 @@ export interface RegistrationActionsProps {
  * @param props - edit mode、pending 状態、cancel callback を含む props です。
  * @returns form の最後に配置する action row を返します。
  */
-export function RegistrationActions({ isEdit, pending, onCancel }: RegistrationActionsProps) {
+export function RegistrationActions({
+  isEdit,
+  disabled,
+  pending,
+  onCancel,
+}: RegistrationActionsProps) {
   return (
     <div className="flex flex-wrap gap-2">
-      <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
-        Cancel
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11"
+        onClick={onCancel}
+        disabled={disabled}
+      >
+        キャンセル
       </Button>
-      <Button type="submit" variant="default" disabled={pending} aria-disabled={pending}>
+      <Button
+        type="submit"
+        variant="default"
+        className="min-h-11"
+        disabled={disabled}
+        aria-disabled={disabled}
+      >
         {pending
           ? isEdit
-            ? 'Saving changes…'
-            : 'Registering Agent and seeding policy…'
+            ? '変更を保存しています…'
+            : 'Agentを登録しています…'
           : isEdit
-            ? 'Save changes'
-            : 'Register Agent'}
+            ? '変更を保存'
+            : 'Agentを登録'}
       </Button>
     </div>
   );

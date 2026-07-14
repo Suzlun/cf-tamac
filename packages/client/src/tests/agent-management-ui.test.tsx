@@ -12,9 +12,14 @@ const registrationActionsPath = new URL(
   import.meta.url
 );
 const modelPolicyFieldsPath = new URL('../components/model-policy-fields.tsx', import.meta.url);
+const clientGlobalsPath = new URL('../../app/globals.css', import.meta.url);
 const modelPolicySummaryPath = new URL('../components/model-policy-summary.tsx', import.meta.url);
 const modelPolicySettingsSectionPath = new URL(
   '../components/model-policy-settings-section.tsx',
+  import.meta.url
+);
+const operationResultRegionPath = new URL(
+  '../components/operation-result-region.tsx',
   import.meta.url
 );
 const registrationSchemaPath = new URL(
@@ -137,6 +142,44 @@ function readAll(filePaths: readonly URL[]): string {
   return filePaths.map(read).join('\n');
 }
 
+function readNeutralLightness(
+  styles: string,
+  theme: 'light' | 'dark',
+  tokenName: 'foreground' | 'muted'
+): number {
+  // 対象 theme の token block だけを切り出し、他 theme の同名 token を誤って評価しないようにします。
+  const declarations =
+    theme === 'light'
+      ? /:root\s*\{([\s\S]*?)\n\s*\}/u.exec(styles)?.[1]
+      : /\.dark\s*\{([\s\S]*?)\n\s*\}/u.exec(styles)?.[1];
+  if (declarations === undefined) {
+    throw new Error(`${theme} theme token block is required for contrast verification.`);
+  }
+
+  // 現行の Shadcn neutral token から lightness を取得し、foreground/muted の対比を token 定義に追従させます。
+  const token =
+    tokenName === 'foreground'
+      ? /--foreground:\s*0 0% (\d+(?:\.\d+)?)%;/u.exec(declarations)?.[1]
+      : /--muted:\s*0 0% (\d+(?:\.\d+)?)%;/u.exec(declarations)?.[1];
+  if (!token) {
+    throw new Error(`${theme} ${tokenName} must remain a Shadcn neutral token.`);
+  }
+
+  return Number(token);
+}
+
+function neutralRelativeLuminance(lightness: number): number {
+  // neutral HSL は RGB 三成分が同じになるため、sRGB 線形化後の一成分が相対輝度になります。
+  const channel = lightness / 100;
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+function contrastRatio(foregroundLightness: number, backgroundLightness: number): number {
+  const foreground = neutralRelativeLuminance(foregroundLightness);
+  const background = neutralRelativeLuminance(backgroundLightness);
+  return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+}
+
 describe('Agent list page (AGENT-MANAGEMENT-UI-S001)', () => {
   it('[AGENT-MANAGEMENT-UI-S001] Agent list displays registry fields from browser-safe data', () => {
     const agentList = read(agentListPath);
@@ -239,29 +282,102 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     expect(registrationSources).toContain('useForm');
     expect(registrationSources).toContain('zodResolver');
     expect(registrationSources).toContain('registrationSchema');
-    expect(registrationSources).toContain('Agent ID is required');
-    expect(registrationSources).toContain('RPC origin must be a valid https:// URL');
-    expect(registrationSources).toContain('Display name is required');
-    expect(registrationSources).toContain('Credential reference is required');
-    expect(registrationSources).toContain('Key ID is required');
-    expect(registrationSources).toContain('Public fingerprint is required');
-    expect(registrationSources).toContain('Masked hint is required');
-    expect(registrationSources).toContain('Policy ref is required');
-    expect(registrationSources).toContain('Only workers-ai provider is available');
-    expect(registrationSources).toContain('Max output tokens must be between 1 and 8192');
+    expect(registrationSources).toContain('Agent IDを入力してください。');
+    expect(registrationSources).toContain('有効なHTTPS Agent RPC originを入力してください。');
+    expect(registrationSources).toContain('表示名を1〜80文字で入力してください。');
+    expect(registrationSources).toContain('credential参照を1〜512文字で入力してください。');
+    expect(registrationSources).toContain('キーIDを1〜128文字で入力してください。');
+    expect(registrationSources).toContain('公開フィンガープリントを1〜128文字で入力してください。');
+    expect(registrationSources).toContain('マスク済みヒントを1〜64文字で入力してください。');
+    expect(registrationSources).toContain(
+      'ポリシー参照は64文字以内の小文字kebab-caseで入力してください。'
+    );
+    expect(registrationSources).toContain('プロバイダーはworkers-aiを選択してください。');
+    expect(registrationSources).toContain('最大出力トークン数は1〜8192の整数で入力してください。');
 
     const registrationActions = read(registrationActionsPath);
 
     // The form uses shadcn-style components.
     expect(registrationForm).toContain('ControlRoomFrame');
     expect(registrationForm).toContain('RhfFormField');
-    expect(registrationForm).toContain('FormErrorSummary');
+    expect(registrationForm).toContain('ValidationSummary');
     expect(registrationActions).toContain('Button');
+    expect(registrationForm).toContain('className="h-11"');
+    expect(registrationActions).toContain('className="min-h-11"');
+    expect(modelPolicyFields).toContain('className="h-11"');
+    expect(modelPolicyFields).toContain('className="min-h-11"');
 
     // The form page uses one server-side submit action to avoid partial writes.
     expect(newAgentPage).toContain('submitManagedAgentRegistration');
     expect(newAgentPage).toContain('validateManagedAgentRegistrationModelPolicy');
     expect(newAgentPage).toContain("'use server'");
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S002] Registration labels resolve their matching inputs without ID-only locators', () => {
+    const registrationForm = read(registrationFormPath);
+    const registrationTextField = registrationForm.slice(
+      registrationForm.indexOf('function RegistrationTextField'),
+      registrationForm.indexOf('interface CredentialReferenceSectionProps')
+    );
+
+    // field name を label の htmlFor と input の id に共用し、支援技術と getByLabel が同一の登録入力を解決できることを固定します。
+    expect(registrationTextField).toMatch(
+      /<FormLabel htmlFor={name}>{label}<\/FormLabel>[\S\s]*?<Input[\S\s]*?id={name}/
+    );
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S002] Validation summary items are semantic field anchors that retain RHF focus', () => {
+    const registrationForm = read(registrationFormPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+    const validationSummary = registrationForm.slice(
+      registrationForm.indexOf('function ValidationSummary'),
+      registrationForm.indexOf('function collectFieldErrorSummaryItems')
+    );
+
+    // `a[href]` は click と Enter の両方で native link semantics を持ち、Button は既存 primitive を再利用する。
+    expect(validationSummary).toMatch(/<Button\s+asChild\s+variant="link"/u);
+    expect(validationSummary).toContain('href={`#${item.fieldName}`}');
+    expect(validationSummary).toContain('onClick={() => {');
+    expect(validationSummary).toContain('form.setFocus(item.fieldName);');
+    expect(registrationForm).toContain('useFormState({ control: form.control })');
+
+    // summary の field path は top-level input、nested policy field、Select trigger の実 ID と一致する。
+    expect(registrationForm).toContain('<FormLabel htmlFor={name}>{label}</FormLabel>');
+    expect(registrationForm).toContain('id={name}');
+    expect(registrationForm).toContain('<FormLabel htmlFor="status">状態</FormLabel>');
+    expect(registrationForm).toContain('ref={field.ref}');
+    expect(registrationForm).toContain('id="status"');
+    expect(modelPolicyFields).toContain('<FormLabel htmlFor={name}>{label}</FormLabel>');
+    expect(modelPolicyFields).toContain('id={name}');
+    expect(modelPolicyFields).toContain('ref={field.ref}');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S002] Registration controls meet the 44px touch-target and action-state requirements', () => {
+    const registrationForm = read(registrationFormPath);
+    const registrationActions = read(registrationActionsPath);
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+    const modelPolicySettings = read(modelPolicySettingsSectionPath);
+
+    expect(registrationForm).toContain('registrationPending');
+    expect(registrationForm).toContain('policyValidationPending');
+    expect(registrationForm).toContain('pending={registrationPending}');
+    expect(registrationActions).toContain('disabled={disabled}');
+    expect(registrationActions).toContain('min-h-11');
+    expect(modelPolicyFields).toContain('className="h-11"');
+    expect(modelPolicyFields).toContain('className="min-h-11"');
+    expect(modelPolicySettings).toContain('pending={pending}');
+    expect(modelPolicySettings).not.toContain(
+      "pending={pending || validationStatus === 'validating'}"
+    );
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S002] Operation result preserves a selectable support ID when Clipboard access is rejected', () => {
+    const resultRegion = read(operationResultRegionPath);
+
+    expect(resultRegion).toContain('setCopyUnavailable(true)');
+    expect(resultRegion).toContain('問い合わせIDを選択してコピーできます。');
+    expect(resultRegion).toContain('aria-live="polite"');
+    expect(resultRegion).toContain('role="status"');
   });
 
   it('[AGENT-MANAGEMENT-UI-S002] Server validation runs before writes and rolls back partial registration', () => {
@@ -299,17 +415,17 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
 
     // Pending state.
     expect(registrationForm).toContain('pending');
-    expect(registrationActions).toContain('Registering Agent and seeding policy');
+    expect(registrationActions).toContain('Agentを登録しています…');
 
     // Error state.
     expect(registrationForm).toContain('formError');
     expect(registrationForm).toContain('role="alert"');
-    expect(registrationForm).toContain('aria-live="assertive"');
+    expect(registrationForm).toContain('OperationResultRegion');
     expect(registrationForm).toContain('setFocus');
 
-    // Success state (redirect to agent overview).
-    expect(registrationForm).toContain('router.push');
-    expect(registrationForm).toContain('/agents/');
+    // Success state keeps the route and offers the specified next actions.
+    expect(registrationForm).toContain('Agentの概要を開く');
+    expect(registrationForm).toContain('Agent一覧に戻る');
   });
 
   it('[AGENT-MANAGEMENT-UI-S002] Form does not persist client-side secrets', () => {
@@ -321,9 +437,11 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     expect(registrationForm).toContain('autoComplete="off"');
 
     // The form captures references, not secrets.
-    expect(registrationForm).toContain('Credential reference');
-    expect(registrationForm).toContain('masked hint');
-    expect(registrationForm).toContain('never plaintext secrets');
+    expect(registrationForm).toContain('credential参照');
+    expect(registrationForm).toContain('マスク済みヒント');
+    expect(registrationForm).toContain(
+      '秘密情報の解決処理とcredential情報はサーバー側が所有します。'
+    );
 
     // The server action returns browser-safe results only.
     expect(managedAgents).toContain('toBrowserSafeCredentialReference');
@@ -422,7 +540,7 @@ describe('Agent settings page (AGENT-MANAGEMENT-UI-S004)', () => {
     expect(settingsForm).toContain('onRotateCredential');
     expect(settingsForm).toContain('router.refresh');
     expect(settingsSources).toContain('Config must be valid JSON.');
-    expect(settingsForm).toContain('Agent configuration and credentials');
+    expect(settingsForm).toContain('Agent設定とcredential');
     expect(settingsSources).toContain('useForm');
     expect(settingsSources).toContain('zodResolver');
     expect(settingsSources).toContain('agentConfigSchema');
@@ -499,6 +617,34 @@ describe('Agent settings page (AGENT-MANAGEMENT-UI-S004)', () => {
 });
 
 describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MANAGEMENT-UI-S018)', () => {
+  it('[AGENT-MANAGEMENT-UI-S017] Model policy uses one semantic legend and contrast-safe muted-surface text', () => {
+    const modelPolicyFields = read(modelPolicyFieldsPath);
+    const clientGlobals = read(clientGlobalsPath);
+    const fieldset = /<fieldset\s+aria-describedby=[\s\S]*?<\/fieldset>/u.exec(
+      modelPolicyFields
+    )?.[0];
+    const legend = /<legend[\s\S]*?<\/legend>/u.exec(fieldset ?? '')?.[0];
+
+    expect(fieldset).toBeDefined();
+    // legend が fieldset の唯一の見出しであり、見出しと状態文を同じ行に保持します。
+    expect(legend).toContain('id="model-policy-heading"');
+    expect(legend).toContain('<span>');
+    expect(legend).toContain('既定モデルポリシー');
+    expect(legend).toContain('<span className="text-primary">');
+    expect(fieldset?.match(/<legend\b/gu)).toHaveLength(1);
+    expect(fieldset?.match(/既定モデルポリシー/gu)).toHaveLength(1);
+    expect(fieldset).not.toContain('aria-labelledby');
+
+    // muted surface 内の本文と field helper は低コントラストの muted foreground ではなく foreground token を使います。
+    expect(fieldset).toContain('text-foreground');
+    expect(fieldset).not.toContain('text-muted-foreground');
+    for (const theme of ['light', 'dark'] as const) {
+      const foreground = readNeutralLightness(clientGlobals, theme, 'foreground');
+      const muted = readNeutralLightness(clientGlobals, theme, 'muted');
+      expect(contrastRatio(foreground, muted)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('[AGENT-MANAGEMENT-UI-S017] Agent creation flow sends initial model policy through server-side RPC', () => {
     const registrationForm = read(registrationFormPath);
     const newAgentPage = read(newAgentPagePath);
@@ -509,8 +655,8 @@ describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MA
 
     expect(registrationForm).toContain('ModelPolicyFields');
     expect(registrationForm).toContain('onValidateModelPolicy');
-    expect(modelPolicyFields).toContain('Default model policy');
-    expect(modelPolicyFields).toContain('Validate policy');
+    expect(modelPolicyFields).toContain('既定モデルポリシー');
+    expect(modelPolicyFields).toContain('ポリシーを検証');
     expect(newAgentPage).toContain('validateManagedAgentRegistrationModelPolicy');
     expect(managedAgents).toContain('validateModelPolicyForRegistration');
     expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
@@ -535,9 +681,9 @@ describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MA
     expect(settingsPage).toContain('validateModelPolicyForManagedAgent');
     expect(settingsPage).toContain('saveDefaultModelPolicy');
     expect(settingsForm).toContain('ModelPolicySettingsSection');
-    expect(settingsSection).toContain('Save default policy');
-    expect(settingsSection).toContain('Upsert the Agent-owned policy first');
-    expect(settingsSection).toContain("result.errorCategory === 'permission_denied'");
+    expect(settingsSection).toContain('既定ポリシーを保存');
+    expect(settingsSection).toContain('Agent所有ポリシーを保存してから');
+    expect(settingsSection).toContain("result.safeErrorCategory === 'permission_denied'");
     expect(settingsSection).toContain('disabled={pending || permissionDenied}');
     expect(summary).toContain('Policy ref');
     expect(summary).toContain('Digest');

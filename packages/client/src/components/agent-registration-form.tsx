@@ -1,9 +1,10 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type SyntheticEvent } from 'react';
-import { useForm, type FieldErrors, type UseFormReturn } from 'react-hook-form';
+import { useForm, useFormState, type FieldErrors, type UseFormReturn } from 'react-hook-form';
 
 import { RegistrationActions } from './agent-registration-actions';
 import { ControlRoomFrame } from './control-room-frame';
@@ -12,6 +13,7 @@ import {
   ModelPolicyFields,
   type ModelPolicyValidationStatus,
 } from './model-policy-fields';
+import { OperationResultRegion } from './operation-result-region';
 import {
   buildRegistrationModelPolicyDefaults,
   REGISTRATION_FIELD_ORDER,
@@ -21,7 +23,7 @@ import {
   type RegistrationSubmitResult,
   type RegistrationValues,
 } from './schemas/agent-registration';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Button } from './ui/button';
 import {
   Form,
   FormControl,
@@ -58,11 +60,13 @@ interface RegistrationFormProps {
 }
 
 /**
- * Accessible add/edit Agent registration form.
+ * 管理対象 Agent の新規登録・編集を行うアクセシブルなフォームです。
  *
- * Credential fields capture references and metadata only; no plaintext secret
- * is persisted or echoed back to the browser. The form uses shadcn `Form`,
- * `react-hook-form`, `zod`, and Server Actions per wireframe §6.2.
+ * @param props - 初期の公開 metadata と Browser-safe Server Action wrapper を含む props です。
+ * @returns 登録入力、フィールド検証、処理中状態、four-field 操作結果を備えたフォームを返します。
+ * @remarks
+ * credential フィールドは参照値と公開 metadata だけを受け取り、平文 secret は保存・再表示しません。
+ * shadcn `Form`、`react-hook-form`、`zod`、Server Action により、UI仕様 §6 のフォーカスと結果表示を実装します。
  */
 export function AgentRegistrationForm({
   initialAgent,
@@ -72,8 +76,10 @@ export function AgentRegistrationForm({
 }: RegistrationFormProps) {
   const router = useRouter();
   const isEdit = initialAgent !== undefined;
-  const [pending, setPending] = useState(false);
+  const [registrationPending, setRegistrationPending] = useState(false);
+  const [policyValidationPending, setPolicyValidationPending] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
+  const [operationResult, setOperationResult] = useState<RegistrationSubmitResult | undefined>();
   const [policyValidationStatus, setPolicyValidationStatus] =
     useState<ModelPolicyValidationStatus>('idle');
   const [policyWarnings, setPolicyWarnings] = useState<readonly BrowserSafeModelPolicyWarning[]>(
@@ -89,24 +95,28 @@ export function AgentRegistrationForm({
   const handleValidSubmit = async (values: RegistrationValues) => {
     form.clearErrors();
     setFormError(undefined);
-    setPending(true);
+    setOperationResult(undefined);
+    setRegistrationPending(true);
     try {
       const result = await onSubmit(values);
-      if (result.ok) {
-        router.push(`/agents/${result.agentId}`);
+      setOperationResult(result);
+      if (result.safeStatus === 'succeeded') {
         return;
       }
-      setFormError(result.formError ?? 'Could not register the Agent.');
-      applyServerFieldErrors(form, result.fieldErrors);
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Could not register the Agent.');
+      setFormError(result.displayData.message);
+      applyServerFieldErrors(form, result.displayData.fieldErrors);
+    } catch {
+      // Server Action の安全な result 契約を守れない例外も raw detail を表示せず、入力を保持して再試行を案内します。
+      setFormError(
+        '入力内容はこの画面に保持されています。時間をおいて「もう一度登録」を実行してください。'
+      );
     } finally {
-      setPending(false);
+      setRegistrationPending(false);
     }
   };
 
   const handleInvalidSubmit = (fieldErrors: FieldErrors<RegistrationValues>) => {
-    setFormError('Correct the highlighted fields before registering the Agent.');
+    setFormError('強調表示されたフィールドを確認すると登録を続行できます。');
     focusFirstInvalidField(form, fieldErrors);
   };
 
@@ -115,44 +125,45 @@ export function AgentRegistrationForm({
     const valid = await form.trigger(REGISTRATION_FIELD_ORDER);
     if (!valid) {
       setPolicyValidationStatus('invalid');
-      setFormError('Correct the highlighted fields before validating the policy.');
+      setFormError('強調表示されたフィールドを確認するとポリシー検証を続行できます。');
       focusFirstInvalidField(form, form.formState.errors);
       return;
     }
-    setPending(true);
+    setOperationResult(undefined);
+    setPolicyValidationPending(true);
     setPolicyValidationStatus('validating');
     setFormError(undefined);
     try {
       const result = await onValidateModelPolicy(form.getValues());
-      if (result.ok) {
-        setPolicyWarnings(result.warnings);
-        setPolicyValidationStatus(result.warnings.length > 0 ? 'warning' : 'valid');
+      if (result.safeStatus === 'succeeded') {
+        setPolicyWarnings(result.displayData.warnings);
+        setPolicyValidationStatus(result.displayData.warnings.length > 0 ? 'warning' : 'valid');
         return;
       }
-      setPolicyWarnings(result.warnings ?? []);
+      setPolicyWarnings(result.displayData.warnings);
       setPolicyValidationStatus('invalid');
-      setFormError(result.formError ?? 'The default model policy could not be validated.');
-      applyServerFieldErrors(form, result.fieldErrors);
-    } catch (error) {
+      setFormError(result.displayData.message);
+      applyServerFieldErrors(form, result.displayData.fieldErrors);
+    } catch {
       setPolicyValidationStatus('unavailable');
-      setFormError(
-        error instanceof Error ? error.message : 'The default model policy could not be validated.'
-      );
+      setFormError('ポリシーの検証結果を確認できません。時間をおいてもう一度実行してください。');
     } finally {
-      setPending(false);
+      setPolicyValidationPending(false);
     }
   };
 
   return (
     <ControlRoomFrame
-      title={isEdit ? 'Agent registry › edit' : 'Agent registry › new'}
-      signalLabel="registration"
+      title={isEdit ? 'Agentレジストリ › 編集' : 'Agentレジストリ › 新規登録'}
+      signalLabel="登録"
     >
       <RegistrationFormContent
         form={form}
         isEdit={isEdit}
-        pending={pending}
+        pending={registrationPending || policyValidationPending}
+        registrationPending={registrationPending}
         formError={formError}
+        operationResult={operationResult}
         policyValidationStatus={policyValidationStatus}
         policyWarnings={policyWarnings}
         onValidatePolicy={() => {
@@ -220,7 +231,9 @@ interface RegistrationFormContentProps {
   readonly form: UseFormReturn<RegistrationValues>;
   readonly isEdit: boolean;
   readonly pending: boolean;
+  readonly registrationPending: boolean;
   readonly formError: string | undefined;
+  readonly operationResult: RegistrationSubmitResult | undefined;
   readonly policyValidationStatus: ModelPolicyValidationStatus;
   readonly policyWarnings: readonly BrowserSafeModelPolicyWarning[];
   readonly onValidatePolicy: () => void;
@@ -232,32 +245,54 @@ function RegistrationFormContent({
   form,
   isEdit,
   pending,
+  registrationPending,
   formError,
+  operationResult,
   policyValidationStatus,
   policyWarnings,
   onValidatePolicy,
   onSubmit,
   onCancel,
 }: RegistrationFormContentProps) {
+  // ValidationSummary は RHF state を直接購読し、フィールド直下の error と同じ render で anchor 一覧を更新します。
+  const { errors: fieldErrors } = useFormState({ control: form.control });
+
   return (
     <>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Registration
-      </p>
-      <h2>Capture references, not secrets.</h2>
+      <h2>サーバー側参照情報でAgentを登録します</h2>
       <p className="text-sm text-muted-foreground">
-        Register a managed Agent by its ID and RPC origin. Credential references are stored as
-        masked hints — never plaintext secrets.
+        Agent ID、許可済みのHTTPS Agent RPC
+        origin、表示名を入力します。credentialフィールドはサーバー側検索参照と公開メタデータを受け付けます。
       </p>
 
       <Form {...form}>
-        <form onSubmit={onSubmit} noValidate>
-          <FormErrorSummary formError={formError} fieldErrors={form.formState.errors} />
+        <form onSubmit={onSubmit} noValidate aria-busy={pending}>
+          <OperationResultRegion
+            result={operationResult}
+            pending={registrationPending}
+            pendingTitle="Agentを登録しています"
+            pendingMessage="登録情報を確認し、Agentを初期化しています…"
+          >
+            {operationResult?.safeStatus === 'succeeded' &&
+            operationResult.displayData.agentId !== undefined ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button asChild type="button" className="min-h-11">
+                  <Link href={`/agents/${operationResult.displayData.agentId}`}>
+                    Agentの概要を開く
+                  </Link>
+                </Button>
+                <Button asChild type="button" variant="outline" className="min-h-11">
+                  <Link href="/agents">Agent一覧に戻る</Link>
+                </Button>
+              </div>
+            ) : null}
+          </OperationResultRegion>
+          <ValidationSummary form={form} formError={formError} fieldErrors={fieldErrors} />
           <RegistrationTextField
             form={form}
             name="agentId"
             label="Agent ID"
-            helper="The Durable Object name. Lowercase, kebab-case."
+            helper="Durable Object名。小文字のkebab-caseで入力してください。"
             disabled={isEdit || pending}
             required
           />
@@ -265,23 +300,23 @@ function RegistrationFormContent({
             form={form}
             name="agentRpcOrigin"
             label="Agent RPC origin"
-            helper="Connect + binary Protobuf endpoint, e.g. https://agent.example.com"
+            helper="運用ポリシーで許可された正規HTTPS originを入力してください（例: https://agent.example.com）。scheme、host、任意のportで構成します。"
             disabled={pending}
             required
           />
           <RegistrationTextField
             form={form}
             name="displayName"
-            label="Display name"
-            helper="Shown in the registry list and overview."
+            label="表示名"
+            helper="Agentレジストリと概要に表示します。"
             disabled={pending}
             required
           />
           <RegistrationTextField
             form={form}
             name="displayOrder"
-            label="Sort order (optional)"
-            helper="Lower numbers sort first within pin group."
+            label="表示順（任意）"
+            helper="同じpin groupでは小さい番号を先に表示します。"
             disabled={pending}
             inputMode="numeric"
           />
@@ -295,7 +330,12 @@ function RegistrationFormContent({
             onValidate={onValidatePolicy}
           />
           <CredentialReferenceSection form={form} pending={pending} />
-          <RegistrationActions isEdit={isEdit} pending={pending} onCancel={onCancel} />
+          <RegistrationActions
+            isEdit={isEdit}
+            disabled={pending}
+            pending={registrationPending}
+            onCancel={onCancel}
+          />
         </form>
       </Form>
     </>
@@ -329,11 +369,14 @@ function RegistrationTextField({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>{label}</FormLabel>
+          {/* field name を label/input の共有 ID として明示し、支援技術とラベル起点の操作が同じ入力を解決できるようにします。 */}
+          <FormLabel htmlFor={name}>{label}</FormLabel>
           {helper !== undefined ? <FormDescription>{helper}</FormDescription> : null}
           <FormControl>
             <Input
               {...field}
+              className="h-11"
+              id={name}
               autoComplete={autoComplete}
               disabled={disabled}
               inputMode={inputMode}
@@ -355,18 +398,15 @@ interface CredentialReferenceSectionProps {
 function CredentialReferenceSection({ form, pending }: CredentialReferenceSectionProps) {
   return (
     <details open>
-      <summary className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Credential reference
-      </summary>
+      <summary className="text-xs font-medium text-muted-foreground">credential参照</summary>
       <p className="text-xs text-muted-foreground">
-        The Client stores a reference, key ID, masked hint, and status. The secret itself is
-        resolved server-side only.
+        Clientは参照値、キーID、公開フィンガープリント、マスク済みヒント、状態を管理します。秘密情報の解決処理とcredential情報はサーバー側が所有します。
       </p>
       <RegistrationTextField
         form={form}
         name="referenceValue"
-        label="Credential reference"
-        helper="Opaque reference (e.g. secret path or KMS key ID)."
+        label="credential参照"
+        helper="サーバー側secret resolverが使用するopaque参照を入力します。"
         disabled={pending}
         autoComplete="off"
         required
@@ -374,7 +414,7 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
       <RegistrationTextField
         form={form}
         name="keyId"
-        label="Key ID"
+        label="キーID"
         disabled={pending}
         autoComplete="off"
         required
@@ -382,8 +422,8 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
       <RegistrationTextField
         form={form}
         name="publicFingerprint"
-        label="Public fingerprint"
-        helper="Hex fingerprint of the Agent public key."
+        label="公開フィンガープリント"
+        helper="Agent公開鍵のフィンガープリントを入力します。"
         disabled={pending}
         autoComplete="off"
         required
@@ -391,8 +431,8 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
       <RegistrationTextField
         form={form}
         name="maskedHint"
-        label="Masked hint"
-        helper='e.g. "ed25519:ab…12" — never the full secret.'
+        label="マスク済みヒント"
+        helper="例: ed25519:ab…12。masked identifierを入力します。"
         disabled={pending}
         autoComplete="off"
         required
@@ -402,7 +442,8 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
         name="status"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Status</FormLabel>
+            {/* ValidationSummary の semantic anchor とラベル操作が同じ Select trigger を解決するよう固定 ID を使います。 */}
+            <FormLabel htmlFor="status">状態</FormLabel>
             <Select
               value={field.value}
               onValueChange={field.onChange}
@@ -410,7 +451,7 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
               name={field.name}
             >
               <FormControl>
-                <SelectTrigger aria-label="Status">
+                <SelectTrigger ref={field.ref} id="status" className="h-11" aria-label="状態">
                   <SelectValue />
                 </SelectTrigger>
               </FormControl>
@@ -428,39 +469,63 @@ function CredentialReferenceSection({ form, pending }: CredentialReferenceSectio
   );
 }
 
-interface FormErrorSummaryProps {
+interface ValidationSummaryProps {
+  readonly form: UseFormReturn<RegistrationValues>;
   readonly formError: string | undefined;
   readonly fieldErrors: FieldErrors<RegistrationValues>;
 }
 
-function FormErrorSummary({ formError, fieldErrors }: FormErrorSummaryProps) {
+function ValidationSummary({ form, formError, fieldErrors }: ValidationSummaryProps) {
   const summaryItems = collectFieldErrorSummaryItems(fieldErrors);
   if (formError === undefined && summaryItems.length === 0) {
     return null;
   }
   return (
-    <Alert variant="destructive" role="alert" aria-live="assertive" className="mb-6">
-      <AlertTitle>Registration needs attention</AlertTitle>
-      <AlertDescription>
-        {formError ?? 'Correct the highlighted fields before registering the Agent.'}
-      </AlertDescription>
+    <div
+      className="mb-6 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-foreground"
+      role="alert"
+    >
+      <h3 className="font-medium">登録内容を確認してください</h3>
+      <p className="mt-1">
+        {formError ?? '強調表示されたフィールドを確認すると登録を続行できます。'}
+      </p>
       {summaryItems.length > 0 ? (
         <ul className="mt-2 list-disc pl-5 font-mono text-xs">
           {summaryItems.map((item) => (
-            <li key={item}>{item}</li>
+            <li key={item.fieldName}>
+              <Button asChild variant="link" className="h-auto p-0 text-left">
+                <a
+                  href={`#${item.fieldName}`}
+                  onClick={() => {
+                    // native anchor の URL/scroll semantics を保ちつつ、click/Enter 後に RHF の field focus を明示します。
+                    form.setFocus(item.fieldName);
+                  }}
+                >
+                  {item.label}: {item.message}
+                </a>
+              </Button>
+            </li>
           ))}
         </ul>
       ) : null}
-    </Alert>
+    </div>
   );
 }
 
-function collectFieldErrorSummaryItems(fieldErrors: FieldErrors<RegistrationValues>): string[] {
-  const items: string[] = [];
+function collectFieldErrorSummaryItems(fieldErrors: FieldErrors<RegistrationValues>): {
+  readonly fieldName: RegistrationFieldName;
+  readonly label: string;
+  readonly message: string;
+}[] {
+  const items: {
+    readonly fieldName: RegistrationFieldName;
+    readonly label: string;
+    readonly message: string;
+  }[] = [];
   for (const fieldName of REGISTRATION_FIELD_ORDER) {
     const message = getFormFieldError(fieldErrors, fieldName)?.message;
     if (typeof message === 'string' && message !== '') {
-      items.push(`${getRegistrationFieldLabel(fieldName)}: ${message}`);
+      items.push({ fieldName, label: getRegistrationFieldLabel(fieldName), message });
     }
   }
   return items;
@@ -492,19 +557,19 @@ function getServerFieldError(
 function getRegistrationFieldLabel(fieldName: RegistrationFieldName): string {
   if (fieldName === 'agentId') return 'Agent ID';
   if (fieldName === 'agentRpcOrigin') return 'Agent RPC origin';
-  if (fieldName === 'displayName') return 'Display name';
-  if (fieldName === 'displayOrder') return 'Sort order';
-  if (fieldName === 'modelPolicy.policyRef') return 'Policy ref';
-  if (fieldName === 'modelPolicy.provider') return 'Provider';
-  if (fieldName === 'modelPolicy.model') return 'Model ID';
-  if (fieldName === 'modelPolicy.temperature') return 'Temperature';
+  if (fieldName === 'displayName') return '表示名';
+  if (fieldName === 'displayOrder') return '表示順（任意）';
+  if (fieldName === 'modelPolicy.policyRef') return 'ポリシー参照';
+  if (fieldName === 'modelPolicy.provider') return 'プロバイダー';
+  if (fieldName === 'modelPolicy.model') return 'モデルID';
+  if (fieldName === 'modelPolicy.temperature') return '温度';
   if (fieldName === 'modelPolicy.topP') return 'Top P';
-  if (fieldName === 'modelPolicy.maxOutputTokens') return 'Max output tokens';
-  if (fieldName === 'referenceValue') return 'Credential reference';
-  if (fieldName === 'keyId') return 'Key ID';
-  if (fieldName === 'publicFingerprint') return 'Public fingerprint';
-  if (fieldName === 'maskedHint') return 'Masked hint';
-  return 'Status';
+  if (fieldName === 'modelPolicy.maxOutputTokens') return '最大出力トークン数';
+  if (fieldName === 'referenceValue') return 'credential参照';
+  if (fieldName === 'keyId') return 'キーID';
+  if (fieldName === 'publicFingerprint') return '公開フィンガープリント';
+  if (fieldName === 'maskedHint') return 'マスク済みヒント';
+  return '状態';
 }
 
 function getFormFieldError(

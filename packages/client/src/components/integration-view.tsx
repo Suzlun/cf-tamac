@@ -20,6 +20,11 @@ import {
 } from './integration-view-mutations';
 import { PaginationBar } from './pagination-bar';
 
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
+
 interface PageInfo {
   readonly nextPageToken?: string;
   readonly resultCount: number;
@@ -100,14 +105,18 @@ interface IntegrationViewProps {
     integrationId: string,
     manifestRef: string,
     requestedGrants: readonly string[]
-  ) => Promise<InstallationSummary>;
+  ) => Promise<BrowserSafeInstallationActionResult>;
   readonly onUninstall: (
     agentId: string,
     installationId: string,
     idempotencyKey: string,
     reason: string
-  ) => Promise<InstallationSummary>;
+  ) => Promise<BrowserSafeInstallationActionResult>;
 }
+
+type BrowserSafeInstallationActionResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: InstallationSummary }
+>;
 
 const TERMINAL_INSTALLATION_STATUSES = new Set(['uninstalled', 'failed']);
 

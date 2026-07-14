@@ -12,3 +12,10 @@ plugins:
     opt:
       - target=ts
       - import_extension=none
+  # SDK の server-side consumer が同じ Agent Protobuf contract を参照するための descriptor 出力先。
+  # 入力は Agent proto だけであり、出力は pnpm gen:agent:rpc によって再生成される。
+  - local: protoc-gen-es
+    out: ../sdk/src/generated/agent-rpc
+    opt:
+      - target=ts
+      - import_extension=none

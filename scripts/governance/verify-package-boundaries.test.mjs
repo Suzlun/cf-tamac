@@ -11,6 +11,7 @@ import {
   collectClientD1StoragePolicyIssues,
   collectOpenCodeWorkflowIssuesFromFiles,
   collectRuntimeCouplingIssues,
+  collectSdkPackageBoundaryIssues,
 } from './verify-package-boundaries.mjs';
 
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -270,9 +271,9 @@ export type MapperLeak = DurableObjectShell;
           '/packages/agent/src/storage/inverted-new.ts: Agent storage must not import Worker, RPC facade, or generated descriptor layers',
         ])
       );
-      expect(issues.some((issue) => issue.includes('/packages/agent/src/domain/state-operations.ts'))).toBe(
-        false
-      );
+      expect(
+        issues.some((issue) => issue.includes('/packages/agent/src/domain/state-operations.ts'))
+      ).toBe(false);
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
@@ -317,8 +318,12 @@ export async function signWithLegacySecret() {
 
       expect(issues).toEqual(
         expect.arrayContaining([
-          expect.stringContaining('Client browser-visible modules must not contain signing material'),
-          expect.stringContaining('Client Agent RPC signing must use the encrypted Ed25519 signing key store'),
+          expect.stringContaining(
+            'Client browser-visible modules must not contain signing material'
+          ),
+          expect.stringContaining(
+            'Client Agent RPC signing must use the encrypted Ed25519 signing key store'
+          ),
         ])
       );
     } finally {
@@ -369,14 +374,177 @@ CREATE TABLE IF NOT EXISTS agent_events (
 
       expect(issues).toEqual(
         expect.arrayContaining([
-          expect.stringContaining('Client D1 must not define plaintext signing material or secret column private_jwk'),
-          expect.stringContaining('Client D1 must not define plaintext signing material or secret column shared_secret'),
-          expect.stringContaining('Client D1 must not define Agent domain snapshot table agent_events'),
+          expect.stringContaining(
+            'Client D1 must not define plaintext signing material or secret column private_jwk'
+          ),
+          expect.stringContaining(
+            'Client D1 must not define plaintext signing material or secret column shared_secret'
+          ),
+          expect.stringContaining(
+            'Client D1 must not define Agent domain snapshot table agent_events'
+          ),
         ])
       );
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S015] Workspace validation classifies SDK ownership and browser-delivered graphs', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'sdk-package-boundary-fixtures-'));
+
+    try {
+      // SDK metadata、Buf target、generated descriptor を揃え、server-side SDK classification の正常系を構成します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/package.json',
+        `${JSON.stringify(
+          {
+            browser: false,
+            exports: {
+              '.': './src/index.ts',
+              './agent-rpc/*': './src/generated/agent-rpc/*',
+            },
+            name: '@cf-tamac/sdk',
+          },
+          null,
+          2
+        )}\n`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/buf.gen.yaml',
+        `plugins:
+  - local: protoc-gen-es
+    out: ../sdk/src/generated/agent-rpc
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+        'export const AgentHealthService = {};\n'
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        `import { AgentHealthService } from './generated/agent-rpc/cftamac/agent/v1_pb';
+
+export const healthService = AgentHealthService;
+`
+      );
+      // Client server module の SDK import は許可し、browser-delivered module の同じ import は拒否する fixture を置きます。
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/agent-rpc/sdk-client.ts',
+        `import 'server-only';
+
+import { healthService } from '@cf-tamac/sdk';
+
+export const serverHealthService = healthService;
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/client/app/browser-sdk-leak.tsx',
+        `import { healthService } from '@cf-tamac/sdk';
+import { AgentHealthService } from '@cf-tamac/sdk-agent-rpc/cftamac/agent/v1_pb';
+
+export const browserHealthService = [healthService, AgentHealthService];
+`
+      );
+
+      expect(collectSdkPackageBoundaryIssues(fixtureRoot)).toEqual([]);
+      expect(collectClientBoundaryIssues(fixtureRoot)).toEqual([
+        '/packages/client/app/browser-sdk-leak.tsx: Client browser-visible modules must not import server-only Agent RPC, credentials, or Connect runtime',
+        '/packages/client/app/browser-sdk-leak.tsx: Client browser-visible modules must not contain Agent RPC credential or Client D1 access seams',
+      ]);
+
+      // SDK が Agent runtime を直接参照すると generated Protobuf consumer ではなくなるため、runtime coupling として拒否します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/agent-runtime-leak.ts',
+        `import { AIAgent } from '@cf-tamac/agent';
+
+export const leakedAgentRuntime = AIAgent;
+`
+      );
+
+      expect(collectRuntimeCouplingIssues(fixtureRoot)).toEqual([
+        '/packages/sdk/src/agent-runtime-leak.ts: SDK runtime must not import Agent or Client runtime or generated RPC from another package',
+      ]);
+
+      // mandatory descriptor root が欠落した場合は、package classification を通さず root path を含む ownership failure を返します。
+      rmSync(join(fixtureRoot, 'packages/sdk/src/generated/agent-rpc'), {
+        force: true,
+        recursive: true,
+      });
+      expect(collectSdkPackageBoundaryIssues(fixtureRoot)).toEqual([
+        'packages/sdk/src/generated/agent-rpc: SDK generated Agent RPC descriptor output root is missing',
+      ]);
+
+      // root が空でも canonical descriptor entry がなければ generated output として認めないことを確認します。
+      writeFixture(fixtureRoot, 'packages/sdk/src/generated/agent-rpc/.gitkeep', '');
+      expect(collectSdkPackageBoundaryIssues(fixtureRoot)).toEqual([
+        'packages/sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts: SDK generated Agent RPC canonical descriptor entry is missing',
+      ]);
+
+      // canonical entry を復元し、comment 内の target 文字列だけでは Protobuf-ES generation ownership を満たさないことを検証します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+        'export const AgentHealthService = {};\n'
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/buf.gen.yaml',
+        `plugins:
+  # out: ../sdk/src/generated/agent-rpc
+  - local: protoc-gen-es
+    out: ../client/src/generated/agent-rpc
+`
+      );
+      expect(collectSdkPackageBoundaryIssues(fixtureRoot)).toEqual([
+        'packages/agent/buf.gen.yaml: SDK generated Agent RPC descriptor output must be owned by pnpm gen:agent:rpc',
+      ]);
+
+      // SDK target が別 plugin stanza に誤配置されても、protoc-gen-es output として関連付かないため拒否します。
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/buf.gen.yaml',
+        `plugins:
+  - local: unrelated-generator
+    out: ../sdk/src/generated/agent-rpc
+  - local: protoc-gen-es
+    out: ../client/src/generated/agent-rpc
+`
+      );
+      expect(collectSdkPackageBoundaryIssues(fixtureRoot)).toEqual([
+        'packages/agent/buf.gen.yaml: SDK generated Agent RPC descriptor output must be owned by pnpm gen:agent:rpc',
+      ]);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S016] Generated policy が SDK Agent RPC contract output を検査する', () => {
+    // 現在の workflow guidance は SDK generated descriptor root を command-owned・手編集禁止 policy として全体で保持します。
+    const files = Object.fromEntries(
+      workflowFiles.map((relativePath) => [relativePath, readProjectFile(relativePath)])
+    );
+
+    expect(collectOpenCodeWorkflowIssuesFromFiles(files)).toEqual([]);
+
+    // SDK root の policy 表記だけを fixture から除き、mandatory target の欠落を明示的な rule report として検出します。
+    const filesWithoutSdkGeneratedPolicy = Object.fromEntries(
+      Object.entries(files).map(([relativePath, content]) => [
+        relativePath,
+        content.replaceAll('packages/sdk/src/generated/agent-rpc/**', ''),
+      ])
+    );
+
+    expect(collectOpenCodeWorkflowIssuesFromFiles(filesWithoutSdkGeneratedPolicy)).toContain(
+      'missing generated output policy for packages/sdk/src/generated/agent-rpc/**'
+    );
   });
 
   it('blocks stale demo-only OpenCode workflow fixtures', () => {

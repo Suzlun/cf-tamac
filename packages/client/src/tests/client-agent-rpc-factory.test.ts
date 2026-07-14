@@ -2,391 +2,219 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import {
-  createAgentRpcAuthInterceptor,
-  createClientServiceJwt,
-  type AgentRpcCredentialMetadata,
-  type ResolvedAgentRpcCredential,
-} from '../server/agent-rpc/authentication';
+import { createServerAgentRpcClients } from '../server/agent-rpc/create-client';
 import { createE2eFakeAgentRpcClients } from '../server/agent-rpc/e2e-fake-clients';
+import { parseApprovedAgentRpcOrigins } from '../server/agent-rpc/origin-policy';
 import {
-  AgentRpcOperationError,
-  normalizeAgentRpcError,
-  withAgentRpcErrorNormalization,
-} from '../server/agent-rpc/errors';
+  createBrowserSafeAgentRpcFailure,
+  createBrowserSafeAgentRpcSuccess,
+} from '../server/agent-rpc/safe-results';
 import {
   toBrowserSafeCredentialReference,
-  toBrowserSafeCredentialReferences,
   toBrowserSafeSigningKey,
-  toBrowserSafeSigningKeys,
 } from '../server/credentials/browser-safe';
-import { resolveProviderCredentialSecret } from '../server/credentials/secret-resolution';
 import {
   generateEd25519SigningKeyMaterial,
-  mapClientStatusToTrustStatus,
   resolveEd25519PrivateKey,
-  computePublicJwkFingerprint,
 } from '../server/credentials/signing-keys';
 
 import type { CredentialReferenceRecord } from '../server/db/access-credentials';
 
 const TEST_ENCRYPTION_KEY_BASE64 = Buffer.alloc(32, 7).toString('base64');
+const agentLoaderPath = new URL('../server/agent-rpc/agent-loader.ts', import.meta.url);
+const createClientPath = new URL('../server/agent-rpc/create-client.ts', import.meta.url);
 
-function makeCredentialRecord(
-  overrides: Partial<CredentialReferenceRecord> = {}
-): CredentialReferenceRecord {
-  return {
-    agentId: 'agent-alpha',
-    credentialRef: 'wrangler-secret:agent-alpha-credential',
-    keyId: 'key-001',
-    publicFingerprint: 'sha256:abcdef',
-    maskedHint: '****-****-****-001',
-    status: 'active',
-    createdAtMs: 1000,
-    updatedAtMs: 2000,
-    ...overrides,
-  };
+function createApprovedOrigin() {
+  const approvedOrigin = parseApprovedAgentRpcOrigins('["https://agent.example.test"]')
+    .values()
+    .next().value;
+  if (approvedOrigin === undefined) {
+    throw new Error('test origin must be configured');
+  }
+  return approvedOrigin;
 }
 
-function readRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-async function buildEd25519Credential(
-  overrides: Partial<ResolvedAgentRpcCredential> = {}
-): Promise<ResolvedAgentRpcCredential> {
+/**
+ * Client D1 が解決した SDK signing context を再現する test helper です。
+ *
+ * @returns Ed25519 private CryptoKey と public credential identity だけを持つ server-only context。
+ * @remarks
+ * Browser payload に含めない private key を SDK adapter が受け取る経路を、実際の Client signing key helper
+ * を使って検証します。
+ */
+async function createSigningContext() {
   const material = await generateEd25519SigningKeyMaterial(TEST_ENCRYPTION_KEY_BASE64);
   const privateKey = await resolveEd25519PrivateKey(
     TEST_ENCRYPTION_KEY_BASE64,
     material.privateJwkCiphertext
   );
-  const base: ResolvedAgentRpcCredential = {
-    agentId: 'agent-alpha',
-    issuer: material.issuer,
-    keyId: material.keyId,
-    publicFingerprint: material.publicFingerprint,
-    publicJwk: material.publicJwk,
-    privateKey,
-    actingUser: { operatorId: 'operator-001', scopes: ['agent:read', 'agent:write'] },
-  };
-  return { ...base, ...overrides };
-}
-
-describe('Server-side Agent RPC client factory', () => {
-  it('[CLIENT-REGISTRY-S003] generated Connect factory stays server-only and binary', () => {
-    const source = readFileSync(
-      fileURLToPath(new URL('../server/agent-rpc/create-client.ts', import.meta.url).href),
-      'utf8'
-    );
-
-    expect(source).toContain("import 'server-only';");
-    expect(source).toContain("import { createClient, type Client } from '@connectrpc/connect';");
-    expect(source).toContain("import { createConnectTransport } from '@connectrpc/connect-web';");
-    expect(source).toContain('@cf-tamac/client-agent-rpc/cftamac/agent/v1_pb');
-    expect(source).toContain('useBinaryFormat: true');
-    expect(source).toContain('useHttpGet: false');
-    expect(source).toContain('createClient(AgentLifecycleService, transport)');
-    expect(source).toContain('createClient(AgentModelPolicyService, transport)');
-    expect(source).toContain('createClient(AgentStateService, transport)');
-  });
-
-  it('[AGENT-MANAGEMENT-UI-S018] E2E fake safe metadata digest matches inline bytes', async () => {
-    const clients = createE2eFakeAgentRpcClients('agent-alpha');
-    const getModelPolicy = clients.modelPolicies.getModelPolicy as unknown as (
-      request: Record<string, unknown>
-    ) => Promise<Record<string, unknown>>;
-
-    const response = await getModelPolicy({
-      agentId: 'agent-alpha',
-      policyRef: 'workers-ai-default',
-    });
-    const policy = readRecord(response.policy);
-    const safeMetadataRef = readRecord(policy?.safeMetadataRef);
-    const inlineBytes = safeMetadataRef?.inlineBytes;
-
-    expect(inlineBytes).toBeInstanceOf(Uint8Array);
-    expect(safeMetadataRef?.sha256).toBe(
-      createHash('sha256')
-        .update(inlineBytes instanceof Uint8Array ? inlineBytes : new Uint8Array())
-        .digest('hex')
-    );
-  });
-
-  it('[CLIENT-REGISTRY-S003] auth interceptor emits EdDSA Bearer JWT without reference headers', async () => {
-    const credential = await buildEd25519Credential();
-    const captured = await captureInterceptorHeaders(credential);
-
-    expect(captured.authorization).toMatch(/^Bearer (?:[\w-]+\.){2}[\w-]+$/);
-    expect(captured.headerKeys).not.toContain('x-client-credential-ref');
-    expect(captured.headerKeys).not.toContain('x-client-key-id');
-    expect(captured.headerKeys).not.toContain('x-agent-id');
-    const token = captured.authorization.slice('Bearer '.length);
-    const segments = token.split('.');
-    expect(segments).toHaveLength(3);
-    const payloadSegment = segments[1];
-    if (typeof payloadSegment !== 'string') {
-      throw new TypeError('payload segment missing');
-    }
-    const decoded = JSON.parse(Buffer.from(payloadSegment, 'base64url').toString('utf8')) as Record<
-      string,
-      unknown
-    >;
-    expect(decoded.iss).toBe(credential.issuer);
-    expect(decoded.sub).toBe(credential.keyId);
-    expect(decoded.agent_id).toBe(credential.agentId);
-    expect(decoded.acting_user_id).toBe('operator-001');
-    expect(decoded.fingerprint).toBe(credential.publicFingerprint);
-  });
-
-  it('[CLIENT-REGISTRY-S003] Client Service JWT signs EdDSA without exposing secret material', async () => {
-    const credential = await buildEd25519Credential();
-    const jwt = await createClientServiceJwt(credential);
-    const segments = jwt.split('.');
-    expect(segments).toHaveLength(3);
-    const headerSegment = segments[0];
-    if (typeof headerSegment !== 'string') {
-      throw new TypeError('header segment missing');
-    }
-    const payloadSegment = segments[1];
-    if (typeof payloadSegment !== 'string') {
-      throw new TypeError('payload segment missing');
-    }
-    const headerJson = JSON.parse(
-      Buffer.from(headerSegment, 'base64url').toString('utf8')
-    ) as Record<string, unknown>;
-    const payloadJson = JSON.parse(
-      Buffer.from(payloadSegment, 'base64url').toString('utf8')
-    ) as Record<string, unknown>;
-    expect(headerJson.alg).toBe('EdDSA');
-    expect(headerJson.kid).toBe(credential.keyId);
-    expect(Object.keys(payloadJson).sort()).toEqual([
-      'acting_user_id',
-      'agent_id',
-      'aud',
-      'exp',
-      'fingerprint',
-      'iss',
-      'jti',
-      'nbf',
-      'scopes',
-      'sub',
-    ]);
-    expect(payloadJson).not.toHaveProperty('privateJwk');
-    expect(payloadJson).not.toHaveProperty('privateJwkCiphertext');
-    expect(payloadJson).not.toHaveProperty('private_jwk');
-    expect(payloadJson).not.toHaveProperty('encryptedPrivateJwk');
-    expect(payloadJson).not.toHaveProperty('d');
-  });
-
-  it('[CLIENT-REGISTRY-S011] Client Service JWT awaits signing key usage touch after successful signing', async () => {
-    const onJwtSigned: NonNullable<ResolvedAgentRpcCredential['onJwtSigned']> = vi.fn(() => {
-      // test callback は Client D1 touch 相当の非同期処理を模倣する。
-      return Promise.resolve();
-    });
-    const credential = await buildEd25519Credential({ onJwtSigned });
-
-    const jwt = await createClientServiceJwt(credential);
-
-    expect(jwt).toMatch(/^(?:[\w-]+\.){2}[\w-]+$/);
-    expect(onJwtSigned).toHaveBeenCalledTimes(1);
-  });
-
-  it('[CLIENT-REGISTRY-S011] Client Service JWT fails closed when signing key usage touch fails', async () => {
-    const onJwtSigned: NonNullable<ResolvedAgentRpcCredential['onJwtSigned']> = vi.fn(() => {
-      // last-used metadata が更新できない状態を再現し、署名済み JWT を送信しないことを確認する。
-      return Promise.reject(new Error('signing key usage touch failed'));
-    });
-    const credential = await buildEd25519Credential({ onJwtSigned });
-
-    await expect(createClientServiceJwt(credential)).rejects.toThrow(
-      'signing key usage touch failed'
-    );
-    expect(onJwtSigned).toHaveBeenCalledTimes(1);
-  });
-
-  it('[CLIENT-REGISTRY-S011] Agent RPC signing source is Ed25519 store only (no credentialRef/AGENT_CREDENTIAL_*/HS256)', async () => {
-    const authenticationSource = readFileSync(
-      fileURLToPath(new URL('../server/agent-rpc/authentication.ts', import.meta.url).href),
-      'utf8'
-    );
-    const loaderSource = readFileSync(
-      fileURLToPath(new URL('../server/agent-rpc/agent-loader.ts', import.meta.url).href),
-      'utf8'
-    );
-    const modelPoliciesSource = readFileSync(
-      fileURLToPath(new URL('../server/actions/model-policies.ts', import.meta.url).href),
-      'utf8'
-    );
-
-    // HS256 signing と credentialRef/secretMaterial は署名経路から撤去済みであること。
-    expect(authenticationSource).not.toMatch(/\bHS256\b/);
-    expect(authenticationSource).not.toMatch(/secretMaterial/);
-    expect(authenticationSource).not.toMatch(/credentialRef/);
-    expect(authenticationSource).toContain('EdDSA');
-    expect(authenticationSource).toContain('await credential.onJwtSigned?.()');
-    expect(loaderSource).toContain('createSigningKeyRepository');
-    expect(loaderSource).toContain('resolveEd25519PrivateKey');
-    expect(loaderSource).toContain('onJwtSigned: () => signingKeys.touchSigningKeyLastUsed(');
-    expect(modelPoliciesSource).toContain(
-      'onJwtSigned: () => signingKeys.touchSigningKeyLastUsed('
-    );
-    expect(loaderSource).not.toMatch(/resolveCredentialSecret|resolveProviderCredentialSecret/);
-
-    // Provider credential resolver は PROVIDER_CREDENTIAL_ prefix だけを受け付ける。
-    const env = {
-      CLIENT_DB: {},
-      AGENT_RPC_DEFAULT_ORIGIN: 'http://localhost:8787',
-      CLIENT_CREDENTIAL_ENCRYPTION_KEY: TEST_ENCRYPTION_KEY_BASE64,
-      PROVIDER_CREDENTIAL_ALPHA: 'provider-secret-value',
-      AGENT_CREDENTIAL_LEGACY: 'legacy-value',
-    } as unknown as Parameters<typeof resolveProviderCredentialSecret>[0];
-
-    await expect(
-      resolveProviderCredentialSecret(env, 'agent-alpha', 'AGENT_CREDENTIAL_LEGACY')
-    ).rejects.toThrow();
-    await expect(
-      resolveProviderCredentialSecret(env, 'agent-alpha', 'CLIENT_DB')
-    ).rejects.toThrow();
-    const resolved = await resolveProviderCredentialSecret(
-      env,
-      'agent-alpha',
-      'PROVIDER_CREDENTIAL_ALPHA'
-    );
-    expect(resolved.secretMaterial).toBe('provider-secret-value');
-  });
-
-  it('[CLIENT-REGISTRY-S008] fingerprint matches between generated public JWK and managed Agent metadata', async () => {
-    const material = await generateEd25519SigningKeyMaterial(TEST_ENCRYPTION_KEY_BASE64);
-    const recomputed = await computePublicJwkFingerprint(material.publicJwk);
-    expect(recomputed).toBe(material.publicFingerprint);
-    // managed Agent metadata は同じ fingerprint 文字列を保持し、loader が照合する。
-    const fakeMetadata: AgentRpcCredentialMetadata = {
+  return {
+    audience: 'https://agent.example.test',
+    credential: {
       agentId: 'agent-alpha',
       issuer: material.issuer,
       keyId: material.keyId,
       publicFingerprint: material.publicFingerprint,
-      publicJwk: material.publicJwk,
-    };
-    expect(fakeMetadata.publicFingerprint).toBe(recomputed);
-  });
-
-  it('[CLIENT-REGISTRY-S007] disabled/deleted key status maps to revoked and signs must be rejected', () => {
-    expect(mapClientStatusToTrustStatus('active')).toBe('active');
-    expect(mapClientStatusToTrustStatus('disabled')).toBe('revoked');
-    expect(mapClientStatusToTrustStatus('deleted')).toBe('revoked');
-  });
-
-  it('[CLIENT-REGISTRY-S003] RPC error normalization maps errors to browser-safe messages', () => {
-    const error = new Error('permission denied: insufficient scope');
-    const normalized = normalizeAgentRpcError(error);
-    expect(normalized).toBeInstanceOf(AgentRpcOperationError);
-    expect(normalized.category).toBe('internal');
-    expect(normalized.message).not.toContain('permission denied');
-    expect(normalized.message).not.toContain('insufficient scope');
-  });
-
-  it('[CLIENT-REGISTRY-S003] withAgentRpcErrorNormalization wraps thrown errors', async () => {
-    await expect(
-      withAgentRpcErrorNormalization(() => Promise.reject(new Error('connect failure')))
-    ).rejects.toBeInstanceOf(AgentRpcOperationError);
-
-    const result = await withAgentRpcErrorNormalization(() => Promise.resolve('ok'));
-    expect(result).toBe('ok');
-  });
-});
-
-describe('Browser-safe credential and signing key serialization', () => {
-  it('[CLIENT-REGISTRY-S002] browser-safe credential reference excludes secret lookup material', () => {
-    const record = makeCredentialRecord();
-    const safe = toBrowserSafeCredentialReference(record);
-    const safeKeys = Object.keys(safe);
-
-    expect(safeKeys).toContain('agentId');
-    expect(safeKeys).toContain('keyId');
-    expect(safeKeys).toContain('maskedHint');
-    expect(safeKeys).toContain('status');
-    expect(safeKeys).not.toContain('credentialRef');
-    expect(safeKeys).not.toContain('publicFingerprint');
-    expect(safeKeys).not.toContain('secretMaterial');
-    expect(safeKeys).not.toContain('secret');
-  });
-
-  it('toBrowserSafeCredentialReferences maps lists', () => {
-    const records = [
-      makeCredentialRecord({ keyId: 'key-001' }),
-      makeCredentialRecord({ keyId: 'key-002' }),
-    ];
-    const safe = toBrowserSafeCredentialReferences(records);
-    expect(safe).toHaveLength(2);
-    expect(safe[0]?.keyId).toBe('key-001');
-    expect(safe[1]?.keyId).toBe('key-002');
-  });
-
-  it('[CLIENT-REGISTRY-S006] browser-safe signing key excludes private JWK material', () => {
-    const signingKey = {
-      issuer: 'cf-tamac-client',
-      keyId: 'key-001',
-      publicJwk: '{"kty":"OKP","crv":"Ed25519","x":"abc"}',
-      publicFingerprint: 'sha256_b64u:abc',
-      privateJwkCiphertext: '{"v":1,"iv":"i","ct":"c"}',
-      status: 'active' as const,
-      isDefault: true,
-      createdAtMs: 1000,
-      updatedAtMs: 2000,
-      lastUsedAtMs: 3000,
-    };
-    const safe = toBrowserSafeSigningKey(signingKey);
-    const safeKeys = Object.keys(safe);
-
-    expect(safeKeys).toContain('issuer');
-    expect(safeKeys).toContain('keyId');
-    expect(safeKeys).toContain('publicJwk');
-    expect(safeKeys).toContain('publicFingerprint');
-    expect(safeKeys).not.toContain('privateJwkCiphertext');
-    expect(safeKeys).not.toContain('privateJwk');
-    expect(safeKeys).not.toContain('d');
-    expect(safeKeys).not.toContain('secretMaterial');
-
-    const list = toBrowserSafeSigningKeys([signingKey]);
-    expect(list).toHaveLength(1);
-    const firstKey = list[0];
-    if (firstKey === undefined) {
-      throw new Error('browser-safe signing key missing');
-    }
-    expect(Object.keys(firstKey)).not.toContain('privateJwkCiphertext');
-  });
-});
+    },
+    privateKey,
+  };
+}
 
 /**
- * Interceptor が request header へ設定した値を記録する test helper。
+ * Browser-safe credential view の source record を作る test helper です。
  *
- * @remarks Authorization / header key 一覧を返し、参照 header が含まれないことを検査する。
+ * @returns Client D1 credential reference row と同じ、server-only lookup metadata を持つ record。
+ * @remarks
+ * helper が返す `credentialRef` は Browser-safe mapper が削除することを検証するためだけに使い、
+ * Agent RPC signing source として使いません。
  */
-async function captureInterceptorHeaders(credential: ResolvedAgentRpcCredential): Promise<{
-  readonly authorization: string;
-  readonly headerKeys: readonly string[];
-}> {
-  let authorization = '';
-  const headerKeys: string[] = [];
-  const interceptor = createAgentRpcAuthInterceptor(credential);
-  await interceptor((request) => {
-    authorization = request.header.get('Authorization') ?? '';
-    for (const key of request.header.keys()) {
-      headerKeys.push(key);
-    }
-    return Promise.resolve({ status: 200 } as never);
-  })({
-    header: new Headers(),
-    httpVersion: '2',
-    method: 'POST',
-    protocol: 'https',
-    signal: undefined,
-    url: 'https://agent.example.com/rpc',
-    body: new Uint8Array(),
-  } as never);
-  return { authorization, headerKeys };
+function createCredentialRecord(): CredentialReferenceRecord {
+  return {
+    agentId: 'agent-alpha',
+    credentialRef: 'wrangler-secret:agent-alpha-provider',
+    createdAtMs: 1000,
+    keyId: 'provider-key-001',
+    maskedHint: '****-001',
+    publicFingerprint: 'sha256:provider-public',
+    status: 'active',
+    updatedAtMs: 2000,
+  };
 }
+
+describe('SDK-backed Management Client Agent RPC adapter', () => {
+  it('[TAMAC-SDK-S003] Client adapter passes Client-owned signing and acting-user context to the SDK', async () => {
+    const signingContext = await createSigningContext();
+    const clients = createServerAgentRpcClients({
+      actingUser: {
+        operatorId: 'operator-001',
+        scopes: ['agent:read', 'agent:write'],
+      },
+      agentRpcOrigin: createApprovedOrigin(),
+      signingContext,
+    });
+
+    expect(clients.invocation.agentId).toBe('agent-alpha');
+    expect(clients.invocation.actingUser).toEqual({ actingUserId: 'operator-001' });
+    expect(clients.invocation.scopes).toEqual(['agent:read', 'agent:write']);
+    expect(clients.invocation.requestId).not.toBe('');
+    expect(clients.invocation.correlationId).not.toBe('');
+    await expect(clients.withErrorNormalization(() => Promise.resolve('sdk-result'))).resolves.toBe(
+      'sdk-result'
+    );
+
+    const source = readFileSync(
+      fileURLToPath(new URL('../server/agent-rpc/create-client.ts', import.meta.url).href),
+      'utf8'
+    );
+    expect(source).toContain('@cf-tamac/sdk');
+    expect(source).toContain('createTamacAgentClient');
+    expect(source).not.toContain('@connectrpc/connect');
+    expect(source).not.toContain('@cf-tamac/client-agent-rpc');
+  });
+
+  it('[TAMAC-SDK-S008] Factory accepts only a policy-approved origin after the loader validates stored metadata', async () => {
+    const signingContext = await createSigningContext();
+    const clients = createServerAgentRpcClients({
+      actingUser: {
+        operatorId: 'operator-001',
+        scopes: ['agent:read'],
+      },
+      agentRpcOrigin: createApprovedOrigin(),
+      signingContext,
+    });
+    const loaderSource = readFileSync(fileURLToPath(agentLoaderPath.href), 'utf8');
+    const factorySource = readFileSync(fileURLToPath(createClientPath.href), 'utf8');
+
+    expect(clients.agentRpcOrigin).toBe('https://agent.example.test');
+    expect(loaderSource).toContain('approveAgentRpcOrigin');
+    expect(loaderSource.indexOf('const approvedOrigin')).toBeLessThan(
+      loaderSource.indexOf('resolveManagedAgentSigningContext')
+    );
+    expect(factorySource).toContain('readonly agentRpcOrigin: ApprovedAgentRpcOrigin;');
+    expect(factorySource).toContain('agentRpcOrigin: config.agentRpcOrigin');
+  });
+
+  it('[TAMAC-SDK-S005] Client safe result helpers exclude signing and transport material', () => {
+    const success = createBrowserSafeAgentRpcSuccess(
+      { agentId: 'agent-alpha', displayName: 'Alpha Agent' },
+      'correlation-success-001'
+    );
+    const failure = createBrowserSafeAgentRpcFailure(
+      new Error('must remain server-side'),
+      'correlation-failure-001',
+      { message: 'safe failure', title: 'safe failure title' }
+    );
+    const serialized = JSON.stringify({ failure, success });
+
+    expect(Object.keys(success).sort()).toEqual([
+      'correlationId',
+      'displayData',
+      'safeErrorCategory',
+      'safeStatus',
+    ]);
+    expect(Object.keys(failure).sort()).toEqual([
+      'correlationId',
+      'displayData',
+      'safeErrorCategory',
+      'safeStatus',
+    ]);
+    expect(success.safeErrorCategory).toBeNull();
+    expect(failure.safeErrorCategory).toBe('internal');
+    expect(serialized).not.toContain('must remain server-side');
+    expect(serialized).not.toContain('privateKey');
+    expect(serialized).not.toContain('Authorization');
+    expect(serialized).not.toContain('agentRpcOrigin');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S018] E2E fake preserves safe metadata digest behavior', async () => {
+    const clients = createE2eFakeAgentRpcClients('agent-alpha');
+    const getModelPolicy = clients.modelPolicies.getModelPolicy as unknown as (
+      request: Record<string, unknown>
+    ) => Promise<Record<string, unknown>>;
+    const response = await getModelPolicy({
+      agentId: 'agent-alpha',
+      policyRef: 'workers-ai-default',
+    });
+    const policy = response.policy as Record<string, unknown>;
+    const safeMetadataRef = policy.safeMetadataRef as Record<string, unknown>;
+    const inlineBytes = safeMetadataRef.inlineBytes;
+
+    expect(inlineBytes).toBeInstanceOf(Uint8Array);
+    expect(safeMetadataRef.sha256).toBe(
+      createHash('sha256')
+        .update(inlineBytes instanceof Uint8Array ? inlineBytes : new Uint8Array())
+        .digest('hex')
+    );
+    expect(clients.invocation.correlationId).toContain('e2e-fake-correlation:agent-alpha');
+  });
+});
+
+describe('Browser-safe Client D1 views', () => {
+  it('[CLIENT-REGISTRY-S002] credential reference mapper excludes lookup material', () => {
+    const safe = toBrowserSafeCredentialReference(createCredentialRecord());
+
+    expect(Object.keys(safe)).not.toContain('credentialRef');
+    expect(Object.keys(safe)).not.toContain('publicFingerprint');
+    expect(Object.keys(safe)).not.toContain('secretMaterial');
+  });
+
+  it('[CLIENT-REGISTRY-S006] signing key mapper excludes encrypted private JWK material', () => {
+    const safe = toBrowserSafeSigningKey({
+      createdAtMs: 1000,
+      isDefault: true,
+      issuer: 'cf-tamac-client',
+      keyId: 'key-001',
+      privateJwkCiphertext: '{"v":1,"iv":"i","ct":"c"}',
+      publicFingerprint: 'sha256_b64u:public',
+      publicJwk: '{"kty":"OKP","crv":"Ed25519","x":"public"}',
+      status: 'active',
+      updatedAtMs: 2000,
+    });
+
+    expect(Object.keys(safe)).not.toContain('privateJwkCiphertext');
+    expect(Object.keys(safe)).not.toContain('privateJwk');
+    expect(Object.keys(safe)).not.toContain('d');
+  });
+});

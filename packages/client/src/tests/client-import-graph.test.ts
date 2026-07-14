@@ -29,14 +29,37 @@ function relativePath(filePath: string): string {
 }
 
 describe('Management Client Agent RPC import graph', () => {
-  it('[MANAGEMENT-CLIENT-SHELL-S006] Client imports generated Agent RPC code without Agent runtime source', () => {
+  it('[WORKSPACE-GOVERNANCE-S015] [MANAGEMENT-CLIENT-SHELL-S006] Client server graph imports the SDK without exposing it to Browser modules', () => {
     const serverAgentRpcSource = collectFiles(serverAgentRpcRoot)
       .map((filePath) => readFileSync(filePath, 'utf8'))
       .join('\n');
 
-    expect(serverAgentRpcSource).toContain('@cf-tamac/client-agent-rpc/cftamac/agent/v1_pb');
-    expect(serverAgentRpcSource).toContain('@connectrpc/connect');
+    expect(serverAgentRpcSource).toContain('@cf-tamac/sdk');
     expect(serverAgentRpcSource).toContain('server-only');
+    expect(serverAgentRpcSource).toContain('ApprovedAgentRpcOrigin');
+    expect(serverAgentRpcSource).toContain('AGENT_RPC_ALLOWED_ORIGINS');
+    expect(serverAgentRpcSource).not.toContain('@cf-tamac/client-agent-rpc');
+    expect(serverAgentRpcSource).not.toContain('@connectrpc/connect');
+
+    const browserSdkIssues = collectFiles(new URL('../../app', import.meta.url)).flatMap(
+      (filePath) => {
+        const content = readFileSync(filePath, 'utf8');
+        return content.includes('@cf-tamac/sdk')
+          ? [`${relativePath(filePath)} imports the server-only SDK`]
+          : [];
+      }
+    );
+    expect(browserSdkIssues).toEqual([]);
+
+    const browserResultBoundaryIssues = collectFiles(new URL('../../app', import.meta.url)).flatMap(
+      (filePath) => {
+        const content = readFileSync(filePath, 'utf8');
+        return /agentRpcOrigin|privateKey|encryptedPrivateJwk|Authorization/.test(content)
+          ? [`${relativePath(filePath)} contains a server-only Agent RPC field`]
+          : [];
+      }
+    );
+    expect(browserResultBoundaryIssues).toEqual([]);
 
     const runtimeImportIssues = collectFiles(clientSourceRoot).flatMap((filePath) => {
       if (

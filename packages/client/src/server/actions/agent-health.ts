@@ -5,6 +5,11 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { loadAgentRpcClients } from '../agent-rpc/agent-loader';
+import {
+  createBrowserSafeAgentRpcActionFailure,
+  createBrowserSafeAgentRpcActionSuccess,
+  type BrowserSafeAgentRpcActionResult,
+} from '../agent-rpc/safe-results';
 import { createManagedAgentRepository } from '../db';
 import { getClientWorkerEnv } from '../env';
 
@@ -67,16 +72,26 @@ export interface BrowserSafeHealthVerificationResult {
  */
 export async function verifyAgentHealth(
   agentId: string
-): Promise<BrowserSafeHealthVerificationResult> {
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeHealthVerificationResult>> {
   if (agentId === '') {
-    return { ok: false, agentId, safeMessage: 'Agent ID is required.' };
+    return createBrowserSafeAgentRpcActionFailure(
+      new TypeError('agentId must not be empty.'),
+      globalThis.crypto.randomUUID(),
+      'Agentの接続設定を確認してください',
+      'Agent IDを確認してから、もう一度ヘルスチェックを実行してください。'
+    );
   }
 
   let loadResult;
   try {
     loadResult = await loadAgentRpcClients(agentId);
   } catch (error) {
-    return { ok: false, agentId, safeMessage: safeSigningErrorMessage(error) };
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'Agentの接続設定を確認してください',
+      'Agent RPC originとClient Service signing keyの設定を確認してください。'
+    );
   }
   const { clients } = loadResult;
 
@@ -86,7 +101,12 @@ export async function verifyAgentHealth(
       clients.health.check({ agentId, includeDependencies: false })
     );
   } catch (error) {
-    return { ok: false, agentId, safeMessage: safeSigningErrorMessage(error) };
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      clients.invocation.correlationId,
+      'Agentの接続を確認できませんでした',
+      '時間をおいてもう一度ヘルスチェックを実行してください。'
+    );
   }
 
   const servingStatus = readString(response.status);
@@ -96,22 +116,38 @@ export async function verifyAgentHealth(
     (servingStatus === 'serving' || servingStatus === 'degraded');
 
   if (!verified) {
-    return {
-      ok: false,
-      agentId,
-      servingStatus,
-      serviceVersion: readString(response.serviceVersion),
-      diagnostic,
-      safeMessage: 'The Agent did not confirm the selected signing key against its trust config.',
-    };
+    return createBrowserSafeAgentRpcActionSuccess(
+      {
+        ok: false,
+        agentId,
+        servingStatus,
+        serviceVersion: readString(response.serviceVersion),
+        diagnostic,
+        safeMessage: 'The Agent did not confirm the selected signing key against its trust config.',
+      },
+      'Agentの接続設定を確認してください',
+      '選択済みのClient Service signing keyをAgentが確認できませんでした。',
+      clients.invocation.correlationId
+    );
   }
 
   const verifiedAtMs = readBigIntMillis(response.checkedAtUnixMs) ?? Date.now();
-  const env = getClientWorkerEnv();
-  await createManagedAgentRepository(env.CLIENT_DB).markManagedAgentSigningVerified(
-    agentId,
-    verifiedAtMs
-  );
+  try {
+    // Agent RPC の成功後に行う Client D1 ledger 更新も action 境界内で捕捉し、raw repository error を返しません。
+    const env = getClientWorkerEnv();
+    await createManagedAgentRepository(env.CLIENT_DB).markManagedAgentSigningVerified(
+      agentId,
+      verifiedAtMs
+    );
+  } catch (error) {
+    // 同一 SDK invocation の correlation ID を保ち、D1 failure を四属性の固定安全結果へ正規化します。
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      clients.invocation.correlationId,
+      'Agentの接続状態を保存できませんでした',
+      'ヘルスチェック結果を保存できませんでした。時間をおいてもう一度実行してください。'
+    );
+  }
   for (const segment of [
     '',
     'threads',
@@ -124,14 +160,19 @@ export async function verifyAgentHealth(
     revalidatePath(segment === '' ? `/agents/${agentId}` : `/agents/${agentId}/${segment}`);
   }
 
-  return {
-    ok: true,
-    agentId,
-    servingStatus,
-    serviceVersion: readString(response.serviceVersion),
-    lastVerifiedAtMs: verifiedAtMs,
-    diagnostic,
-  };
+  return createBrowserSafeAgentRpcActionSuccess(
+    {
+      ok: true,
+      agentId,
+      servingStatus,
+      serviceVersion: readString(response.serviceVersion),
+      lastVerifiedAtMs: verifiedAtMs,
+      diagnostic,
+    },
+    'Agentの接続を確認しました',
+    '選択済みのClient Service signing keyを確認しました。',
+    clients.invocation.correlationId
+  );
 }
 
 /**
@@ -183,19 +224,4 @@ function readBigIntMillis(value: unknown): number | undefined {
     return value;
   }
   return undefined;
-}
-
-function safeSigningErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message !== '') {
-    // Server Action 境界で既に browser-safe に正規化された AgentRpcOperationError を想定。
-    // 秘密情報・stack trace は含まれないが、未知の error は安全側へ潰す。
-    if (
-      error.message.includes('signing key') ||
-      error.message.includes('Acting user') ||
-      error.message.includes('Agent RPC')
-    ) {
-      return error.message;
-    }
-  }
-  return 'Agent health verification could not confirm the connection.';
 }

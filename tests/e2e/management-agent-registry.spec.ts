@@ -2,8 +2,11 @@ import { expect, test } from '@playwright/test';
 
 import {
   createE2eAgentId,
+  E2E_APPROVED_AGENT_RPC_ORIGIN,
   ensureDefaultSigningKeyThroughUi,
+  fillManagedAgentRegistrationForm,
   registerManagedAgentThroughUi,
+  submitManagedAgentRegistration,
 } from './managed-agent-fixture';
 
 const FORBIDDEN_BROWSER_SECRET_PATTERNS = [
@@ -45,8 +48,55 @@ test('[MANAGEMENT-CLIENT-SHELL-S001] Registry shell keeps registration calls to 
   await page.goto('/agents');
 
   await expect(page.getByText('Agent registry').first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'New Agent', exact: true })).toBeVisible();
+  await expect(
+    page.locator('header').getByRole('link', { name: 'New Agent', exact: true })
+  ).toBeVisible();
   await expect(page.getByText(/hello|users/i)).toHaveCount(0);
+});
+
+test('[TAMAC-SDK-S007] 許可済み HTTPS origin で managed Agent を登録する', async ({
+  page,
+}, testInfo) => {
+  const agentId = createE2eAgentId(testInfo);
+
+  await ensureDefaultSigningKeyThroughUi(page);
+
+  // desktop wireframe は登録見出し、初期 ResultRegion、44px の主要操作を同じ DOM 順で提供する。
+  await page.setViewportSize({ width: 1280, height: 960 });
+  await page.goto('/agents/new');
+  await expect(
+    page.getByRole('heading', { name: 'サーバー側参照情報でAgentを登録します' })
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Agentを登録', exact: true })).toHaveCSS(
+    'min-height',
+    '44px'
+  );
+
+  // mobile wireframe でも同じ field order と touch target を保ち、canonicalization 対象の Browser input を送る。
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByLabel('Agent ID', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Agent RPC origin', { exact: true })).toBeVisible();
+  await fillManagedAgentRegistrationForm(
+    page,
+    agentId,
+    'https://CF-TAMAC-AGENT.EXAMPLE.WORKERS.DEV:443'
+  );
+  await submitManagedAgentRegistration(page, agentId);
+
+  const successHeading = page.getByRole('heading', { name: 'Agentを登録しました' });
+  const successRegion = successHeading.locator('..');
+  await expect(successRegion).toHaveAttribute('role', 'status');
+  await expect(successRegion).toHaveAttribute('aria-live', 'polite');
+  await expect(successHeading).toBeFocused();
+  await expect(successRegion).toContainText(`「E2E ${agentId}」を管理対象に追加しました。`);
+
+  // 登録フォーム入力は canonical 値でなくてもよいが、registry metadata には server policy の canonical origin だけが残る。
+  await page.getByRole('link', { name: 'Agent一覧に戻る', exact: true }).click();
+  const registeredAgentItem = page
+    .getByRole('region', { name: 'Managed Agents' })
+    .getByRole('listitem')
+    .filter({ hasText: agentId });
+  await expect(registeredAgentItem).toContainText(E2E_APPROVED_AGENT_RPC_ORIGIN);
 });
 
 test('[AGENT-MANAGEMENT-UI-S010] Signing key management handles Global Settings key lifecycle', async ({
@@ -128,8 +178,20 @@ test('[AGENT-MANAGEMENT-UI-S019] Selected-Agent pages render real Agent RPC data
   await page.getByRole('button', { name: 'Run Health Check' }).click();
   await expect(page.getByText('verified', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  for (const route of ['', 'threads', 'events', 'runs', 'schedules', 'integrations', 'settings']) {
-    await page.goto(route === '' ? `/agents/${agentId}` : `/agents/${agentId}/${route}`);
+  for (const [route, navigationLabel] of [
+    ['', 'Overview'],
+    ['threads', 'Threads'],
+    ['events', 'Events'],
+    ['runs', 'Runs'],
+    ['schedules', 'Schedules'],
+    ['integrations', 'Integrations'],
+    ['settings', 'Settings'],
+  ] as const) {
+    // 実利用者と同じ selected-Agent navigation を使い、dev server の連続 document navigation 中断を避ける。
+    await page.getByRole('link', { name: navigationLabel, exact: true }).click();
+    await expect(page).toHaveURL(
+      route === '' ? `/agents/${agentId}` : `/agents/${agentId}/${route}`
+    );
     await expect(page.locator('body')).toContainText(agentId);
     await expect(page.getByText(/data unavailable/i)).toHaveCount(0);
     await expect(page.getByText(/temporarily unavailable/i)).toHaveCount(0);

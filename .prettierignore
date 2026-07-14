@@ -17,6 +17,9 @@ test-results/
 packages/agent/proto/**
 packages/agent/src/generated/rpc/**
 packages/client/src/generated/agent-rpc/**
+# SDK の RPC descriptor も `pnpm gen:agent:rpc` が所有する生成出力であり、
+# Agent/Client と同様に Prettier の手編集対象から除外して command ownership を保つ。
+packages/sdk/src/generated/agent-rpc/**
 
 # Reference memo is not an implementation artifact.
 docs/memo/**

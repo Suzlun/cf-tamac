@@ -9,6 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
+import type {
   BrowserSafeHealthVerificationResult,
   BrowserSafeSigningKey,
 } from '../lib/signing-key-types';
@@ -33,7 +37,7 @@ export interface AgentSigningKeySelectProps {
     readonly keyId: string;
     readonly publicFingerprint: string;
   }) => Promise<unknown>;
-  readonly runHealthCheckAction: (agentId: string) => Promise<BrowserSafeHealthVerificationResult>;
+  readonly runHealthCheckAction: (agentId: string) => Promise<BrowserSafeHealthActionResult>;
 }
 
 /**
@@ -124,7 +128,7 @@ export function AgentSigningKeySelect(props: AgentSigningKeySelectProps): ReactN
           selectedKeyId={selectedKeyId}
           selectedPublicFingerprint={selectedPublicFingerprint}
           lastVerifiedAtMs={lastVerifiedAtMs}
-          healthResult={selectionState.healthResult}
+          healthResult={selectionState.healthResult?.displayData.data}
           hasSelection={hasSelection}
         />
       </div>
@@ -136,8 +140,12 @@ interface SelectionState {
   readonly selectedRef: string;
   readonly saving: boolean;
   readonly verifying: boolean;
-  readonly healthResult?: BrowserSafeHealthVerificationResult;
+  readonly healthResult?: BrowserSafeHealthActionResult;
 }
+
+type BrowserSafeHealthActionResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: BrowserSafeHealthVerificationResult }
+>;
 
 function initialSelectionState(
   activeKeys: readonly BrowserSafeSigningKey[],

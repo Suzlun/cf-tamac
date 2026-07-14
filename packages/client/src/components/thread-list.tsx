@@ -7,9 +7,15 @@ import { AgentToken } from './agent-token';
 import { DataTable } from './data-table';
 import { DetailDrawer } from './detail-drawer';
 import { EmptyState } from './empty-state';
+import { ErrorAlert } from './error-alert';
 import { PaginationBar } from './pagination-bar';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
 
 interface PageInfo {
   readonly nextPageToken?: string;
@@ -67,8 +73,15 @@ interface ThreadListProps {
   readonly page: PageInfo;
   readonly statusFilter: string;
   readonly threadKeyPrefix: string;
-  readonly onGetThread: (agentId: string, threadId: string) => Promise<ThreadDetail>;
+  readonly onGetThread: (
+    agentId: string,
+    threadId: string
+  ) => Promise<BrowserSafeThreadQueryResult>;
 }
+
+type BrowserSafeThreadQueryResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: ThreadDetail }
+>;
 
 /**
  * Thread list with scoped filters, cursor pagination, and a detail drawer。
@@ -91,13 +104,23 @@ export function ThreadList({
 }: ThreadListProps) {
   const [selected, setSelected] = useState<ThreadDetail | undefined>();
   const [pending, setPending] = useState(false);
+  const [detailError, setDetailError] = useState<string | undefined>();
 
   const openThread = async (threadId: string) => {
     // Detail drawer の読み込み中に重複操作を避けるため、local pending を立てる。
     setPending(true);
+    setDetailError(undefined);
     try {
-      const detail = await onGetThread(agentId, threadId);
-      setSelected(detail);
+      const result = await onGetThread(agentId, threadId);
+      if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+        // Server Action が返した固定安全文言だけを表示し、SDK/Connect error は Browser で読まない。
+        setDetailError(result.displayData.message);
+        return;
+      }
+      setSelected(result.displayData.data);
+    } catch {
+      // envelope 契約外の失敗でも raw detail を表示せず、再試行可能な固定安全文言へ丸めます。
+      setDetailError('Thread詳細を確認できませんでした。時間をおいてもう一度表示してください。');
     } finally {
       setPending(false);
     }
@@ -112,6 +135,7 @@ export function ThreadList({
         statusFilter={statusFilter}
         threadKeyPrefix={threadKeyPrefix}
       />
+      {detailError !== undefined ? <ErrorAlert message={detailError} /> : null}
 
       {threads.length === 0 ? (
         <EmptyState

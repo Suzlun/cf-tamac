@@ -44,9 +44,10 @@
 1. Client Deploy Button を押します。
 2. `CLIENT_DB` D1 database を Cloudflare Dashboard で作成または選択します。
 3. `src/server/db/migrations` の Client D1 migrations を適用します。
-4. `AGENT_RPC_DEFAULT_ORIGIN` を Agent Worker の deployed origin に設定します。
-5. `CLIENT_ACTING_OPERATOR_ID` と `CLIENT_ACTING_SCOPES` は運用 policy に合わせて絞ります。
-6. `CLIENT_CREDENTIAL_ENCRYPTION_KEY` が Worker Secret として設定済みであることを確認します。
+4. `AGENT_RPC_ALLOWED_ORIGINS` を non-empty JSON string array として設定します。例: `['https://agent.example.com']` を JSON 表現した `"[\"https://agent.example.com\"]"`。各 literal は unique canonical HTTPS `URL.origin` と完全一致させ、path、query、fragment、userinfo、duplicate、non-canonical default `:443` を含めません。
+5. `AGENT_RPC_AUDIENCE` を Agent Worker の `AGENT_RPC_AUDIENCE` と `AGENT_CONTROL_PLANE_TRUST.audiences` に一致させます。audience は destination origin や secret ではありません。
+6. `CLIENT_ACTING_OPERATOR_ID` と `CLIENT_ACTING_SCOPES` は運用 policy に合わせて絞ります。
+7. `CLIENT_CREDENTIAL_ENCRYPTION_KEY` が Worker Secret として設定済みであることを確認します。
 
 ## 7. Cloudflare Access
 
@@ -55,10 +56,34 @@
 3. Browser-visible code に Agent RPC credential、JWT signing material、Provider secret、private JWK、encrypted private JWK、生 JWT が含まれないことを確認します。
 4. Client Worker に Agent API proxy route、`/api/client/*`、`/api/agent*`、arbitrary RPC forwarding route を追加しません。
 
-## 8. Health verification
+## 8. Provider ingress boundary
 
-1. Management Client で managed Agent record を作成し、Agent Worker origin、Agent ID、signing issuer/kid/fingerprint を設定します。
+1. Integration Provider は Agent/Client Worker と分離した server-side deployment とし、Provider-owned Ed25519 private signing key を Client D1、Client Worker Secret、Browser へ移しません。
+2. Provider には `TamacProviderIngressClient` の `PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` だけを使わせます。Client Service JWT、acting user、Client D1 context を Provider request に渡しません。
+3. Provider は unsigned generated Protobuf body の digest/length と canonical identity text を detached-sign します。Agent は active Installation/trust key、request identity、digest、Ed25519 signature、Agent-owned fixed `300_000` ms timestamp window を検証し、verified `INTEGRATION_INSTALLATION` principal を作ってから nonce/idempotency reservation と Agent-local final authorization を行います。
+4. Provider が request metadata で自己申告する skew を Agent の trust source にしません。
+
+## 9. Health verification and staging smoke
+
+1. Management Client で managed Agent record を作成し、allowlist にある Agent Worker origin、Agent ID、signing issuer/kid/fingerprint を設定します。登録 input は canonicalize 後に `AGENT_RPC_ALLOWED_ORIGINS` と exact match しなければなりません。
 2. Agent settings から `AgentHealthService.Check` を実行します。
-3. 成功結果に serving/degraded metadata、issuer、kid、fingerprint、trust config fingerprint が表示されることを確認します。
-4. REST `/health`、HTTP GET、Connect JSON request、public Durable Object fetch probe が成功 path にならないことを確認します。
-5. 失敗時は `docs/operations/agent-control-plane-auth.md` の rotation、emergency revoke、break-glass recovery に従います。
+3. 成功結果に serving/degraded metadata、issuer、kid、fingerprint、trust config fingerprint、Browser-safe `correlationId` が表示されることを確認します。
+4. allowlist から外した stored origin の record を使う operation が、signing key、acting user、SDK transport の解決前に configuration failure として停止することを staging で確認します。
+5. 成功・失敗とも Browser result が `displayData`、`safeStatus`、`safeErrorCategory`、`correlationId` だけを返し、raw diagnostic、JWT、credential、signing material、origin policy detail を含まないことを確認します。問い合わせ時は correlation ID を使って Client/Agent の server-side logs を照合します。
+6. REST `/health`、HTTP GET、Connect JSON request、public Durable Object fetch probe が成功 path にならないことを確認します。
+7. Provider staging request は three-method detached-signature surface に限定され、invalid signature、inactive Installation/key、window 外 timestamp、reused nonce が受理されないことを確認します。
+8. 失敗時は `docs/operations/agent-control-plane-auth.md` の rotation、emergency revoke、break-glass recovery に従います。
+
+## 10. Maintainer verification commands
+
+source change または generated deploy artifact を更新する maintainer は、repository root で次を実行します。
+
+```bash
+pnpm check:codegen
+pnpm lint:governance
+pnpm lint:openspec
+pnpm test:client
+pnpm test:agent
+pnpm test:governance
+pnpm gen:deploy-artifacts && pnpm check:deploy-artifacts
+```

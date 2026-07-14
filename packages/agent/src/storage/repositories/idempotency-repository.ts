@@ -54,7 +54,7 @@ export interface AgentIdempotencyRepository {
   updateRecordResponse(input: {
     readonly idempotencyKey: string;
     readonly principalId: string;
-    readonly responseRef: string;
+    readonly responseRef: string | null;
     readonly status: string;
   }): void;
 }

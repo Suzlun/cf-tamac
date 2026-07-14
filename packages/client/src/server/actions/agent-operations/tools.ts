@@ -4,6 +4,12 @@ import { revalidatePath } from 'next/cache';
 
 import { loadAgentRpcClients } from '../../agent-rpc/agent-loader';
 import {
+  createBrowserSafeAgentRpcActionFailure,
+  createBrowserSafeAgentRpcActionSuccess,
+  executeBrowserSafeAgentRpcQuery,
+  type BrowserSafeAgentRpcActionResult,
+} from '../../agent-rpc/safe-results';
+import {
   toBrowserSafeApproval,
   toBrowserSafeInvocationSummary,
   toBrowserSafeProviderOperation,
@@ -21,6 +27,23 @@ import {
 } from '../browser-safe-helpers';
 
 /**
+ * Tool catalog query が Browser へ返す allowlisted display DTO です。
+ *
+ * @remarks
+ * Tool summary と cursor は mapper が許可した field だけを含み、Provider target body は含めません。
+ */
+export type BrowserSafeToolListDisplayData = BrowserSafePagedResult<BrowserSafeToolSummary>;
+
+/**
+ * Tool invocation 一覧 query が Browser へ返す allowlisted display DTO です。
+ *
+ * @remarks
+ * Invocation input/output は payload reference metadata に限定し、本文や SDK response を含めません。
+ */
+export type BrowserSafeInvocationListDisplayData =
+  BrowserSafePagedResult<BrowserSafeInvocationSummary>;
+
+/**
  * AgentToolService.ListTools を cursor pagination 付きで呼び出す。
  *
  * @param agentId - Tool catalog を読み出す Agent aggregate の ID。
@@ -31,21 +54,31 @@ import {
 export async function listTools(
   agentId: string,
   options: ListToolsOptions = {}
-): Promise<BrowserSafePagedResult<BrowserSafeToolSummary>> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.tools.listTools({
-      agentId,
-      page: buildScopedPageRequest(agentId, 'tools', options.page),
-      includeUnavailable: options.includeUnavailable ?? false,
-      installationId: options.installationId,
-    })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeToolListDisplayData>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // Tool catalog request は Agent/Installation/cursor scope を server-only SDK にだけ渡します。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.tools.listTools({
+          agentId,
+          page: buildScopedPageRequest(agentId, 'tools', options.page),
+          includeUnavailable: options.includeUnavailable ?? false,
+          installationId: options.installationId,
+        })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => ({
+      // Provider target/schema body は破棄し、Tool summary と page metadata だけを Browser に返します。
+      items: response.tools.map(toBrowserSafeToolSummary),
+      page: toBrowserSafePageInfo(response.page),
+    }),
+    'ツール一覧を取得しました',
+    'ツールの安全な一覧情報を表示しています。',
+    'ツール一覧を確認してください',
+    'ツール一覧を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  return {
-    items: response.tools.map(toBrowserSafeToolSummary),
-    page: toBrowserSafePageInfo(response.page),
-  };
 }
 
 /**
@@ -59,23 +92,33 @@ export async function listTools(
 export async function listInvocations(
   agentId: string,
   options: ListInvocationsOptions = {}
-): Promise<BrowserSafePagedResult<BrowserSafeInvocationSummary>> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.tools.listInvocations({
-      agentId,
-      threadId: options.threadId,
-      page: buildScopedPageRequest(agentId, 'tool-invocations', options.page),
-      runId: options.runId,
-      status: options.status,
-      installationId: options.installationId,
-    })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeInvocationListDisplayData>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // Invocation filter は Agent scope を越えない request として SDK に閉じます。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.tools.listInvocations({
+          agentId,
+          threadId: options.threadId,
+          page: buildScopedPageRequest(agentId, 'tool-invocations', options.page),
+          runId: options.runId,
+          status: options.status,
+          installationId: options.installationId,
+        })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => ({
+      // raw invocation payload を捨て、明示的な invocation summary/page mapper の出力だけを返します。
+      items: response.invocations.map((invocation) => toBrowserSafeInvocationSummary(invocation)),
+      page: toBrowserSafePageInfo(response.page),
+    }),
+    'ツール呼び出し一覧を取得しました',
+    'ツール呼び出しの安全な一覧情報を表示しています。',
+    'ツール呼び出し一覧を確認してください',
+    'ツール呼び出し一覧を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  return {
-    items: response.invocations.map((invocation) => toBrowserSafeInvocationSummary(invocation)),
-    page: toBrowserSafePageInfo(response.page),
-  };
 }
 
 /**
@@ -89,17 +132,27 @@ export async function listInvocations(
 export async function getInvocation(
   agentId: string,
   invocationId: string
-): Promise<BrowserSafeInvocationDetail> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.tools.getInvocation({ agentId, invocationId, includePayloadRefs: true })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeInvocationDetail>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // invocation detail は payload ref のみ要求し、SDK generated response は server-only に保持します。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.tools.getInvocation({ agentId, invocationId, includePayloadRefs: true })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => ({
+      // approval/provider operation は明示的な mapper を通し、raw payload/body を返しません。
+      ...toBrowserSafeInvocationSummary(response.invocation, invocationId),
+      approval: toBrowserSafeApproval(response.approval),
+      providerOperation: toBrowserSafeProviderOperation(response.providerOperation),
+    }),
+    'ツール呼び出し詳細を取得しました',
+    'ツール呼び出しの安全な詳細情報を表示しています。',
+    'ツール呼び出し詳細を確認してください',
+    'ツール呼び出し詳細を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  return {
-    ...toBrowserSafeInvocationSummary(response.invocation, invocationId),
-    approval: toBrowserSafeApproval(response.approval),
-    providerOperation: toBrowserSafeProviderOperation(response.providerOperation),
-  };
 }
 
 /**
@@ -117,21 +170,35 @@ export async function approveInvocation(
   invocationId: string,
   idempotencyKey: string,
   reason: string
-): Promise<BrowserSafeInvocationSummary> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.tools.approveInvocation({
-      agentId,
-      idempotencyKey,
-      invocationId,
-      reason: reason === '' ? undefined : reason,
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeInvocationSummary>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const response = await clients.withErrorNormalization(() =>
+      clients.tools.approveInvocation({
+        agentId,
+        idempotencyKey,
+        invocationId,
+        reason: reason === '' ? undefined : reason,
+      })
+    );
 
-  // Tool approval context は Runs 画面の文脈 detail に移動したため、/tools ではなく /runs を revalidate する。
-  revalidatePath(`/agents/${agentId}/runs`);
-  revalidatePath(`/agents/${agentId}`);
-  return toBrowserSafeInvocationSummary(response.invocation, invocationId, 'approved');
+    // Tool approval context は Runs 画面の文脈 detail に移動したため、/tools ではなく /runs を revalidate する。
+    revalidatePath(`/agents/${agentId}/runs`);
+    revalidatePath(`/agents/${agentId}`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      toBrowserSafeInvocationSummary(response.invocation, invocationId, 'approved'),
+      'ツール呼び出しを承認しました',
+      'ツール呼び出しの実行を承認しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'ツール呼び出しを確認してください',
+      'ツール呼び出しの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
+  }
 }
 
 /**
@@ -149,19 +216,33 @@ export async function rejectInvocation(
   invocationId: string,
   idempotencyKey: string,
   reason: string
-): Promise<BrowserSafeInvocationSummary> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.tools.rejectInvocation({
-      agentId,
-      idempotencyKey,
-      invocationId,
-      reason: reason === '' ? undefined : reason,
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeInvocationSummary>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const response = await clients.withErrorNormalization(() =>
+      clients.tools.rejectInvocation({
+        agentId,
+        idempotencyKey,
+        invocationId,
+        reason: reason === '' ? undefined : reason,
+      })
+    );
 
-  // Tool approval context は Runs 画面の文脈 detail に移動したため、/tools ではなく /runs を revalidate する。
-  revalidatePath(`/agents/${agentId}/runs`);
-  revalidatePath(`/agents/${agentId}`);
-  return toBrowserSafeInvocationSummary(response.invocation, invocationId, 'rejected');
+    // Tool approval context は Runs 画面の文脈 detail に移動したため、/tools ではなく /runs を revalidate する。
+    revalidatePath(`/agents/${agentId}/runs`);
+    revalidatePath(`/agents/${agentId}`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      toBrowserSafeInvocationSummary(response.invocation, invocationId, 'rejected'),
+      'ツール呼び出しを却下しました',
+      'ツール呼び出しの実行を却下しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'ツール呼び出しを確認してください',
+      'ツール呼び出しの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
+  }
 }

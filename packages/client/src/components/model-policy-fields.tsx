@@ -15,10 +15,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import type { BrowserSafeModelPolicyWarning, ModelPolicyFieldName } from './schemas/model-policy';
 import type { FieldValues, Path, UseFormReturn } from 'react-hook-form';
 
-/** Model policy editor の表示 mode です。 */
+/**
+ * モデルポリシー編集領域の表示 mode です。
+ *
+ * @remarks
+ * `create` は登録フォーム内の初期ポリシー、`settings` は選択済み Agent の既定ポリシーを表します。
+ * 表示文言と初期状態だけを分岐し、server-only Agent RPC の実行経路は変えません。
+ */
 export type ModelPolicyMode = 'create' | 'settings';
 
-/** Model policy validation UI が表示する状態です。 */
+/**
+ * モデルポリシー検証 UI が表示する安全な状態です。
+ *
+ * @remarks
+ * 値は Browser 内の入力・待機状態または Server Action が返す Browser-safe result にだけ対応します。
+ * SDK error、credential、raw transport detail はこの union へ含めません。
+ */
 export type ModelPolicyValidationStatus =
   | 'idle'
   | 'validating'
@@ -89,36 +101,35 @@ export function ModelPolicyFields<TValues extends FieldValues>({
 
   return (
     <fieldset
-      aria-labelledby="model-policy-heading"
       aria-describedby="model-policy-helper model-policy-boundary-helper"
-      className="rounded-md border bg-card p-4 text-sm space-y-1"
+      className="rounded-md bg-muted px-3 py-2 text-sm space-y-1"
     >
-      <div className="flex items-center justify-between border-b pb-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Model execution
-        </span>
+      {/* legend を唯一の見出しとして使い、fieldset のアクセシブル名と可視の見出しを一致させます。 */}
+      <legend
+        id="model-policy-heading"
+        className="flex w-full items-center justify-between border-b pb-3 font-medium"
+      >
+        <span>既定モデルポリシー</span>
         <span className="text-primary">
-          {mode === 'create' ? 'active on create' : 'server-side only'}
+          {mode === 'create' ? '作成時に有効' : 'サーバー側で処理'}
         </span>
-      </div>
-      <legend id="model-policy-heading">Default model policy</legend>
-      <p id="model-policy-helper" className="text-xs text-muted-foreground">
-        Seed the Agent-owned policy that future Runs resolve by reference. The browser sees only
-        ref, provider, model, parameters, status, warnings, and digest.
+      </legend>
+      <p id="model-policy-helper" className="text-xs text-foreground">
+        AgentConfig.modelPolicyRefで参照するAgent所有ポリシーを設定します。安全化済みの参照、プロバイダー、モデル、パラメーター、状態、警告、ダイジェストだけを表示します。
       </p>
-      <p id="model-policy-boundary-helper" className="text-xs text-muted-foreground">
-        Validation and save happen through server-side Agent RPC. No Provider credential or Agent
-        RPC credential is sent to the browser.
+      <p id="model-policy-boundary-helper" className="text-xs text-foreground">
+        検証と保存はサーバー側Agent RPCで行います。Provider credentialとAgent RPC
+        credentialはブラウザーへ送信しません。
       </p>
-      <p aria-live="polite" className="text-xs text-muted-foreground">
+      <p aria-live="polite" className="text-xs text-foreground">
         {statusCopy}
       </p>
       <div className="grid gap-4 md:grid-cols-2">
         <PolicyTextField
           form={form}
           name={names.policyRef}
-          label="Policy ref"
-          helper="Agent-owned reference used by AgentConfig.modelPolicyRef. Use lowercase kebab-case."
+          label="ポリシー参照"
+          helper="AgentConfig.modelPolicyRefで参照するAgent所有ID。小文字のkebab-caseで入力してください。"
           disabled={disabled || pending}
           required
         />
@@ -126,16 +137,16 @@ export function ModelPolicyFields<TValues extends FieldValues>({
         <PolicyTextField
           form={form}
           name={names.model}
-          label="Model ID"
-          helper="Workers AI model identifier. The Agent validates support before saving."
+          label="モデルID"
+          helper="Workers AI model ID。保存前にAgentが利用可否を検証します。"
           disabled={disabled || pending}
           required
         />
         <PolicyTextField
           form={form}
           name={names.temperature}
-          label="Temperature"
-          helper="0.00–2.00. Lower is steadier; higher is more exploratory."
+          label="温度"
+          helper="0.00〜2.00。小さい値ほど出力が安定します。"
           disabled={disabled || pending}
           inputMode="decimal"
           type="number"
@@ -145,7 +156,7 @@ export function ModelPolicyFields<TValues extends FieldValues>({
           form={form}
           name={names.topP}
           label="Top P"
-          helper="0.01–1.00 nucleus sampling cap."
+          helper="0.01〜1.00のnucleus sampling上限です。"
           disabled={disabled || pending}
           inputMode="decimal"
           type="number"
@@ -154,8 +165,8 @@ export function ModelPolicyFields<TValues extends FieldValues>({
         <PolicyTextField
           form={form}
           name={names.maxOutputTokens}
-          label="Max output tokens"
-          helper="1–8192 token response cap for one model call."
+          label="最大出力トークン数"
+          helper="1回のmodel callで返すtoken数を1〜8192で指定します。"
           disabled={disabled || pending}
           inputMode="numeric"
           type="number"
@@ -168,11 +179,12 @@ export function ModelPolicyFields<TValues extends FieldValues>({
           <Button
             type="button"
             variant="outline"
+            className="min-h-11"
             onClick={onValidate}
             disabled={validateDisabled}
             aria-disabled={validateDisabled}
           >
-            {pending ? 'Validating policy…' : 'Validate policy'}
+            {pending ? 'ポリシーを検証しています…' : 'ポリシーを検証'}
           </Button>
         </div>
       ) : null}
@@ -207,13 +219,16 @@ function PolicyTextField<TValues extends FieldValues>({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <FormDescription>{helper}</FormDescription>
+          {/* 登録フォームの ValidationSummary anchor が nested RHF path と同じ input を指せるよう ID を固定します。 */}
+          <FormLabel htmlFor={name}>{label}</FormLabel>
+          <FormDescription className="text-foreground">{helper}</FormDescription>
           <FormControl>
             <Input
               {...field}
               autoComplete="off"
+              className="h-11"
               disabled={disabled}
+              id={name}
               inputMode={inputMode}
               required={required}
               type={type}
@@ -241,9 +256,10 @@ function ProviderField<TValues extends FieldValues>({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Provider</FormLabel>
-          <FormDescription>
-            Only Workers AI is available for this change. Provider credentials stay server-side.
+          {/* Select trigger にも field path を ID として付け、検証概要の anchor/focus 導線を成立させます。 */}
+          <FormLabel htmlFor={name}>プロバイダー</FormLabel>
+          <FormDescription className="text-foreground">
+            この画面ではworkers-aiを選択できます。Provider credentialはサーバー側が所有します。
           </FormDescription>
           <Select
             value={field.value}
@@ -253,7 +269,7 @@ function ProviderField<TValues extends FieldValues>({
             required
           >
             <FormControl>
-              <SelectTrigger aria-label="Provider">
+              <SelectTrigger ref={field.ref} id={name} className="h-11" aria-label="プロバイダー">
                 <SelectValue />
               </SelectTrigger>
             </FormControl>
@@ -282,7 +298,7 @@ function WarningList({
       role="status"
       aria-live="polite"
     >
-      <strong>Policy validation warnings</strong>
+      <strong>ポリシー検証の警告</strong>
       <ul className="mt-2 list-disc pl-5 font-mono text-xs">
         {warnings.map((warning) => (
           <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>
@@ -297,21 +313,21 @@ function resolveStatusCopy(
   validationStatus: ModelPolicyValidationStatus,
   warningCount: number
 ): string {
-  if (validationStatus === 'validating') return 'Validating policy…';
-  if (validationStatus === 'valid') return 'Policy draft is valid for Workers AI.';
+  if (validationStatus === 'validating') return 'ポリシーを検証しています…';
+  if (validationStatus === 'valid') return 'ポリシーの入力内容を確認しました。';
   if (validationStatus === 'warning' || warningCount > 0) {
-    return 'Policy draft is valid with warnings.';
+    return 'ポリシーの入力内容に警告があります。';
   }
-  if (validationStatus === 'invalid') return 'The policy draft is invalid.';
+  if (validationStatus === 'invalid') return 'ポリシーの入力内容を確認してください。';
   if (validationStatus === 'permission_denied') {
-    return 'You do not have permission to update the default model policy.';
+    return '既定モデルポリシーの更新権限を確認してください。';
   }
   if (validationStatus === 'unavailable') {
-    return 'Agent policy service is temporarily unavailable.';
+    return 'ポリシーサービスを一時的に確認できません。';
   }
   return mode === 'create'
-    ? 'Initial default policies must be active.'
-    : 'Only active policies can be the Agent default.';
+    ? '初期の既定ポリシーにはactive状態を使用します。'
+    : 'active状態のポリシーだけをAgentの既定値にできます。';
 }
 
 /**

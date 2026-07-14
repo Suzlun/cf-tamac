@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as TamacSdk from '@cf-tamac/sdk';
+
 import { generateEd25519SigningKeyMaterial } from '../server/credentials/signing-keys';
 import { createManagedAgentRepository, createSigningKeyRepository } from '../server/db';
 
 import { applyClientMigration, createTestD1Database } from './test-d1-helper';
 
-import type { ResolvedAgentRpcCredential } from '../server/agent-rpc/authentication';
-import type { ServerAgentRpcClients } from '../server/agent-rpc/create-client';
-
 const TEST_ENCRYPTION_KEY_BASE64 = Buffer.alloc(32, 17).toString('base64');
+
+type TamacSdkModule = typeof TamacSdk;
 
 const mocks = vi.hoisted(() => ({
   getCloudflareContext: vi.fn(),
@@ -23,19 +24,26 @@ vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
 }));
 
-vi.mock('../server/agent-rpc/create-client', async () => {
-  const { createClientServiceJwt } = await import('../server/agent-rpc/authentication');
-
+vi.mock('@cf-tamac/sdk', async (importOriginal) => {
+  const sdk: TamacSdkModule = await importOriginal();
   return {
-    createServerAgentRpcClients(config: {
-      readonly credential: ResolvedAgentRpcCredential;
-    }): ServerAgentRpcClients {
+    ...sdk,
+    createTamacAgentClient(config: TamacSdk.TamacAgentClientConfig): TamacSdk.TamacAgentClient {
       const clients = {
+        // SDK aggregate と同じ invocation shape を返し、Browser-safe result が correlation を取得できるようにします。
+        agentRpcOrigin: config.agentRpcOrigin,
+        invocation: config.invocation,
         modelPolicies: {
           async validateModelPolicy() {
-            // 生成済み Connect client の auth interceptor 相当として JWT 署名まで実行し、
-            // signing path に渡された onJwtSigned callback が D1 の last-used metadata を更新することを検査する。
-            await createClientServiceJwt(config.credential);
+            // SDK auth metadata 生成まで実行し、Client D1 callback が署名後に last-used metadata を更新することを検査します。
+            await sdk.createClientServiceJwt({
+              invocation: config.invocation,
+              methodContext: {
+                methodName: 'ValidateModelPolicy',
+                serviceName: 'cftamac.agent.v1.AgentModelPolicyService',
+              },
+              signingContext: config.signingContext,
+            });
             return {
               validation: { ok: true, warnings: [] },
               policyPreview: {
@@ -49,12 +57,8 @@ vi.mock('../server/agent-rpc/create-client', async () => {
             };
           },
         },
-        async withErrorNormalization<T>(callback: () => Promise<T>): Promise<T> {
-          // この test では error normalization の変換ではなく signing usage tracking を観測する。
-          return callback();
-        },
       };
-      return clients as unknown as ServerAgentRpcClients;
+      return clients as unknown as TamacSdk.TamacAgentClient;
     },
   };
 });
@@ -125,7 +129,8 @@ describe('Client signing key usage tracking from signing paths', () => {
       material.issuer,
       material.keyId
     );
-    expect(result.ok).toBe(true);
+    expect(result.safeStatus).toBe('succeeded');
+    expect(result.safeErrorCategory).toBeNull();
     expect(stored?.lastUsedAtMs).toBeDefined();
     expect(stored?.lastUsedAtMs).toBeGreaterThanOrEqual(beforeSigningMs);
   });
@@ -154,7 +159,8 @@ function setClientWorkerEnv(db: D1Database): void {
   mocks.getCloudflareContext.mockReturnValue({
     env: {
       CLIENT_DB: db,
-      AGENT_RPC_DEFAULT_ORIGIN: 'https://agent.example.com',
+      AGENT_RPC_ALLOWED_ORIGINS: '["https://agent.example.com"]',
+      AGENT_RPC_AUDIENCE: 'cf-tamac-agent',
       CLIENT_CREDENTIAL_ENCRYPTION_KEY: TEST_ENCRYPTION_KEY_BASE64,
       CLIENT_ACTING_OPERATOR_ID: 'operator-usage-test',
       CLIENT_ACTING_SCOPES: 'agent:read agent:write',

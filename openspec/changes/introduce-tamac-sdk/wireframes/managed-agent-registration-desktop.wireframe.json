@@ -1,0 +1,364 @@
+{
+  "name": "管理対象Agent登録・デスクトップ状態仕様",
+  "viewport": { "width": 1280, "height": 2600 },
+  "root": {
+    "name": "Management Clientシェル",
+    "direction": "vertical",
+    "children": [
+      { "name": "メインコンテンツへ移動", "type": "link", "height": 40 },
+      {
+        "name": "デスクトップ本文",
+        "direction": "horizontal",
+        "grow": true,
+        "children": [
+          {
+            "name": "グローバルサイドバー — Agents選択中",
+            "direction": "vertical",
+            "width": 256,
+            "padding": 16,
+            "gap": 16,
+            "children": [
+              { "name": "cf-tamac Management", "type": "text", "variant": "heading", "height": 40 },
+              { "name": "グローバル", "type": "text", "variant": "caption", "height": 24 },
+              { "name": "Agents — 選択中", "type": "link", "height": 44 },
+              { "name": "グローバル設定", "type": "link", "height": 44 },
+              { "name": "Agent選択ガイダンス", "type": "text", "height": 32 },
+              {
+                "name": "Agent RPCはサーバー側で実行",
+                "type": "text",
+                "variant": "caption",
+                "height": 40
+              }
+            ]
+          },
+          {
+            "name": "メインコンテンツ",
+            "direction": "vertical",
+            "grow": true,
+            "padding": 32,
+            "gap": 32,
+            "children": [
+              {
+                "name": "ページヘッダー",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 8,
+                "children": [
+                  { "name": "登録", "type": "text", "variant": "caption", "height": 24 },
+                  {
+                    "name": "Agentレジストリ › 新規登録",
+                    "type": "text",
+                    "variant": "display",
+                    "height": 56
+                  },
+                  {
+                    "name": "サーバー側参照情報でAgentを登録します",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "Agent ID、許可済みのHTTPS Agent RPC origin、表示名を入力します。credentialフィールドはサーバー側検索参照と公開メタデータを受け付けます。",
+                    "type": "text",
+                    "height": 56
+                  }
+                ]
+              },
+              {
+                "name": "登録フォーム — 初期状態",
+                "direction": "vertical",
+                "maxWidth": 880,
+                "padding": 24,
+                "gap": 24,
+                "children": [
+                  {
+                    "name": "ResultRegion — 初期状態は高さ0の領域",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  },
+                  { "name": "Agent ID — 小文字のkebab-case", "type": "input", "height": 44 },
+                  {
+                    "name": "Agent RPC origin — 許可済みの正規HTTPS origin",
+                    "type": "input",
+                    "height": 44
+                  },
+                  { "name": "表示名 — Agentレジストリと概要に表示", "type": "input", "height": 44 },
+                  { "name": "表示順（任意） — 0以上の整数", "type": "input", "height": 44 },
+                  {
+                    "name": "既定モデルポリシー",
+                    "direction": "vertical",
+                    "padding": 24,
+                    "gap": 16,
+                    "children": [
+                      {
+                        "name": "ポリシー見出し行",
+                        "direction": "horizontal",
+                        "padding": 8,
+                        "gap": 8,
+                        "justify": "space-between",
+                        "align": "center",
+                        "children": [
+                          {
+                            "name": "既定モデルポリシー",
+                            "type": "text",
+                            "variant": "heading",
+                            "height": 40
+                          },
+                          { "name": "作成時に有効", "type": "text", "height": 32 }
+                        ]
+                      },
+                      {
+                        "name": "初期の既定ポリシーにはactive状態を使用します。",
+                        "type": "text",
+                        "height": 32
+                      },
+                      {
+                        "name": "ポリシーフィールドのグリッド",
+                        "direction": "horizontal",
+                        "padding": 16,
+                        "gap": 16,
+                        "wrap": true,
+                        "children": [
+                          {
+                            "name": "ポリシー参照",
+                            "type": "input",
+                            "grow": true,
+                            "maxWidth": 380,
+                            "height": 44
+                          },
+                          {
+                            "name": "プロバイダー — workers-ai",
+                            "type": "input",
+                            "grow": true,
+                            "maxWidth": 380,
+                            "height": 44
+                          },
+                          {
+                            "name": "モデルID",
+                            "type": "input",
+                            "grow": true,
+                            "maxWidth": 380,
+                            "height": 44
+                          },
+                          {
+                            "name": "温度",
+                            "type": "input",
+                            "grow": true,
+                            "maxWidth": 380,
+                            "height": 44
+                          },
+                          {
+                            "name": "Top P",
+                            "type": "input",
+                            "grow": true,
+                            "maxWidth": 380,
+                            "height": 44
+                          },
+                          {
+                            "name": "最大出力トークン数",
+                            "type": "input",
+                            "grow": true,
+                            "maxWidth": 380,
+                            "height": 44
+                          }
+                        ]
+                      },
+                      { "name": "ポリシーを検証", "type": "button", "height": 44 }
+                    ]
+                  },
+                  {
+                    "name": "credential参照 — 初期状態で展開",
+                    "direction": "vertical",
+                    "padding": 24,
+                    "gap": 16,
+                    "children": [
+                      {
+                        "name": "credential参照",
+                        "type": "text",
+                        "variant": "heading",
+                        "height": 40
+                      },
+                      {
+                        "name": "Clientは参照値、キーID、公開フィンガープリント、マスク済みヒント、状態を管理します。秘密情報の解決処理とcredential情報はサーバー側が所有します。",
+                        "type": "text",
+                        "height": 48
+                      },
+                      {
+                        "name": "credential参照 — サーバー側検索用opaque参照",
+                        "type": "input",
+                        "height": 44
+                      },
+                      { "name": "キーID", "type": "input", "height": 44 },
+                      { "name": "公開フィンガープリント", "type": "input", "height": 44 },
+                      { "name": "マスク済みヒント", "type": "input", "height": 44 },
+                      {
+                        "name": "状態 — active / pending / rotating",
+                        "type": "input",
+                        "height": 44
+                      }
+                    ]
+                  },
+                  {
+                    "name": "登録操作",
+                    "direction": "horizontal",
+                    "padding": 8,
+                    "gap": 8,
+                    "children": [
+                      { "name": "キャンセル", "type": "button", "height": 44 },
+                      { "name": "Agentを登録", "type": "button", "height": 44 }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "登録状態一覧 — ResultRegionとフォーム動作",
+                "type": "text",
+                "variant": "heading",
+                "height": 40
+              },
+              {
+                "name": "処理中状態",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "Agentを登録しています",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "登録情報を確認し、Agentを初期化しています…",
+                    "type": "text",
+                    "height": 32
+                  },
+                  {
+                    "name": "フィールド・ポリシー検証・キャンセル・登録は処理中の操作状態",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  },
+                  { "name": "Agentを登録しています…", "type": "button", "height": 44 }
+                ]
+              },
+              { "name": "処理中と成功の区切り", "type": "divider" },
+              {
+                "name": "成功状態 — 成功確認を表示",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "Agentを登録しました",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "「{displayName}」を管理対象に追加しました。",
+                    "type": "text",
+                    "height": 32
+                  },
+                  {
+                    "name": "成功結果 — displayData / safeStatus: succeeded / safeErrorCategory: null / correlationId",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 32
+                  },
+                  {
+                    "name": "成功後の操作",
+                    "direction": "horizontal",
+                    "padding": 8,
+                    "gap": 8,
+                    "children": [
+                      { "name": "Agentの概要を開く", "type": "button", "height": 44 },
+                      { "name": "Agent一覧に戻る", "type": "link", "height": 44 }
+                    ]
+                  }
+                ]
+              },
+              { "name": "成功と入力検証の区切り", "type": "divider" },
+              {
+                "name": "フィールド検証案内",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "登録内容を確認してください",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "強調表示されたフィールドを確認すると登録を続行できます。",
+                    "type": "text",
+                    "height": 32
+                  },
+                  {
+                    "name": "Agent ID: Agent IDを入力してください。",
+                    "type": "link",
+                    "height": 32
+                  },
+                  {
+                    "name": "Agent RPC origin: 有効なHTTPS Agent RPC originを入力してください。",
+                    "type": "link",
+                    "height": 32
+                  },
+                  {
+                    "name": "DOM順で最初の確認対象フィールドへフォーカス",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  }
+                ]
+              },
+              { "name": "入力検証と設定案内の区切り", "type": "divider" },
+              {
+                "name": "originポリシー設定案内",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "Agent RPC originを確認してください",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "Agent RPC originを運用ポリシーで確認してください。許可済みのHTTPS originを登録すると操作を続行できます。",
+                    "type": "text",
+                    "height": 56
+                  },
+                  {
+                    "name": "フィールド案内 — 許可済みのHTTPS Agent RPC originを入力してください。",
+                    "type": "text",
+                    "height": 32
+                  },
+                  { "name": "問い合わせID: {correlationId}", "type": "text", "height": 32 },
+                  {
+                    "name": "このIDを運用担当者へ伝えると、サーバー側ログを安全に照合できます。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 32
+                  },
+                  { "name": "問い合わせIDをコピー", "type": "button", "height": 44 },
+                  {
+                    "name": "コピー完了通知 — 問い合わせIDをコピーしました。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  },
+                  { "name": "origin確認後にAgentを再登録", "type": "button", "height": 44 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

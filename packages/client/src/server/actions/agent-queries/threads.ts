@@ -2,6 +2,10 @@
 
 import { loadAgentRpcClients } from '../../agent-rpc/agent-loader';
 import {
+  executeBrowserSafeAgentRpcQuery,
+  type BrowserSafeAgentRpcActionResult,
+} from '../../agent-rpc/safe-results';
+import {
   buildScopedPageRequest,
   toOptionalString,
   toSafeNumber,
@@ -29,6 +33,15 @@ import {
 } from './view-models';
 
 /**
+ * Thread 一覧 query が Browser へ返す allowlisted display DTO です。
+ *
+ * @remarks
+ * row は `toBrowserSafeThreadSummary`、cursor は `toBrowserSafePageInfo` の出力だけで構成します。
+ * Agent-owned snapshot body、SDK response、credential context は含めません。
+ */
+export type BrowserSafeThreadListDisplayData = BrowserSafePagedResult<BrowserSafeThreadSummary>;
+
+/**
  * AgentThreadService.ListThreads を Agent-scoped cursor 付きで呼び出す。
  *
  * @param agentId - Thread を読み出す Agent aggregate の ID。
@@ -39,21 +52,31 @@ import {
 export async function listThreads(
   agentId: string,
   options: ListThreadsOptions = {}
-): Promise<BrowserSafePagedResult<BrowserSafeThreadSummary>> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.threads.listThreads({
-      agentId,
-      page: buildScopedPageRequest(agentId, 'threads', options.page),
-      status: options.status,
-      threadKeyPrefix: options.threadKeyPrefix,
-    })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeThreadListDisplayData>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // Agent scope と cursor scope を request に固定して、Thread 正本を server-side で取得します。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.threads.listThreads({
+          agentId,
+          page: buildScopedPageRequest(agentId, 'threads', options.page),
+          status: options.status,
+          threadKeyPrefix: options.threadKeyPrefix,
+        })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => ({
+      // generated Thread row をそのまま返さず、明示的な summary/page mapper の結果だけを返します。
+      items: response.threads.map(toBrowserSafeThreadSummary),
+      page: toBrowserSafePageInfo(response.page),
+    }),
+    'Thread一覧を取得しました',
+    'Threadの安全な一覧情報を表示しています。',
+    'Thread一覧を確認してください',
+    'Thread一覧を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  return {
-    items: response.threads.map(toBrowserSafeThreadSummary),
-    page: toBrowserSafePageInfo(response.page),
-  };
 }
 
 /**
@@ -67,21 +90,33 @@ export async function listThreads(
 export async function getThread(
   agentId: string,
   threadId: string
-): Promise<BrowserSafeThreadDetail> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.threads.getThread({ agentId, threadId })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeThreadDetail>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // detail request は caller の thread ID を Agent-scoped SDK invocation にだけ渡します。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.threads.getThread({ agentId, threadId })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => {
+      // latest Event/Run も各 summary mapper を通し、generated nested object を Browser へ流しません。
+      const thread = toSafeRecord(response.thread);
+      return {
+        threadId: toOptionalString(thread?.threadId) ?? threadId,
+        threadKey: toOptionalString(thread?.threadKey) ?? '',
+        status: toOptionalString(thread?.status) ?? '',
+        currentSection: toBrowserSafeThreadSection(response.currentSection),
+        latestEvent: toBrowserSafeEventSummary(response.latestEvent),
+        latestRun: toBrowserSafeRunSummary(response.latestRun),
+      };
+    },
+    'Thread詳細を取得しました',
+    'Threadの安全な詳細情報を表示しています。',
+    'Thread詳細を確認してください',
+    'Thread詳細を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  const thread = toSafeRecord(response.thread);
-  return {
-    threadId: toOptionalString(thread?.threadId) ?? threadId,
-    threadKey: toOptionalString(thread?.threadKey) ?? '',
-    status: toOptionalString(thread?.status) ?? '',
-    currentSection: toBrowserSafeThreadSection(response.currentSection),
-    latestEvent: toBrowserSafeEventSummary(response.latestEvent),
-    latestRun: toBrowserSafeRunSummary(response.latestRun),
-  };
 }
 
 /**
@@ -95,13 +130,22 @@ export async function getThread(
 export async function getLatestCompaction(
   agentId: string,
   threadId: string
-): Promise<BrowserSafeCompactionDetail> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.threads.getLatestCompaction({ agentId, threadId })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeCompactionDetail>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // Compaction の raw body ではなく、Agent RPC response を server-only に受け取ります。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.threads.getLatestCompaction({ agentId, threadId })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => toBrowserSafeCompaction(response.compaction, response.snapshot),
+    'Compaction情報を取得しました',
+    'Compactionの安全な参照情報を表示しています。',
+    'Compaction情報を確認してください',
+    'Compaction情報を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  return toBrowserSafeCompaction(response.compaction, response.snapshot);
 }
 
 /**
@@ -115,24 +159,36 @@ export async function getLatestCompaction(
 export async function getThreadMemory(
   agentId: string,
   threadId: string
-): Promise<BrowserSafeThreadMemoryDetail> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.threads.getThreadMemory({ agentId, threadId })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeThreadMemoryDetail>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // Memory の本文 blob は取得結果を Browser へ渡さず、server-only mapper に閉じます。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.threads.getThreadMemory({ agentId, threadId })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => {
+      // Memory item は content reference/provenance の allowlisted metadata だけへ射影します。
+      const memory = toSafeRecord(response.memory);
+      return {
+        memoryId: toOptionalString(memory?.memoryId),
+        version: toOptionalString(memory?.version),
+        itemCount: toSafeNumber(memory?.itemCount),
+        memoryRef: toOptionalString(memory?.memoryRef),
+        snapshotRef: toOptionalString(memory?.snapshotRef),
+        latestCompactionId: toOptionalString(memory?.latestCompactionId),
+        rebaseStatus: toOptionalString(memory?.rebaseStatus),
+        updatedAtUnixMs: toOptionalInt64String(memory?.updatedAtUnixMs),
+        items: response.items.map(toBrowserSafeThreadMemoryItem),
+      };
+    },
+    'Thread Memoryを取得しました',
+    'Thread Memoryの安全な参照情報を表示しています。',
+    'Thread Memoryを確認してください',
+    'Thread Memoryを確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  const memory = toSafeRecord(response.memory);
-  return {
-    memoryId: toOptionalString(memory?.memoryId),
-    version: toOptionalString(memory?.version),
-    itemCount: toSafeNumber(memory?.itemCount),
-    memoryRef: toOptionalString(memory?.memoryRef),
-    snapshotRef: toOptionalString(memory?.snapshotRef),
-    latestCompactionId: toOptionalString(memory?.latestCompactionId),
-    rebaseStatus: toOptionalString(memory?.rebaseStatus),
-    updatedAtUnixMs: toOptionalInt64String(memory?.updatedAtUnixMs),
-    items: response.items.map(toBrowserSafeThreadMemoryItem),
-  };
 }
 
 /**
@@ -150,27 +206,37 @@ export async function searchThreadHistory(
   threadId: string,
   query: string,
   options: SearchThreadHistoryOptions = {}
-): Promise<BrowserSafeThreadHistoryResult> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.threads.searchThreadHistory({
-      agentId,
-      threadId,
-      query,
-      page: buildScopedPageRequest(agentId, `history:${threadId}`, options.page),
-      filter: {
-        query,
-        sectionId: options.sectionId,
-        compactionId: options.compactionId,
-        provenanceContains: options.provenanceContains,
-      },
-    })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeThreadHistoryResult>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // History 検索条件は Agent/Thread scope を含む request としてだけ SDK に渡します。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.threads.searchThreadHistory({
+          agentId,
+          threadId,
+          query,
+          page: buildScopedPageRequest(agentId, `history:${threadId}`, options.page),
+          filter: {
+            query,
+            sectionId: options.sectionId,
+            compactionId: options.compactionId,
+            provenanceContains: options.provenanceContains,
+          },
+        })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => ({
+      // History body は返さず、明示的に安全化した reference metadata と cursor だけを返します。
+      items: response.results.map(toBrowserSafeHistoryItem),
+      page: toBrowserSafePageInfo(response.page),
+    }),
+    'Thread履歴を取得しました',
+    'Thread履歴の安全な参照情報を表示しています。',
+    'Thread履歴を確認してください',
+    'Thread履歴を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  return {
-    items: response.results.map(toBrowserSafeHistoryItem),
-    page: toBrowserSafePageInfo(response.page),
-  };
 }
 
 function toOptionalInt64String(value: unknown): string | undefined {

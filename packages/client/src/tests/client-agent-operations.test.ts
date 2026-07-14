@@ -12,7 +12,7 @@ import {
 } from '../server/actions/browser-safe-helpers';
 import { deriveActingUserContext } from '../server/agent-rpc/acting-user';
 
-import type { ActingUserContext } from '../server/agent-rpc/authentication';
+import type { ActingUserContext } from '../server/agent-rpc/acting-user';
 
 function readSource(path: URL): string {
   return readFileSync(fileURLToPath(path.href), 'utf8');
@@ -193,32 +193,26 @@ describe('Server Action credential safety with mocked Agent RPC', () => {
     expect(loaderSource).toContain('createSigningKeyRepository');
     expect(loaderSource).toContain('resolveEd25519PrivateKey');
     expect(loaderSource).toContain('createServerAgentRpcClients');
+    expect(loaderSource).toContain('ClientServiceSigningContext');
+    expect(loaderSource).not.toContain('@connectrpc/connect');
+    expect(loaderSource).not.toContain('@cf-tamac/client-agent-rpc');
 
     expect(schemaSource).toContain('clientManagedAgentsTable');
     expect(schemaSource).toContain('clientAgentCredentialRefsTable');
     expect(schemaSource).toContain('forbiddenClientAgentSnapshotTables');
   });
 
-  it('[CLIENT-REGISTRY-S003] error normalization wraps Agent RPC failures', async () => {
-    const { withAgentRpcErrorNormalization, AgentRpcOperationError } =
-      await import('../server/agent-rpc/errors');
+  it('[CLIENT-REGISTRY-S003] Client adapter delegates RPC error normalization to the SDK', () => {
+    const factorySource = readSource(
+      new URL('../server/agent-rpc/create-client.ts', import.meta.url)
+    );
 
-    await expect(
-      withAgentRpcErrorNormalization(() =>
-        Promise.reject(new Error('Agent RPC connection refused'))
-      )
-    ).rejects.toBeInstanceOf(AgentRpcOperationError);
-
-    try {
-      await withAgentRpcErrorNormalization(() =>
-        Promise.reject(new Error('Agent RPC connection refused'))
-      );
-      expect.fail('should have thrown');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      expect(message).not.toContain('connection refused');
-      expect(message).not.toContain('Agent RPC');
-    }
+    expect(factorySource).toContain('@cf-tamac/sdk');
+    expect(factorySource).toContain('createTamacAgentClient');
+    expect(factorySource).toContain('withErrorNormalization');
+    expect(factorySource).not.toContain('@connectrpc/connect');
+    expect(factorySource).not.toContain('@connectrpc/connect-web');
+    expect(factorySource).not.toContain('@cf-tamac/client-agent-rpc');
   });
 });
 

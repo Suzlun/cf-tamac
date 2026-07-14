@@ -32,7 +32,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - Install: `corepack enable && pnpm install`
 - Dev (Agent Worker): `pnpm dev:agent`
 - Dev (Management Client): `pnpm dev:client`
-- Build Agent/Client: `pnpm build`
+- Build Agent, SDK, and Management Client: `pnpm build`
 - Check Agent/Client: `pnpm check:agent && pnpm check:client`
 
 ## API Contract (TypeSpec)

@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createClientServiceJwt,
-  type ResolvedAgentRpcCredential,
-} from '../server/agent-rpc/authentication';
+  type ClientServiceSigningContext,
+  type TamacSdkInvocationContext,
+} from '@cf-tamac/sdk';
+
 import { toBrowserSafeSigningKey } from '../server/credentials/browser-safe';
 import {
   decryptPrivateJwk,
@@ -333,20 +335,35 @@ describe('Client Service signing key store and encryption boundary', () => {
       TEST_ENCRYPTION_KEY_BASE64,
       material.privateJwkCiphertext
     );
-    const credential: ResolvedAgentRpcCredential = {
-      agentId: 'agent-alpha',
-      issuer: material.issuer,
-      keyId: material.keyId,
-      publicFingerprint: material.publicFingerprint,
-      publicJwk: material.publicJwk,
+    const signingContext: ClientServiceSigningContext = {
+      audience: 'https://agent.example.test',
+      credential: {
+        agentId: 'agent-alpha',
+        issuer: material.issuer,
+        keyId: material.keyId,
+        publicFingerprint: material.publicFingerprint,
+      },
       privateKey,
-      actingUser: { operatorId: 'operator-001', scopes: ['agent:read'] },
       // 実際の signing paths と同じ callback seam で Client D1 の last-used metadata を更新する。
       onJwtSigned: () => signingKeys.touchSigningKeyLastUsed(material.issuer, material.keyId),
     };
+    const invocation: TamacSdkInvocationContext = {
+      actingUser: { actingUserId: 'operator-001' },
+      agentId: 'agent-alpha',
+      correlationId: 'client-signing-store-correlation',
+      requestId: 'client-signing-store-request',
+      scopes: ['agent:read'],
+    };
     const beforeSigningMs = Date.now();
 
-    const jwt = await createClientServiceJwt(credential);
+    const jwt = await createClientServiceJwt({
+      invocation,
+      methodContext: {
+        methodName: 'Check',
+        serviceName: 'cftamac.agent.v1.AgentHealthService',
+      },
+      signingContext,
+    });
 
     const stored = await signingKeys.getSigningKey(material.issuer, material.keyId);
     expect(jwt).toMatch(/^(?:[\w-]+\.){2}[\w-]+$/);
@@ -423,7 +440,7 @@ describe('Registration signing key prerequisite and rollback safety', () => {
     // create のみ DB 書き込み前に既定 signing key を検査する (partial write 防止)。
     expect(source).toContain('const isCreate = options.existingAgentId === undefined;');
     expect(source).toContain(
-      'Generate and select a default Client Service signing key under Global Settings before registering an Agent.'
+      'グローバル設定で既定のClient Service signing keyを生成して選択すると、Agent登録を続行できます。'
     );
     // rollback (delete) は create mode だけ。edit mode は既存台帳行を削除しない。
     expect(source).toContain('if (isCreate) {');

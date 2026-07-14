@@ -31,6 +31,15 @@ export interface AgentAuthorizationInput {
  * @returns 認可成功時は `undefined`、拒否時は安全な Connect error 分類です。
  */
 export function authorizeAgentRequest(input: AgentAuthorizationInput): AgentRpcGuardResult {
+  const operation = getConnectMethodIdentity(new URL(input.request.url).pathname);
+  // Provider ingress は test-only header を含め Client Service principal では通さず、detached signature だけに閉じます。
+  if (isProviderIngressOperation(operation)) {
+    return {
+      code: Code.PermissionDenied,
+      message: 'Integration ingress RPC requires detached Provider signature authentication.',
+      reason: 'provider_ingress_auth_required',
+    };
+  }
   // test seam は Vitest 専用認証で作られた principal だけが利用でき、本番 bearer principal は header を無視します。
   if (
     input.principal.authenticationMode === 'test' &&
@@ -39,14 +48,6 @@ export function authorizeAgentRequest(input: AgentAuthorizationInput): AgentRpcG
     return undefined;
   }
 
-  const operation = parseConnectMethodIdentity(new URL(input.request.url).pathname);
-  if (isProviderIngressOperation(operation)) {
-    return {
-      code: Code.PermissionDenied,
-      message: 'Integration ingress RPC requires detached Provider signature authentication.',
-      reason: 'provider_ingress_auth_required',
-    };
-  }
   const requiredScopes = getRequiredAgentRpcScopes(operation);
   if (requiredScopes === undefined) {
     return {
@@ -63,7 +64,45 @@ export function authorizeAgentRequest(input: AgentAuthorizationInput): AgentRpcG
     };
   }
 
-  const requestAgentIdResult = extractAgentIdFromProtobuf(input.rawBody);
+  return validateRequestAgentId(input.rawBody, input.principal);
+}
+
+/**
+ * Provider ingress の raw Protobuf request が Agent aggregate を一意に指定することを検証します。
+ *
+ * Client Service JWT を参照せず、Provider 専用 path が `agent_id` を欠落・重複・破損した状態で
+ * Durable Object へ到達することを防ぎます。Installation、connection、tool、delivery の identity は
+ * decoded generated request を受け取る Integration operation で Agent-owned state と照合します。
+ *
+ * @param input Connect request と不変 raw Protobuf body を含む Provider ingress 入力です。
+ * @returns identity が妥当な場合は `undefined`、拒否時は公開してよい Connect error 分類です。
+ * @example
+ * ```ts
+ * const rejection = validateProviderIngressRequestIdentity({ rawBody, request });
+ * ```
+ */
+export function validateProviderIngressRequestIdentity(input: {
+  readonly rawBody: Uint8Array;
+  readonly request: Request;
+}): AgentRpcGuardResult {
+  // Provider path 以外をこの validator へ渡す wiring 誤りは fail-closed にし、Client Service policy と混線させません。
+  const operation = getConnectMethodIdentity(new URL(input.request.url).pathname);
+  if (!isProviderIngressOperation(operation)) {
+    return {
+      code: Code.PermissionDenied,
+      message:
+        'Provider ingress identity validation is only available for Integration ingress RPC methods.',
+      reason: 'provider_ingress_method_required',
+    };
+  }
+  return validateRequestAgentId(input.rawBody);
+}
+
+function validateRequestAgentId(
+  rawBody: Uint8Array,
+  principal?: AuthenticatedAgentPrincipal
+): AgentRpcGuardResult {
+  const requestAgentIdResult = extractAgentIdFromProtobuf(rawBody);
   if (requestAgentIdResult.status === 'invalid') {
     return {
       code: Code.InvalidArgument,
@@ -89,14 +128,15 @@ export function authorizeAgentRequest(input: AgentAuthorizationInput): AgentRpcG
   }
   // `allowedAgentIds: ["*"]` は policy 側の広い許可に限定し、principal.agentId 自体は JWT claim 由来の具体 ID として必ず一致させます。
   // ここで完全一致を要求することで、wildcard subject-agent が request body の別 Agent へ横断する抜け道を閉じます。
-  if (requestAgentId !== input.principal.agentId) {
+  if (principal === undefined) return undefined;
+  if (requestAgentId !== principal.agentId) {
     return {
       code: Code.PermissionDenied,
       message: 'Agent RPC request agent_id does not match authenticated principal scope.',
       reason: 'agent_scope_mismatch',
     };
   }
-  if (!isAllowedAgentId(input.principal.allowedAgentIds, requestAgentId)) {
+  if (!isAllowedAgentId(principal.allowedAgentIds, requestAgentId)) {
     return {
       code: Code.PermissionDenied,
       message: 'Agent RPC request agent_id is outside the authenticated principal policy.',
@@ -121,6 +161,37 @@ export function getRequiredAgentRpcScopes(input: {
 }
 
 /**
+ * Client Service RPC の scope と request semantics を返します。
+ *
+ * Provider ingress はこの matrix の外にあり、`undefined` が返ることで Client Service JWT aggregate が
+ * detached-signature-only surface を操作できないことを明示します。
+ *
+ * @param input Connect path から取り出した service/method 名です。
+ * @returns scope と command/query semantics。未登録または Provider ingress には `undefined` です。
+ * @example
+ * ```ts
+ * const policy = getAgentRpcRequestSemantics({ service, method });
+ * ```
+ */
+export function getAgentRpcRequestSemantics(input: {
+  readonly method: string;
+  readonly service: string;
+}):
+  | {
+      readonly requestKind: 'command' | 'query';
+      readonly requiredScopes: readonly AgentControlPlaneScope[];
+    }
+  | undefined {
+  const key = `${input.service}/${input.method}`;
+  const requiredScopes = methodScopeMatrix.get(key);
+  if (requiredScopes === undefined || providerIngressOperationKeys.has(key)) return undefined;
+  return {
+    requestKind: clientServiceCommandOperationKeys.has(key) ? 'command' : 'query',
+    requiredScopes,
+  };
+}
+
+/**
  * Provider callback 専用 RPC かどうかを判定します。
  *
  * @param input Connect path から取り出した service/method 名です。
@@ -138,6 +209,25 @@ const providerIngressOperationKeys = new Set<string>([
   'cftamac.agent.v1.IntegrationIngressService/PublishDeliveryResult',
   'cftamac.agent.v1.IntegrationIngressService/PublishEvent',
   'cftamac.agent.v1.IntegrationIngressService/PublishToolResult',
+]);
+
+const clientServiceCommandOperationKeys = new Set<string>([
+  'cftamac.agent.v1.AgentLifecycleService/InitializeAgent',
+  'cftamac.agent.v1.AgentLifecycleService/DestroyAgent',
+  'cftamac.agent.v1.AgentLifecycleService/RotateAgentCredential',
+  'cftamac.agent.v1.AgentModelPolicyService/UpsertModelPolicy',
+  'cftamac.agent.v1.AgentModelPolicyService/ArchiveModelPolicy',
+  'cftamac.agent.v1.AgentEventService/PublishEvent',
+  'cftamac.agent.v1.AgentRunService/CancelRun',
+  'cftamac.agent.v1.AgentStateService/UpdateConfig',
+  'cftamac.agent.v1.AgentScheduleService/CreateSchedule',
+  'cftamac.agent.v1.AgentScheduleService/CancelSchedule',
+  'cftamac.agent.v1.AgentToolService/ApproveInvocation',
+  'cftamac.agent.v1.AgentToolService/RejectInvocation',
+  'cftamac.agent.v1.AgentIntegrationService/InstallIntegration',
+  'cftamac.agent.v1.AgentIntegrationService/UninstallIntegration',
+  'cftamac.agent.v1.AgentIntegrationService/CreateAdapterConnection',
+  'cftamac.agent.v1.AgentIntegrationService/DeleteAdapterConnection',
 ]);
 
 const methodScopeMatrix = new Map<string, readonly AgentControlPlaneScope[]>([
@@ -184,7 +274,17 @@ const methodScopeMatrix = new Map<string, readonly AgentControlPlaneScope[]>([
   ['cftamac.agent.v1.AgentModelPolicyService/ValidateModelPolicy', agentReadScope],
 ]);
 
-function parseConnectMethodIdentity(path: string): {
+/**
+ * Connect request path を generated service/method identity へ分解します。
+ *
+ * @param path Connect unary RPC path です。
+ * @returns path が不完全な場合も `unknown` を含む fail-closed 用 identity です。
+ * @example
+ * ```ts
+ * const operation = getConnectMethodIdentity('/cftamac.agent.v1.AgentHealthService/Check');
+ * ```
+ */
+export function getConnectMethodIdentity(path: string): {
   readonly method: string;
   readonly service: string;
 } {

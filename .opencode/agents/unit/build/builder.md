@@ -10,6 +10,7 @@ permission:
     'packages/agent/proto/**': deny
     'packages/agent/src/generated/rpc/**': deny
     'packages/client/src/generated/agent-rpc/**': deny
+    'packages/sdk/src/generated/agent-rpc/**': deny
     'packages/typespec/openapi/openapi.json': deny
     'packages/frontend/api/src/generated/**': deny
   webfetch: allow
@@ -61,7 +62,10 @@ You are an implementation support subagent that helps this repository pass build
 - Do not use the `task` tool except to call `unit/build/reviewer`; no other delegation and no self-calls
 - Use `lsp` as needed to confirm types/references/error locations and reduce rework
 - Do not hand-edit generated outputs. Regenerate with the repo's codegen commands when needed.
-- Generated Agent outputs are command-owned: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, and `packages/client/src/generated/agent-rpc/**` must be produced by commands, not edits.
+- Generated Agent outputs are command-owned: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, and `packages/sdk/src/generated/agent-rpc/**` must be produced by commands, not edits.
+- Treat Agent, Client, and SDK descriptor roots as one TypeSpec -> proto -> generated contract; do not create compatibility copies or hand edits. Codegen collector changes preserve a single input snapshot, responsibility-specific helpers, deterministic issue order, and zero ESLint cognitive-complexity warnings.
+- Keep Client Service Ed25519 JWT operations separate from Provider detached-signature ingress. Provider access is limited to `PublishEvent`, `PublishToolResult`, and `PublishDeliveryResult`; the Agent verifies the fixed `300_000` ms window, active Installation/trust key, unsigned Protobuf digest, Ed25519 signature, and identity before creating an `INTEGRATION_INSTALLATION` principal.
+- For Client Service operations, require canonical `AGENT_RPC_ALLOWED_ORIGINS` approval before signing key, acting user, or SDK transport resolution. Browser-safe results return only `displayData`, `safeStatus`, `safeErrorCategory`, and secret-free `correlationId`.
 - Keep supply-chain guardrails intact: do not lower `minimumReleaseAge`, do not add `minimumReleaseAgeExclude`, and do not enable `dangerouslyAllowAllBuilds`.
 - If the change involves specs, align in order: OpenSpec -> TypeSpec -> generated artifacts -> implementation
 - Ask first before dependency changes, version changes, or permission boundary changes
@@ -75,16 +79,18 @@ You are an implementation support subagent that helps this repository pass build
 4. Implement
 5. If legacy contract changes were made, run `pnpm gen:api-sdk`
 6. If Agent contract changes were made, run `pnpm gen:agent:proto`, `pnpm gen:agent:rpc`, and `pnpm check:codegen`
-7. Run relevant governance checks for Agent surface, package boundaries, supply-chain, and OpenSpec scenario coverage
-8. Run `pnpm lint`
-9. Run `pnpm test:run`
-10. Run `pnpm build`
-11. Confirm there are no unexpected diffs, especially command-owned generated artifacts
-12. Determine whether you changed any source code yourself
-13. If you did not change source code yourself, do not call `unit/build/reviewer`; report completion with evidence and explicitly state that reviewer review was not requested because you made no source code change
-14. If you changed source code yourself, call `unit/build/reviewer` with the intent, change summary, touched paths, and verification evidence
-15. If the reviewer returns `Request changes` or `Needs clarification`, address every item and send the updated change back to the same reviewer
-16. Repeat until the reviewer returns `Approve`
+7. If SDK generated policy or codegen collector changes were made, run `pnpm check:codegen`, `pnpm lint:eslint`, and `pnpm test:governance`; do not accept cognitive-complexity warnings
+8. If Client destination policy or Browser-safe result changes were made, run `pnpm test:client` and `pnpm lint:governance`, then staging-smoke canonical allowlist approval, stored-origin revalidation before signing/transport, and correlation ID tracing
+9. Run relevant governance checks for Agent surface, package boundaries, supply-chain, and OpenSpec scenario coverage
+10. Run `pnpm lint`
+11. Run `pnpm test:run`
+12. Run `pnpm build`
+13. Confirm there are no unexpected diffs, especially command-owned generated artifacts
+14. Determine whether you changed any source code yourself
+15. If you did not change source code yourself, do not call `unit/build/reviewer`; report completion with evidence and explicitly state that reviewer review was not requested because you made no source code change
+16. If you changed source code yourself, call `unit/build/reviewer` with the intent, change summary, touched paths, and verification evidence
+17. If the reviewer returns `Request changes` or `Needs clarification`, address every item and send the updated change back to the same reviewer
+18. Repeat until the reviewer returns `Approve`
 
 # Reporting
 

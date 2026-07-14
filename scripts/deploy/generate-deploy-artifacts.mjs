@@ -22,6 +22,14 @@ const agentRuntimeExcludes = [
 
 const clientRuntimeExcludes = [/^packages\/client\/src\/tests(?:\/|$)/];
 
+const sdkRuntimeExcludes = [/^packages\/sdk\/src\/tests(?:\/|$)/];
+
+// Deploy Button 用の Client 設定例は、origin policy が受理する canonical HTTPS literal を固定する。
+const clientAllowedOriginsExample =
+  'AGENT_RPC_ALLOWED_ORIGINS=\'["https://cf-tamac-agent.example.workers.dev"]\'';
+const clientAllowedOriginsWorkerVariable =
+  'AGENT_RPC_ALLOWED_ORIGINS = \'["https://cf-tamac-agent.example.workers.dev"]\'';
+
 const artifactSpecs = [
   {
     name: 'agent',
@@ -47,6 +55,7 @@ const artifactSpecs = [
     createPackageJson: createAgentPackageJson,
     createTsconfig: createAgentTsconfig,
     createReadme: createAgentReadme,
+    workspacePackages: [],
   },
   {
     name: 'client',
@@ -62,6 +71,8 @@ const artifactSpecs = [
       { from: 'packages/client/tailwind.config.ts', to: 'tailwind.config.ts' },
       { from: 'packages/client/components.json', to: 'components.json' },
       { from: 'packages/client/.dev.vars.example', to: '.dev.vars.example' },
+      { from: 'packages/sdk/src', to: 'sdk/src', excludes: sdkRuntimeExcludes },
+      { from: 'packages/sdk/package.json', to: 'sdk/package.json' },
     ],
     requiredFiles: [
       'package.json',
@@ -74,11 +85,24 @@ const artifactSpecs = [
       'src/server/db/migrations/0001_client_foundation.sql',
       'src/server/db/migrations/0002_control_plane_signing_keys.sql',
       'src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+      'sdk/package.json',
+      'sdk/src/index.ts',
+      'sdk/src/client.ts',
+      'sdk/src/transport.ts',
+      'sdk/src/provider-ingress.ts',
+      'sdk/src/provider-ingress-transport.ts',
+      'sdk/src/provider-ingress-types.ts',
+      'sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+    ],
+    requiredContents: [
+      { path: '.dev.vars.example', content: clientAllowedOriginsExample },
+      { path: 'wrangler.toml', content: clientAllowedOriginsWorkerVariable },
     ],
     forbiddenPaths: ['src/tests'],
     createPackageJson: createClientPackageJson,
     createTsconfig: createClientTsconfig,
     createReadme: createClientReadme,
+    workspacePackages: ['sdk'],
   },
 ];
 
@@ -125,7 +149,10 @@ export function generateDeployArtifacts(options = {}) {
 
     // Deploy Button 上でも運用者が境界と secret handling を読めるよう artifact 固有 README を生成する。
     writeText(resolve(targetRoot, 'README.md'), spec.createReadme());
-    writeText(resolve(targetRoot, 'pnpm-workspace.yaml'), createArtifactPnpmWorkspace(root));
+    writeText(
+      resolve(targetRoot, 'pnpm-workspace.yaml'),
+      createArtifactPnpmWorkspace(root, spec.workspacePackages)
+    );
     writeText(resolve(targetRoot, '.gitignore'), createArtifactGitignore());
 
     // 必須 file と禁止 path を検査し、壊れた artifact branch を CI から publish しない。
@@ -303,7 +330,7 @@ function createClientReadme() {
 
 1. Agent Service を先に deploy し、Agent Worker origin を控えます。
 2. Cloudflare Deploy Button でこの branch を選択します。
-3. \`AGENT_RPC_DEFAULT_ORIGIN\` を deployed Agent Worker origin に設定します。
+3. \`AGENT_RPC_ALLOWED_ORIGINS='["https://cf-tamac-agent.example.workers.dev"]'\` の example を、deployed Agent Worker の canonical HTTPS origin だけを含む non-empty JSON array に置き換えます。
 4. D1 binding \`CLIENT_DB\` を作成または選択し、\`src/server/db/migrations\` の migrations を適用します。
 5. Worker Secret \`CLIENT_CREDENTIAL_ENCRYPTION_KEY\` を base64 encoded 32-byte AES key で設定します。
 6. \`CLIENT_CONTROL_PLANE_PRIVATE_KEYS\` は使いません。Ed25519 private JWK は Management Client UI が生成し、\`CLIENT_CREDENTIAL_ENCRYPTION_KEY\` で暗号化して Client D1 に保存します。
@@ -333,11 +360,15 @@ next-env.d.ts
 `;
 }
 
-function createArtifactPnpmWorkspace(root) {
+function createArtifactPnpmWorkspace(root, workspacePackages) {
   const workspaceConfig = readFileSync(resolve(root, 'pnpm-workspace.yaml'), 'utf8');
+  const artifactPackages = ['.', ...workspacePackages]
+    .map((packagePath) => `  - '${packagePath}'`)
+    .join('\n');
 
-  // Deploy artifact root は単一 package workspace として扱い、root repository の supply-chain policy は維持する。
-  return workspaceConfig.replace(/^packages:\n(?:\s+- .+\n)+/m, "packages:\n  - '.'\n");
+  // Client artifact では SDK package も同じ workspace に含め、workspace:* dependency を self-contained root で解決する。
+  // root repository の supply-chain policy は加工せず、artifact にそのまま継承する。
+  return workspaceConfig.replace(/^packages:\n(?:\s+- .+\n)+/m, `packages:\n${artifactPackages}\n`);
 }
 
 function selectVersions(rootPackage, sourcePackage, packageNames) {
@@ -405,6 +436,16 @@ function validateArtifact(targetRoot, spec) {
     const filePath = resolve(targetRoot, forbiddenPath);
     if (existsSync(filePath)) {
       throw new Error(`${spec.name} deploy artifact must not include ${forbiddenPath}`);
+    }
+  }
+  for (const requiredContent of spec.requiredContents ?? []) {
+    const filePath = resolve(targetRoot, requiredContent.path);
+
+    // copied configuration が canonical example を失うと、deploy root から安全な origin policy を設定できない。
+    if (!readFileSync(filePath, 'utf8').includes(requiredContent.content)) {
+      throw new Error(
+        `${spec.name} deploy artifact is missing canonical configuration in ${requiredContent.path}`
+      );
     }
   }
 }

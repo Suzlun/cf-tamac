@@ -1,4 +1,13 @@
-import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Page, type TestInfo } from '@playwright/test';
+
+/**
+ * E2E の Client Worker 設定で許可する canonical HTTPS Agent RPC origin です。
+ *
+ * @remarks
+ * Browser 入力の正規化を検証する各 scenario は、この server-managed allowlist の canonical 値を
+ * 基準にします。E2E fake RPC により外部 Agent Worker への通信は発生しません。
+ */
+export const E2E_APPROVED_AGENT_RPC_ORIGIN = 'https://cf-tamac-agent.example.workers.dev';
 
 /**
  * E2E ごとに一意な managed Agent ID を生成します。
@@ -35,62 +44,88 @@ export function createE2eAgentId(testInfo: TestInfo): string {
 export async function registerManagedAgentThroughUi(page: Page, agentId: string): Promise<void> {
   await ensureDefaultSigningKeyThroughUi(page);
   await page.goto('/agents/new');
+  await fillManagedAgentRegistrationForm(page, agentId);
+  await submitManagedAgentRegistration(page, agentId);
 
+  // 成功結果を確認してから detail 導線を使い、後続 E2E が登録済み Agent を前提にできる状態へ遷移する。
+  await page.getByRole('link', { name: 'Agentの概要を開く', exact: true }).click();
+  await expect(page).toHaveURL(`/agents/${agentId}`, { timeout: 15_000 });
+}
+
+/**
+ * Management Client の登録フォームへ browser-safe な管理対象 Agent metadata を入力します。
+ *
+ * @param page - 操作対象の Playwright page です。
+ * @param agentId - 登録する lowercase kebab-case の Agent ID です。
+ * @param agentRpcOrigin - allowlist と照合する HTTPS Agent RPC origin 入力です。
+ * @returns フォームの必須値をすべて入力した Promise です。
+ * @remarks
+ * 入力する credential は参照値と公開 metadata だけです。secret material、private JWK、raw JWT は
+ * 入力・生成・検査しません。
+ */
+export async function fillManagedAgentRegistrationForm(
+  page: Page,
+  agentId: string,
+  agentRpcOrigin = E2E_APPROVED_AGENT_RPC_ORIGIN
+): Promise<void> {
   // Client component の hydration が入力値を上書きしないよう、フォーム見出しが操作可能になるまで待つ。
   await expect(
-    page.getByRole('heading', { name: 'Capture references, not secrets.' })
+    page.getByRole('heading', { name: 'サーバー側参照情報でAgentを登録します' })
   ).toBeVisible();
 
   // Agent ID は登録後 route と D1 primary key の前提なので、入力直後と送信直前の両方で値を確認する。
-  const agentIdInput = page.getByRole('textbox', { name: 'Agent ID', exact: true });
+  const agentIdInput = page.getByLabel('Agent ID', { exact: true });
   await agentIdInput.fill(agentId);
   await expect(agentIdInput).toHaveValue(agentId);
 
-  // RPC origin は外部通信を発生させない example domain に固定し、Client D1 の metadata 保存だけを通す。
-  await page
-    .getByRole('textbox', { name: 'Agent RPC origin', exact: true })
-    .fill('https://agent.example.test');
-  await page.getByRole('textbox', { name: 'Display name', exact: true }).fill(`E2E ${agentId}`);
-  await page.getByRole('textbox', { name: 'Sort order (optional)', exact: true }).fill('0');
+  // RPC origin は E2E fake RPC が外部通信を抑止した状態で、Client D1 metadata と origin policy の境界を通す。
+  await page.getByLabel('Agent RPC origin', { exact: true }).fill(agentRpcOrigin);
+  await page.getByLabel('表示名', { exact: true }).fill(`E2E ${agentId}`);
+  await page.getByLabel('表示順（任意）', { exact: true }).fill('0');
 
   // Credential は secret 本体ではなく参照値と公開 metadata だけを入力し、Client の secrecy boundary を維持する。
+  await page.getByLabel('credential参照', { exact: true }).fill(`local-ref-${agentId}`);
+  await page.getByLabel('キーID', { exact: true }).fill(`local-key-${agentId}`.slice(0, 128));
   await page
-    .getByRole('textbox', { name: 'Credential reference', exact: true })
-    .fill(`local-ref-${agentId}`);
-  await page
-    .getByRole('textbox', { name: 'Key ID', exact: true })
-    .fill(`local-key-${agentId}`.slice(0, 128));
-  await page
-    .getByRole('textbox', { name: 'Public fingerprint', exact: true })
+    .getByLabel('公開フィンガープリント', { exact: true })
     .fill(`fp-${agentId}`.slice(0, 128));
   await page
-    .getByRole('textbox', { name: 'Masked hint', exact: true })
+    .getByLabel('マスク済みヒント', { exact: true })
     .fill(`ed25519:${agentId.slice(-8)}`.slice(0, 64));
-  await page.getByRole('combobox', { name: 'Status' }).click();
+  await page.getByRole('combobox', { name: '状態' }).click();
   await page.getByRole('option', { name: 'active', exact: true }).click();
 
   // Server Action へ渡す直前にも必須 ID を再入力し、WebKit の hydration / 再描画による値落ちを失敗原因から外す。
   await agentIdInput.fill(agentId);
   await expect(agentIdInput).toHaveValue(agentId);
-  await submitRegistrationWithAgentIdRecovery(page, agentIdInput, agentId);
 }
 
-async function submitRegistrationWithAgentIdRecovery(
-  page: Page,
-  agentIdInput: Locator,
-  agentId: string
-): Promise<void> {
+/**
+ * 入力済みの登録フォームを送信し、Browser-safe 成功結果まで待機します。
+ *
+ * @param page - 操作対象の Playwright page です。
+ * @param agentId - hydration recovery 時に再設定する Agent ID です。
+ * @returns `Agentを登録しました` の結果見出しが表示される Promise です。
+ * @remarks
+ * 登録成功は同一 route の ResultRegion で確認し、登録後の遷移は呼び出し元が明示的に選択します。
+ * これにより成功 result の live region と focus を scenario ごとに検証できます。
+ */
+export async function submitManagedAgentRegistration(page: Page, agentId: string): Promise<void> {
+  const agentIdInput = page.getByLabel('Agent ID', { exact: true });
+
   // WebKit は長い multi-project run の終盤で controlled input の値が送信直前に落ちる場合があるため、
   // Agent ID required の validation だけを再入力対象として扱う。その他の form error は本当の失敗として残す。
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    await page.getByRole('button', { name: 'Register Agent' }).click();
+    await page.getByRole('button', { name: 'Agentを登録', exact: true }).click();
     try {
-      // ローカル D1 書き込みと redirect を待ち、以降の tests が登録済み detail route を前提にできるようにする。
-      await expect(page).toHaveURL(`/agents/${agentId}`, { timeout: 15_000 });
+      // Server Action の four-field success result が ResultRegion へ適用されるまで待つ。
+      await expect(page.getByRole('heading', { name: 'Agentを登録しました' })).toBeVisible({
+        timeout: 15_000,
+      });
       return;
     } catch (error) {
       const agentIdRequired = await page
-        .getByText('Agent ID is required.', { exact: true })
+        .getByText('Agent IDを入力してください。', { exact: true })
         .count();
       if (attempt > 0 || agentIdRequired === 0) {
         throw error;

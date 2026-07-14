@@ -138,7 +138,13 @@ describe('Agent Stage 2 core implementation', () => {
     const schema = readSource(tableInitializerPath);
 
     expect(eventPublishOperations).toContain('checkAgentIdempotency<PublishAgentEventResult>');
-    expect(eventPublishOperations).toContain('recordAgentIdempotency({');
+    expect(eventPublishOperations).toContain('input.repositories.transaction((repositories) => {');
+    expect(eventPublishOperations).toContain('reserveAgentIdempotencyRecord({');
+    expect(eventPublishOperations).toContain('completeAgentIdempotencyRecord({');
+    expect(eventPublishOperations).toContain('failAgentIdempotencyRecord({');
+    expect(eventPublishOperations.indexOf('reserveAgentIdempotencyRecord({')).toBeLessThan(
+      eventPublishOperations.indexOf('await appendEvent(input)')
+    );
     expect(eventQueryOperations).toContain('pageSize + 1');
     expect(eventQueryOperations).toContain('cursorScope: `${agentId}:${threadId}`');
     expect(payload).toContain('inlineEventPayloadLimitBytes = agentInlineBodyLimitBytes');

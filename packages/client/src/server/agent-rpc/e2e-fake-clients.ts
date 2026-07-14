@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { ManagedAgentRecord } from '../db';
 import type { ServerAgentRpcClients } from './create-client';
+import type { ApprovedAgentRpcOrigin } from './origin-policy';
 
 const DEFAULT_POLICY_REF = 'workers-ai-default';
 const DEFAULT_PROVIDER = 'workers-ai';
@@ -134,9 +135,11 @@ export function createE2eFakeAgentRpcClients(
   } as unknown as ServerAgentRpcClients['state'];
 
   return {
+    // SDK-backed production adapter と同じ public aggregate shape を保ち、E2E action が transport 実装へ依存しないようにします。
+    agentRpcOrigin: (managedAgent?.agentRpcOrigin ??
+      'https://e2e-fake-agent.invalid') as ApprovedAgentRpcOrigin,
     events: buildEmptyEventClient(agentId),
     health: buildFakeHealthClient(agentId, managedAgent?.agentRpcOrigin),
-    integrationIngress: buildEmptyIntegrationIngressClient(),
     integrations: buildEmptyIntegrationClient(agentId),
     lifecycle,
     modelPolicies,
@@ -145,6 +148,14 @@ export function createE2eFakeAgentRpcClients(
     state,
     threads: buildEmptyThreadClient(agentId),
     tools: buildEmptyToolClient(agentId),
+    // fake でも Browser-safe correlation を持つ invocation shape を返し、production SDK context と同じ read-only seam を維持します。
+    invocation: {
+      actingUser: { actingUserId: 'e2e-fake-operator' },
+      agentId,
+      correlationId: `e2e-fake-correlation:${agentId}`,
+      requestId: `e2e-fake-request:${agentId}`,
+      scopes: ['agent:read'],
+    },
     withErrorNormalization: <T>(operation: () => Promise<T>): Promise<T> => operation(),
   };
 }
@@ -488,14 +499,6 @@ function buildEmptyIntegrationClient(agentId: string): ServerAgentRpcClients['in
       }),
     uninstallIntegration: () => resolveFake({ cleanup: { status: 'uninstalled' } }),
   } as unknown as ServerAgentRpcClients['integrations'];
-}
-
-function buildEmptyIntegrationIngressClient(): ServerAgentRpcClients['integrationIngress'] {
-  return {
-    publishDeliveryResult: () => resolveFake({ accepted: true }),
-    publishEvent: () => resolveFake({ accepted: true }),
-    publishToolResult: () => resolveFake({ accepted: true }),
-  } as unknown as ServerAgentRpcClients['integrationIngress'];
 }
 
 function buildFakeHealthClient(

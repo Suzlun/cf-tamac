@@ -4,7 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
  * Management Client Worker の環境 binding 型。
  *
  * @remarks
- * Client Worker は `CLIENT_DB`、Agent RPC origin、server-only acting user context、そして
+ * Client Worker は `CLIENT_DB`、Agent RPC origin allowlist/audience、server-only acting user context、そして
  * Ed25519 signing key store の暗号化に使う `CLIENT_CREDENTIAL_ENCRYPTION_KEY` だけを所有する。
  * `AI_AGENT` や Agent-owned storage binding を追加してはならない。
  * Agent RPC の署名鍵は Client D1 の暗号化済み signing key store が正本であり、
@@ -12,7 +12,22 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
  */
 export interface ClientWorkerEnv extends CloudflareEnv {
   readonly CLIENT_DB: D1Database;
-  readonly AGENT_RPC_DEFAULT_ORIGIN: string;
+  /**
+   * canonical HTTPS Agent RPC origin だけを含む non-empty JSON string array です。
+   *
+   * @remarks
+   * この値は Browser へ渡さない server-managed destination policy です。個々の登録 input と
+   * Client D1 record は SDK transport/signing context の解決より前に、この allowlist で再検証されます。
+   */
+  readonly AGENT_RPC_ALLOWED_ORIGINS: string;
+  /**
+   * Agent Worker の `AGENT_RPC_AUDIENCE` と trust config の `audiences` に一致させる公開 JWT audience。
+   *
+   * @remarks
+   * origin と audience は別の識別子です。Client adapter は signing key store を解決した後、この値を SDK signing
+   * context へ渡します。秘密値ではありませんが、誤った audience の JWT を送らないよう server-only env で検証します。
+   */
+  readonly AGENT_RPC_AUDIENCE: string;
   /**
    * Client Service signing key store の private JWK 暗号化に使う Worker Secret。
    *
@@ -51,7 +66,8 @@ export function getClientWorkerEnv(): ClientWorkerEnv {
 function isClientWorkerEnv(env: CloudflareEnv): env is ClientWorkerEnv {
   const candidate = env as {
     readonly CLIENT_DB?: unknown;
-    readonly AGENT_RPC_DEFAULT_ORIGIN?: unknown;
+    readonly AGENT_RPC_ALLOWED_ORIGINS?: unknown;
+    readonly AGENT_RPC_AUDIENCE?: unknown;
     readonly CLIENT_CREDENTIAL_ENCRYPTION_KEY?: unknown;
     readonly CLIENT_ACTING_OPERATOR_ID?: unknown;
     readonly CLIENT_ACTING_SCOPES?: unknown;
@@ -61,8 +77,10 @@ function isClientWorkerEnv(env: CloudflareEnv): env is ClientWorkerEnv {
     candidate.CLIENT_DB !== null &&
     'prepare' in candidate.CLIENT_DB &&
     typeof candidate.CLIENT_DB.prepare === 'function' &&
-    typeof candidate.AGENT_RPC_DEFAULT_ORIGIN === 'string' &&
-    candidate.AGENT_RPC_DEFAULT_ORIGIN !== '' &&
+    typeof candidate.AGENT_RPC_ALLOWED_ORIGINS === 'string' &&
+    candidate.AGENT_RPC_ALLOWED_ORIGINS !== '' &&
+    typeof candidate.AGENT_RPC_AUDIENCE === 'string' &&
+    candidate.AGENT_RPC_AUDIENCE !== '' &&
     typeof candidate.CLIENT_CREDENTIAL_ENCRYPTION_KEY === 'string' &&
     candidate.CLIENT_CREDENTIAL_ENCRYPTION_KEY !== '' &&
     typeof candidate.CLIENT_ACTING_OPERATOR_ID === 'string' &&

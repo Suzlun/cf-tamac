@@ -11,7 +11,12 @@ import {
 } from './errors';
 import { createAgentRpcAuditContext, runWithAgentRpcAuditContext } from './interceptors/audit';
 import { authenticateAgentRequest } from './interceptors/authentication';
-import { authorizeAgentRequest } from './interceptors/authorization';
+import {
+  authorizeAgentRequest,
+  getConnectMethodIdentity,
+  isProviderIngressOperation,
+  validateProviderIngressRequestIdentity,
+} from './interceptors/authorization';
 import {
   getBinaryConnectRequestRejection,
   getMalformedProtobufRequestRejection,
@@ -55,82 +60,118 @@ export function createAgentConnectFetchHandler(
       return createUnimplementedResponse(`Unsupported Agent RPC path: ${path}`);
     }
 
-    const authentication = await authenticateAgentRequest(
-      request,
-      createAuthenticationOptions(env, options)
-    );
-    if (authentication.rejection !== undefined) {
-      return createConnectErrorResponse(
-        authentication.rejection.code,
-        authentication.rejection.message
-      );
+    const operation = getConnectMethodIdentity(path);
+    if (isProviderIngressOperation(operation)) {
+      return handleProviderIngressRequest(request, handler);
     }
-
-    const rawBody = new Uint8Array(await request.clone().arrayBuffer());
-    const protobufRejection = getMalformedProtobufRequestRejection(rawBody);
-    if (protobufRejection !== undefined) {
-      return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
-    }
-
-    const authorizationRejection = authorizeAgentRequest({
-      principal: authentication.principal,
-      rawBody,
-      request,
-    });
-    if (authorizationRejection !== undefined) {
-      return createConnectErrorResponse(
-        authorizationRejection.code,
-        authorizationRejection.message
-      );
-    }
-
-    const replayRejection = await inspectReplayProtection({
-      env,
-      principal: authentication.principal,
-      request,
-    });
-    if (replayRejection !== undefined) {
-      return createConnectErrorResponse(replayRejection.code, replayRejection.message);
-    }
-
-    const rateLimitRejection = inspectAgentRateLimit(request);
-    if (rateLimitRejection !== undefined) {
-      return createConnectErrorResponse(rateLimitRejection.code, rateLimitRejection.message);
-    }
-
-    const validationRejection = validateAgentRpcRequest(request);
-    if (validationRejection !== undefined) {
-      return createConnectErrorResponse(validationRejection.code, validationRejection.message);
-    }
-
-    const auditContext = await createAgentRpcAuditContext(
-      request,
-      authentication.principal,
-      createReplayProtectionContext(request, authentication.principal),
-      await createRawBodyDigest(rawBody),
-      env.AGENT_AUDIT_HASH_PEPPER
-    );
-    return runWithAgentRpcAuditContext(auditContext, () => handler(request)).catch(
-      (error: unknown) => {
-        if (error instanceof ConnectError) {
-          if (error.code === Code.Internal && isMalformedProtobufDescription(error.rawMessage)) {
-            return createConnectErrorResponse(
-              Code.InvalidArgument,
-              'Agent RPC received malformed Protobuf bytes.'
-            );
-          }
-          return createConnectErrorResponse(error.code, error.rawMessage);
-        }
-        if (isMalformedProtobufError(error)) {
-          return createConnectErrorResponse(
-            Code.InvalidArgument,
-            'Agent RPC received malformed Protobuf bytes.'
-          );
-        }
-        return createConnectErrorResponseFromDomainError(normalizeUnknownAgentError(error));
-      }
-    );
+    return handleClientServiceRequest(request, env, options, handler);
   };
+}
+
+async function handleProviderIngressRequest(
+  request: Request,
+  handler: (request: Request) => Promise<Response>
+): Promise<Response> {
+  // Provider ingress は Client Service JWT aggregate と完全に分離し、Bearer header を受け取った時点で停止します。
+  if (request.headers.has('Authorization')) {
+    return createConnectErrorResponse(
+      Code.PermissionDenied,
+      'Integration ingress RPC does not accept Client Service bearer authentication.'
+    );
+  }
+  // generated request decode 前に raw Protobuf の Agent identity を検証し、曖昧な aggregate routing を防ぎます。
+  const rawBody = new Uint8Array(await request.clone().arrayBuffer());
+  const protobufRejection = getMalformedProtobufRequestRejection(rawBody);
+  if (protobufRejection !== undefined) {
+    return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
+  }
+  const identityRejection = validateProviderIngressRequestIdentity({ rawBody, request });
+  if (identityRejection !== undefined) {
+    return createConnectErrorResponse(identityRejection.code, identityRejection.message);
+  }
+  // signature、trust key、nonce、idempotency、grant は Agent-owned DO state を必要とするため、generated handler 以降へ限定します。
+  return handleAgentRpcHandlerError(() => handler(request));
+}
+
+async function handleClientServiceRequest(
+  request: Request,
+  env: AgentWorkerEnv,
+  options: { readonly allowTestSeam?: boolean },
+  handler: (request: Request) => Promise<Response>
+): Promise<Response> {
+  // Client Service path だけが AGENT_CONTROL_PLANE_TRUST と Ed25519 bearer JWT を利用します。
+  const authentication = await authenticateAgentRequest(
+    request,
+    createAuthenticationOptions(env, options)
+  );
+  if (authentication.rejection !== undefined) {
+    return createConnectErrorResponse(
+      authentication.rejection.code,
+      authentication.rejection.message
+    );
+  }
+  const rawBody = new Uint8Array(await request.clone().arrayBuffer());
+  const protobufRejection = getMalformedProtobufRequestRejection(rawBody);
+  if (protobufRejection !== undefined) {
+    return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
+  }
+  const authorizationRejection = authorizeAgentRequest({
+    principal: authentication.principal,
+    rawBody,
+    request,
+  });
+  if (authorizationRejection !== undefined) {
+    return createConnectErrorResponse(authorizationRejection.code, authorizationRejection.message);
+  }
+  const replayRejection = await inspectReplayProtection({
+    env,
+    principal: authentication.principal,
+    request,
+  });
+  if (replayRejection !== undefined) {
+    return createConnectErrorResponse(replayRejection.code, replayRejection.message);
+  }
+  const rateLimitRejection = inspectAgentRateLimit(request);
+  if (rateLimitRejection !== undefined) {
+    return createConnectErrorResponse(rateLimitRejection.code, rateLimitRejection.message);
+  }
+  const validationRejection = validateAgentRpcRequest(request);
+  if (validationRejection !== undefined) {
+    return createConnectErrorResponse(validationRejection.code, validationRejection.message);
+  }
+  const auditContext = await createAgentRpcAuditContext(
+    request,
+    authentication.principal,
+    createReplayProtectionContext(request, authentication.principal),
+    await createRawBodyDigest(rawBody),
+    env.AGENT_AUDIT_HASH_PEPPER
+  );
+  return handleAgentRpcHandlerError(() =>
+    runWithAgentRpcAuditContext(auditContext, () => handler(request))
+  );
+}
+
+async function handleAgentRpcHandlerError(operation: () => Promise<Response>): Promise<Response> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof ConnectError) {
+      if (error.code === Code.Internal && isMalformedProtobufDescription(error.rawMessage)) {
+        return createConnectErrorResponse(
+          Code.InvalidArgument,
+          'Agent RPC received malformed Protobuf bytes.'
+        );
+      }
+      return createConnectErrorResponse(error.code, error.rawMessage);
+    }
+    if (isMalformedProtobufError(error)) {
+      return createConnectErrorResponse(
+        Code.InvalidArgument,
+        'Agent RPC received malformed Protobuf bytes.'
+      );
+    }
+    return createConnectErrorResponseFromDomainError(normalizeUnknownAgentError(error));
+  }
 }
 
 function createAuthenticationOptions(

@@ -12,6 +12,7 @@ import {
 
 import { createRawBodyDigest } from '../domain/security';
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
+import { getAgentRpcRequestSemantics } from '../rpc/interceptors/authorization';
 
 import {
   createClientServiceJwtPayload,
@@ -164,6 +165,68 @@ async function createToken(input: {
 }
 
 describe('Client Service Ed25519 Agent RPC authentication', () => {
+  it('[TAMAC-SDK-S002] Client Service SDK と Provider integration surface が専用の認証文脈を使用する', () => {
+    // design の Client Service operation matrix を Agent authorization source から読み、全 service の scope と command/idempotency semantics を固定します。
+    const matrix = [
+      ['AgentLifecycleService', 'InitializeAgent', 'agent:admin', 'command'],
+      ['AgentLifecycleService', 'GetAgent', 'agent:read', 'query'],
+      ['AgentLifecycleService', 'DestroyAgent', 'agent:admin', 'command'],
+      ['AgentLifecycleService', 'RotateAgentCredential', 'agent:admin', 'command'],
+      ['AgentModelPolicyService', 'UpsertModelPolicy', 'agent:write', 'command'],
+      ['AgentModelPolicyService', 'GetModelPolicy', 'agent:read', 'query'],
+      ['AgentModelPolicyService', 'ListModelPolicies', 'agent:read', 'query'],
+      ['AgentModelPolicyService', 'ArchiveModelPolicy', 'agent:write', 'command'],
+      ['AgentModelPolicyService', 'ValidateModelPolicy', 'agent:read', 'query'],
+      ['AgentEventService', 'PublishEvent', 'agent:write', 'command'],
+      ['AgentEventService', 'GetEvent', 'agent:read', 'query'],
+      ['AgentEventService', 'ListEvents', 'agent:read', 'query'],
+      ['AgentThreadService', 'ListThreads', 'agent:read', 'query'],
+      ['AgentThreadService', 'GetThread', 'agent:read', 'query'],
+      ['AgentThreadService', 'ListSections', 'agent:read', 'query'],
+      ['AgentThreadService', 'GetLatestCompaction', 'agent:read', 'query'],
+      ['AgentThreadService', 'GetThreadMemory', 'agent:read', 'query'],
+      ['AgentThreadService', 'SearchThreadHistory', 'agent:read', 'query'],
+      ['AgentRunService', 'GetRun', 'agent:read', 'query'],
+      ['AgentRunService', 'ListRuns', 'agent:read', 'query'],
+      ['AgentRunService', 'CancelRun', 'agent:write', 'command'],
+      ['AgentStateService', 'GetState', 'agent:read', 'query'],
+      ['AgentStateService', 'GetConfig', 'agent:read', 'query'],
+      ['AgentStateService', 'UpdateConfig', 'agent:write', 'command'],
+      ['AgentScheduleService', 'CreateSchedule', 'agent:write', 'command'],
+      ['AgentScheduleService', 'GetSchedule', 'agent:read', 'query'],
+      ['AgentScheduleService', 'ListSchedules', 'agent:read', 'query'],
+      ['AgentScheduleService', 'CancelSchedule', 'agent:write', 'command'],
+      ['AgentToolService', 'ListTools', 'agent:read', 'query'],
+      ['AgentToolService', 'GetInvocation', 'agent:read', 'query'],
+      ['AgentToolService', 'ListInvocations', 'agent:read', 'query'],
+      ['AgentToolService', 'ApproveInvocation', 'agent:tool:approve', 'command'],
+      ['AgentToolService', 'RejectInvocation', 'agent:tool:approve', 'command'],
+      ['AgentIntegrationService', 'InstallIntegration', 'agent:integration:admin', 'command'],
+      ['AgentIntegrationService', 'UninstallIntegration', 'agent:integration:admin', 'command'],
+      ['AgentIntegrationService', 'GetInstallation', 'agent:read', 'query'],
+      ['AgentIntegrationService', 'ListInstallations', 'agent:read', 'query'],
+      ['AgentIntegrationService', 'CreateAdapterConnection', 'agent:integration:admin', 'command'],
+      ['AgentIntegrationService', 'DeleteAdapterConnection', 'agent:integration:admin', 'command'],
+      ['AgentIntegrationService', 'ListAdapterConnections', 'agent:read', 'query'],
+      ['AgentHealthService', 'Check', 'agent:read', 'query'],
+    ] as const;
+
+    for (const [service, method, requiredScope, requestKind] of matrix) {
+      // Client Service path は method ごとに一意の JWT scope と command/query semantics を持ち、command は idempotency key を要求する設計です。
+      expect(
+        getAgentRpcRequestSemantics({ service: `cftamac.agent.v1.${service}`, method })
+      ).toEqual({ requestKind, requiredScopes: [requiredScope] });
+    }
+
+    // Integration ingress は Client Service aggregate matrix に含めず、JWT ではなく detached Provider signature だけを入口にします。
+    expect(
+      getAgentRpcRequestSemantics({
+        service: 'cftamac.agent.v1.IntegrationIngressService',
+        method: 'PublishEvent',
+      })
+    ).toBeUndefined();
+  });
+
   it('[AGENT-SECURITY-S001] 有効な Client Service JWT が Agent RPC を認証する', async () => {
     const fixture = await createEd25519TrustFixture();
     const { env, healthCalls } = createTestEnv({ trustConfigJson: fixture.trustConfigJson });

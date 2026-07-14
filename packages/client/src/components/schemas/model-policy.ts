@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './browser-safe-result';
+
 const POLICY_REF_RE = /^[\da-z][\da-z-]{0,63}$/;
 const WORKERS_AI_PROVIDER = 'workers-ai' as const;
 const FIRST_PRINTABLE_ASCII_CODE_POINT = 0x20;
@@ -131,9 +136,10 @@ export type BrowserSafeModelPolicyFieldErrors = Partial<Record<ModelPolicyFieldN
  *
  * @remarks
  * 成功時は safe metadata、失敗時は field-level/form-level の安全な文言だけを返します。
- * generated RPC message をそのまま Client Component に渡さないための UI 境界 contract です。
+ * generated RPC message をそのまま Client Component に渡さず、SDK invocation の correlation identifier と
+ * server-side execution の safe status だけを追加する UI 境界 contract です。
  */
-export interface BrowserSafeModelPolicyMutationResult {
+export interface BrowserSafeModelPolicyMutationDisplayData extends BrowserSafeOperationDisplayData {
   readonly ok: boolean;
   readonly metadata?: BrowserSafeModelPolicyMetadata;
   readonly fieldErrors: BrowserSafeModelPolicyFieldErrors;
@@ -143,15 +149,25 @@ export interface BrowserSafeModelPolicyMutationResult {
 }
 
 /**
+ * Validate/upsert/archive/get 系 model policy mutation の四属性 Browser-safe result です。
+ *
+ * @remarks
+ * `displayData` は policy metadata、field association、固定安全文言だけを持ちます。SDK invocation、
+ * raw error、origin policy detail、credential、JWT は最上位にも表示データにも含めません。
+ */
+export type BrowserSafeModelPolicyMutationResult =
+  BrowserSafeAgentRpcResult<BrowserSafeModelPolicyMutationDisplayData>;
+
+/**
  * Settings の default model policy 保存結果です。
  *
  * @remarks
  * `configVersion` は Agent RPC の `UpdateConfig` 成功後にだけ設定します。Browser はこの値を
  * 楽観的に生成せず、server response 由来の値だけを表示します。
  */
-export interface BrowserSafeModelPolicySaveResult extends BrowserSafeModelPolicyMutationResult {
-  readonly configVersion?: string;
-}
+export type BrowserSafeModelPolicySaveResult = BrowserSafeAgentRpcResult<
+  BrowserSafeModelPolicyMutationDisplayData & { readonly configVersion?: string }
+>;
 
 /**
  * Model policy form が保持する browser-safe draft 値です。
@@ -196,28 +212,31 @@ export const modelPolicyDraftSchema = z.object({
   policyRef: z
     .string()
     .trim()
-    .min(1, 'Policy ref is required.')
-    .regex(POLICY_REF_RE, 'Policy ref must be lowercase kebab-case (max 64 chars).'),
+    .min(1, 'ポリシー参照は64文字以内の小文字kebab-caseで入力してください。')
+    .regex(POLICY_REF_RE, 'ポリシー参照は64文字以内の小文字kebab-caseで入力してください。'),
   provider: z.literal(WORKERS_AI_PROVIDER, {
-    message: 'Only workers-ai provider is available for this change.',
+    message: 'プロバイダーはworkers-aiを選択してください。',
   }),
   model: z
     .string()
     .trim()
-    .min(1, 'Model ID is required.')
-    .max(160, 'Model ID must be 160 characters or fewer.')
-    .refine(isSafeModelIdentifier, 'Model ID must not contain whitespace or control characters.'),
-  temperature: decimalStringSchema('Temperature', 0, 2, true),
+    .min(1, 'モデルIDは160文字以内のmodel identifier形式で入力してください。')
+    .max(160, 'モデルIDは160文字以内のmodel identifier形式で入力してください。')
+    .refine(
+      isSafeModelIdentifier,
+      'モデルIDは160文字以内のmodel identifier形式で入力してください。'
+    ),
+  temperature: decimalStringSchema('温度', 0, 2, true),
   topP: decimalStringSchema('Top P', 0.01, 1, true),
   maxOutputTokens: z
     .string()
     .trim()
-    .min(1, 'Max output tokens is required.')
-    .refine((value) => /^\d+$/.test(value), 'Max output tokens must be an integer.')
+    .min(1, '最大出力トークン数は1〜8192の整数で入力してください。')
+    .refine((value) => /^\d+$/.test(value), '最大出力トークン数は1〜8192の整数で入力してください。')
     .refine((value) => {
       const parsed = Number(value);
       return parsed >= 1 && parsed <= 8192;
-    }, 'Max output tokens must be between 1 and 8192.'),
+    }, '最大出力トークン数は1〜8192の整数で入力してください。'),
 });
 
 /**
@@ -265,21 +284,22 @@ export function normalizeModelPolicyDraftValues(
 }
 
 function decimalStringSchema(label: string, min: number, max: number, scale2: boolean) {
+  const message =
+    label === '温度'
+      ? '温度は0.00〜2.00の範囲で、小数第2位まで入力してください。'
+      : 'Top Pは0.01〜1.00の範囲で、小数第2位まで入力してください。';
   return z
     .string()
     .trim()
-    .min(1, `${label} is required.`)
-    .refine((value) => /^\d+(?:\.\d+)?$/.test(value), `${label} must be a number.`)
+    .min(1, message)
+    .refine((value) => /^\d+(?:\.\d+)?$/.test(value), message)
     .refine((value) => !scale2 || /^\d+(?:\.\d{1,2})?$/.test(value), {
-      message: `${label} supports up to 2 decimal places.`,
+      message,
     })
-    .refine(
-      (value) => {
-        const parsed = Number(value);
-        return parsed >= min && parsed <= max;
-      },
-      `${label} must be between ${String(min)} and ${String(max)}.`
-    );
+    .refine((value) => {
+      const parsed = Number(value);
+      return parsed >= min && parsed <= max;
+    }, message);
 }
 
 function isSafeModelIdentifier(value: string): boolean {

@@ -22,6 +22,14 @@ interface AgentRunsPageProps {
   }>;
 }
 
+type RunListDisplayData = NonNullable<Awaited<ReturnType<typeof listRuns>>['displayData']['data']>;
+type ToolListDisplayData = NonNullable<
+  Awaited<ReturnType<typeof listTools>>['displayData']['data']
+>;
+type InvocationListDisplayData = NonNullable<
+  Awaited<ReturnType<typeof listInvocations>>['displayData']['data']
+>;
+
 /**
  * Agent Run history 画面（AGENT-MANAGEMENT-UI-S005 / S007 / S019 / S020）。
  *
@@ -39,16 +47,16 @@ export default async function AgentRunsPage({ params, searchParams }: AgentRunsP
   const actingOperatorId = await getActingOperatorId();
   // Agent RPC / credential resolution の失敗時も Runs route 自体は落とさず、safe fallback を描画する。
   let dataUnavailable = false;
-  let runs: Awaited<ReturnType<typeof listRuns>> = { items: [], page: { resultCount: 0 } };
-  let tools: Awaited<ReturnType<typeof listTools>> = { items: [], page: { resultCount: 0 } };
-  let invocations: Awaited<ReturnType<typeof listInvocations>> = {
+  let runs: RunListDisplayData = { items: [], page: { resultCount: 0 } };
+  let tools: ToolListDisplayData = { items: [], page: { resultCount: 0 } };
+  let invocations: InvocationListDisplayData = {
     items: [],
     page: { resultCount: 0 },
   };
 
   try {
     // Run 一覧と Tool 文脈データを並行取得する。両者とも server-side Agent RPC 経由。
-    [runs, tools, invocations] = await Promise.all([
+    const [runResult, toolResult, invocationResult] = await Promise.all([
       listRuns(agentId, {
         threadId: thread,
         status: status === 'all' ? undefined : status,
@@ -57,6 +65,21 @@ export default async function AgentRunsPage({ params, searchParams }: AgentRunsP
       listTools(agentId, { includeUnavailable: false }),
       listInvocations(agentId, { status: 'pending_approval', page: {} }),
     ]);
+    if (
+      runResult.safeStatus === 'failed' ||
+      toolResult.safeStatus === 'failed' ||
+      invocationResult.safeStatus === 'failed' ||
+      runResult.displayData.data === undefined ||
+      toolResult.displayData.data === undefined ||
+      invocationResult.displayData.data === undefined
+    ) {
+      // failure envelope の raw error は読まず、固定 unavailable state へ閉じます。
+      dataUnavailable = true;
+    } else {
+      runs = runResult.displayData.data;
+      tools = toolResult.displayData.data;
+      invocations = invocationResult.displayData.data;
+    }
   } catch {
     // 例外詳細は secret-safe ではない可能性があるため Browser payload に含めない。
     dataUnavailable = true;

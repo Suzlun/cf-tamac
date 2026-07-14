@@ -5,8 +5,15 @@ import { revalidatePath } from 'next/cache';
 import {
   toRegistrationModelPolicyFieldErrors,
   type RegistrationPolicyValidationResult,
+  type RegistrationSubmitResult,
 } from '../../components/schemas/agent-registration';
 import { deriveActingUserContext } from '../agent-rpc/acting-user';
+import { approveAgentRpcOrigin, parseApprovedAgentRpcOrigins } from '../agent-rpc/origin-policy';
+import {
+  createBrowserSafeAgentRpcFailure,
+  createBrowserSafeAgentRpcFailureForCategory,
+  createBrowserSafeAgentRpcSuccess,
+} from '../agent-rpc/safe-results';
 import {
   toBrowserSafeCredentialReference,
   type BrowserSafeCredentialReference,
@@ -25,28 +32,17 @@ import {
   validateManagedAgentRegistrationInput,
   type ManagedAgentRegistrationInput,
   type ManagedAgentRegistrationOptions,
-  type ManagedAgentRegistrationResult,
 } from './managed-agent-registration';
 import { validateModelPolicyForRegistration } from './model-policies';
-import { safeModelPolicyErrorMessage } from './model-policy-view-models';
 
 const INTEGRATION_MANAGEMENT_DENIED_REASON = 'You do not have permission to manage Integrations.';
 
 /**
- * Client D1 の管理対象 Agent 台帳へ登録または更新する入力です。
+ * Client D1 の管理対象 Agent 台帳へ登録または更新する server-only 入力です。
  *
  * @remarks
- * `agentId` と `agentRpcOrigin` は Agent Service を識別する metadata であり、credential secret や Agent domain snapshot は含めません。
- * `displayOrder` は Client-owned list の表示順だけに使われ、Agent Worker の状態は変更しません。
- *
- * @example
- * ```ts
- * const input: RegisterManagedAgentInput = {
- *   agentId: 'agent-alpha',
- *   agentRpcOrigin: 'https://agent.example.com',
- *   displayName: 'Agent Alpha',
- * };
- * ```
+ * この legacy action も `submitManagedAgentRegistration` と同じ origin policy を必ず通します。
+ * Agent domain snapshot や credential secret は含めず、表示順は Client-owned list metadata だけに使います。
  */
 export interface RegisterManagedAgentInput {
   readonly agentId: string;
@@ -84,29 +80,27 @@ export interface SaveCredentialReferenceInput {
 }
 
 /**
- * Client-owned 管理対象 Agent metadata を登録または更新します。
+ * Client-owned 管理対象 Agent metadata を、現在の origin allowlist を通して登録または更新します。
  *
- * @param input - Agent ID、RPC origin、表示名、任意の表示順を含む台帳入力です。
- * @returns upsert 後に Client D1 から読み戻した `ManagedAgentRecord` を返します。
- * @throws D1 binding が利用できない場合、または repository validation/persistence に失敗した場合に error を投げます。
+ * @param input - Agent ID、未承認の origin 文字列、表示名、任意の表示順を含む台帳入力です。
+ * @returns canonical HTTPS origin を持つ、Client D1 から読み戻した `ManagedAgentRecord` を返します。
+ * @throws env の allowlist が不正、または origin が許可されない場合は `AgentRpcOriginPolicyError` を送出します。
  * @remarks
- * この Server Action は Client D1 の registry metadata だけを書き換え、Agent Worker へは RPC しません。成功後は Agent list と
- * detail route を revalidate します。
- *
- * @example
- * ```ts
- * await registerManagedAgent({
- *   agentId: 'agent-alpha',
- *   agentRpcOrigin: 'https://agent.example.com',
- *   displayName: 'Agent Alpha',
- * });
- * ```
+ * 互換用の登録入口であっても raw origin を D1 に書き込ませません。SDK transport への到達可否と同じ
+ * server-managed allowlist を永続化前に適用し、canonical 値だけを repository へ渡します。
  */
 export async function registerManagedAgent(
   input: RegisterManagedAgentInput
 ): Promise<ManagedAgentRecord> {
   const env = getClientWorkerEnv();
-  const record = await createManagedAgentRepository(env.CLIENT_DB).upsertManagedAgent(input);
+  const agentRpcOrigin = approveAgentRpcOrigin(
+    input.agentRpcOrigin,
+    parseApprovedAgentRpcOrigins(env.AGENT_RPC_ALLOWED_ORIGINS)
+  );
+  const record = await createManagedAgentRepository(env.CLIENT_DB).upsertManagedAgent({
+    ...input,
+    agentRpcOrigin,
+  });
   revalidatePath('/agents');
   revalidatePath(`/agents/${record.agentId}`);
   return record;
@@ -193,91 +187,145 @@ export async function saveAgentAccessLookup(input: {
 export async function submitManagedAgentRegistration(
   input: ManagedAgentRegistrationInput,
   options: ManagedAgentRegistrationOptions = {}
-): Promise<ManagedAgentRegistrationResult> {
+): Promise<RegistrationSubmitResult> {
+  const correlationId = globalThis.crypto.randomUUID();
   const validation = validateManagedAgentRegistrationInput(input);
   if (!validation.ok) {
-    return {
-      ok: false,
-      fieldErrors: validation.fieldErrors,
-      formError: 'Correct the highlighted fields before registering the Agent.',
-    };
+    return createBrowserSafeAgentRpcFailureForCategory(
+      {
+        fieldErrors: validation.fieldErrors,
+        message: '強調表示されたフィールドを確認すると登録を続行できます。',
+        title: '登録内容を確認してください',
+      },
+      'invalid_argument',
+      correlationId
+    );
   }
 
-  const env = getClientWorkerEnv();
-  // edit mode 判定。create のみ初期化に既定 signing key が必要で、失敗時は今回作成した行だけ削除する。
-  // edit mode では既存台帳行を絶対に削除せず、prerequisite error や init failure を formError へ変換する。
-  const isCreate = options.existingAgentId === undefined;
-  let createDefaultSigningKey:
-    | {
-        readonly issuer: string;
-        readonly keyId: string;
-        readonly publicFingerprint: string;
-      }
-    | undefined;
+  try {
+    const env = getClientWorkerEnv();
+    // Browser input は Client D1 write より前に canonical HTTPS origin へ変換し、現在の server-managed
+    // allowlist との完全一致を確認します。allowlist 外の destination は登録 metadata に保存しません。
+    const approvedAgentRpcOrigin = approveAgentRpcOrigin(
+      validation.value.agentRpcOrigin,
+      parseApprovedAgentRpcOrigins(env.AGENT_RPC_ALLOWED_ORIGINS)
+    );
+    const validatedRegistration = {
+      ...validation.value,
+      agentRpcOrigin: approvedAgentRpcOrigin,
+    };
+    // edit mode 判定。create のみ初期化に既定 signing key が必要で、失敗時は今回作成した行だけ削除する。
+    // edit mode では既存台帳行を絶対に削除せず、prerequisite error や init failure を安全な結果へ変換する。
+    const isCreate = options.existingAgentId === undefined;
+    let createDefaultSigningKey:
+      | {
+          readonly issuer: string;
+          readonly keyId: string;
+          readonly publicFingerprint: string;
+        }
+      | undefined;
 
-  if (isCreate) {
-    // create のみ、DB 書き込み前に既定 signing key の前提を検査し、台帳への partial write を防ぐ。
-    const defaultSigningKey = await createSigningKeyRepository(
-      env.CLIENT_DB
-    ).getDefaultSigningKey();
-    if (defaultSigningKey?.status !== 'active') {
-      return {
-        ok: false,
-        fieldErrors: {},
-        formError:
-          'Generate and select a default Client Service signing key under Global Settings before registering an Agent.',
+    if (isCreate) {
+      // create のみ、DB 書き込み前に既定 signing key の前提を検査し、台帳への partial write を防ぐ。
+      const defaultSigningKey = await createSigningKeyRepository(
+        env.CLIENT_DB
+      ).getDefaultSigningKey();
+      if (defaultSigningKey?.status !== 'active') {
+        return createBrowserSafeAgentRpcFailureForCategory(
+          {
+            fieldErrors: {},
+            message:
+              'グローバル設定で既定のClient Service signing keyを生成して選択すると、Agent登録を続行できます。',
+            title: '登録前の設定を確認してください',
+          },
+          'configuration',
+          correlationId
+        );
+      }
+      createDefaultSigningKey = {
+        issuer: defaultSigningKey.issuer,
+        keyId: defaultSigningKey.keyId,
+        publicFingerprint: defaultSigningKey.publicFingerprint,
       };
     }
-    createDefaultSigningKey = {
-      issuer: defaultSigningKey.issuer,
-      keyId: defaultSigningKey.keyId,
-      publicFingerprint: defaultSigningKey.publicFingerprint,
-    };
-  }
 
-  const result = await persistManagedAgentRegistration(
-    validation.value,
-    {
-      agents: createManagedAgentRepository(env.CLIENT_DB),
-      credentials: createCredentialReferenceRepository(env.CLIENT_DB),
-    },
-    options
-  );
+    const persisted = await persistManagedAgentRegistration(
+      validatedRegistration,
+      {
+        agents: createManagedAgentRepository(env.CLIENT_DB),
+        credentials: createCredentialReferenceRepository(env.CLIENT_DB),
+      },
+      options
+    );
+    if (!persisted.ok) {
+      return createBrowserSafeAgentRpcFailureForCategory(
+        {
+          fieldErrors: persisted.fieldErrors,
+          message: '強調表示されたフィールドを確認すると登録を続行できます。',
+          title: '登録内容を確認してください',
+        },
+        'invalid_argument',
+        correlationId
+      );
+    }
 
-  if (result.ok) {
     try {
       // create のみ、新規 Agent に既定 signing key を割り当ててから初期化する。
       // edit は既存の signing metadata を保持し、default で上書きしない。
       if (isCreate && createDefaultSigningKey !== undefined) {
         await createManagedAgentRepository(env.CLIENT_DB).updateManagedAgentSigningKey({
-          agentId: result.agentId,
+          agentId: persisted.agentId,
           signingIssuer: createDefaultSigningKey.issuer,
           signingKeyId: createDefaultSigningKey.keyId,
           signingPublicFingerprint: createDefaultSigningKey.publicFingerprint,
         });
       }
-      await initializeAgentWithDefaultModelPolicy(
-        result.agentId,
-        buildRegistrationIdempotencyKey(result.agentId),
-        validation.value.displayName,
-        validation.value.modelPolicy
+      const initializationResult = await initializeAgentWithDefaultModelPolicy(
+        persisted.agentId,
+        buildRegistrationIdempotencyKey(persisted.agentId),
+        validatedRegistration.displayName,
+        validatedRegistration.modelPolicy
       );
+      if (initializationResult.safeStatus === 'failed') {
+        if (isCreate) {
+          await rollbackFailedAgentInitialization(env.CLIENT_DB, persisted.agentId);
+        }
+        return createBrowserSafeAgentRpcFailureForCategory(
+          {
+            fieldErrors:
+              initializationResult.safeErrorCategory === 'configuration'
+                ? { agentRpcOrigin: '許可済みのHTTPS Agent RPC originを入力してください。' }
+                : {},
+            message: initializationResult.displayData.message,
+            title: initializationResult.displayData.title,
+          },
+          initializationResult.safeErrorCategory,
+          initializationResult.correlationId
+        );
+      }
       revalidatePath('/agents');
-      revalidatePath(`/agents/${result.agentId}`);
-      revalidatePath(`/agents/${result.agentId}/settings`);
+      revalidatePath(`/agents/${persisted.agentId}`);
+      revalidatePath(`/agents/${persisted.agentId}/settings`);
+      return createBrowserSafeAgentRpcSuccess(
+        {
+          agentId: persisted.agentId,
+          displayName: validatedRegistration.displayName,
+          fieldErrors: {},
+          message: `「${validatedRegistration.displayName}」を管理対象に追加しました。`,
+          title: 'Agentを登録しました',
+        },
+        correlationId
+      );
     } catch (error) {
       // create のみ、今回作成した行を rollback する。edit は既存台帳行を削除しない。
       if (isCreate) {
-        await rollbackFailedAgentInitialization(env.CLIENT_DB, result.agentId);
+        await rollbackFailedAgentInitialization(env.CLIENT_DB, persisted.agentId);
       }
-      return {
-        ok: false,
-        fieldErrors: {},
-        formError: safeModelPolicyErrorMessage(error),
-      };
+      return registrationFailureFromError(error, correlationId);
     }
+  } catch (error) {
+    return registrationFailureFromError(error, correlationId);
   }
-  return result;
 }
 
 /**
@@ -292,13 +340,19 @@ export async function submitManagedAgentRegistration(
 export async function validateManagedAgentRegistrationModelPolicy(
   input: ManagedAgentRegistrationInput
 ): Promise<RegistrationPolicyValidationResult> {
+  const correlationId = globalThis.crypto.randomUUID();
   const validation = validateManagedAgentRegistrationInput(input);
   if (!validation.ok) {
-    return {
-      ok: false,
-      fieldErrors: validation.fieldErrors,
-      formError: 'Correct the highlighted fields before validating the policy.',
-    };
+    return createBrowserSafeAgentRpcFailureForCategory(
+      {
+        fieldErrors: validation.fieldErrors,
+        message: '強調表示されたフィールドを確認するとポリシー検証を続行できます。',
+        title: 'ポリシーの入力内容を確認してください',
+        warnings: [],
+      },
+      'invalid_argument',
+      correlationId
+    );
   }
   const result = await validateModelPolicyForRegistration({
     agentId: validation.value.agentId,
@@ -307,15 +361,62 @@ export async function validateManagedAgentRegistrationModelPolicy(
     keyId: validation.value.keyId,
     modelPolicy: validation.value.modelPolicy,
   });
-  if (result.ok) {
-    return { ok: true, warnings: result.warnings };
+  if (result.safeStatus === 'succeeded' && result.displayData.ok) {
+    return createBrowserSafeAgentRpcSuccess(
+      {
+        fieldErrors: {},
+        message: 'ポリシーの入力内容を確認しました。',
+        title: 'ポリシーを検証しました',
+        warnings: result.displayData.warnings,
+      },
+      result.correlationId
+    );
   }
-  return {
-    ok: false,
-    fieldErrors: toRegistrationModelPolicyFieldErrors(result.fieldErrors),
-    formError: result.formError,
-    warnings: result.warnings,
-  };
+  return createBrowserSafeAgentRpcFailureForCategory(
+    {
+      fieldErrors: toRegistrationModelPolicyFieldErrors(result.displayData.fieldErrors),
+      message:
+        result.displayData.formError ??
+        '強調表示されたフィールドを確認するとポリシー検証を続行できます。',
+      title: 'ポリシーの入力内容を確認してください',
+      warnings: result.displayData.warnings,
+    },
+    result.safeErrorCategory ?? 'internal',
+    result.correlationId
+  );
+}
+
+/**
+ * 登録処理で捕捉した server-only error を、固定安全文言と四属性 result へ変換します。
+ *
+ * @param error - D1、origin policy、signing key、SDK transport で発生した未直列化の error です。
+ * @param correlationId - registration request に割り当てた非機密 correlation identifier です。
+ * @returns Browser に返してよい field association、固定 copy、safe category だけを持つ result です。
+ * @remarks
+ * origin policy の configuration failure は origin field に関連付け、その他の server-only failure は
+ * raw message を表示せず、入力保持と再試行を案内します。
+ */
+function registrationFailureFromError(
+  error: unknown,
+  correlationId: string
+): RegistrationSubmitResult {
+  const originFailure = createBrowserSafeAgentRpcFailure(error, correlationId, {
+    fieldErrors: {
+      agentRpcOrigin: '許可済みのHTTPS Agent RPC originを入力してください。',
+    },
+    message:
+      'Agent RPC originを運用ポリシーで確認してください。許可済みのHTTPS originを登録すると操作を続行できます。',
+    title: 'Agent RPC originを確認してください',
+  });
+  if (originFailure.safeErrorCategory === 'configuration') {
+    return originFailure;
+  }
+  return createBrowserSafeAgentRpcFailure(error, correlationId, {
+    fieldErrors: {},
+    message:
+      '入力内容はこの画面に保持されています。時間をおいて「もう一度登録」を実行してください。運用調査には問い合わせIDを利用できます。',
+    title: '登録情報を保持しました',
+  });
 }
 
 function buildRegistrationIdempotencyKey(agentId: string): string {

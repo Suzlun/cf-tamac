@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
@@ -11,6 +12,7 @@ import {
   type ModelPolicyValidationStatus,
 } from './model-policy-fields';
 import { ModelPolicySummary } from './model-policy-summary';
+import { OperationResultRegion } from './operation-result-region';
 import {
   settingsModelPolicySchema,
   type SettingsModelPolicyValues,
@@ -66,7 +68,10 @@ export function ModelPolicySettingsSection({
     initialMetadata?.warnings ?? []
   );
   const [formError, setFormError] = useState<string | undefined>();
-  const [success, setSuccess] = useState<string | undefined>();
+  const [operationResult, setOperationResult] = useState<
+    BrowserSafeModelPolicyMutationResult | undefined
+  >();
+  const [currentMetadata, setCurrentMetadata] = useState(initialMetadata);
   const form = useForm<SettingsModelPolicyValues>({
     resolver: zodResolver(settingsModelPolicySchema),
     defaultValues: metadataToDraft(initialMetadata),
@@ -78,75 +83,73 @@ export function ModelPolicySettingsSection({
     // Server refresh で Agent RPC 由来 metadata が変わったら、未送信 draft を現在の safe metadata へ戻す。
     form.reset(metadataToDraft(initialMetadata));
     setWarnings(initialMetadata?.warnings ?? []);
+    setCurrentMetadata(initialMetadata);
     setValidationStatus('idle');
     setFormError(undefined);
-    setSuccess(undefined);
+    setOperationResult(undefined);
   }, [form, initialMetadata]);
 
-  const permissionDenied = validationStatus === 'permission_denied';
+  const permissionDenied = operationResult?.safeErrorCategory === 'permission_denied';
 
   const handleValidate = async (): Promise<void> => {
     if (permissionDenied) {
-      setFormError('You do not have permission to update the default model policy.');
+      setFormError('既定モデルポリシーの更新権限を確認してください。');
       return;
     }
     const valid = await form.trigger();
     if (!valid) {
       setValidationStatus('invalid');
-      setFormError('The policy draft is invalid. Fix the highlighted fields and validate again.');
+      setFormError('強調表示されたフィールドを確認するとポリシー検証を続行できます。');
       return;
     }
     setValidationStatus('validating');
     setFormError(undefined);
     const result = await onValidatePolicy(form.getValues());
+    setOperationResult(result);
     applyPolicyResult(result, setValidationStatus, setWarnings, setFormError);
   };
 
   const handleSave = async (): Promise<void> => {
     if (permissionDenied) {
-      setFormError('You do not have permission to update the default model policy.');
+      setFormError('既定モデルポリシーの更新権限を確認してください。');
       return;
     }
     const valid = await form.trigger();
     if (!valid) {
       setValidationStatus('invalid');
-      setFormError('The policy draft is invalid. Fix the highlighted fields and validate again.');
+      setFormError('強調表示されたフィールドを確認するとポリシー検証を続行できます。');
       return;
     }
     setValidationStatus('validating');
     setFormError(undefined);
-    setSuccess(undefined);
     const result = await onSavePolicy(generateIdempotencyKey(), form.getValues());
+    setOperationResult(result);
     applyPolicyResult(result, setValidationStatus, setWarnings, setFormError);
-    if (result.ok && result.metadata !== undefined) {
-      form.reset(metadataToDraft(result.metadata));
-      setSuccess(
-        `Default model policy saved as ${result.metadata.policyRef}; config updated to v${result.configVersion ?? result.metadata.configVersion ?? 'unknown'}.`
-      );
+    if (
+      result.safeStatus === 'succeeded' &&
+      result.displayData.ok &&
+      result.displayData.metadata !== undefined
+    ) {
+      form.reset(metadataToDraft(result.displayData.metadata));
+      setCurrentMetadata(result.displayData.metadata);
     }
   };
 
   return (
     <section aria-labelledby="model-policy-editor-heading">
       <ModelPolicySummary
-        metadata={initialMetadata}
+        metadata={currentMetadata}
         loading={false}
         permissionDenied={permissionDenied}
       />
-      <div className="rounded-md border bg-card p-4 text-sm space-y-1">
-        <strong id="model-policy-editor-heading">Edit default model policy</strong>
+      <div className="space-y-1 text-sm">
+        <strong id="model-policy-editor-heading">既定モデルポリシーを編集</strong>
         <p className="text-xs text-muted-foreground">
-          Upsert the Agent-owned policy first, then attach the saved ref to
-          AgentConfig.modelPolicyRef. The browser receives only the safe result metadata.
+          Agent所有ポリシーを保存してから、保存済みの参照をAgentConfig.modelPolicyRefへ適用します。ブラウザーには安全化済みの結果を返します。
         </p>
-        {formError !== undefined ? (
-          <p className="text-destructive" role="alert">
+        {formError !== undefined && operationResult === undefined ? (
+          <p className="text-sm text-destructive" role="alert">
             {formError}
-          </p>
-        ) : null}
-        {success !== undefined ? (
-          <p className="text-primary" role="status">
-            {success}
           </p>
         ) : null}
         <Form {...form}>
@@ -157,7 +160,23 @@ export function ModelPolicySettingsSection({
               void handleSave();
             }}
             noValidate
+            aria-busy={pending || validationStatus === 'validating'}
           >
+            <OperationResultRegion
+              result={operationResult}
+              pending={pending}
+              pendingTitle="既定モデルポリシーを保存しています"
+              pendingMessage="ポリシーを保存し、Agent設定へ適用しています…"
+            >
+              {operationResult?.safeStatus === 'failed' &&
+              operationResult.safeErrorCategory === 'configuration' ? (
+                <Button asChild type="button" variant="outline" className="mt-4 min-h-11">
+                  <Link href={`/agents/new?edit=${encodeURIComponent(agentId)}`}>
+                    登録情報を編集
+                  </Link>
+                </Button>
+              ) : null}
+            </OperationResultRegion>
             <ModelPolicyFields
               form={form}
               names={buildModelPolicyFieldNames<SettingsModelPolicyValues>('')}
@@ -173,16 +192,17 @@ export function ModelPolicySettingsSection({
               <Button
                 type="submit"
                 variant="default"
+                className="min-h-11"
                 disabled={pending || permissionDenied}
                 aria-disabled={pending || permissionDenied}
               >
-                {pending ? 'Saving default policy…' : 'Save default policy'}
+                {pending ? '保存しています…' : '既定ポリシーを保存'}
               </Button>
             </div>
           </form>
         </Form>
       </div>
-      <p className="text-xs text-muted-foreground">Policy editor for Agent ID: {agentId}</p>
+      <p className="text-xs text-muted-foreground">Agent ID: {agentId}</p>
     </section>
   );
 }
@@ -209,14 +229,14 @@ function applyPolicyResult(
   setWarnings: (warnings: readonly BrowserSafeModelPolicyWarning[]) => void,
   setFormError: (message: string | undefined) => void
 ): void {
-  setWarnings(result.warnings);
-  if (result.ok) {
-    setValidationStatus(result.warnings.length > 0 ? 'warning' : 'valid');
+  setWarnings(result.displayData.warnings);
+  if (result.safeStatus === 'succeeded' && result.displayData.ok) {
+    setValidationStatus(result.displayData.warnings.length > 0 ? 'warning' : 'valid');
     setFormError(undefined);
     return;
   }
   setValidationStatus(
-    result.errorCategory === 'permission_denied' ? 'permission_denied' : 'invalid'
+    result.safeErrorCategory === 'permission_denied' ? 'permission_denied' : 'invalid'
   );
-  setFormError(result.formError ?? 'Default model policy could not be saved.');
+  setFormError(result.displayData.message);
 }

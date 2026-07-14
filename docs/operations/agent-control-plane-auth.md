@@ -8,6 +8,9 @@
 - Management Client は `CLIENT_CREDENTIAL_ENCRYPTION_KEY` を required secret として使い、Client D1 の encrypted Client Service signing key store に private JWK を暗号化保存します。
 - Browser、HTML、Client bundle、public Client route、log、D1 の平文列、Worker variables には private JWK plaintext、encrypted private JWK、生 JWT、署名 logic、完全な public key value を出しません。
 - Client private signing key JSON を Worker Secret へ手貼りする運用は禁止です。Worker Secret は暗号化 root key と Agent 側 public-only trust config に限定します。
+- Client Service JWT の送信先は Client Worker の server-managed `AGENT_RPC_ALLOWED_ORIGINS` だけです。この値は unique canonical HTTPS origins の non-empty JSON array とし、Browser registration input と Client D1 の stored origin は signing key、acting user、SDK transport の解決前に exact-match で再検証します。
+- `TamacAgentClient` の Client Service JWT surface と `TamacProviderIngressClient` の Provider detached-signature surface を混在させません。Provider は Client D1、acting user、Client Service JWT を受け取らず、`PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` だけを呼びます。
+- SDK-backed Server Action は成功・失敗とも `displayData`、`safeStatus`、`safeErrorCategory`、secret-free `correlationId` だけを Browser に返します。raw Connect/SDK diagnostic、origin policy detail、credential、JWT、signing material、D1 record は server-side security/observability context に閉じます。
 
 ## 2. `AGENT_CONTROL_PLANE_TRUST` schema
 
@@ -58,6 +61,8 @@ Agent Worker に設定する値は public-only JSON です。秘密鍵 parameter
    ```
 
 5. managed Agent record に既存 global signing key の issuer/kid/fingerprint を選択し、`AgentHealthService.Check` を実行します。成功時は trust config fingerprint、issuer、kid、fingerprint、last verified at を key material なしで確認できます。
+6. Client Worker の `AGENT_RPC_ALLOWED_ORIGINS` に、Client Service JWT を送る Agent Worker origin を canonical HTTPS JSON array として設定します。例は `AGENT_RPC_ALLOWED_ORIGINS='["https://agent.example.com"]'` です。各 literal は `URL.origin` と完全一致し、path、query、fragment、userinfo、duplicate、non-canonical default `:443` を含めません。
+7. `AGENT_RPC_AUDIENCE` が Agent Worker の `AGENT_RPC_AUDIENCE` と `AGENT_CONTROL_PLANE_TRUST.audiences` に一致することを確認します。audience は origin や secret ではありません。
 
 ## 4. Rotation
 
@@ -79,5 +84,25 @@ Management Client が利用不能な場合でも、Cloudflare Dashboard、Cloudf
 
 - Agent と Client の required secrets が設定されていることを確認します。
 - `AgentHealthService.Check` を generated Connect client から binary Protobuf で呼び、REST `/health`、Connect JSON、HTTP GET unary が成功 path にならないことを確認します。
+- canonical allowlist origin の managed Agent registration と health operation が成功し、policy から外した stored origin が signing-key/acting-user/SDK transport の解決前に `configuration` category の safe failure になることを確認します。
+- successful / failed SDK-backed Server Action の Browser result が `displayData`、`safeStatus`、`safeErrorCategory`、`correlationId` だけを持つことを確認します。Browser へ raw diagnostic や secret を返さず、correlation ID で Client/Agent の server-side logs を照合します。
+- Provider staging では、Provider-owned Ed25519 signer が unsigned Protobuf digest と canonical request identity を detached-sign した three-method request だけを送ります。Agent が active Installation/trust key、identity、digest、signature、Agent-owned fixed `300_000` ms window を検証して `INTEGRATION_INSTALLATION` principal を作ること、invalid signature、inactive key/Installation、window 外 timestamp、reused nonce を拒否することを確認します。
 - Browser response、storage、bundle、public Client route に private JWK、encrypted private JWK、生 JWT、signing material、Agent credential forwarding が含まれないことを確認します。
 - Client D1 は managed Agent records、外部 credential references (external credential references)、encrypted Client Service signing key store だけを持ち、Agent domain snapshots と plaintext secrets を持たないことを確認します。
+
+## 8. Source and deploy verification commands
+
+source、codegen policy、Client destination policy、または deploy artifact を更新する maintainer は repository root で次を実行します。
+
+```bash
+pnpm check:codegen
+pnpm lint:eslint
+pnpm lint:governance
+pnpm lint:openspec
+pnpm test:agent
+pnpm test:client
+pnpm test:governance
+pnpm gen:deploy-artifacts && pnpm check:deploy-artifacts
+```
+
+Provider or Agent contract を変更した場合は、先に `pnpm gen:agent:proto && pnpm gen:agent:rpc` を実行し、4つの command-owned generated roots を手編集せずに `pnpm check:codegen` を通します。

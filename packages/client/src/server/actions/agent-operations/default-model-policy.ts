@@ -3,6 +3,11 @@
 import { revalidatePath } from 'next/cache';
 
 import { loadAgentRpcClients } from '../../agent-rpc/agent-loader';
+import {
+  createBrowserSafeAgentRpcFailure,
+  createBrowserSafeAgentRpcFailureForCategory,
+  createBrowserSafeAgentRpcSuccess,
+} from '../../agent-rpc/safe-results';
 import { upsertModelPolicyForManagedAgent } from '../model-policies';
 import {
   createModelPolicyFailureResult,
@@ -34,24 +39,35 @@ export async function saveDefaultModelPolicy(
   draft: ModelPolicyDraftValues
 ): Promise<BrowserSafeModelPolicySaveResult> {
   const upsertResult = await upsertModelPolicyForManagedAgent(agentId, idempotencyKey, draft);
-  if (!upsertResult.ok) {
-    return { ...upsertResult, configVersion: undefined };
-  }
-  if (upsertResult.metadata === undefined) {
+  if (upsertResult.safeStatus === 'failed') {
     return {
-      ...createModelPolicyFailureResult(
-        'Default model policy could not be saved. Retry after verifying the highlighted fields.'
-      ),
-      configVersion: undefined,
+      ...upsertResult,
+      displayData: { ...upsertResult.displayData, configVersion: undefined },
     };
   }
-  if (upsertResult.metadata.status !== 'active') {
-    return {
-      ...createModelPolicyFailureResult(
-        'Only active model policies can be attached as the Agent default.'
-      ),
-      configVersion: undefined,
-    };
+  const upsertDisplay = upsertResult.displayData;
+  const upsertMetadata = upsertDisplay.metadata;
+  if (!upsertDisplay.ok || upsertMetadata === undefined) {
+    return createBrowserSafeAgentRpcFailureForCategory(
+      {
+        ...createModelPolicyFailureResult(
+          '既定モデルポリシーを保存できませんでした。強調表示されたフィールドを確認してください。'
+        ),
+        configVersion: undefined,
+      },
+      'failed_precondition',
+      upsertResult.correlationId
+    );
+  }
+  if (upsertMetadata.status !== 'active') {
+    return createBrowserSafeAgentRpcFailureForCategory(
+      {
+        ...createModelPolicyFailureResult('active状態のモデルポリシーだけを既定値に設定できます。'),
+        configVersion: undefined,
+      },
+      'failed_precondition',
+      upsertResult.correlationId
+    );
   }
 
   try {
@@ -62,7 +78,7 @@ export async function saveDefaultModelPolicy(
         idempotencyKey: `${idempotencyKey}:config`,
         config: {
           agentId,
-          modelPolicyRef: upsertResult.metadata?.policyRef,
+          modelPolicyRef: upsertMetadata.policyRef,
         } as never,
       })
     );
@@ -72,20 +88,25 @@ export async function saveDefaultModelPolicy(
     const metadata =
       toBrowserSafeModelPolicyMetadata(response.defaultModelPolicy, {
         configVersion,
-        fallbackGenerationParameters: upsertResult.metadata.generationParameters,
-        warnings: upsertResult.warnings,
-      }) ?? upsertResult.metadata;
+        fallbackGenerationParameters: upsertMetadata.generationParameters,
+        warnings: upsertDisplay.warnings,
+      }) ?? upsertMetadata;
     revalidatePath(`/agents/${agentId}`);
     revalidatePath(`/agents/${agentId}/settings`);
-    return {
-      ok: true,
-      metadata: { ...metadata, configVersion },
-      fieldErrors: {},
-      warnings: upsertResult.warnings,
-      configVersion,
-    };
+    return createBrowserSafeAgentRpcSuccess(
+      {
+        configVersion,
+        fieldErrors: {},
+        message: `「${metadata.policyRef}」を保存し、設定バージョン v${configVersion} を適用しました。`,
+        metadata: { ...metadata, configVersion },
+        ok: true,
+        title: '既定モデルポリシーを保存しました',
+        warnings: upsertDisplay.warnings,
+      },
+      clients.invocation.correlationId
+    );
   } catch (error) {
-    return {
+    return createBrowserSafeAgentRpcFailure(error, globalThis.crypto.randomUUID(), {
       ...createModelPolicyFailureResult(
         safeModelPolicyErrorMessage(error),
         {},
@@ -93,6 +114,6 @@ export async function saveDefaultModelPolicy(
         safeModelPolicyErrorCategory(error)
       ),
       configVersion: undefined,
-    };
+    });
   }
 }

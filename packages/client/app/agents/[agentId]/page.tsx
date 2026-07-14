@@ -29,16 +29,8 @@ interface OverviewLoadResult {
   readonly errorCategory?: string;
 }
 
-function getErrorCategory(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('category' in error)) {
-    return undefined;
-  }
-  const category = (error as { readonly category?: unknown }).category;
-  return typeof category === 'string' ? category : undefined;
-}
-
-function safeOverviewErrorMessage(error: unknown): string {
-  switch (getErrorCategory(error)) {
+function safeOverviewErrorMessage(category: string | undefined): string {
+  switch (category) {
     case 'not_found':
       return 'The Agent Worker has no aggregate for this Agent ID. Verify the Agent ID and RPC origin in Settings.';
     case 'permission_denied':
@@ -51,24 +43,35 @@ function safeOverviewErrorMessage(error: unknown): string {
 }
 
 async function loadOverview(agentId: string): Promise<OverviewLoadResult> {
+  // 各 query は四属性 Browser-safe result を返すため、raw rejection detail を画面文言へ渡しません。
   const [overviewResult, stateResult] = await Promise.allSettled([
     getAgentOverview(agentId),
     getAgentState(agentId),
   ]);
-  const overview = overviewResult.status === 'fulfilled' ? overviewResult.value : undefined;
-  const state = stateResult.status === 'fulfilled' ? stateResult.value : undefined;
-  let errorReason: unknown;
-  if (overviewResult.status === 'rejected') {
-    errorReason = overviewResult.reason;
-  } else if (stateResult.status === 'rejected') {
-    errorReason = stateResult.reason;
-  }
+  const overviewAction = overviewResult.status === 'fulfilled' ? overviewResult.value : undefined;
+  const stateAction = stateResult.status === 'fulfilled' ? stateResult.value : undefined;
+  const overview =
+    overviewAction?.safeStatus === 'succeeded' ? overviewAction.displayData.data : undefined;
+  const state = stateAction?.safeStatus === 'succeeded' ? stateAction.displayData.data : undefined;
+  const failedAction =
+    overviewAction?.safeStatus === 'failed'
+      ? overviewAction
+      : stateAction?.safeStatus === 'failed'
+        ? stateAction
+        : undefined;
+  const category = failedAction?.safeErrorCategory;
+  const hasUnexpectedRejection =
+    overviewResult.status === 'rejected' || stateResult.status === 'rejected';
 
   return {
     overview,
     state,
-    error: errorReason === undefined ? undefined : safeOverviewErrorMessage(errorReason),
-    errorCategory: errorReason === undefined ? undefined : getErrorCategory(errorReason),
+    // action が予期せず reject しても error.reason は読まず、固定安全文言だけを採用します。
+    error:
+      failedAction === undefined && !hasUnexpectedRejection
+        ? undefined
+        : safeOverviewErrorMessage(category),
+    errorCategory: category,
   };
 }
 

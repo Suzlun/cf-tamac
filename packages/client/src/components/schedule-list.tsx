@@ -15,6 +15,11 @@ import { ScheduleDetailContent } from './schedule-detail-content';
 import { ScheduleTable } from './schedule-table';
 import { Button } from './ui/button';
 
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
+
 interface PageInfo {
   readonly nextPageToken?: string;
   readonly resultCount: number;
@@ -57,14 +62,18 @@ interface ScheduleListProps {
     threadId: string,
     scheduleSpec: string,
     overlapPolicy: string
-  ) => Promise<ScheduleSummary>;
+  ) => Promise<BrowserSafeScheduleActionResult>;
   readonly onCancelSchedule: (
     agentId: string,
     scheduleId: string,
     idempotencyKey: string,
     reason: string
-  ) => Promise<ScheduleSummary>;
+  ) => Promise<BrowserSafeScheduleActionResult>;
 }
+
+type BrowserSafeScheduleActionResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: ScheduleSummary }
+>;
 
 interface PendingScheduleCreate {
   readonly idempotencyKey: string;
@@ -210,11 +219,17 @@ async function confirmScheduleCreate(input: ConfirmScheduleCreateInput): Promise
       input.createDraft.scheduleSpec,
       input.createDraft.overlapPolicy
     );
-    input.setSuccess(`Schedule ${result.scheduleId} created.`);
+    if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+      input.setError(result.displayData.message);
+      return;
+    }
+    input.setSuccess(result.displayData.message);
     input.setShowCreate(false);
     input.setCreateDraft(undefined);
-  } catch (error_) {
-    input.setError(error_ instanceof Error ? error_.message : 'Schedule creation failed.');
+  } catch {
+    input.setError(
+      'スケジュールの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
   } finally {
     input.setPending(false);
   }
@@ -237,17 +252,23 @@ async function cancelScheduleFromUi(input: CancelScheduleInput): Promise<void> {
   }
   input.setPending(true);
   try {
-    await input.onCancelSchedule(
+    const result = await input.onCancelSchedule(
       input.agentId,
       input.cancelScheduleId,
       generateIdempotencyKey(),
       'cancelled from UI'
     );
-    input.setSuccess(`Schedule ${input.cancelScheduleId} cancelled.`);
+    if (result.safeStatus === 'failed') {
+      input.setError(result.displayData.message);
+      return;
+    }
+    input.setSuccess(result.displayData.message);
     input.setCancelScheduleId(undefined);
     input.setSelected(undefined);
-  } catch (error_) {
-    input.setError(error_ instanceof Error ? error_.message : 'Schedule cancellation failed.');
+  } catch {
+    input.setError(
+      'スケジュールの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
   } finally {
     input.setPending(false);
   }

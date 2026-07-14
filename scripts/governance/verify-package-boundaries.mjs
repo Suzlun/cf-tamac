@@ -22,7 +22,15 @@ const generatedPolicyPaths = [
   'packages/agent/proto/**',
   'packages/agent/src/generated/rpc/**',
   'packages/client/src/generated/agent-rpc/**',
+  'packages/sdk/src/generated/agent-rpc/**',
 ];
+
+const sdkPackagePath = 'packages/sdk/package.json';
+const sdkGeneratedDescriptorRoot = 'packages/sdk/src/generated/agent-rpc';
+const sdkGeneratedDescriptorEntry = `${sdkGeneratedDescriptorRoot}/cftamac/agent/v1_pb.ts`;
+const sdkDescriptorExportPath = './agent-rpc/*';
+const sdkDescriptorExportTarget = './src/generated/agent-rpc/*';
+const sdkBufGenerationTarget = '../sdk/src/generated/agent-rpc';
 
 // 既存 domain の storage 依存は Phase 0 の開始時点でこの 5 ファイルに閉じているため、
 // 新規 domain ファイルへ同じ例外が広がらないよう normalized path で固定する。
@@ -40,6 +48,7 @@ const agentDomainStorageImportExceptionPaths = new Set([
 export function collectPackageBoundaryIssues(root = projectRoot) {
   return [
     ...collectRuntimeCouplingIssues(root),
+    ...collectSdkPackageBoundaryIssues(root),
     ...collectAgentLayerIssues(root),
     ...collectClientBoundaryIssues(root),
     ...collectClientD1StoragePolicyIssues(root),
@@ -74,7 +83,90 @@ export function collectRuntimeCouplingIssues(root) {
       issues.push(`${normalizedPath}: Client runtime must not import Agent runtime`);
     }
   }
+  // SDK runtime は Agent/Client runtime の代替実装ではなく、SDK 自身の generated descriptor を使う consumer に固定します。
+  for (const filePath of collectFiles(`${root}/packages/sdk/src`)) {
+    const normalizedPath = normalizePath(root, filePath);
+    if (normalizedPath.includes('/src/generated/') || normalizedPath.includes('/src/tests/')) {
+      continue;
+    }
+    const imports = collectResolvedImports(root, filePath);
+    if (imports.some((importedPath) => isForbiddenSdkRuntimeImport(importedPath))) {
+      issues.push(
+        `${normalizedPath}: SDK runtime must not import Agent or Client runtime or generated RPC from another package`
+      );
+    }
+  }
   return issues;
+}
+
+/**
+ * Collect SDK package metadata and generated-descriptor ownership issues.
+ */
+export function collectSdkPackageBoundaryIssues(root) {
+  const issues = [];
+  const packageManifestPath = `${root}/${sdkPackagePath}`;
+
+  // package metadata が存在しない状態は SDK を workspace の server-side package として分類できないため fail closed にします。
+  if (!existsSync(packageManifestPath)) {
+    return [`${sdkPackagePath}: missing SDK package metadata`];
+  }
+  const packageManifest = readJsonRecord(packageManifestPath);
+  if (packageManifest === undefined) {
+    return [`${sdkPackagePath}: SDK package metadata must be valid JSON object`];
+  }
+  // 固定 package name により、Client の server-side dependency と SDK ownership の識別子を一意に保ちます。
+  if (packageManifest.name !== '@cf-tamac/sdk') {
+    issues.push(`${sdkPackagePath}: SDK package name must be @cf-tamac/sdk`);
+  }
+  // browser false は bundler と静的検査が SDK を browser-delivered graph から除外するための明示的な contract です。
+  if (packageManifest.browser !== false) {
+    issues.push(`${sdkPackagePath}: SDK package must set browser to false`);
+  }
+  // public entrypoint と generated descriptor export を SDK package 内へ固定し、別 package の descriptor ownership を混在させません。
+  if (!hasSdkDescriptorExports(packageManifest)) {
+    issues.push(
+      `${sdkPackagePath}: SDK package must export its generated Agent RPC descriptors from ${sdkDescriptorExportTarget}`
+    );
+  }
+
+  const generatedDescriptorRootPath = `${root}/${sdkGeneratedDescriptorRoot}`;
+  // root 自体がない場合は mandatory generated-policy target が欠けているため、descriptor entry の検査へ進まず fail closed にします。
+  if (!existsSync(generatedDescriptorRootPath)) {
+    issues.push(
+      `${sdkGeneratedDescriptorRoot}: SDK generated Agent RPC descriptor output root is missing`
+    );
+  } else if (!existsSync(`${root}/${sdkGeneratedDescriptorEntry}`)) {
+    // root 内の canonical descriptor を固定し、空 directory や手書きの代替 entrypoint を generated output と認識しません。
+    issues.push(
+      `${sdkGeneratedDescriptorEntry}: SDK generated Agent RPC canonical descriptor entry is missing`
+    );
+  }
+  const bufGenerationConfigPath = `${root}/packages/agent/buf.gen.yaml`;
+  // Buf target は Agent proto から SDK descriptor を生成する唯一の ownership seam なので、生成先登録の欠落を拒否します。
+  if (
+    !existsSync(bufGenerationConfigPath) ||
+    !hasSdkBufGenerationTarget(readFileSync(bufGenerationConfigPath, 'utf8'))
+  ) {
+    issues.push(
+      'packages/agent/buf.gen.yaml: SDK generated Agent RPC descriptor output must be owned by pnpm gen:agent:rpc'
+    );
+  }
+
+  // SDK source 自身が browser client directive を宣言すると package metadata と実行境界が矛盾するため拒否します。
+  for (const filePath of collectFiles(`${root}/packages/sdk/src`)) {
+    const normalizedPath = normalizePath(root, filePath);
+    if (
+      !/\.(?:ts|tsx)$/.test(normalizedPath) ||
+      normalizedPath.includes('/src/generated/') ||
+      normalizedPath.includes('/src/tests/')
+    ) {
+      continue;
+    }
+    if (/^["']use client["'];?/.test(readFileSync(filePath, 'utf8').trimStart())) {
+      issues.push(`${normalizedPath}: SDK runtime must not declare a browser client entrypoint`);
+    }
+  }
+  return [...new Set(issues)];
 }
 
 /**
@@ -285,19 +377,16 @@ export function collectClientBoundaryIssues(root) {
 
     if (isClientBrowserVisiblePath(normalizedPath, content)) {
       for (const importedPath of imports) {
-        if (
-          importedPath.startsWith('/packages/client/src/server/') ||
-          importedPath === 'server-only' ||
-          importedPath.startsWith('@cf-tamac/client-agent-rpc') ||
-          importedPath.startsWith('@connectrpc/connect')
-        ) {
+        if (isForbiddenClientBrowserImport(importedPath)) {
           issues.push(
             `${normalizedPath}: Client browser-visible modules must not import server-only Agent RPC, credentials, or Connect runtime`
           );
         }
       }
       if (
-        /createServerAgentRpcClients|CLIENT_DB|credentialRef|credential_ref/.test(content) ||
+        /createServerAgentRpcClients|CLIENT_DB|credentialRef|credential_ref|@cf-tamac\/sdk(?:-agent-rpc)?["'/]/.test(
+          content
+        ) ||
         /authorization|bearer/i.test(content)
       ) {
         issues.push(
@@ -358,7 +447,9 @@ export function collectClientD1StoragePolicyIssues(root) {
     const tableNames = collectTableNames(content);
     for (const tableName of tableNames) {
       if (isForbiddenClientD1TableName(tableName)) {
-        issues.push(`${normalizedPath}: Client D1 must not define Agent domain snapshot table ${tableName}`);
+        issues.push(
+          `${normalizedPath}: Client D1 must not define Agent domain snapshot table ${tableName}`
+        );
       }
     }
     for (const forbiddenColumn of collectForbiddenClientD1SecretColumns(content)) {
@@ -598,10 +689,9 @@ function isAgentRpcServicePath(normalizedPath) {
 }
 
 function isAgentRpcRouterPath(normalizedPath) {
-  return [
-    '/packages/agent/src/rpc/router',
-    '/packages/agent/src/rpc/router.ts',
-  ].includes(normalizedPath);
+  return ['/packages/agent/src/rpc/router', '/packages/agent/src/rpc/router.ts'].includes(
+    normalizedPath
+  );
 }
 
 function isAgentRpcAdapterPath(normalizedPath) {
@@ -624,10 +714,9 @@ function isAgentRpcMapperPath(normalizedPath) {
 }
 
 function isAgentRoutingPath(normalizedPath) {
-  return [
-    '/packages/agent/src/agent-routing',
-    '/packages/agent/src/agent-routing.ts',
-  ].includes(normalizedPath);
+  return ['/packages/agent/src/agent-routing', '/packages/agent/src/agent-routing.ts'].includes(
+    normalizedPath
+  );
 }
 
 function isAgentGeneratedRpcPath(normalizedPath) {
@@ -639,6 +728,118 @@ function isAgentGeneratedRpcPath(normalizedPath) {
     hasPathPrefix(normalizedPath, '/packages/agent/src/generated/rpc/') ||
     hasPathPrefix(normalizedPath, '/packages/client/src/generated/agent-rpc/')
   );
+}
+
+function isForbiddenSdkRuntimeImport(importedPath) {
+  return [
+    '@cf-tamac/agent',
+    '@cf-tamac/client',
+    '@cf-tamac/agent-rpc',
+    '@cf-tamac/client-agent-rpc',
+    '/packages/agent/src/',
+    '/packages/client/src/',
+  ].some(
+    (prefix) =>
+      importedPath === prefix ||
+      importedPath.startsWith(`${prefix}/`) ||
+      importedPath.startsWith(prefix)
+  );
+}
+
+function isForbiddenClientBrowserImport(importedPath) {
+  return (
+    importedPath.startsWith('/packages/client/src/server/') ||
+    importedPath === 'server-only' ||
+    importedPath.startsWith('@cf-tamac/client-agent-rpc') ||
+    importedPath.startsWith('@connectrpc/connect') ||
+    importedPath === '@cf-tamac/sdk' ||
+    importedPath.startsWith('@cf-tamac/sdk/') ||
+    importedPath === '@cf-tamac/sdk-agent-rpc' ||
+    importedPath.startsWith('@cf-tamac/sdk-agent-rpc/') ||
+    importedPath === '/packages/sdk' ||
+    importedPath.startsWith('/packages/sdk/')
+  );
+}
+
+function hasSdkDescriptorExports(packageManifest) {
+  if (!isRecord(packageManifest.exports)) {
+    return false;
+  }
+  return (
+    packageManifest.exports['.'] === './src/index.ts' &&
+    packageManifest.exports[sdkDescriptorExportPath] === sdkDescriptorExportTarget
+  );
+}
+
+function readJsonRecord(filePath) {
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Buf の plugins stanza に SDK descriptor を出力する Protobuf-ES target が存在するかを検査します。
+ * 入力は `buf.gen.yaml` の文字列、出力は SDK target を持つ plugin がある場合だけ true です。
+ * YAML text の読み取りと限定的な stanza 解析だけを行い、Buf config や generated output を変更しません。
+ */
+function hasSdkBufGenerationTarget(content) {
+  // コメントや別の YAML key に偶然 target 文字列があっても通さないため、plugins stanza を意味単位で抽出します。
+  return collectBufPluginStanzas(content).some(
+    (plugin) => plugin.local === 'protoc-gen-es' && plugin.out === sdkBufGenerationTarget
+  );
+}
+
+/**
+ * Buf v2 configuration の top-level plugins sequence を plugin ごとの local/out record として抽出します。
+ * 入力は YAML text、出力は plugins 配下の stanza だけを順序どおり保持する record 配列です。
+ * comments、top-level の別 key、plugin 外の `out` は対象外とし、入力文字列を変更しません。
+ */
+function collectBufPluginStanzas(content) {
+  const plugins = [];
+  let isInPlugins = false;
+  let plugin;
+
+  for (const sourceLine of content.split('\n')) {
+    // 空行と full-line comment は YAML の structure を持たないため、target 判定の入力から除外します。
+    const trimmedLine = sourceLine.trim();
+    if (trimmedLine === '' || trimmedLine.startsWith('#')) {
+      continue;
+    }
+
+    // top-level `plugins:` だけを collector の開始点にし、同名文字列を含む nested value を受理しません。
+    if (!isInPlugins) {
+      isInPlugins = trimmedLine === 'plugins:' && sourceLine === 'plugins:';
+      continue;
+    }
+
+    // 次の top-level key に達したら plugins sequence を閉じ、以降の `out` は誤配置として無視します。
+    if (!sourceLine.startsWith(' ')) {
+      break;
+    }
+
+    const pluginStart = sourceLine.match(/^ {2}- (?<key>[A-Z_a-z]+):\s*(?<value>\S.*?)\s*$/);
+    if (pluginStart) {
+      // 新しい sequence item を record 化し、同じ stanza の nested property だけを後続で関連付けます。
+      plugin = { [pluginStart.groups.key]: pluginStart.groups.value };
+      plugins.push(plugin);
+      continue;
+    }
+
+    const pluginProperty = sourceLine.match(/^ {4}(?<key>[A-Z_a-z]+):\s*(?<value>\S.*?)\s*$/);
+    if (plugin !== undefined && pluginProperty) {
+      // `out` が plugin stanza に属することを保証するため、現在の record にのみ nested property を追加します。
+      plugin[pluginProperty.groups.key] = pluginProperty.groups.value;
+    }
+  }
+
+  return plugins;
 }
 
 function isAgentWorkerEntrypointPath(normalizedPath) {

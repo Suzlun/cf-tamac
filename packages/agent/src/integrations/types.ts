@@ -244,7 +244,21 @@ export interface DeliverToIntegrationProviderCommand {
   readonly runId: string;
 }
 
-/** Ingress 署名検証に必要な request metadata です。 */
+/**
+ * Ingress 署名検証に必要な正規化済み request metadata です。
+ *
+ * @remarks
+ * Provider が指定した時刻許容幅は保持せず、Agent が固定する `300_000` ms window だけで評価します。
+ *
+ * @property algorithm `Ed25519` に固定された detached signature algorithm です。
+ * @property byteLength unsigned Protobuf binary body の byte length です。
+ * @property digestHex lowercase SHA-256 hex digest です。
+ * @property keyId active Installation trust key を選ぶ NFC 正規化済み ID です。
+ * @property nonce replay reservation に使う NFC 正規化済み nonce です。
+ * @property signature Ed25519 signature bytes です。
+ * @property signedAtMs Provider が signature を生成した Unix epoch milliseconds です。
+ * @property timestampMs canonical signature base と fixed window に使う Unix epoch milliseconds です。
+ */
 export interface IntegrationIngressSignatureInput {
   readonly algorithm: string;
   readonly byteLength: number;
@@ -254,7 +268,6 @@ export interface IntegrationIngressSignatureInput {
   readonly signature: Uint8Array;
   readonly signedAtMs: number;
   readonly timestampMs: number;
-  readonly acceptedSkewMs?: number;
 }
 
 /** InstallIntegration の mutation 結果です。 */

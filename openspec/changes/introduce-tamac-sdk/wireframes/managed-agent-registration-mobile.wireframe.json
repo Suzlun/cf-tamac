@@ -1,0 +1,232 @@
+{
+  "name": "管理対象Agent登録・モバイル状態仕様",
+  "viewport": { "width": 390, "height": 3000 },
+  "root": {
+    "name": "モバイルManagement Clientシェル",
+    "direction": "vertical",
+    "children": [
+      { "name": "メインコンテンツへ移動", "type": "link", "height": 44 },
+      {
+        "name": "モバイル固定ヘッダー",
+        "direction": "horizontal",
+        "padding": 16,
+        "gap": 12,
+        "align": "center",
+        "children": [
+          { "name": "ナビゲーションを開く", "type": "button", "height": 44 },
+          { "name": "cf-tamac Management", "type": "text", "height": 32 }
+        ]
+      },
+      {
+        "name": "モバイルメイン",
+        "direction": "vertical",
+        "padding": 24,
+        "gap": 24,
+        "children": [
+          {
+            "name": "ページヘッダー",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 8,
+            "children": [
+              { "name": "登録", "type": "text", "variant": "caption", "height": 24 },
+              {
+                "name": "Agentレジストリ › 新規登録",
+                "type": "text",
+                "variant": "display",
+                "height": 72
+              },
+              {
+                "name": "サーバー側参照情報でAgentを登録します",
+                "type": "text",
+                "variant": "heading",
+                "height": 64
+              },
+              {
+                "name": "Agent ID、許可済みのHTTPS Agent RPC origin、表示名を入力します。credentialフィールドはサーバー側検索参照と公開メタデータを受け付けます。",
+                "type": "text",
+                "height": 88
+              }
+            ]
+          },
+          {
+            "name": "1列の登録フォーム — 初期状態",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 16,
+            "children": [
+              {
+                "name": "ResultRegion — 初期状態は高さ0の領域",
+                "type": "text",
+                "variant": "caption",
+                "height": 24
+              },
+              { "name": "Agent ID", "type": "input", "height": 44 },
+              { "name": "Agent RPC origin", "type": "input", "height": 44 },
+              { "name": "表示名", "type": "input", "height": 44 },
+              { "name": "表示順（任意）", "type": "input", "height": 44 },
+              {
+                "name": "既定モデルポリシー — 1列",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 16,
+                "children": [
+                  {
+                    "name": "既定モデルポリシー",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 56
+                  },
+                  { "name": "作成時に有効", "type": "text", "height": 32 },
+                  { "name": "ポリシー参照", "type": "input", "height": 44 },
+                  { "name": "プロバイダー — workers-ai", "type": "input", "height": 44 },
+                  { "name": "モデルID", "type": "input", "height": 44 },
+                  { "name": "温度", "type": "input", "height": 44 },
+                  { "name": "Top P", "type": "input", "height": 44 },
+                  { "name": "最大出力トークン数", "type": "input", "height": 44 },
+                  { "name": "ポリシーを検証", "type": "button", "height": 44 }
+                ]
+              },
+              {
+                "name": "credential参照 — 展開",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 16,
+                "children": [
+                  {
+                    "name": "credential参照",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 56
+                  },
+                  { "name": "credential参照", "type": "input", "height": 44 },
+                  { "name": "キーID", "type": "input", "height": 44 },
+                  { "name": "公開フィンガープリント", "type": "input", "height": 44 },
+                  { "name": "マスク済みヒント", "type": "input", "height": 44 },
+                  { "name": "状態", "type": "input", "height": 44 }
+                ]
+              },
+              { "name": "キャンセル", "type": "button", "height": 44 },
+              { "name": "Agentを登録", "type": "button", "height": 44 }
+            ]
+          },
+          { "name": "登録状態一覧", "type": "text", "variant": "heading", "height": 48 },
+          {
+            "name": "処理中のResultRegion",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 12,
+            "children": [
+              {
+                "name": "Agentを登録しています",
+                "type": "text",
+                "variant": "heading",
+                "height": 56
+              },
+              {
+                "name": "登録情報を確認し、Agentを初期化しています…",
+                "type": "text",
+                "height": 48
+              },
+              { "name": "Agentを登録しています…", "type": "button", "height": 44 }
+            ]
+          },
+          { "name": "処理中と成功の区切り", "type": "divider" },
+          {
+            "name": "成功確認",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 12,
+            "children": [
+              { "name": "Agentを登録しました", "type": "text", "variant": "heading", "height": 56 },
+              {
+                "name": "「{displayName}」を管理対象に追加しました。",
+                "type": "text",
+                "height": 48
+              },
+              {
+                "name": "成功結果 — displayData / safeStatus: succeeded / safeErrorCategory: null / correlationId",
+                "type": "text",
+                "variant": "caption",
+                "height": 48
+              },
+              { "name": "Agentの概要を開く", "type": "button", "height": 44 },
+              { "name": "Agent一覧に戻る", "type": "link", "height": 44 }
+            ]
+          },
+          { "name": "成功と入力検証の区切り", "type": "divider" },
+          {
+            "name": "フィールド検証案内",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 12,
+            "children": [
+              {
+                "name": "登録内容を確認してください",
+                "type": "text",
+                "variant": "heading",
+                "height": 56
+              },
+              {
+                "name": "強調表示されたフィールドを確認すると登録を続行できます。",
+                "type": "text",
+                "height": 48
+              },
+              { "name": "Agent ID: Agent IDを入力してください。", "type": "link", "height": 44 },
+              {
+                "name": "最初の確認対象フィールドへフォーカス",
+                "type": "text",
+                "variant": "caption",
+                "height": 24
+              }
+            ]
+          },
+          { "name": "入力検証と設定案内の区切り", "type": "divider" },
+          {
+            "name": "originポリシー設定案内",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 12,
+            "children": [
+              {
+                "name": "Agent RPC originを確認してください",
+                "type": "text",
+                "variant": "heading",
+                "height": 72
+              },
+              {
+                "name": "Agent RPC originを運用ポリシーで確認してください。許可済みのHTTPS originを登録すると操作を続行できます。",
+                "type": "text",
+                "height": 96
+              },
+              {
+                "name": "許可済みのHTTPS Agent RPC originを入力してください。",
+                "type": "text",
+                "height": 48
+              },
+              {
+                "name": "問い合わせID: {correlationId} — 全文を折り返し表示",
+                "type": "text",
+                "height": 56
+              },
+              {
+                "name": "このIDを運用担当者へ伝えると、サーバー側ログを安全に照合できます。",
+                "type": "text",
+                "variant": "caption",
+                "height": 48
+              },
+              { "name": "問い合わせIDをコピー", "type": "button", "height": 44 },
+              {
+                "name": "コピー完了通知 — 問い合わせIDをコピーしました。",
+                "type": "text",
+                "variant": "caption",
+                "height": 24
+              },
+              { "name": "origin確認後にAgentを再登録", "type": "button", "height": 44 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

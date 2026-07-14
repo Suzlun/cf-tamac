@@ -4,9 +4,13 @@ import { defineConfig, devices } from '@playwright/test';
 // production secret ではなく test-only seed から shell 実行時に導出し、実運用の秘密値は repository に保存しない。
 const e2eClientCredentialEncryptionKeyCommand =
   "node -e \"console.log(require('node:crypto').createHash('sha256').update('cf-tamac-e2e-client-credential-encryption-key').digest('base64'))\"";
+// 開発用の標準 port 3000 は別 session の Client 起動が使用し得るため、E2E 一時 server 専用の固定 port を使う。
+// webServer URL と Browser baseURL を同じ origin に固定し、Next の自動 port fallback による起動待機 timeout を防ぐ。
+const e2eClientPort = 3100;
+const e2eClientOrigin = `http://localhost:${e2eClientPort}`;
 // Client の local D1 migration を先に適用してから Next dev server を起動し、E2E fake Agent RPC で外部 Agent Worker 依存を避ける。
 // Playwright の長い multi-browser run では Turbopack HMR chunk 再生成が WebKit 終盤の chunk load error になり得るため、E2E 専用に webpack dev server を使う。
-const e2eClientWebServerCommand = `CLIENT_CREDENTIAL_ENCRYPTION_KEY="$(${e2eClientCredentialEncryptionKeyCommand})" E2E_FAKE_AGENT_RPC=1 sh -c 'pnpm --filter @cf-tamac/client db:migrate:local && pnpm --filter @cf-tamac/client exec next dev --webpack'`;
+const e2eClientWebServerCommand = `CLIENT_CREDENTIAL_ENCRYPTION_KEY="$(${e2eClientCredentialEncryptionKeyCommand})" E2E_FAKE_AGENT_RPC=1 sh -c 'pnpm --filter @cf-tamac/client db:migrate:local && pnpm --filter @cf-tamac/client exec next dev --webpack --port ${e2eClientPort}'`;
 
 /**
  * Playwright E2E テスト設定
@@ -27,7 +31,7 @@ export default defineConfig({
   /* 共通設定 */
   use: {
     /* ベースURL */
-    baseURL: 'http://localhost:3000',
+    baseURL: e2eClientOrigin,
     /* 失敗時のスクリーンショット */
     screenshot: 'only-on-failure',
     /* 失敗時のビデオ */
@@ -40,8 +44,9 @@ export default defineConfig({
   webServer: [
     {
       command: e2eClientWebServerCommand,
-      url: 'http://localhost:3000',
-      reuseExistingServer: process.env.CI === undefined,
+      url: e2eClientOrigin,
+      // 既存 server を再利用すると fake RPC・migration・webpack 条件を満たさない未知環境を検証するため、常に test-owned process を要求する。
+      reuseExistingServer: false,
       timeout: 120 * 1000,
     },
   ],

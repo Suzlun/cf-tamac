@@ -1,38 +1,42 @@
 ## ADDED Requirements
 
-### Requirement: Server-side Agent 操作 SDK
+### Requirement: サーバーサイド Agent 操作 SDK
 
-`@cf-tamac/sdk` は server-side consumer が TAMAC Agent を typed Protobuf RPC client aggregate で操作できる SDK として提供される SHALL。
+TAMAC server-side SDK は、server-side consumer が一貫した typed Agent RPC aggregate で TAMAC Agent を操作できる能力を提供する SHALL。
 
 **Customer Context**
 
-TAMAC Agent を組み込む開発者は、Agent lifecycle、Thread、Event、Run、Schedule、Tool、Integration、Health を同じ server-side TypeScript API から操作したい。開発者は Protobuf RPC の service ごとの差異を SDK の型と client 集約で扱い、Agent ID、RPC origin、scope、acting user 文脈を毎回一貫して渡せる必要がある。
+TAMAC Agent を組み込む開発者は、Agent lifecycle、model policy、Event、Thread、Run、State、Schedule、Tool、Integration、Health を同じ server-side TypeScript API から操作したい。開発者は Protobuf RPC の service ごとの差異を SDK の型と client 集約で扱い、Agent ID、RPC origin、scope、acting user 文脈を毎回一貫して渡せる必要がある。
 
 **Requirement**
 
-`@cf-tamac/sdk` は server-side TypeScript package として公開される SHALL。
+TAMAC server-side SDK は TypeScript consumer 向けに公開される SHALL。
 
-SDK は TAMAC Agent の generated Protobuf RPC service descriptors を利用し、Connect unary binary Protobuf transport で Agent Service を呼び出す SHALL。
+SDK は TAMAC Agent の typed RPC request/response contract に従って Agent Service を呼び出す SHALL。
 
-SDK は Agent lifecycle、event、thread、run、state、schedule、tool、integration、integration ingress、health、model policy の service client を一つの server-side client 集約として提供する SHALL。
+Client Service SDK aggregate は Client Service principal が認可された lifecycle、model policy、event、thread、run、state、schedule、tool、integration、health operations を提供する SHALL。
+
+Client Service SDK aggregate の各 operation は同じ Client Service JWT context、Agent scope、acting user context、request correlation context を使用する SHALL。
+
+Integration Provider は Provider-facing signature context と detached-signature principal を使用する専用 integration surface から ingress operations を呼び出す SHALL。
 
 SDK consumer は Agent RPC origin、`agent_id`、要求 scope、acting user context、signing context、request correlation context を server-side execution context で与える SHALL。
 
-SDK は server-side execution context ごとの transport と authentication metadata を生成し、各 RPC call に service/method、`agent_id`、request ID、idempotency key を関連付ける SHALL。
+SDK は server-side execution context ごとの authentication metadata を生成し、各 RPC call に operation、`agent_id`、request ID、idempotency key を関連付ける SHALL。
 
 #### Scenario: Server-side consumer が SDK で Agent health を確認する (TAMAC-SDK-S001)
 
 - **GIVEN** server-side consumer が Agent RPC origin、`agent_id`、scope、acting user context、signing context を持っている
-- **WHEN** consumer が `@cf-tamac/sdk` の Agent health client で `Check` を呼び出す
-- **THEN** SDK は Connect unary binary Protobuf request と Client Service 認証 metadata を生成する
+- **WHEN** consumer が TAMAC server-side SDK の Agent health operation を呼び出す
+- **THEN** SDK は typed Agent RPC request と Client Service 認証 metadata を生成する
 - **AND** SDK は Agent health response を typed result として返す
 
-#### Scenario: SDK client 集約が Agent service 群を同じ呼び出し文脈で提供する (TAMAC-SDK-S002)
+#### Scenario: Client Service SDK と Provider integration surface が専用の認証文脈を使用する (TAMAC-SDK-S002)
 
-- **GIVEN** server-side consumer が SDK client 集約を作成している
-- **WHEN** consumer が Event publish、Thread query、Schedule command、Tool approval、Integration operation の各 client を取得する
-- **THEN** 各 client は同じ Agent RPC origin、`agent_id`、scope、acting user context、request correlation context を共有する
-- **AND** 各 RPC call は generated Protobuf RPC service descriptor に対応する typed request と typed response を扱う
+- **GIVEN** Client Service consumer が SDK aggregate を作成し、Integration Provider が Provider-facing signature context を持っている
+- **WHEN** Client Service consumer が lifecycle、model policy、event、thread、run、state、schedule、tool、integration、health operations を取得する
+- **THEN** 各 operation は同じ Agent RPC origin、`agent_id`、scope、acting user context、request correlation context、Client Service JWT context を共有する
+- **AND** Provider ingress operations は Provider-facing signature context と detached-signature principal を使用する専用 integration surface から呼び出される
 
 ### Requirement: Client Service 認証 metadata の生成
 
@@ -46,11 +50,11 @@ SDK consumer は Agent Service に対して短命 Client Service credential を�
 
 SDK は EdDSA Client Service JWT を生成する SHALL。JWT は issuer、subject、JWT ID、audience、有効期間、`agent_id`、scope、acting user identity、request correlation identifier を含む SHALL。
 
-SDK は generated RPC method、`agent_id`、scope、idempotency key、request ID を JWT または RPC metadata に関連付ける SHALL。
+SDK は Agent operation identity、`agent_id`、scope、idempotency key、request ID を JWT または RPC metadata に関連付ける SHALL。
 
 Signing context は consumer-owned secure server-side storage から供給される SHALL。SDK は供給された signing context を RPC metadata 生成の処理範囲で扱う SHALL。
 
-SDK は `ResolvedAgentRpcCredential` 相当の credential view、`ActingUserContext` 相当の acting user view、scope view を public SDK types として提供する SHALL。
+SDK は credential view、acting user view、scope view を typed public inputs として提供する SHALL。
 
 #### Scenario: SDK が acting user 付き Client Service JWT を付与する (TAMAC-SDK-S003)
 
@@ -66,30 +70,60 @@ SDK は `ResolvedAgentRpcCredential` 相当の credential view、`ActingUserCont
 - **THEN** SDK は consumer から受け取った signing context で RPC authentication metadata を構築する
 - **AND** SDK public API は credential view と acting user view を typed input として受け取る
 
-### Requirement: Server-side boundary と安全な browser-delivered data
+### Requirement: サーバーサイド境界と安全な Browser 配信 data
 
 SDK consumer は Agent RPC execution を server-side boundary に集約し、browser-delivered data を安全な表示用 payload に限定する SHALL。
 
 **Customer Context**
 
-Management Client や他の UI を持つ SDK consumer は、Browser には表示用データだけを届け、Agent RPC origin、credential、署名処理、Connect runtime construction を server-side execution boundary に集約したい。SDK package の利用境界が明確であるほど、UI 実装者は Agent 操作の安全な呼び出し面を選びやすい。
+Management Client や他の UI を持つ SDK consumer は、Browser には表示用データだけを届け、Agent RPC origin、credential、署名処理、Agent RPC transport を server-side execution boundary に集約したい。SDK usage の境界が明確であるほど、UI 実装者は Agent 操作の安全な呼び出し面を選びやすい。
 
 **Requirement**
 
-SDK public package は server-side runtime package として識別される SHALL。
+SDK entrypoint は server-side execution boundary で利用される SHALL。
 
-SDK consumer の browser-delivered payload は、SDK result から作られた安全な display data、status、safe error category、correlation identifier に限定される SHALL。
+SDK consumer が Browser に返す Agent 操作結果は、SDK result または normalized error から作られた safe display data、safe status、safe error category、correlation ID の閉じた schema で構成される SHALL。
 
-SDK consumer の server-side execution boundary は、SDK client construction、Agent RPC origin、credential view、signing context、Connect transport construction、generated RPC descriptor usage を所有する SHALL。
+SDK consumer の server-side execution boundary は、SDK aggregate construction、Agent RPC origin、credential view、signing context、Agent RPC transport を所有する SHALL。
 
-SDK は bundler と static validation が server-side package boundary を識別できる package metadata と public entrypoints を提供する SHALL。
+Credential、private signing key、raw JWT、SDK raw error detail は server-side security と observability context が所有し、Browser 向け結果は safe fields へ投影される SHALL。
 
 #### Scenario: Management Client が SDK result を安全な表示データとして返す (TAMAC-SDK-S005)
 
-- **GIVEN** Management Client の server-side action が SDK 経由で Agent RPC を呼び出している
-- **WHEN** action が Browser に結果を返す
-- **THEN** Browser-delivered payload は表示用 data、safe status、safe error category、correlation identifier で構成される
-- **AND** SDK client construction と authentication metadata generation は server-side execution boundary に属する
+- **GIVEN** Management Client が SDK 経由で Agent RPC を呼び出している
+- **WHEN** Management Client が Browser に Agent 操作結果を返す
+- **THEN** Browser-delivered payload は safe display data、safe status、safe error category、correlation ID の閉じた schema で構成される
+- **AND** credential、private signing key、raw JWT、SDK raw error detail は server-side security と observability context で処理される
+
+### Requirement: Management Client の Agent RPC origin policy
+
+Management Client は server-managed HTTPS origin allowlist によって Agent RPC destination を検証する SHALL。
+
+**Customer Context**
+
+Management Client の管理者は、Browser から Agent を登録して Management Client で操作するとき、Client Service JWT が運用者の承認した Agent Service origin にだけ送信されることを必要としている。登録済み metadata を利用する時点でも同じ policy が適用されることで、運用設定の更新を直ちに通信境界へ反映できる。
+
+**Requirement**
+
+Management Client は server-managed configuration から HTTPS Agent RPC origin allowlist を検証可能な形式で読み込む SHALL。
+
+Browser registration input の Agent RPC origin は、正規化後の HTTPS origin が server-managed allowlist に一致した場合に managed Agent metadata として受理される SHALL。
+
+Management Client は managed Agent metadata から SDK transport を構築する直前に Agent RPC origin を server-managed allowlist で再検証する SHALL。Origin policy violation は safe configuration error category と correlation ID を持つ Browser 向け Agent 操作結果として完了する SHALL。
+
+#### Scenario: 管理者が許可済み HTTPS Agent RPC origin を登録する (TAMAC-SDK-S007)
+
+- **GIVEN** server-managed configuration が正規化済み HTTPS Agent RPC origin を許可している
+- **WHEN** 管理者が Browser registration input から同じ origin の managed Agent metadata を登録する
+- **THEN** Management Client は origin policy validation を完了し、managed Agent metadata を受理する
+- **AND** Browser は safe status と correlation ID を持つ登録結果を受け取る
+
+#### Scenario: SDK transport 構築時の origin policy validation が安全な結果を返す (TAMAC-SDK-S008)
+
+- **GIVEN** Management Client が managed Agent metadata を読み込み、現在の server-managed origin policy を適用できる
+- **WHEN** 管理者が SDK transport を必要とする Agent 操作を要求する
+- **THEN** Management Client は transport 構築前に HTTPS origin allowlist validation を実行する
+- **AND** origin policy violation の場合、Management Client は safe configuration error category と correlation ID を持つ Browser 向け Agent 操作結果を返す
 
 ### Requirement: SDK error 正規化と observability context
 

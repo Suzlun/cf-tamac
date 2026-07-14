@@ -32,11 +32,22 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/agent/src/typespec/src/services/integration-tool.tsp`: Provider-facing `IntegrationToolService` contract generated from Agent TypeSpec/proto
 - `packages/agent/src/typespec/src/services/integration-delivery.tsp`: Provider-facing `IntegrationDeliveryService` contract generated from Agent TypeSpec/proto
 - `packages/agent/buf.yaml`: Buf lint/breaking configuration
-- `packages/agent/buf.gen.yaml`: Protobuf-ES generation targets for Agent and Client outputs
+- `packages/agent/buf.gen.yaml`: Protobuf-ES generation targets for Agent、Client、SDK outputs
 - `packages/agent/proto/cftamac/agent/v1.proto`: command-owned generated proto output; do not hand-edit
 - `packages/agent/src/generated/rpc/cftamac/agent/v1_pb.ts`: command-owned generated Agent RPC descriptors; do not hand-edit
 - `packages/client/src/generated/agent-rpc/cftamac/agent/v1_pb.ts`: command-owned generated Client RPC descriptors; do not hand-edit
-- `scripts/codegen/check-agent-codegen-drift.mjs`: Agent proto/RPC drift, public Agent OpenAPI absence, RPC Service Inventory, descriptor invariant, and Protobuf field stability checks
+- `packages/sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts`: command-owned generated SDK RPC descriptors; do not hand-edit
+- `scripts/codegen/check-agent-codegen-drift.mjs`: mandatory Agent/Client/SDK descriptor roots, parity, public Agent OpenAPI absence, RPC inventory/invariants, and Protobuf field stability checks. Its responsibility-specific collectors must take one input snapshot, retain deterministic issue order, and keep ESLint cognitive-complexity warnings at zero
+
+## Server-side SDK enforcement
+
+- Scope: `packages/sdk/**`; `@cf-tamac/sdk` is a server-side typed Agent RPC consumer, not a browser package or an Agent/Client runtime source dependency
+- `packages/sdk/package.json`: server-side package metadata and public entrypoint/export declarations
+- `packages/sdk/src/index.ts`: re-export-only SDK public entrypoint
+- `packages/sdk/src/client.ts`, `packages/sdk/src/transport.ts`, `packages/sdk/src/auth/**`, `packages/sdk/src/errors.ts`, `packages/sdk/src/invocation-context.ts`: Client Service aggregate, binary Connect transport, Ed25519 JWT metadata, error normalization, and invocation context
+- `packages/sdk/src/provider-ingress.ts`, `packages/sdk/src/provider-ingress-transport.ts`, `packages/sdk/src/provider-ingress-types.ts`: Provider-only detached-signature `PublishEvent` / `PublishToolResult` / `PublishDeliveryResult` surface, canonical unsigned-Protobuf digest, and restricted request/correlation metadata
+- `packages/sdk/src/generated/agent-rpc/**`: command-owned Agent RPC descriptor output from `pnpm gen:agent:rpc`; do not hand-edit
+- `packages/sdk/src/tests/*.test.ts`: `TAMAC-SDK-*` Scenario ID coverage
 
 ## Management Client foundation enforcement
 
@@ -47,8 +58,11 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/client/open-next.config.ts`: Cloudflare/OpenNext adapter configuration
 - `packages/client/app/**`: management route shells for `/agents` and detail sections; no `hello` or `users` experience
 - `packages/client/src/server/actions/managed-agents.ts`: Server Actions for Client-owned management ledger interactions
-- `packages/client/src/server/agent-rpc/**`: server-only generated Agent RPC client factory and auth metadata
-- `packages/client/src/server/db/**`: Client D1 schema, migrations, managed Agent records, and credential reference repositories only
+- `packages/client/src/server/agent-rpc/**`: server-only SDK adapter that owns Client D1 resolution, encrypted signing-key access, and acting-user policy before constructing `@cf-tamac/sdk`
+- `packages/client/src/server/agent-rpc/origin-policy.ts`: `AGENT_RPC_ALLOWED_ORIGINS` parser and exact canonical HTTPS destination approval
+- `packages/client/src/server/agent-rpc/agent-loader.ts`: managed Agent stored-origin revalidation before signing-key, acting-user, or SDK transport resolution
+- `packages/client/src/server/agent-rpc/safe-results.ts`: Browser-safe four-field result (`displayData`, `safeStatus`, `safeErrorCategory`, `correlationId`) without raw diagnostics or secrets
+- `packages/client/src/server/db/**`: Client D1 schema, migrations, managed Agent records, credential reference repositories, and encrypted Client Service signing-key store only
 - `packages/client/src/tests/*.test.ts*`: `client-*` Scenario ID coverage
 
 ## Git hooks
@@ -71,7 +85,7 @@ Read these files before applying `coding-guardian` in this repository.
 ## Workspace governance enforcement
 
 - `scripts/governance/verify-agent-surface.mjs`: forbidden Agent REST/OpenAPI/Orval/JSON surface and documentation command checks
-- `scripts/governance/verify-package-boundaries.mjs`: Agent/Client runtime coupling, binding boundary, and `.opencode` workflow alignment checks
+- `scripts/governance/verify-package-boundaries.mjs`: Agent/SDK/Client runtime coupling, SDK server-side package classification, generated descriptor ownership, Client browser boundary, binding boundary, and `.opencode` workflow alignment checks
 - `scripts/security/verify-pnpm-supply-chain.mjs`: release-age and package-by-package build-script approval checks
 - `.opencode/skills/coding-guardian/SKILL.md`: coding baseline for Agent/Client foundation and generated RPC policy
 - `.opencode/agents/openspec/applier.md`: delegation map for Agent/Client/codegen/governance/docs work
@@ -87,4 +101,7 @@ Read these files before applying `coding-guardian` in this repository.
 - There is no `openapi.gen.go`
 - There is no `docs/brand/**` baseline today
 - Agent API must not use REST/OpenAPI/Orval as the public contract
-- Generated RPC output is command-owned even when checked into git
+- `@cf-tamac/sdk` is server-side only; Browser-visible modules must not import SDK, Connect runtime, generated RPC descriptors, credentials, or JWT signing
+- Generated RPC output is command-owned even when checked into git, including `packages/sdk/src/generated/agent-rpc/**`
+- `TamacAgentClient` is the Client Service Ed25519 JWT aggregate; `TamacProviderIngressClient` is the separate Provider Ed25519 detached-signature aggregate. Do not mix Client D1, acting-user, JWT, or Provider signing-key ownership between them
+- `AGENT_RPC_ALLOWED_ORIGINS` is a non-empty JSON array of unique canonical HTTPS origins. Validate Browser input and stored Client D1 origin against it before a Client Service JWT can be signed or sent

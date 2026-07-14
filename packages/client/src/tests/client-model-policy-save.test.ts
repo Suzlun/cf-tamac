@@ -47,14 +47,28 @@ describe('Default model policy save Server Action', () => {
     const permissionError = { category: 'permission_denied' };
     const updateConfig = vi.fn().mockRejectedValue(permissionError);
     mocks.upsertModelPolicyForManagedAgent.mockResolvedValue({
-      ok: true,
-      metadata: ACTIVE_POLICY_METADATA,
-      fieldErrors: {},
-      warnings: [],
+      correlationId: 'upsert-correlation',
+      displayData: {
+        fieldErrors: {},
+        message: '既定モデルポリシーを保存しました。',
+        metadata: ACTIVE_POLICY_METADATA,
+        ok: true,
+        title: '既定モデルポリシーを保存しました',
+        warnings: [],
+      },
+      safeErrorCategory: null,
+      safeStatus: 'succeeded',
     });
     mocks.loadAgentRpcClients.mockResolvedValue({
       clients: {
         state: { updateConfig },
+        invocation: {
+          actingUser: { actingUserId: 'operator-test' },
+          agentId: 'agent-alpha',
+          correlationId: 'save-correlation',
+          requestId: 'save-request',
+          scopes: ['agent:write'],
+        },
         withErrorNormalization: async <T>(callback: () => Promise<T>): Promise<T> => callback(),
       },
     });
@@ -76,10 +90,9 @@ describe('Default model policy save Server Action', () => {
         modelPolicyRef: 'workers-ai-default',
       },
     });
-    expect(result.ok).toBe(false);
-    expect(result.errorCategory).toBe('permission_denied');
-    expect(result.formError).toBe('You do not have permission to update the default model policy.');
-    expect(result.configVersion).toBeUndefined();
+    expect(result.safeStatus).toBe('failed');
+    expect(result.safeErrorCategory).toBe('internal');
+    expect(result.displayData.configVersion).toBeUndefined();
   });
 
   it('[AGENT-MANAGEMENT-UI-S018] builds Agent-compatible v1 model policy payload', async () => {

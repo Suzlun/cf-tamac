@@ -150,6 +150,7 @@ const packageTestGlobs = ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*
 const generatedSourceGlobs = [
   'packages/agent/src/generated/**/*.{ts,tsx}',
   'packages/client/src/generated/**/*.{ts,tsx}',
+  'packages/sdk/src/generated/agent-rpc/**/*.{ts,tsx}',
 ];
 
 // Agent 新レイヤーの import 制約は ESLint の raw specifier に対して評価されるため、
@@ -339,9 +340,15 @@ export default tseslint.config(
           pattern: 'packages/client/src/generated/agent-rpc/**/*',
           mode: 'full',
         },
+        {
+          type: 'sdk-generated-agent-rpc',
+          pattern: 'packages/sdk/src/generated/agent-rpc/**/*',
+          mode: 'full',
+        },
         { type: 'agent-runtime', pattern: 'packages/agent/src/**/*', mode: 'full' },
         { type: 'client-runtime', pattern: 'packages/client/src/**/*', mode: 'full' },
         { type: 'client-app', pattern: 'packages/client/app/**/*', mode: 'full' },
+        { type: 'sdk-runtime', pattern: 'packages/sdk/src/**/*', mode: 'full' },
       ],
     },
     rules: {
@@ -415,8 +422,13 @@ export default tseslint.config(
           rules: [
             { from: ['agent-generated-rpc'], allow: ['agent-generated-rpc'] },
             { from: ['client-generated-agent-rpc'], allow: ['client-generated-agent-rpc'] },
+            { from: ['sdk-generated-agent-rpc'], allow: ['sdk-generated-agent-rpc'] },
             { from: ['agent-runtime'], allow: ['agent-runtime', 'agent-generated-rpc'] },
-            { from: ['client-runtime'], allow: ['client-runtime', 'client-generated-agent-rpc'] },
+            { from: ['sdk-runtime'], allow: ['sdk-runtime', 'sdk-generated-agent-rpc'] },
+            {
+              from: ['client-runtime'],
+              allow: ['client-runtime', 'client-generated-agent-rpc', 'sdk-runtime'],
+            },
             { from: ['client-app'], allow: ['client-app', 'client-runtime'] },
           ],
         },
@@ -844,11 +856,18 @@ export default tseslint.config(
                 '../server/**',
                 '../../server/**',
                 '@cf-tamac/client-agent-rpc/**',
+                '@cf-tamac/sdk',
+                '@cf-tamac/sdk/**',
+                '@cf-tamac/sdk-agent-rpc',
+                '@cf-tamac/sdk-agent-rpc/**',
                 '@connectrpc/connect',
                 '@connectrpc/connect/**',
+                '**/sdk',
+                '**/packages/sdk/**',
+                '**/sdk/**',
               ],
               message:
-                'Browser-visible Client modules must not import server-only Agent RPC, credentials, generated Agent RPC, or Connect runtime.',
+                'Browser-visible Client modules must not import server-only SDK/JWT signing, Agent RPC credentials, generated Agent RPC, or Connect runtime.',
             },
           ],
         },
