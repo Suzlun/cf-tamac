@@ -2,7 +2,7 @@
 description: Build agent helper for Agent/Client generation, lint, tests, build, governance checks, and repository-wide execution support.
 mode: subagent
 hidden: false
-model: openai/gpt-5.6-terra
+model: openai/gpt-5.6-luna
 reasoningEffort: 'xhigh'
 permission:
   edit:
