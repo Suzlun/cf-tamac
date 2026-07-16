@@ -1,5 +1,8 @@
 import { createConnectTransport } from '@connectrpc/connect-web';
 
+import { normalizeTamacSdkError } from './errors';
+import { parseConnectMethodContext } from './invocation-context';
+
 import type { ProviderIngressInvocationContext } from './provider-ingress-types';
 import type { Interceptor, Transport } from '@connectrpc/connect';
 
@@ -25,7 +28,7 @@ export interface TamacProviderIngressTransportConfig {
  *
  * @param config - HTTPS Agent origin、Provider request/correlation context、任意 fetch implementation です。
  * @returns `IntegrationIngressService` の three-method surface だけが利用する binary Connect transport です。
- * @throws origin または Provider request/correlation identity が不完全な場合、request を送信せずに投げます。
+ * @throws canonical HTTPS origin または Provider request/correlation identity が不完全な場合、request を送信せずに投げます。
  * @remarks
  * HTTP metadata は Connect が設定する `Content-Type: application/proto` と、SDK が設定する `x-request-id`、
  * `x-agent-correlation-id` に限定します。Authorization、Client Service JWT、任意の Provider header は設定しません。
@@ -37,14 +40,39 @@ export function createTamacProviderIngressTransport(
   assertProviderIngressOrigin(config.agentRpcOrigin);
   // request/correlation identity を送信前に検証し、監査不能な Provider ingress を拒否します。
   assertProviderRequestContext(config.invocation);
-  // binary Connect profile と allowlist 済み HTTP metadata interceptor だけを Provider transport に束ねます。
+  // binary Connect profile、error normalization、allowlist 済み HTTP metadata interceptor だけを Provider transport に束ねます。
   return createConnectTransport({
     baseUrl: config.agentRpcOrigin,
     fetch: config.fetch,
-    interceptors: [createProviderIngressMetadataInterceptor(config.invocation)],
+    interceptors: [
+      createProviderIngressErrorNormalizationInterceptor(config.invocation),
+      createProviderIngressMetadataInterceptor(config.invocation),
+    ],
     useBinaryFormat: true,
     useHttpGet: false,
   });
+}
+
+function createProviderIngressErrorNormalizationInterceptor(
+  invocation: ProviderIngressInvocationContext
+): Interceptor {
+  return (next) => async (request) => {
+    // Connect が実際に送る URL から Provider procedure を導出し、caller input を error service/method に使いません。
+    const methodContext = parseConnectMethodContext(request.url);
+    try {
+      // binary transport の response をそのまま返し、HTTP 429 を含む Connect failure だけを catch します。
+      return await next(request);
+    } catch (error) {
+      // Provider identity を保った安全な context で、429/resource_exhausted を TamacSdkOperationError に正規化します。
+      throw normalizeTamacSdkError(error, {
+        agentId: invocation.agentId,
+        correlationId: invocation.correlationId,
+        idempotencyKey: invocation.idempotencyKey,
+        methodContext,
+        requestId: invocation.requestId,
+      });
+    }
+  };
 }
 
 function createProviderIngressMetadataInterceptor(
@@ -71,6 +99,20 @@ function assertProviderIngressOrigin(origin: string): void {
   // Provider installation identity と signature metadata の送信経路を HTTPS に固定します。
   if (parsedOrigin.protocol !== 'https:') {
     throw new TypeError('Provider ingress Agent RPC origin must use HTTPS.');
+  }
+  // userinfo を含む URL は origin 一致だけでは検出できないため、署名済み request の credential leak を明示的に防ぎます。
+  if (parsedOrigin.username !== '' || parsedOrigin.password !== '') {
+    throw new TypeError('Provider ingress Agent RPC origin must not include credentials.');
+  }
+  // origin 以外の path/query/fragment は Connect base URL の path join を曖昧にするため拒否します。
+  if (parsedOrigin.pathname !== '/' || parsedOrigin.search !== '' || parsedOrigin.hash !== '') {
+    throw new TypeError(
+      'Provider ingress Agent RPC origin must not include a path, query, or fragment.'
+    );
+  }
+  // literal と URL.origin の完全一致により trailing slash、default port、case/IDN の非 canonical 表現を拒否します。
+  if (origin !== parsedOrigin.origin) {
+    throw new TypeError('Provider ingress Agent RPC origin must be a canonical HTTPS origin.');
   }
 }
 

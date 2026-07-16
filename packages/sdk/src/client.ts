@@ -197,8 +197,11 @@ function createNormalizedTamacServiceClient<Service extends TamacAgentService>(
         } catch (error) {
           // service/method と shared invocation を失わず、raw Connect failure を public SDK error へ変換します。
           throw normalizeTamacSdkError(error, {
-            invocation,
+            agentId: invocation.agentId,
+            correlationId: invocation.correlationId,
+            idempotencyKey: invocation.idempotency?.idempotencyKey,
             methodContext: { methodName: toProtobufMethodName(property), serviceName },
+            requestId: invocation.requestId,
           });
         }
       };

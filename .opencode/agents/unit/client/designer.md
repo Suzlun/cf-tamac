@@ -71,7 +71,7 @@ If any are missing, do not start. Report the missing inputs and ask the caller a
 - You may edit only `openspec/changes/**`.
 - You may specify `packages/client/**` integration requirements in wireframes/specifications, but must not edit `packages/client/**` directly.
 - You must never edit `packages/agent/**`.
-- You must never hand-edit generated files: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, or `packages/client/src/generated/agent-rpc/**`.
+- You must never hand-edit generated files: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, or `packages/sdk/src/generated/agent-rpc/**`.
 - If implementation requires code changes, stop and return exact instructions for `unit/client/engineer` or `unit/agent/engineer` instead of editing those files yourself.
 
 ## UI/UX Design Workflow

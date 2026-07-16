@@ -11,6 +11,7 @@ import { agentToolFoundationTables } from './schema/tool';
  */
 export const agentFoundationTables = [
   'agent_profile',
+  'agent_initialization_receipts',
   'agent_credentials',
   'agent_config_versions',
   'agent_principals',

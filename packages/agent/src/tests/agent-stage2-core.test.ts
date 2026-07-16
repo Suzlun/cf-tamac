@@ -47,8 +47,13 @@ describe('Agent Stage 2 core implementation', () => {
     expect(lifecycle).toContain('checkAgentIdempotency<InitializeAgentResult>');
     expect(lifecycle).toContain("lifecycleStatus: 'destroyed'");
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS agent_config_versions');
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS agent_initialization_receipts');
     expect(schema).toContain('secret_reference TEXT');
     expect(lifecycleDispatch).toContain('dispatchInitializeAgent');
+    expect(lifecycleDispatch).toContain(
+      'registrationRequestDigest: request.registrationRequestDigest'
+    );
+    expect(lifecycle).toContain('input.repositories.transaction((repositories) => {');
     expect(lifecycleDispatch).toContain('dispatchRotateAgentCredential');
   });
 
@@ -79,6 +84,7 @@ describe('Agent Stage 2 core implementation', () => {
     expect(modelPolicy).toContain('policyRef: defaultPolicyRef');
     expect(modelPolicy).toContain('policyDigest');
     expect(mapper).toContain('defaultModelPolicy');
+    expect(lifecycle).toContain('initializationReceipt.upsertReceipt');
     expect(`${lifecycle}\n${modelPolicy}\n${mapper}`).not.toMatch(
       /secretValue|providerToken|rawPrompt|rawCompletion/
     );

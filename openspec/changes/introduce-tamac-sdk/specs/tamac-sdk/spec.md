@@ -20,11 +20,17 @@ Client Service SDK aggregate の各 operation は同じ Client Service JWT conte
 
 Integration Provider は Provider-facing signature context と detached-signature principal を使用する専用 integration surface から ingress operations を呼び出す SHALL。
 
+Provider ingress は、信頼済みedge source identityとRPC procedureから構成されるrequest identityに対して、pre-auth traffic allowanceを評価する SHALL。
+
+Provider ingress trafficがallowanceを超えた場合、Agent Serviceはdetached-signatureの検証結果から独立した安全な`resource_exhausted` responseを返す SHALL。後続の認可済みreadはrequest受信前と同じAgent resource versionを返す SHALL。
+
+Provider ingressの受理は、traffic allowance、request認証、認可、replay/idempotency検証の順に完了する SHALL。受理されたrequestはAgent Event、Run、Thread、audit、resource versionへ一貫して反映される SHALL。
+
 SDK consumer は Agent RPC origin、`agent_id`、要求 scope、acting user context、signing context、request correlation context を server-side execution context で与える SHALL。
 
 SDK は server-side execution context ごとの authentication metadata を生成し、各 RPC call に operation、`agent_id`、request ID、idempotency key を関連付ける SHALL。
 
-#### Scenario: Server-side consumer が SDK で Agent health を確認する (TAMAC-SDK-S001)
+#### Scenario: サーバー側consumerがSDKでAgent healthを確認する (TAMAC-SDK-S001)
 
 - **GIVEN** server-side consumer が Agent RPC origin、`agent_id`、scope、acting user context、signing context を持っている
 - **WHEN** consumer が TAMAC server-side SDK の Agent health operation を呼び出す
@@ -37,6 +43,8 @@ SDK は server-side execution context ごとの authentication metadata を生�
 - **WHEN** Client Service consumer が lifecycle、model policy、event、thread、run、state、schedule、tool、integration、health operations を取得する
 - **THEN** 各 operation は同じ Agent RPC origin、`agent_id`、scope、acting user context、request correlation context、Client Service JWT context を共有する
 - **AND** Provider ingress operations は Provider-facing signature context と detached-signature principal を使用する専用 integration surface から呼び出される
+- **AND** Provider ingress trafficが信頼済みedge source identityとRPC procedureに対するallowanceを超えた場合、Agent Serviceはpre-auth判定を優先して安全な`resource_exhausted` responseを返す
+- **AND** 後続の認可済みreadはrequest受信前と同じAgent resource versionを返す
 
 ### Requirement: Client Service 認証 metadata の生成
 
@@ -44,7 +52,7 @@ SDK は server-side consumer から供給された signing context と acting us
 
 **Customer Context**
 
-SDK consumer は Agent Service に対して短命 Client Service credential を付与し、acting user と request correlation を監査可能にしたい。署名鍵の保管元は consumer ごとに異なるため、SDK は credential material の読み取り元を固定せず、server-side context から受け取った signing context で metadata を生成する必要がある。
+SDK consumer は Agent Service に対して短命 Client Service credential を付与し、acting user と request correlation を監査可能にしたい。SDK はconsumer-owned server-side contextをsigning contextの供給境界とし、consumerごとのsecure storage構成を利用できる必要がある。
 
 **Requirement**
 
@@ -84,7 +92,7 @@ SDK entrypoint は server-side execution boundary で利用される SHALL。
 
 SDK consumer が Browser に返す Agent 操作結果は、SDK result または normalized error から作られた safe display data、safe status、safe error category、correlation ID の閉じた schema で構成される SHALL。
 
-SDK consumer の server-side execution boundary は、SDK aggregate construction、Agent RPC origin、credential view、signing context、Agent RPC transport を所有する SHALL。
+Mutation responseから適用状態を確定できない場合、SDK consumerは同じidempotency contextによる状態確認を次操作として提示し、利用者入力と直前に確認済みの表示状態を保持するsafe failure resultを返す SHALL。Managed Agent登録では、`GetAgent`が返す`initialization_receipt`の`idempotency_key`と`registration_request_digest`、profile、configが登録試行と完全一致することを`active`確定条件とする SHALL。
 
 Credential、private signing key、raw JWT、SDK raw error detail は server-side security と observability context が所有し、Browser 向け結果は safe fields へ投影される SHALL。
 
@@ -94,6 +102,8 @@ Credential、private signing key、raw JWT、SDK raw error detail は server-sid
 - **WHEN** Management Client が Browser に Agent 操作結果を返す
 - **THEN** Browser-delivered payload は safe display data、safe status、safe error category、correlation ID の閉じた schema で構成される
 - **AND** credential、private signing key、raw JWT、SDK raw error detail は server-side security と observability context で処理される
+- **AND** mutation の適用状態を確定できない場合、Browser は同じ idempotency context による状態確認を次操作として持つ safe failure result を受け取り、利用者入力と直前に確認済みの表示状態を継続して確認できる
+- **AND** Managed Agent登録は`GetAgent`の`initialization_receipt`と登録試行の`idempotency_key`および`registration_request_digest`が完全一致した結果で`active`として確定する
 
 ### Requirement: Management Client の Agent RPC origin policy
 
@@ -143,7 +153,7 @@ SDK normalized error と observability metadata は safe detail、safe category�
 
 SDK consumer は normalized error を application log、UI status、test assertion に利用できる SHALL。
 
-#### Scenario: Permission denied が SDK normalized error として返る (TAMAC-SDK-S006)
+#### Scenario: 権限拒否がSDK normalized errorとして返る (TAMAC-SDK-S006)
 
 - **GIVEN** server-side consumer が scope 外の Agent RPC を SDK 経由で呼び出している
 - **WHEN** Agent Service が `permission_denied` を返す

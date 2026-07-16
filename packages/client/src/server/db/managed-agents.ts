@@ -6,6 +6,23 @@ import { clientManagedAgentsTable, clientSigningKeysTable } from './schema';
 const AGENT_ID_REQUIRED_ERROR = 'agentId must not be empty.';
 
 /**
+ * Client-owned registration attempt の台帳状態です。
+ *
+ * @remarks
+ * `initializing` は fixed idempotency key で Agent 初期化を送信済みの状態、`active` は Agent profile/config
+ * 照合まで確定した状態、`reconciliation_required` は response loss 等により同じ attempt の GetAgent 照合を必要とする状態です。
+ * Agent Worker の domain lifecycle state を複製せず、Client create flow の安全な再送判断だけに使います。
+ *
+ * @example
+ * ```ts
+ * if (record.registrationState === 'reconciliation_required') {
+ *   // 同じ initializationIdempotencyKey による状態確認を行う。
+ * }
+ * ```
+ */
+export type ManagedAgentRegistrationState = 'initializing' | 'active' | 'reconciliation_required';
+
+/**
  * managed agents table から Drizzle が推論する select row 型です。
  *
  * @remarks
@@ -55,6 +72,16 @@ export interface ManagedAgentRecord {
   readonly signingPublicFingerprint?: string;
   /** 最後に Agent health verification が成功した Unix epoch milliseconds。未検証時は `undefined`。 */
   readonly signingLastVerifiedAtMs?: number;
+  /** Client create flow の現在状態。既存 migration row は `active` として扱う。 */
+  readonly registrationState: ManagedAgentRegistrationState;
+  /** 初期化 attempt を一意に識別する secret-free UUID。状態確認時だけ使用する。 */
+  readonly registrationAttemptId?: string;
+  /** `InitializeAgent` に固定して渡す command idempotency key。Browser へ返さない。 */
+  readonly initializationIdempotencyKey?: string;
+  /** 正規化済み create request の SHA-256 digest。Browser へ返さない。 */
+  readonly registrationRequestDigest?: string;
+  /** create attempt が要求した model policy ref。再照合用の Client-owned intent であり、Agent config snapshot ではない。 */
+  readonly registrationModelPolicyRef?: string;
 }
 
 /**
@@ -503,7 +530,20 @@ function toManagedAgentRecord(row: ManagedAgentRow): ManagedAgentRecord {
     signingKeyId: normalizeOptionalDbString(row.signingKeyId),
     signingPublicFingerprint: normalizeOptionalDbString(row.signingPublicFingerprint),
     signingLastVerifiedAtMs: row.signingLastVerifiedAtMs ?? undefined,
+    registrationState: toRegistrationState(row.registrationState),
+    registrationAttemptId: normalizeOptionalDbString(row.registrationAttemptId),
+    initializationIdempotencyKey: normalizeOptionalDbString(row.initializationIdempotencyKey),
+    registrationRequestDigest: normalizeOptionalDbString(row.registrationRequestDigest),
+    registrationModelPolicyRef: normalizeOptionalDbString(row.registrationModelPolicyRef),
   };
+}
+
+function toRegistrationState(value: string): ManagedAgentRegistrationState {
+  // migration 前の nullable row を repository が読むことはないが、不正値を active と誤認しないよう安全側へ照合要求へ丸めます。
+  if (value === 'initializing' || value === 'active' || value === 'reconciliation_required') {
+    return value;
+  }
+  return 'reconciliation_required';
 }
 
 function assertManagedAgentInput(input: UpsertManagedAgentInput): void {

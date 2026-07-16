@@ -1,6 +1,7 @@
 import { create, toBinary } from '@bufbuild/protobuf';
 import { createClient } from '@connectrpc/connect';
 
+import { normalizeTamacSdkError } from './errors';
 import {
   IntegrationIngressService,
   NonceMetadataSchema,
@@ -107,8 +108,13 @@ export function createTamacProviderIngressClient(
         unsignedBody: toBinary(PublishDeliveryResultRequestSchema, unsignedRequest),
       });
       // generated request に署名済み metadata を設定してから、typed binary Connect method へ渡します。
-      return ingress.publishDeliveryResult(
-        create(PublishDeliveryResultRequestSchema, { ...unsignedRequest, ...security })
+      return normalizeProviderIngressOperation(
+        () =>
+          ingress.publishDeliveryResult(
+            create(PublishDeliveryResultRequestSchema, { ...unsignedRequest, ...security })
+          ),
+        config.invocation,
+        'PublishDeliveryResult'
       );
     },
     publishEvent: async (input) => {
@@ -128,8 +134,13 @@ export function createTamacProviderIngressClient(
         unsignedBody: toBinary(PublishIntegrationEventRequestSchema, unsignedRequest),
       });
       // generated request に署名済み metadata を設定してから、typed binary Connect method へ渡します。
-      return ingress.publishEvent(
-        create(PublishIntegrationEventRequestSchema, { ...unsignedRequest, ...security })
+      return normalizeProviderIngressOperation(
+        () =>
+          ingress.publishEvent(
+            create(PublishIntegrationEventRequestSchema, { ...unsignedRequest, ...security })
+          ),
+        config.invocation,
+        'PublishEvent'
       );
     },
     publishToolResult: async (input) => {
@@ -149,11 +160,36 @@ export function createTamacProviderIngressClient(
         unsignedBody: toBinary(PublishToolResultRequestSchema, unsignedRequest),
       });
       // generated request に署名済み metadata を設定してから、typed binary Connect method へ渡します。
-      return ingress.publishToolResult(
-        create(PublishToolResultRequestSchema, { ...unsignedRequest, ...security })
+      return normalizeProviderIngressOperation(
+        () =>
+          ingress.publishToolResult(
+            create(PublishToolResultRequestSchema, { ...unsignedRequest, ...security })
+          ),
+        config.invocation,
+        'PublishToolResult'
       );
     },
   };
+}
+
+async function normalizeProviderIngressOperation<Response>(
+  operation: () => Promise<Response>,
+  invocation: ProviderIngressInvocationContext,
+  methodName: ProviderCanonicalIdentity['method']
+): Promise<Response> {
+  try {
+    // generated client の typed result をそのまま返し、Provider public surface の response shape を保ちます。
+    return await operation();
+  } catch (error) {
+    // Connect が interceptor error を再度包んだ場合も cause を復元し、Provider operation context を失わず正規化します。
+    throw normalizeTamacSdkError(error, {
+      agentId: invocation.agentId,
+      correlationId: invocation.correlationId,
+      idempotencyKey: invocation.idempotencyKey,
+      methodContext: { methodName, serviceName: PROVIDER_INGRESS_SERVICE },
+      requestId: invocation.requestId,
+    });
+  }
 }
 
 interface ProviderCanonicalIdentity {
@@ -308,9 +344,12 @@ function assertProviderIngressConfig(config: TamacProviderIngressClientConfig): 
       throw new TypeError(`Provider ingress ${name} must not be empty.`);
     }
   }
-  // timestamp は整数 milliseconds に限定し、canonical decimal representation を指数表記や小数にしません。
-  if (!Number.isSafeInteger(config.invocation.timestampUnixMs)) {
-    throw new TypeError('Provider ingress timestampUnixMs must be a safe integer.');
+  // timestamp は非負の safe integer milliseconds に限定し、canonical decimal representation と Agent replay window を保ちます。
+  if (
+    !Number.isSafeInteger(config.invocation.timestampUnixMs) ||
+    config.invocation.timestampUnixMs < 0
+  ) {
+    throw new TypeError('Provider ingress timestampUnixMs must be a non-negative safe integer.');
   }
 }
 

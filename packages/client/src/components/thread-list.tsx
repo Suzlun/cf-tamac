@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { startTransition, useState } from 'react';
 
 import { AgentToken } from './agent-token';
 import { DataTable } from './data-table';
@@ -107,22 +107,35 @@ export function ThreadList({
   const [detailError, setDetailError] = useState<string | undefined>();
 
   const openThread = async (threadId: string) => {
-    // Detail drawer の読み込み中に重複操作を避けるため、local pending を立てる。
-    setPending(true);
-    setDetailError(undefined);
+    // 新しい detail request 開始時に旧 selection を transition で明示的に消し、失敗後に stale Thread detail を残しません。
+    startTransition(() => {
+      setSelected(undefined);
+      setPending(true);
+      setDetailError(undefined);
+    });
     try {
       const result = await onGetThread(agentId, threadId);
       if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
         // Server Action が返した固定安全文言だけを表示し、SDK/Connect error は Browser で読まない。
-        setDetailError(result.displayData.message);
+        startTransition(() => {
+          setSelected(undefined);
+          setDetailError(result.displayData.message);
+        });
         return;
       }
-      setSelected(result.displayData.data);
+      startTransition(() => {
+        setSelected(result.displayData.data);
+      });
     } catch {
       // envelope 契約外の失敗でも raw detail を表示せず、再試行可能な固定安全文言へ丸めます。
-      setDetailError('Thread詳細を確認できませんでした。時間をおいてもう一度表示してください。');
+      startTransition(() => {
+        setSelected(undefined);
+        setDetailError('Thread詳細を確認できませんでした。時間をおいてもう一度表示してください。');
+      });
     } finally {
-      setPending(false);
+      startTransition(() => {
+        setPending(false);
+      });
     }
   };
 

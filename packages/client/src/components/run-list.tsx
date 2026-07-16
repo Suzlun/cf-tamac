@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { startTransition, useState } from 'react';
 
 import { AgentToken } from './agent-token';
 import { ConfirmDialog } from './confirm-dialog';
@@ -118,22 +118,35 @@ export function RunList({
   const [error, setError] = useState<string | undefined>();
 
   const openRun = async (runId: string) => {
-    // detail query の再実行前に古い安全な失敗文言を消し、pending 状態を一つに保ちます。
-    setError(undefined);
-    setPending(true);
+    // 新しい detail request の開始前に前回 selection/detail/error を transition 内で消し、失敗時に stale Run detail を残しません。
+    startTransition(() => {
+      setSelected(undefined);
+      setError(undefined);
+      setPending(true);
+    });
     try {
       const result = await onGetRun(agentId, runId);
       if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
         // envelope 内の固定安全文言だけを表示し、raw SDK/Connect failure は Browser に露出しません。
-        setError(result.displayData.message);
+        startTransition(() => {
+          setSelected(undefined);
+          setError(result.displayData.message);
+        });
         return;
       }
-      setSelected(result.displayData.data);
+      startTransition(() => {
+        setSelected(result.displayData.data);
+      });
     } catch {
       // envelope 契約外の失敗も raw detail を出さず、利用者へ再表示を案内します。
-      setError('Run詳細を確認できませんでした。時間をおいてもう一度表示してください。');
+      startTransition(() => {
+        setSelected(undefined);
+        setError('Run詳細を確認できませんでした。時間をおいてもう一度表示してください。');
+      });
     } finally {
-      setPending(false);
+      startTransition(() => {
+        setPending(false);
+      });
     }
   };
 

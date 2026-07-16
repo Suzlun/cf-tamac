@@ -153,7 +153,8 @@
       ["initial_config", 4],
       ["credential_policy", 5],
       ["security", 6],
-      ["initial_model_policy", 7]
+      ["initial_model_policy", 7],
+      ["registration_request_digest", 8]
     ],
     "InstallIntegrationRequest": [
       ["agent_id", 1],

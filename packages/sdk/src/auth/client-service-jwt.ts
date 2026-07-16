@@ -1,3 +1,5 @@
+import { parseConnectMethodContext } from '../invocation-context';
+
 import type { TamacAgentRpcMethodContext, TamacSdkInvocationContext } from '../invocation-context';
 import type { ClientServiceSigningContext, ResolvedAgentRpcCredential } from './types';
 import type { Interceptor } from '@connectrpc/connect';
@@ -166,33 +168,6 @@ export function createClientServiceRequestContextInterceptor(
   };
 }
 
-/**
- * Connect request URL から generated Protobuf service/method identity を読み取ります。
- *
- * @param url - Connect transport が組み立てた unary RPC request URL です。
- * @returns fully-qualified service name と generated method name です。
- * @throws Connect path が service/method の 2 segment を持たない場合に投げます。
- * @remarks
- * 異常な URL を `unknown` として署名せず、fail closed にすることで method identity が欠落した JWT を
- * Agent Service へ送ることを防ぎます。
- */
-export function parseConnectMethodContext(url: string): TamacAgentRpcMethodContext {
-  // Connect unary path の空 segment を除外して service と method を明確に分離します。
-  const segments = new URL(url).pathname.split('/').filter((segment) => segment !== '');
-  const [serviceName, methodName, ...extraSegments] = segments;
-  // generated unary method path 以外を拒否し、曖昧な metadata を作らないようにします。
-  if (
-    serviceName === undefined ||
-    methodName === undefined ||
-    extraSegments.length > 0 ||
-    serviceName === '' ||
-    methodName === ''
-  ) {
-    throw new TypeError('Connect request URL must identify exactly one service and method.');
-  }
-  return { methodName, serviceName };
-}
-
 interface ClientServiceJwtHeader {
   readonly alg: 'EdDSA';
   readonly kid: string;
@@ -270,11 +245,14 @@ async function signEdDsaJwt(
   // compact JWS の header/payload を base64url 化し、署名対象を決定的に作ります。
   const signingInput = `${encodeBase64UrlJson(header)}.${encodeBase64UrlJson(payload)}`;
   // Web Crypto Ed25519 API へ独立した ArrayBuffer を渡し、shared backing buffer を署名対象にしません。
-  const signature = await globalThis.crypto.subtle.sign(
+  const crypto = globalThis.crypto.subtle;
+  const method = crypto.sign.bind(crypto);
+  // 抽出した Web Crypto method に元の receiver を明示して渡し、runtime 固有の this binding を失わず署名します。
+  const signature = await Reflect.apply(method, crypto, [
     'Ed25519',
     privateKey,
-    copyToArrayBuffer(new TextEncoder().encode(signingInput))
-  );
+    copyToArrayBuffer(new TextEncoder().encode(signingInput)),
+  ]);
   // compact JWS の第三 segment を作り、raw signature bytes を外部へ露出しません。
   return `${signingInput}.${encodeBase64Url(new Uint8Array(signature))}`;
 }

@@ -1,27 +1,37 @@
 {
-  "name": "管理対象Agent登録・モバイル状態仕様",
-  "viewport": { "width": 390, "height": 3000 },
+  "name": "管理対象Agent登録・モバイル4状態仕様",
+  "viewport": { "width": 390, "height": 5400 },
   "root": {
     "name": "モバイルManagement Clientシェル",
     "direction": "vertical",
+    "fill": "#F3F7F7",
     "children": [
       { "name": "メインコンテンツへ移動", "type": "link", "height": 44 },
       {
         "name": "モバイル固定ヘッダー",
         "direction": "horizontal",
         "padding": 16,
-        "gap": 12,
+        "gap": 16,
         "align": "center",
+        "fill": "#E7EFF0",
+        "stroke": { "color": "#B8CBCD", "width": 1 },
         "children": [
           { "name": "ナビゲーションを開く", "type": "button", "height": 44 },
-          { "name": "cf-tamac Management", "type": "text", "height": 32 }
+          {
+            "name": "TAMAC Control",
+            "type": "text",
+            "height": 32,
+            "color": "#142A2E",
+            "fontWeight": 700
+          }
         ]
       },
       {
         "name": "モバイルメイン",
         "direction": "vertical",
-        "padding": 24,
+        "padding": 16,
         "gap": 24,
+        "fill": "#F3F7F7",
         "children": [
           {
             "name": "ページヘッダー",
@@ -34,50 +44,79 @@
                 "name": "Agentレジストリ › 新規登録",
                 "type": "text",
                 "variant": "display",
-                "height": 72
+                "height": 88,
+                "color": "#142A2E",
+                "fontWeight": 700
               },
               {
-                "name": "サーバー側参照情報でAgentを登録します",
+                "name": "登録結果を同じ試行のreceiptと照合します",
                 "type": "text",
                 "variant": "heading",
-                "height": 64
+                "height": 64,
+                "color": "#35535A"
               },
               {
-                "name": "Agent ID、許可済みのHTTPS Agent RPC origin、表示名を入力します。credentialフィールドはサーバー側検索参照と公開メタデータを受け付けます。",
+                "name": "初期、状態確認が必要、active成功、再登録可能の4画面状態。",
                 "type": "text",
-                "height": 88
+                "height": 48
               }
             ]
           },
           {
-            "name": "1列の登録フォーム — 初期状態",
+            "name": "画面1 — 初期登録",
             "direction": "vertical",
             "padding": 16,
             "gap": 16,
+            "fill": "#FFFFFF",
+            "borderRadius": 8,
+            "stroke": { "color": "#B8CBCD", "width": 1 },
+            "_solves": "片手操作でも登録入力と主要操作を順番に進められる",
             "children": [
               {
-                "name": "ResultRegion — 初期状態は高さ0の領域",
+                "name": "初期 — 入力可能",
+                "type": "text",
+                "variant": "heading",
+                "height": 56,
+                "color": "#142A2E",
+                "fontWeight": 700
+              },
+              {
+                "name": "ResultRegionとValidationSummary — 待機時は視覚領域0",
                 "type": "text",
                 "variant": "caption",
-                "height": 24
+                "height": 24,
+                "color": "#526D73"
               },
-              { "name": "Agent ID", "type": "input", "height": 44 },
-              { "name": "Agent RPC origin", "type": "input", "height": 44 },
-              { "name": "表示名", "type": "input", "height": 44 },
-              { "name": "表示順（任意）", "type": "input", "height": 44 },
               {
-                "name": "既定モデルポリシー — 1列",
+                "name": "識別情報 — 1列・編集可能",
                 "direction": "vertical",
                 "padding": 16,
                 "gap": 16,
+                "fill": "#F8FBFB",
+                "stroke": { "color": "#C9D8DA", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  { "name": "Agent ID", "type": "input", "height": 44 },
+                  { "name": "Agent RPC origin", "type": "input", "height": 44 },
+                  { "name": "表示名", "type": "input", "height": 44 },
+                  { "name": "表示順（任意）", "type": "input", "height": 44 }
+                ]
+              },
+              {
+                "name": "既定モデルポリシー — 1列・編集可能",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 16,
+                "fill": "#F8FBFB",
+                "stroke": { "color": "#C9D8DA", "width": 1 },
+                "borderRadius": 8,
                 "children": [
                   {
-                    "name": "既定モデルポリシー",
+                    "name": "既定モデルポリシー / 作成時に有効",
                     "type": "text",
                     "variant": "heading",
-                    "height": 56
+                    "height": 64
                   },
-                  { "name": "作成時に有効", "type": "text", "height": 32 },
                   { "name": "ポリシー参照", "type": "input", "height": 44 },
                   { "name": "プロバイダー — workers-ai", "type": "input", "height": 44 },
                   { "name": "モデルID", "type": "input", "height": 44 },
@@ -88,17 +127,15 @@
                 ]
               },
               {
-                "name": "credential参照 — 展開",
+                "name": "credential参照 — 展開・編集可能",
                 "direction": "vertical",
                 "padding": 16,
                 "gap": 16,
+                "fill": "#F8FBFB",
+                "stroke": { "color": "#C9D8DA", "width": 1 },
+                "borderRadius": 8,
                 "children": [
-                  {
-                    "name": "credential参照",
-                    "type": "text",
-                    "variant": "heading",
-                    "height": 56
-                  },
+                  { "name": "credential参照", "type": "text", "variant": "heading", "height": 56 },
                   { "name": "credential参照", "type": "input", "height": 44 },
                   { "name": "キーID", "type": "input", "height": 44 },
                   { "name": "公開フィンガープリント", "type": "input", "height": 44 },
@@ -106,123 +143,350 @@
                   { "name": "状態", "type": "input", "height": 44 }
                 ]
               },
-              { "name": "キャンセル", "type": "button", "height": 44 },
-              { "name": "Agentを登録", "type": "button", "height": 44 }
-            ]
-          },
-          { "name": "登録状態一覧", "type": "text", "variant": "heading", "height": 48 },
-          {
-            "name": "処理中のResultRegion",
-            "direction": "vertical",
-            "padding": 16,
-            "gap": 12,
-            "children": [
+              { "name": "キャンセル", "type": "link", "height": 44 },
               {
-                "name": "Agentを登録しています",
-                "type": "text",
-                "variant": "heading",
-                "height": 56
-              },
-              {
-                "name": "登録情報を確認し、Agentを初期化しています…",
-                "type": "text",
-                "height": 48
-              },
-              { "name": "Agentを登録しています…", "type": "button", "height": 44 }
-            ]
-          },
-          { "name": "処理中と成功の区切り", "type": "divider" },
-          {
-            "name": "成功確認",
-            "direction": "vertical",
-            "padding": 16,
-            "gap": 12,
-            "children": [
-              { "name": "Agentを登録しました", "type": "text", "variant": "heading", "height": 56 },
-              {
-                "name": "「{displayName}」を管理対象に追加しました。",
-                "type": "text",
-                "height": 48
-              },
-              {
-                "name": "成功結果 — displayData / safeStatus: succeeded / safeErrorCategory: null / correlationId",
-                "type": "text",
-                "variant": "caption",
-                "height": 48
-              },
-              { "name": "Agentの概要を開く", "type": "button", "height": 44 },
-              { "name": "Agent一覧に戻る", "type": "link", "height": 44 }
-            ]
-          },
-          { "name": "成功と入力検証の区切り", "type": "divider" },
-          {
-            "name": "フィールド検証案内",
-            "direction": "vertical",
-            "padding": 16,
-            "gap": 12,
-            "children": [
-              {
-                "name": "登録内容を確認してください",
-                "type": "text",
-                "variant": "heading",
-                "height": 56
-              },
-              {
-                "name": "強調表示されたフィールドを確認すると登録を続行できます。",
-                "type": "text",
-                "height": 48
-              },
-              { "name": "Agent ID: Agent IDを入力してください。", "type": "link", "height": 44 },
-              {
-                "name": "最初の確認対象フィールドへフォーカス",
-                "type": "text",
-                "variant": "caption",
-                "height": 24
+                "name": "Agentを登録",
+                "type": "button",
+                "height": 44,
+                "fill": "#0A666A",
+                "color": "#FFFFFF",
+                "fontWeight": 700
               }
             ]
           },
-          { "name": "入力検証と設定案内の区切り", "type": "divider" },
+          { "name": "初期登録と状態確認の区切り", "type": "divider" },
           {
-            "name": "originポリシー設定案内",
+            "name": "画面2 — 状態確認が必要",
             "direction": "vertical",
             "padding": 16,
-            "gap": 12,
+            "gap": 16,
+            "fill": "#FFF3D6",
+            "borderRadius": 8,
+            "stroke": { "color": "#D39A2C", "width": 1 },
+            "_solves": "モバイルでも不確定な応答を成功と誤認せず同じ試行を照合できる",
             "children": [
               {
-                "name": "Agent RPC originを確認してください",
+                "name": "状態確認が必要 — 入力保持・編集一時停止",
                 "type": "text",
                 "variant": "heading",
-                "height": 72
+                "height": 72,
+                "color": "#684508",
+                "fontWeight": 700
               },
               {
-                "name": "Agent RPC originを運用ポリシーで確認してください。許可済みのHTTPS originを登録すると操作を続行できます。",
+                "name": "ResultRegion — role=alert",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 12,
+                "fill": "#FFF8E8",
+                "stroke": { "color": "#D39A2C", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  {
+                    "name": "登録状態を確認してください",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 72,
+                    "color": "#684508",
+                    "fontWeight": 700
+                  },
+                  {
+                    "name": "Agent側の応答を確定できませんでした。入力内容を保持しています。「登録状態を確認」で、同じ登録試行のreceipt、profile、設定を照合します。",
+                    "type": "text",
+                    "height": 120,
+                    "color": "#684508"
+                  },
+                  {
+                    "name": "登録状態の確認が完了するまで入力の編集を一時停止しています。",
+                    "type": "text",
+                    "height": 64,
+                    "color": "#684508"
+                  },
+                  {
+                    "name": "問い合わせID: {correlationId} — 全文を折り返し",
+                    "type": "text",
+                    "height": 56
+                  },
+                  { "name": "問い合わせIDをコピー", "type": "button", "height": 44 },
+                  {
+                    "name": "登録状態を確認",
+                    "type": "button",
+                    "height": 44,
+                    "fill": "#0A666A",
+                    "color": "#FFFFFF",
+                    "fontWeight": 700
+                  }
+                ]
+              },
+              {
+                "name": "保持中の入力 — 編集一時停止",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 16,
+                "fill": "#FFFFFF",
+                "stroke": { "color": "#D9C58F", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  {
+                    "name": "識別情報4項目 — 保持値",
+                    "type": "input",
+                    "height": 44,
+                    "fill": "#EEF3F3",
+                    "opacity": 0.78
+                  },
+                  {
+                    "name": "モデルポリシー6項目 — 保持値",
+                    "type": "input",
+                    "height": 44,
+                    "fill": "#EEF3F3",
+                    "opacity": 0.78
+                  },
+                  {
+                    "name": "credential参照5項目 — 保持値",
+                    "type": "input",
+                    "height": 44,
+                    "fill": "#EEF3F3",
+                    "opacity": 0.78
+                  }
+                ]
+              },
+              { "name": "確認操作後のpending表示", "type": "divider" },
+              {
+                "name": "状態確認中 — 同じattempt context",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 12,
+                "fill": "#E5F0F6",
+                "stroke": { "color": "#789CBD", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  {
+                    "name": "登録状態を確認しています",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 72,
+                    "color": "#1B4664",
+                    "fontWeight": 700
+                  },
+                  {
+                    "name": "同じ登録試行のreceipt、profile、設定をAgent側の状態と照合しています…",
+                    "type": "text",
+                    "height": 72,
+                    "color": "#1B4664"
+                  },
+                  {
+                    "name": "確認しています… — aria-disabled / focus維持",
+                    "type": "button",
+                    "height": 44,
+                    "opacity": 0.7
+                  },
+                  {
+                    "name": "フォーム aria-busy=true",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24,
+                    "color": "#1B4664"
+                  }
+                ]
+              }
+            ]
+          },
+          { "name": "状態確認と成功の区切り", "type": "divider" },
+          {
+            "name": "画面3 — active成功",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 16,
+            "fill": "#E3F3E9",
+            "borderRadius": 8,
+            "stroke": { "color": "#77A989", "width": 1 },
+            "_solves": "完全一致後だけ成功と遷移操作を伝える",
+            "children": [
+              {
+                "name": "active — 完全一致を確認済み",
                 "type": "text",
-                "height": 96
+                "variant": "heading",
+                "height": 72,
+                "color": "#155B34",
+                "fontWeight": 700
               },
               {
-                "name": "許可済みのHTTPS Agent RPC originを入力してください。",
+                "name": "ResultRegion — role=status",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 12,
+                "fill": "#F3FBF6",
+                "stroke": { "color": "#77A989", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  {
+                    "name": "Agentを登録しました",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 72,
+                    "color": "#155B34",
+                    "fontWeight": 700
+                  },
+                  {
+                    "name": "「{displayName}」のreceipt、profile、設定が登録試行と一致し、管理対象として登録されました。",
+                    "type": "text",
+                    "height": 88,
+                    "color": "#155B34"
+                  },
+                  {
+                    "name": "照合結果 — 登録試行と一致",
+                    "type": "text",
+                    "height": 40,
+                    "color": "#155B34",
+                    "fontWeight": 700
+                  },
+                  { "name": "登録状態 — active", "type": "text", "height": 32, "color": "#155B34" },
+                  {
+                    "name": "Agentの概要を開く",
+                    "type": "button",
+                    "height": 44,
+                    "fill": "#0A666A",
+                    "color": "#FFFFFF",
+                    "fontWeight": 700
+                  },
+                  { "name": "Agent一覧に戻る", "type": "link", "height": 44 }
+                ]
+              },
+              {
+                "name": "照合済み登録内容 — 読み取り表示",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 8,
+                "fill": "#FFFFFF",
+                "stroke": { "color": "#A9CBB5", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  { "name": "Agent ID / 表示名", "type": "text", "height": 40 },
+                  { "name": "Agent RPC origin", "type": "text", "height": 40 },
+                  { "name": "既定モデルポリシー", "type": "text", "height": 40 },
+                  { "name": "credential公開メタデータ", "type": "text", "height": 40 }
+                ]
+              }
+            ]
+          },
+          { "name": "成功と再登録可能の区切り", "type": "divider" },
+          {
+            "name": "画面4 — 再登録可能",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 16,
+            "fill": "#E5F0F6",
+            "borderRadius": 8,
+            "stroke": { "color": "#789CBD", "width": 1 },
+            "_solves": "確認済みの安全な状態から保持入力を編集して新しい試行を開始できる",
+            "children": [
+              {
+                "name": "再登録可能 — 入力保持・編集可能",
                 "type": "text",
-                "height": 48
+                "variant": "heading",
+                "height": 72,
+                "color": "#1B4664",
+                "fontWeight": 700
               },
               {
-                "name": "問い合わせID: {correlationId} — 全文を折り返し表示",
+                "name": "ResultRegion — role=alert",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 12,
+                "fill": "#F4F9FC",
+                "stroke": { "color": "#789CBD", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  {
+                    "name": "Agentを再登録できます",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 72,
+                    "color": "#1B4664",
+                    "fontWeight": 700
+                  },
+                  {
+                    "name": "Agent側で対象Agentが見つからず、Client側の登録試行データの整理が完了しました。入力内容を保持しています。必要に応じて編集し、「Agentを再登録」で新しい登録試行を開始してください。",
+                    "type": "text",
+                    "height": 144,
+                    "color": "#1B4664"
+                  },
+                  {
+                    "name": "次の登録は新しい登録試行として実行されます。",
+                    "type": "text",
+                    "height": 56,
+                    "color": "#1B4664",
+                    "fontWeight": 700
+                  },
+                  {
+                    "name": "問い合わせID: {correlationId} — 全文を折り返し",
+                    "type": "text",
+                    "height": 56
+                  },
+                  { "name": "問い合わせIDをコピー", "type": "button", "height": 44 }
+                ]
+              },
+              {
+                "name": "保持された登録入力 — 1列・編集可能",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 16,
+                "fill": "#FFFFFF",
+                "stroke": { "color": "#A8C0D3", "width": 1 },
+                "borderRadius": 8,
+                "children": [
+                  { "name": "Agent ID — 保持値", "type": "input", "height": 44 },
+                  { "name": "Agent RPC origin — 保持値", "type": "input", "height": 44 },
+                  { "name": "表示名 — 保持値", "type": "input", "height": 44 },
+                  { "name": "表示順 — 保持値", "type": "input", "height": 44 },
+                  {
+                    "name": "既定モデルポリシー6項目 — 保持値・編集可能",
+                    "type": "input",
+                    "height": 44
+                  },
+                  {
+                    "name": "credential参照5項目 — 保持値・編集可能",
+                    "type": "input",
+                    "height": 44
+                  },
+                  { "name": "ポリシーを検証", "type": "button", "height": 44 }
+                ]
+              },
+              { "name": "キャンセル", "type": "link", "height": 44 },
+              {
+                "name": "Agentを再登録",
+                "type": "button",
+                "height": 44,
+                "fill": "#0A666A",
+                "color": "#FFFFFF",
+                "fontWeight": 700
+              }
+            ]
+          },
+          {
+            "name": "通知責務",
+            "direction": "vertical",
+            "padding": 16,
+            "gap": 8,
+            "fill": "#FFFFFF",
+            "stroke": { "color": "#B8CBCD", "width": 1 },
+            "borderRadius": 8,
+            "children": [
+              {
+                "name": "Server Action完了 — ResultRegionだけがstatus / alertを通知",
                 "type": "text",
                 "height": 56
               },
               {
-                "name": "このIDを運用担当者へ伝えると、サーバー側ログを安全に照合できます。",
+                "name": "Browser入力検証 — ValidationSummaryだけがalertを通知",
                 "type": "text",
-                "variant": "caption",
-                "height": 48
+                "height": 56
               },
-              { "name": "問い合わせIDをコピー", "type": "button", "height": 44 },
               {
-                "name": "コピー完了通知 — 問い合わせIDをコピーしました。",
+                "name": "成功・safe failure・状態確認完了 — 結果見出しへfocus",
                 "type": "text",
-                "variant": "caption",
-                "height": 24
-              },
-              { "name": "origin確認後にAgentを再登録", "type": "button", "height": 44 }
+                "height": 56
+              }
             ]
           }
         ]

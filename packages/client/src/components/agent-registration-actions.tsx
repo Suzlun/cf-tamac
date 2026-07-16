@@ -11,6 +11,8 @@ import { Button } from './ui/button';
  */
 export interface RegistrationActionsProps {
   readonly isEdit: boolean;
+  /** not_found cleanup 完了後に保持入力から新しい registration attempt を開始する状態です。 */
+  readonly reRegistrationReady: boolean;
   /** ポリシー検証を含む、action row 全体を操作不可にする状態です。 */
   readonly disabled: boolean;
   /** 登録または変更保存そのものが進行中である状態です。 */
@@ -26,6 +28,7 @@ export interface RegistrationActionsProps {
  */
 export function RegistrationActions({
   isEdit,
+  reRegistrationReady,
   disabled,
   pending,
   onCancel,
@@ -36,8 +39,15 @@ export function RegistrationActions({
         type="button"
         variant="outline"
         className="min-h-11"
-        onClick={onCancel}
-        disabled={disabled}
+        disabled={disabled && !pending}
+        aria-disabled={disabled}
+        aria-busy={pending}
+        onClick={() => {
+          // aria-disabled は起点要素を DOM と focus 順へ保持するため、操作拒否は callback 側でも明示します。
+          if (!disabled) {
+            onCancel();
+          }
+        }}
       >
         キャンセル
       </Button>
@@ -45,8 +55,9 @@ export function RegistrationActions({
         type="submit"
         variant="default"
         className="min-h-11"
-        disabled={disabled}
+        disabled={disabled && !pending}
         aria-disabled={disabled}
+        aria-busy={pending}
       >
         {pending
           ? isEdit
@@ -54,7 +65,9 @@ export function RegistrationActions({
             : 'Agentを登録しています…'
           : isEdit
             ? '変更を保存'
-            : 'Agentを登録'}
+            : reRegistrationReady
+              ? 'Agentを再登録'
+              : 'Agentを登録'}
       </Button>
     </div>
   );

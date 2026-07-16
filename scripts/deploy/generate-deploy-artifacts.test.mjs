@@ -19,7 +19,11 @@ describe('Deploy Button artifact generation', () => {
 
     try {
       const outDir = join(fixtureRoot, 'out');
-      const artifacts = generateDeployArtifacts({ root: projectRoot, outDir });
+      const artifacts = generateDeployArtifacts({
+        root: projectRoot,
+        outDir,
+        rateLimitNamespaceIds: { production: '9001', staging: '9002' },
+      });
       const agentRoot = join(outDir, 'agent');
       const clientRoot = join(outDir, 'client');
 
@@ -42,6 +46,10 @@ describe('Deploy Button artifact generation', () => {
       expect(agentTsconfig).not.toContain('../../tsconfig.base.json');
       expect(agentWrangler).toContain('name = "AI_AGENT"');
       expect(agentWrangler).toContain('binding = "AGENT_BLOBS"');
+      expect(agentWrangler).toContain('namespace_id = "9001"');
+      expect(agentWrangler).toContain('namespace_id = "9002"');
+      expect(agentWrangler).not.toContain('namespace_id = "1001"');
+      expect(agentWrangler).not.toContain('namespace_id = "1002"');
       expect(agentDevVars).toContain('AGENT_CONTROL_PLANE_TRUST');
       expect(agentDevVars).not.toContain('PRIVATE_KEY_BASE64URL');
       expect(existsSync(join(agentRoot, 'src/generated/rpc/cftamac/agent/v1_pb.ts'))).toBe(true);
@@ -103,7 +111,11 @@ describe('Deploy Button artifact generation', () => {
       const outDir = join(fixtureRoot, 'out');
 
       // Client artifact を生成し、workspace dependency を含む deploy root を検査対象として固定する。
-      generateDeployArtifacts({ root: projectRoot, outDir });
+      generateDeployArtifacts({
+        root: projectRoot,
+        outDir,
+        rateLimitNamespaceIds: { production: '9001', staging: '9002' },
+      });
       const clientRoot = join(outDir, 'client');
       const clientPackage = JSON.parse(readArtifactFile(clientRoot, 'package.json'));
       const sdkPackage = JSON.parse(readArtifactFile(clientRoot, 'sdk/package.json'));
@@ -164,6 +176,32 @@ describe('Deploy Button artifact generation', () => {
       expect(clientReadme).not.toContain('AGENT_RPC_DEFAULT_ORIGIN');
     } finally {
       // 一時 artifact は test process 外へ残さず、fixture 間の状態干渉を防ぐ。
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S014] rejects missing, invalid, or shared Rate Limiting namespace inputs', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'cf-tamac-deploy-namespace-validation-'));
+
+    try {
+      expect(() =>
+        generateDeployArtifacts({ root: projectRoot, outDir: join(fixtureRoot, 'missing') })
+      ).toThrow('positive integer Rate Limiting namespace ID');
+      expect(() =>
+        generateDeployArtifacts({
+          root: projectRoot,
+          outDir: join(fixtureRoot, 'invalid'),
+          rateLimitNamespaceIds: { production: '0', staging: '9002' },
+        })
+      ).toThrow('positive integer Rate Limiting namespace ID');
+      expect(() =>
+        generateDeployArtifacts({
+          root: projectRoot,
+          outDir: join(fixtureRoot, 'shared'),
+          rateLimitNamespaceIds: { production: '9001', staging: '9001' },
+        })
+      ).toThrow('must differ');
+    } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });

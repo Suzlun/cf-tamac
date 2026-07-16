@@ -85,6 +85,11 @@ interface AgentSettingsFormProps {
     idempotencyKey: string,
     draft: ModelPolicyDraftValues
   ) => Promise<BrowserSafeModelPolicySaveResult>;
+  readonly onReconcileDefaultModelPolicy: (
+    agentId: string,
+    operationKey: string,
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicySaveResult>;
   readonly onDestroy: (
     agentId: string,
     idempotencyKey: string,
@@ -426,6 +431,7 @@ function SettingsContent({
   onSaveConfig,
   onValidatePolicyDraft,
   onSaveDefaultPolicyDraft,
+  onReconcileDefaultModelPolicy,
   onRotate,
   onSaveNewReference,
   onOpenDestroyDialog,
@@ -460,6 +466,9 @@ function SettingsContent({
         pending={state.pending}
         onValidatePolicy={onValidatePolicyDraft}
         onSavePolicy={onSaveDefaultPolicyDraft}
+        onReconcilePolicy={(operationKey, draft) =>
+          onReconcileDefaultModelPolicy(agentId, operationKey, draft)
+        }
       />
 
       <AgentConfigSection

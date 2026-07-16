@@ -8,6 +8,19 @@ const DEFAULT_POLICY_REF = 'workers-ai-default';
 const DEFAULT_PROVIDER = 'workers-ai';
 const DEFAULT_MODEL_ID = '@cf/meta/llama-3.1-8b-instruct';
 const DEFAULT_DECISION_SCHEMA_VERSION = 'v1';
+const E2E_RECONCILIATION_REGISTRATION_PREFIX = 'e2e-reconciliation-';
+const E2E_RECONCILIATION_POLICY_REF = 'workers-ai-reconciliation';
+const E2E_UNCONFIRMED_POLICY_REF = 'workers-ai-e2e-unconfirmed';
+const e2ePolicyReconciliationAgentIds = new Set<string>();
+const e2eInitializedAgentStates = new Map<
+  string,
+  {
+    readonly displayName: string;
+    readonly policyRef: string;
+    readonly idempotencyKey: string;
+    readonly registrationRequestDigest: string;
+  }
+>();
 
 /**
  * Playwright E2E 用の Agent RPC fake を使うかどうかを判定します。
@@ -47,22 +60,52 @@ export function createE2eFakeAgentRpcClients(
   managedAgent?: Pick<ManagedAgentRecord, 'agentRpcOrigin' | 'displayName'>
 ): ServerAgentRpcClients {
   const displayName = managedAgent?.displayName ?? agentId;
+  const reconciliationRegistration = agentId.startsWith(E2E_RECONCILIATION_REGISTRATION_PREFIX);
   const lifecycle = {
     destroyAgent: () => resolveFake({ agentId, status: 'destroyed' }),
-    getAgent: () =>
-      resolveFake({
+    getAgent: async () => {
+      const initializedState = e2eInitializedAgentStates.get(agentId);
+      const policyRef = reconciliationRegistration
+        ? E2E_UNCONFIRMED_POLICY_REF
+        : (initializedState?.policyRef ?? DEFAULT_POLICY_REF);
+      const resolvedDisplayName = initializedState?.displayName ?? displayName;
+      return await resolveFake({
         activeCredential: buildFakeCredential(agentId),
-        agent: buildFakeAgent(agentId, displayName),
+        agent: buildFakeAgent(agentId, resolvedDisplayName),
         capabilitySummary: buildFakeCapabilitySummary(),
-        config: buildFakeConfig(agentId, displayName, DEFAULT_POLICY_REF),
-      }),
+        config: buildFakeConfig(agentId, resolvedDisplayName, policyRef),
+        defaultModelPolicy: await buildFakePolicy(agentId, { policyRef }),
+        initializationReceipt:
+          initializedState === undefined
+            ? undefined
+            : {
+                idempotencyKey: initializedState.idempotencyKey,
+                registrationRequestDigest: initializedState.registrationRequestDigest,
+              },
+      });
+    },
     initializeAgent: async (request: Record<string, unknown>) => {
+      // Client registration reconciliation が照合する profile/config/receipt を fake Agent の server-side state として保持する。
+      const initializationReceipt = {
+        idempotencyKey: readString(request.idempotencyKey),
+        registrationRequestDigest: readString(request.registrationRequestDigest),
+      };
       const policy = await buildFakePolicy(agentId, readRecord(request.initialModelPolicy));
+      e2eInitializedAgentStates.set(agentId, {
+        displayName,
+        policyRef: readString(policy.policyRef, DEFAULT_POLICY_REF),
+        ...initializationReceipt,
+      });
+      if (reconciliationRegistration) {
+        // E2E の response-loss scenario だけは、Agent profile と異なる config を返して registration reconciliation を継続する。
+        throw new Error('E2E registration response is intentionally unavailable.');
+      }
       const config = buildFakeConfig(agentId, displayName, readString(policy.policyRef));
       return resolveFake({
         agent: buildFakeAgent(agentId, displayName),
         config,
         defaultModelPolicy: policy,
+        initializationReceipt,
       });
     },
     rotateAgentCredential: () =>
@@ -106,11 +149,16 @@ export function createE2eFakeAgentRpcClients(
   } as unknown as ServerAgentRpcClients['modelPolicies'];
 
   const state = {
-    getConfig: async () =>
-      resolveFake({
-        config: buildFakeConfig(agentId, displayName, DEFAULT_POLICY_REF),
-        defaultModelPolicy: await buildFakePolicy(agentId, { policyRef: DEFAULT_POLICY_REF }),
-      }),
+    getConfig: async () => {
+      const initializedState = e2eInitializedAgentStates.get(agentId);
+      const policyRef = e2ePolicyReconciliationAgentIds.has(agentId)
+        ? E2E_UNCONFIRMED_POLICY_REF
+        : (initializedState?.policyRef ?? DEFAULT_POLICY_REF);
+      return await resolveFake({
+        config: buildFakeConfig(agentId, displayName, policyRef),
+        defaultModelPolicy: await buildFakePolicy(agentId, { policyRef }),
+      });
+    },
     getState: () =>
       resolveFake({
         state: {
@@ -127,6 +175,11 @@ export function createE2eFakeAgentRpcClients(
     updateConfig: async (request: Record<string, unknown>) => {
       const configInput = readRecord(request.config);
       const policyRef = readString(configInput?.modelPolicyRef, DEFAULT_POLICY_REF);
+      if (policyRef === E2E_RECONCILIATION_POLICY_REF) {
+        // update response を未確定にし、以後の GetConfig は desired/previous のどちらにも一致しない値を返す。
+        e2ePolicyReconciliationAgentIds.add(agentId);
+        throw new Error('E2E model policy update response is intentionally unavailable.');
+      }
       return resolveFake({
         config: buildFakeConfig(agentId, displayName, policyRef, '2'),
         defaultModelPolicy: await buildFakePolicy(agentId, { policyRef }),

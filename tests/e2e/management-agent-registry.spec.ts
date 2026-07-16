@@ -4,8 +4,12 @@ import {
   createE2eAgentId,
   E2E_APPROVED_AGENT_RPC_ORIGIN,
   ensureDefaultSigningKeyThroughUi,
+  expectFocusedOperationResult,
   fillManagedAgentRegistrationForm,
+  gotoAgentRegistrationPage,
+  gotoAgentRoute,
   registerManagedAgentThroughUi,
+  submitManagedAgentRegistrationAttempt,
   submitManagedAgentRegistration,
 } from './managed-agent-fixture';
 
@@ -39,6 +43,9 @@ test('[MANAGEMENT-CLIENT-SHELL-S001] Agent registry shell renders without demo c
   await expect(page.getByText(/hello|users/i)).toHaveCount(0);
 
   await openOverviewButton.click();
+  // overview linkのClient navigationが完了してからdetail固有のAgent IDを検査し、RSC更新とのraceを隠しません。
+  await expect(page).toHaveURL(`/agents/${agentId}`, { timeout: 15_000 });
+  await page.waitForLoadState('networkidle');
   await expect(page.getByText(`agent_id: ${agentId}`)).toBeVisible();
 });
 
@@ -63,7 +70,7 @@ test('[TAMAC-SDK-S007] 許可済み HTTPS origin で managed Agent を登録す�
 
   // desktop wireframe は登録見出し、初期 ResultRegion、44px の主要操作を同じ DOM 順で提供する。
   await page.setViewportSize({ width: 1280, height: 960 });
-  await page.goto('/agents/new');
+  await gotoAgentRegistrationPage(page);
   await expect(
     page.getByRole('heading', { name: 'サーバー側参照情報でAgentを登録します' })
   ).toBeVisible();
@@ -83,20 +90,55 @@ test('[TAMAC-SDK-S007] 許可済み HTTPS origin で managed Agent を登録す�
   );
   await submitManagedAgentRegistration(page, agentId);
 
-  const successHeading = page.getByRole('heading', { name: 'Agentを登録しました' });
-  const successRegion = successHeading.locator('..');
-  await expect(successRegion).toHaveAttribute('role', 'status');
-  await expect(successRegion).toHaveAttribute('aria-live', 'polite');
-  await expect(successHeading).toBeFocused();
+  const successRegion = await expectFocusedOperationResult(page, 'Agentを登録しました', 'status');
   await expect(successRegion).toContainText(`「E2E ${agentId}」を管理対象に追加しました。`);
 
   // 登録フォーム入力は canonical 値でなくてもよいが、registry metadata には server policy の canonical origin だけが残る。
   await page.getByRole('link', { name: 'Agent一覧に戻る', exact: true }).click();
+  await expect(page).toHaveURL('/agents', { timeout: 15_000 });
+  await page.waitForLoadState('networkidle');
   const registeredAgentItem = page
     .getByRole('region', { name: 'Managed Agents' })
     .getByRole('listitem')
     .filter({ hasText: agentId });
+  await expect(registeredAgentItem).toBeVisible();
   await expect(registeredAgentItem).toContainText(E2E_APPROVED_AGENT_RPC_ORIGIN);
+});
+
+test('[MANAGEMENT-CLIENT-WIREFRAMES-S001] [TAMAC-SDK-S005] Registration reconciliation keeps the mobile draft and exposes one confirmation action', async ({
+  page,
+}, testInfo) => {
+  // E2E fake の明示 prefix は、外部 Agent RPC を使わず response-loss 後の未確定 registration state を再現する。
+  const agentId = createE2eAgentId(testInfo, 'e2e-reconciliation');
+
+  await ensureDefaultSigningKeyThroughUi(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoAgentRegistrationPage(page);
+  await fillManagedAgentRegistrationForm(page, agentId);
+  await submitManagedAgentRegistrationAttempt(page, agentId);
+
+  const resultRegion = await expectFocusedOperationResult(
+    page,
+    '登録状態を確認してください',
+    'alert'
+  );
+  const correlationId = resultRegion.locator('code');
+  await expect(correlationId).toHaveText(`e2e-fake-correlation:${agentId}`);
+  await expect(correlationId).not.toContainText(/private|rawjwt|authorization/i);
+  await expect(page.getByLabel('Agent ID', { exact: true })).toHaveValue(agentId);
+  await expect(page.getByLabel('Agent RPC origin', { exact: true })).toHaveValue(
+    E2E_APPROVED_AGENT_RPC_ORIGIN
+  );
+  await expect(page.getByLabel('表示名', { exact: true })).toHaveValue(`E2E ${agentId}`);
+  await expect(page.getByLabel('Agent ID', { exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Agentを登録', exact: true })).toBeDisabled();
+
+  const reconcileButton = resultRegion.getByRole('button', { name: '登録状態を確認', exact: true });
+  await expect(reconcileButton).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '適用状態を確認', exact: true })).toHaveCount(0);
+  await reconcileButton.click();
+  await expectFocusedOperationResult(page, '登録状態を確認してください', 'alert');
+  await expect(page.getByRole('button', { name: '登録状態を確認', exact: true })).toHaveCount(1);
 });
 
 test('[AGENT-MANAGEMENT-UI-S010] Signing key management handles Global Settings key lifecycle', async ({
@@ -119,7 +161,7 @@ test('[AGENT-MANAGEMENT-UI-S012] Agent settings verifies issuer kid fingerprint 
   const agentId = createE2eAgentId(testInfo);
 
   await registerManagedAgentThroughUi(page, agentId);
-  await page.goto(`/agents/${agentId}/settings`);
+  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
 
   await expect(
     page.getByRole('heading', { name: 'Signing Key Selection And Health' })
@@ -174,7 +216,7 @@ test('[AGENT-MANAGEMENT-UI-S019] Selected-Agent pages render real Agent RPC data
   const agentId = createE2eAgentId(testInfo);
 
   await registerManagedAgentThroughUi(page, agentId);
-  await page.goto(`/agents/${agentId}/settings`);
+  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
   await page.getByRole('button', { name: 'Run Health Check' }).click();
   await expect(page.getByText('verified', { exact: true })).toBeVisible({ timeout: 15_000 });
 
@@ -226,11 +268,11 @@ test('[WORKSPACE-GOVERNANCE-S013] Operational smoke reaches Agent RPC real data 
   await expect(page.getByText('Schema validation passed')).toBeVisible({ timeout: 15_000 });
 
   await registerManagedAgentThroughUi(page, agentId);
-  await page.goto(`/agents/${agentId}/settings`);
+  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
   await page.getByRole('button', { name: 'Run Health Check' }).click();
   await expect(page.getByText('verified', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  await page.goto(`/agents/${agentId}`);
+  await gotoAgentRoute(page, `/agents/${agentId}`);
   await expect(page.getByText('Profile + lifecycle')).toBeVisible();
   await expect(page.getByText('Capabilities')).toBeVisible();
   await expect(page.getByText('Storage & health')).toBeVisible();

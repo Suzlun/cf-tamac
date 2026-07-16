@@ -1,4 +1,4 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 /**
  * E2E の Client Worker 設定で許可する canonical HTTPS Agent RPC origin です。
@@ -18,7 +18,7 @@ export const E2E_APPROVED_AGENT_RPC_ORIGIN = 'https://cf-tamac-agent.example.wor
  * ローカル D1 は E2E 実行間で残る場合があるため、実行時刻を suffix に含めます。外部 secret や Agent RPC は使わず、
  * Client registry UI の登録 flow だけを通して detail route の前提を作ります。
  */
-export function createE2eAgentId(testInfo: TestInfo): string {
+export function createE2eAgentId(testInfo: TestInfo, prefix = 'e2e'): string {
   const titleSlug = testInfo.title
     .toLowerCase()
     .replaceAll(/[^\da-z]+/g, '-')
@@ -28,7 +28,78 @@ export function createE2eAgentId(testInfo: TestInfo): string {
   const retry = String(testInfo.retry);
   const timestamp = String(Date.now());
   const stableTitleSlug = titleSlug.length > 0 ? titleSlug : 'scenario';
-  return `e2e-${workerIndex}-${retry}-${timestamp}-${stableTitleSlug}`.slice(0, 63);
+  return `${prefix}-${workerIndex}-${retry}-${timestamp}-${stableTitleSlug}`.slice(0, 63);
+}
+
+/**
+ * 完了した Browser-safe 操作結果がアクセシブルな通知とフォーカスを提供することを確認します。
+ *
+ * @param page - 操作結果を表示する Playwright page です。
+ * @param headingName - result heading に表示される固定安全文言です。
+ * @param role - 成功時の `status` または safe failure 時の `alert` です。
+ * @returns result heading の親 notification container を返します。
+ * @remarks
+ * success、safe failure、状態確認の完了結果は同じ `OperationResultRegion` を使用します。この helper は
+ * heading の `tabindex=-1`、programmatic focus、ancestor role と live-region atomicity を E2E で同時に
+ * 検証し、DOM source の文字列確認だけに依存しません。
+ */
+export async function expectFocusedOperationResult(
+  page: Page,
+  headingName: string,
+  role: 'alert' | 'status'
+): Promise<Locator> {
+  const heading = page.getByRole('heading', { name: headingName });
+  const region = heading.locator('..');
+  await expect(region).toHaveAttribute('role', role);
+  await expect(region).toHaveAttribute('aria-atomic', 'true');
+  if (role === 'status') {
+    await expect(region).toHaveAttribute('aria-live', 'polite');
+  }
+  await expect(heading).toHaveAttribute('tabindex', '-1');
+  await expect(heading).toBeFocused();
+  return region;
+}
+
+/**
+ * Server Action の同一origin再検証後にAgent登録画面へ遷移します。
+ *
+ * @param page - 操作対象の Playwright page です。
+ * @returns `/agents/new` の load 完了まで待つ Promise です。
+ * @throws Server Action の再検証競合以外の navigation error を送出します。
+ * @remarks
+ * WebKit が同一originの Server Action navigation と次の `page.goto` を同時に観測した場合だけ、1回待機して再実行します。
+ * E2E の実際のページ遷移・form submit・Server Action は変更せず、既知の browser scheduling race だけを安定化します。
+ */
+export async function gotoAgentRegistrationPage(page: Page): Promise<void> {
+  await gotoAgentRoute(page, '/agents/new');
+}
+
+/**
+ * Server Action 後の既知の同一origin navigation 競合を避けて managed Agent route へ移動します。
+ *
+ * @param page - 操作対象の Playwright page です。
+ * @param path - `/agents/...` 配下の E2E route です。
+ * @returns 指定 route の load 完了まで待つ Promise です。
+ * @throws 既知の navigation interruption 以外の error を送出します。
+ * @remarks
+ * Server Action による RSC refresh が直前 route の navigation を遅延させる場合があるため、該当する Playwright
+ * error だけを1回再試行します。別の失敗を待機や再送で隠さないことで、実際の UI/Server Action failure を保持します。
+ */
+export async function gotoAgentRoute(page: Page, path: string): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt > 0 || !message.includes('interrupted by another navigation')) {
+        throw error;
+      }
+      await page.waitForTimeout(250);
+      await page.waitForLoadState('load').catch(() => undefined);
+    }
+  }
 }
 
 /**
@@ -43,13 +114,15 @@ export function createE2eAgentId(testInfo: TestInfo): string {
  */
 export async function registerManagedAgentThroughUi(page: Page, agentId: string): Promise<void> {
   await ensureDefaultSigningKeyThroughUi(page);
-  await page.goto('/agents/new');
+  await gotoAgentRegistrationPage(page);
   await fillManagedAgentRegistrationForm(page, agentId);
   await submitManagedAgentRegistration(page, agentId);
 
   // 成功結果を確認してから detail 導線を使い、後続 E2E が登録済み Agent を前提にできる状態へ遷移する。
   await page.getByRole('link', { name: 'Agentの概要を開く', exact: true }).click();
   await expect(page).toHaveURL(`/agents/${agentId}`, { timeout: 15_000 });
+  // detail navigation の document/RSC 更新が完了してから、呼び出し元が settings 等へ移動できるようにする。
+  await page.waitForLoadState('networkidle');
 }
 
 /**
@@ -137,6 +210,40 @@ export async function submitManagedAgentRegistration(page: Page, agentId: string
 }
 
 /**
+ * 登録結果が成功または reconciliation required になるまで登録 submit を実行します。
+ *
+ * @param page - 操作対象の Playwright page です。
+ * @param agentId - hydration recovery 時に再設定する Agent ID です。
+ * @returns 登録 Server Action の success または未確定結果が描画されるまで完了する Promise です。
+ * @remarks
+ * WebKit で controlled input が submit 直前に空になる既知の局所競合だけを再入力で回復します。
+ * その他の validation failure は再試行せず、E2E の失敗として残します。Server Action は一度だけ発行されるため、
+ * reconciliation required の場合も InitializeAgent を Browser から再送しません。
+ */
+export async function submitManagedAgentRegistrationAttempt(
+  page: Page,
+  agentId: string
+): Promise<void> {
+  const agentIdInput = page.getByLabel('Agent ID', { exact: true });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.getByRole('button', { name: 'Agentを登録', exact: true }).click();
+    await expect(page.locator('body')).toContainText(
+      /登録状態を確認してください|Agentを登録しました|Agent IDを入力してください。/u,
+      { timeout: 15_000 }
+    );
+    if ((await page.getByText('Agent IDを入力してください。', { exact: true }).count()) > 0) {
+      if (attempt > 0) {
+        throw new Error('Agent ID was cleared twice before registration submit.');
+      }
+      await agentIdInput.fill(agentId);
+      await expect(agentIdInput).toHaveValue(agentId);
+      continue;
+    }
+    return;
+  }
+}
+
+/**
  * Management Client の Global Settings UI だけを使って既定 signing key を用意します。
  *
  * @param page - 操作対象の Playwright page です。
@@ -146,7 +253,8 @@ export async function submitManagedAgentRegistration(page: Page, agentId: string
  * 署名鍵管理画面の positive surface から前提を作ります。private JWK や raw JWT は Browser で扱いません。
  */
 export async function ensureDefaultSigningKeyThroughUi(page: Page): Promise<void> {
-  await page.goto('/global-settings/signing-keys');
+  // signing key Server Action の再検証 navigation が完了してから、次の登録 route へ移動できる状態を作る。
+  await page.goto('/global-settings/signing-keys', { waitUntil: 'networkidle' });
   await expect(page.getByRole('heading', { name: 'Client Service Signing Keys' })).toBeVisible();
 
   // key が 0 件の場合は Global Settings の公開 UI から生成し、server-only action と D1 repository の境界を通す。
@@ -166,4 +274,7 @@ export async function ensureDefaultSigningKeyThroughUi(page: Page): Promise<void
       timeout: 15_000,
     });
   }
+
+  // Server Action の再検証 navigation が完了するまで待ち、直後の /agents/new navigation と競合させない。
+  await page.waitForLoadState('networkidle');
 }

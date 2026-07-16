@@ -118,6 +118,7 @@ export interface InitializeAgentCommand {
   readonly displayName?: string;
   readonly initialConfig: AgentConfigCommandInput;
   readonly initialModelPolicy?: AgentModelPolicyCommandInput;
+  readonly registrationRequestDigest: string;
 }
 
 /**
@@ -303,6 +304,38 @@ export interface AgentProfileView {
   readonly status: string;
   readonly systemThreadId: string;
   readonly updatedAtMs: number;
+}
+
+/**
+ * Client registration reconciliation 用の Agent-owned initialization receipt です。
+ *
+ * @remarks
+ * この値は初期化 command の固定 idempotency key と Client が正規化した registration intent digest だけを含みます。
+ * credential、JWT、private key、request 本文は保持せず、GetAgent のserver-side照合にだけ使用します。
+ * profileが存在するinitialized Agentでは必ず存在し、欠落した状態は成功responseへ変換してはいけません。
+ *
+ * @example
+ * ```ts
+ * const receipt: AgentInitializationReceiptView = {
+ *   idempotencyKey: 'registration-1',
+ *   registrationRequestDigest: 'sha256:...',
+ * };
+ * ```
+ */
+export interface AgentInitializationReceiptView {
+  /**
+   * 成功したInitializeAgent commandに指定されたidempotency keyです。
+   *
+   * この値は同一登録試行のreplayを識別するために使い、後続commandのkeyで上書きしません。
+   */
+  readonly idempotencyKey: string;
+
+  /**
+   * Clientが登録requestから固定した照合用digestです。
+   *
+   * 空白だけの値はdomain validationで拒否し、保存時は入力文字列をtrimせず完全一致で保持します。
+   */
+  readonly registrationRequestDigest: string;
 }
 
 /**
@@ -593,6 +626,7 @@ export interface InitializeAgentResult {
   readonly config: AgentConfigView;
   readonly credential: AgentCredentialView;
   readonly defaultModelPolicy?: AgentModelPolicySummaryView;
+  readonly initializationReceipt: AgentInitializationReceiptView;
   readonly replayed: boolean;
   readonly threadKeyRule: {
     readonly normalizedThreadKey: string;
@@ -609,6 +643,7 @@ export interface GetAgentResult {
   readonly capabilitySummary: AgentCapabilitySummaryView;
   readonly config: AgentConfigView;
   readonly defaultModelPolicy?: AgentModelPolicySummaryView;
+  readonly initializationReceipt: AgentInitializationReceiptView;
 }
 
 /**

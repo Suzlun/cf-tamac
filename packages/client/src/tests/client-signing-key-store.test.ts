@@ -24,11 +24,7 @@ import {
   resolveDefaultSigningIssuer,
   resolveEd25519PrivateKey,
 } from '../server/credentials/signing-keys';
-import {
-  createCredentialReferenceRepository,
-  createManagedAgentRepository,
-  createSigningKeyRepository,
-} from '../server/db';
+import { createManagedAgentRepository, createSigningKeyRepository } from '../server/db';
 
 import { applyClientMigration, createTestD1Database } from './test-d1-helper';
 
@@ -428,10 +424,37 @@ describe('Agent settings signing key selection reachability', () => {
       "if (configResult.status === 'rejected') {\n    return ("
     );
   });
+
+  it('[MANAGEMENT-CLIENT-WIREFRAMES-S001] Health Check reuses the shared pending/result focus and live-region contract', () => {
+    const componentSource = readFileSync(
+      fileURLToPath(new URL('../components/agent-signing-key-select.tsx', import.meta.url).href),
+      'utf8'
+    );
+
+    // health action の pending/success/failure は OperationResultRegion に集約し、form busy state と heading focus を共通実装で保証する。
+    expect(componentSource).toContain(
+      "import { OperationResultRegion } from './operation-result-region'"
+    );
+    expect(componentSource).toContain('result={healthResult}');
+    expect(componentSource).toContain('pending={verifying}');
+    expect(componentSource).toContain('aria-busy={selectionState.verifying}');
+    expect(componentSource).not.toContain('<Card role="alert">');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S012] signing-key selection and health actions provide 44px touch targets', () => {
+    const componentSource = readFileSync(
+      fileURLToPath(new URL('../components/agent-signing-key-select.tsx', import.meta.url).href),
+      'utf8'
+    );
+
+    // wireframe の mobile touch target を既存 Tailwind spacing token で統一し、radio 自体が小さくても label 全体で操作できるようにする。
+    expect(componentSource).toContain('className="min-h-11"');
+    expect(componentSource).toContain('className="flex min-h-11 items-center gap-2 text-sm"');
+  });
 });
 
 describe('Registration signing key prerequisite and rollback safety', () => {
-  it('[CLIENT-REGISTRY-S001] registration checks default signing key before persist and only rolls back create mode', () => {
+  it('[CLIENT-REGISTRY-S001] registration checks default signing key before atomic create attempt and keeps edit server-only', () => {
     const source = readFileSync(
       fileURLToPath(new URL('../server/actions/managed-agents.ts', import.meta.url).href),
       'utf8'
@@ -442,11 +465,12 @@ describe('Registration signing key prerequisite and rollback safety', () => {
     expect(source).toContain(
       'グローバル設定で既定のClient Service signing keyを生成して選択すると、Agent登録を続行できます。'
     );
-    // rollback (delete) は create mode だけ。edit mode は既存台帳行を削除しない。
+    // create は atomic attempt repository を使い、response-loss cleanup でも attempt ID を照合する。
     expect(source).toContain('if (isCreate) {');
-    expect(source).toContain('await rollbackFailedAgentInitialization(env.CLIENT_DB');
-    // edit mode で default signing key で上書きしない (既存 metadata を保持)。
-    expect(source).toContain('edit は既存の signing metadata を保持し、default で上書きしない');
+    expect(source).toContain('createManagedAgentRegistrationAttempt');
+    // edit mode は Agent Initialize を呼ばず、既存 signing/attempt metadata を保持する。
+    expect(source).toContain('updateRegistrationMetadata');
+    expect(source).toContain('edit は signing/attempt metadata を保持し');
   });
 });
 
@@ -455,36 +479,27 @@ describe('Edit mode missing-row safety', () => {
     const db = createTestD1Database();
     await applyClientMigration(db);
     const agents = createManagedAgentRepository(db);
-    const credentials = createCredentialReferenceRepository(db);
-
-    const { persistManagedAgentRegistration } =
-      await import('../server/actions/managed-agent-registration');
-    const result = await persistManagedAgentRegistration(
-      {
-        agentId: 'agent-missing-edit',
-        agentRpcOrigin: 'http://localhost:8787',
-        displayName: 'Missing Edit',
-        displayOrder: 0,
-        referenceValue: 'PROVIDER_CREDENTIAL_ALPHA',
-        keyId: 'key-001',
-        publicFingerprint: 'sha256_b64u:abc',
-        maskedHint: 'masked',
-        status: 'active',
-        modelPolicy: {
-          policyRef: 'workers-ai-default',
-          provider: 'workers-ai',
-          model: '@cf/meta/llama-3.1-8b-instruct',
-          temperature: '0.2',
-          topP: '0.9',
-          maxOutputTokens: '1024',
+    const { createManagedAgentRegistrationAttemptRepository } = await import('../server/db');
+    const registrationRepository = createManagedAgentRegistrationAttemptRepository(db);
+    await expect(
+      registrationRepository.updateRegistrationMetadata({
+        agent: {
+          agentId: 'agent-missing-edit',
+          agentRpcOrigin: 'http://localhost:8787',
+          displayName: 'Missing Edit',
+          displayOrder: 0,
         },
-      },
-      { agents, credentials },
-      { existingAgentId: 'agent-missing-edit' }
-    );
+        credential: {
+          credentialRef: 'PROVIDER_CREDENTIAL_ALPHA',
+          keyId: 'key-001',
+          publicFingerprint: 'sha256_b64u:abc',
+          maskedHint: 'masked',
+          status: 'active',
+        },
+      })
+    ).rejects.toThrow();
 
     // edit target が存在しない場合は拒否され、台帳行は作成されない。
-    expect(result.ok).toBe(false);
     const after = await agents.getManagedAgent('agent-missing-edit');
     expect(after).toBeUndefined();
   });

@@ -4,6 +4,11 @@ import {
   createE2eAgentId,
   E2E_APPROVED_AGENT_RPC_ORIGIN,
   ensureDefaultSigningKeyThroughUi,
+  expectFocusedOperationResult,
+  gotoAgentRegistrationPage,
+  gotoAgentRoute,
+  registerManagedAgentThroughUi,
+  submitManagedAgentRegistration,
 } from './managed-agent-fixture';
 
 const SAFE_MODEL_POLICY_RESULT_COPY =
@@ -37,7 +42,7 @@ test('[AGENT-MANAGEMENT-UI-S017] Agent creation flow が initial model policy �
   const agentId = createE2eAgentId(testInfo);
 
   await ensureDefaultSigningKeyThroughUi(page);
-  await page.goto('/agents/new');
+  await gotoAgentRegistrationPage(page);
   await expect(
     page.getByRole('heading', { name: 'サーバー側参照情報でAgentを登録します' })
   ).toBeVisible();
@@ -71,18 +76,14 @@ test('[AGENT-MANAGEMENT-UI-S018] Settings 画面が default model policy を安�
   const agentId = createE2eAgentId(testInfo);
 
   await ensureDefaultSigningKeyThroughUi(page);
-  await page.goto('/agents/new');
+  await gotoAgentRegistrationPage(page);
   await fillCreationFormWithSafePolicyDraft(page, agentId, 'workers-ai-default-e2e');
-  const registered = await submitRegistrationAndDetectSuccess(page);
-  test.skip(
-    !registered,
-    'Agent RPC-backed registration is unavailable, so Settings mutation UI cannot be reached in this environment.'
-  );
+  await submitManagedAgentRegistration(page, agentId);
 
-  await page.goto(`/agents/${agentId}/settings`);
+  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('heading', { name: 'Agent設定とcredential' })).toBeVisible();
-  await expect(page.getByText('Current Agent-owned policy metadata.')).toBeVisible();
+  await expect(page.getByText(/Agent所有ポリシーの安全なメタデータを表示します/u)).toBeVisible();
   const savePolicyButton = page.getByRole('button', { name: '既定ポリシーを保存' });
   await expect(savePolicyButton).toBeVisible();
   const savePolicyBox = await savePolicyButton.boundingBox();
@@ -99,6 +100,51 @@ test('[AGENT-MANAGEMENT-UI-S018] Settings 画面が default model policy を安�
     timeout: 15_000,
   });
   await assertBrowserSecrecy(page, secrecyProbe);
+});
+
+test('[MANAGEMENT-CLIENT-WIREFRAMES-S001] [TAMAC-SDK-S005] Model policy reconciliation keeps the mobile draft and prior summary behind one confirmation action', async ({
+  page,
+}, testInfo) => {
+  const agentId = createE2eAgentId(testInfo);
+
+  await registerManagedAgentThroughUi(page, agentId);
+  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const summary = page.getByRole('region', { name: '既定モデルポリシー', exact: true });
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText('workers-ai-default');
+
+  const policyRefInput = page.getByLabel('ポリシー参照');
+  // WebKit の Server Component 再描画が draft を初期値へ戻す場合があるため、送信前に Browser DOM の値を確認する。
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await policyRefInput.fill('workers-ai-reconciliation');
+    try {
+      await expect(policyRefInput).toHaveValue('workers-ai-reconciliation');
+      break;
+    } catch (error) {
+      if (attempt > 0) {
+        throw error;
+      }
+    }
+  }
+  await page.getByRole('button', { name: '既定ポリシーを保存' }).click();
+  const resultRegion = await expectFocusedOperationResult(
+    page,
+    '操作結果を確認してください',
+    'alert'
+  );
+  await expect(resultRegion).toContainText('適用状態を確認');
+  await expect(resultRegion.locator('code')).not.toContainText(/private|rawjwt|authorization/i);
+  await expect(policyRefInput).toHaveValue('workers-ai-reconciliation');
+  await expect(summary).toContainText('workers-ai-default');
+  await expect(page.getByRole('button', { name: '既定ポリシーを保存' })).toBeDisabled();
+
+  const reconcileButton = resultRegion.getByRole('button', { name: '適用状態を確認', exact: true });
+  await expect(reconcileButton).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '登録状態を確認', exact: true })).toHaveCount(0);
+  await reconcileButton.click();
+  await expectFocusedOperationResult(page, '接続状態を確認してください', 'alert');
+  await expect(page.getByRole('button', { name: '適用状態を確認', exact: true })).toHaveCount(1);
 });
 
 function startBrowserSecrecyProbe(page: Page): BrowserSecrecyProbe {
@@ -132,11 +178,12 @@ function isBrowserDirectAgentRpcRequest(request: Request): boolean {
 
 function isBrowserScriptResponse(response: Response): boolean {
   const request = response.request();
-  // Playwright config が選ぶ専用 E2E origin の script だけを検査し、外部 resource を Browser bundle と誤認しない。
-  return (
-    request.resourceType() === 'script' &&
-    new URL(response.url()).origin === new URL(request.frame().url()).origin
-  );
+  // Service Worker 起点の request は frame を持たず、Playwright の request.frame() 呼び出し自体が例外になる。
+  if (request.resourceType() !== 'script' || request.serviceWorker() !== null) {
+    return false;
+  }
+  // frame を持つ document script だけを E2E origin と照合し、外部 resource を Browser bundle と誤認しない。
+  return new URL(response.url()).origin === new URL(request.frame().url()).origin;
 }
 
 async function readResponseTextSafely(response: Response): Promise<string> {
@@ -182,22 +229,6 @@ async function fillPolicyDraftFields(page: Page, policyRef: string): Promise<voi
   await page.getByLabel('温度').fill('0.20');
   await page.getByLabel('Top P').fill('0.90');
   await page.getByLabel('最大出力トークン数').fill('1024');
-}
-
-async function submitRegistrationAndDetectSuccess(page: Page): Promise<boolean> {
-  await page.getByRole('button', { name: 'Agentを登録' }).click();
-  try {
-    await expect(page.getByRole('heading', { name: 'Agentを登録しました' })).toBeVisible({
-      timeout: 15_000,
-    });
-    return true;
-  } catch {
-    await expect(page.locator('body')).toContainText(
-      /Agentの接続設定を確認してください|操作を再実行できます|強調表示されたフィールド/,
-      { timeout: 15_000 }
-    );
-    return false;
-  }
 }
 
 async function assertBrowserSecrecy(page: Page, secrecyProbe: BrowserSecrecyProbe): Promise<void> {

@@ -132,6 +132,42 @@ export async function upsertModelPolicyForManagedAgent(
 ): Promise<BrowserSafeModelPolicyMutationResult> {
   try {
     const { clients } = await loadAgentRpcClients(agentId);
+    const result = await upsertModelPolicyWithClients(clients, agentId, idempotencyKey, draft);
+    if (result.safeStatus === 'succeeded') {
+      revalidatePath(`/agents/${agentId}`);
+      revalidatePath(`/agents/${agentId}/settings`);
+    }
+    return result;
+  } catch (error) {
+    return createFailureResultFromError(error);
+  }
+}
+
+/**
+ * 解決済みの同一 `ServerAgentRpcClients` で model policy を upsert します。
+ *
+ * @param clients - 一つの correlation/acting-user/transport context を共有する server-only SDK aggregate です。
+ * @param agentId - 対象 managed Agent ID です。
+ * @param idempotencyKey - 親 operation key から導出した `:policy` command key です。
+ * @param draft - Browser-safe policy draft です。
+ * @returns policy metadata を持つ four-field safe result です。
+ * @remarks
+ * この helper は route revalidate を行いません。`UpdateConfig` と同じ operation の完了前に summary を成功表示しないため、
+ * caller が desired config の確定後だけ revalidate します。
+ *
+ * @example
+ * ```ts
+ * const result = await upsertModelPolicyWithClients(clients, 'agent-alpha', 'save-1:policy', draft);
+ * ```
+ */
+export async function upsertModelPolicyWithClients(
+  clients: ServerAgentRpcClients,
+  agentId: string,
+  idempotencyKey: string,
+  draft: ModelPolicyDraftValues
+): Promise<BrowserSafeModelPolicyMutationResult> {
+  try {
+    // Browser draft を Agent-owned policy payload へ変換し、Client D1 には policy body を保存しません。
     const policy = await buildAgentModelPolicyInput(draft);
     const response = await clients.withErrorNormalization(() =>
       clients.modelPolicies.upsertModelPolicy({ agentId, idempotencyKey, policy: policy as never })
@@ -151,13 +187,11 @@ export async function upsertModelPolicyForManagedAgent(
     if (metadata === undefined) {
       return attachSdkResult(
         createModelPolicyFailureResult(
-          'Default model policy could not be saved. Retry after verifying the highlighted fields.'
+          '既定モデルポリシーを保存できませんでした。入力内容を確認してください。'
         ),
         clients
       );
     }
-    revalidatePath(`/agents/${agentId}`);
-    revalidatePath(`/agents/${agentId}/settings`);
     return attachSdkResult(
       {
         fieldErrors: {},
@@ -170,7 +204,7 @@ export async function upsertModelPolicyForManagedAgent(
       clients
     );
   } catch (error) {
-    return createFailureResultFromError(error);
+    return createFailureResultFromError(error, clients.invocation.correlationId);
   }
 }
 
@@ -218,7 +252,10 @@ export async function archiveModelPolicyForManagedAgent(
   }
 }
 
-function createFailureResultFromError(error: unknown): BrowserSafeModelPolicyMutationResult {
+function createFailureResultFromError(
+  error: unknown,
+  correlationId = globalThis.crypto.randomUUID()
+): BrowserSafeModelPolicyMutationResult {
   // Client D1/signing resolution failure も raw error を返さず、SDK helper の固定 status/correlation envelope へ閉じます。
   const displayData = createModelPolicyFailureResult(
     safeModelPolicyErrorMessage(error),
@@ -226,7 +263,7 @@ function createFailureResultFromError(error: unknown): BrowserSafeModelPolicyMut
     [],
     safeModelPolicyErrorCategory(error)
   );
-  return createBrowserSafeAgentRpcFailure(error, globalThis.crypto.randomUUID(), displayData);
+  return createBrowserSafeAgentRpcFailure(error, correlationId, displayData);
 }
 
 /**

@@ -1085,6 +1085,12 @@ message InitializeAgentRequest {
   CredentialRotationPolicy credential_policy = 5;
   SecurityMetadata security = 6;
   AgentModelPolicyInput initial_model_policy = 7;
+  string registration_request_digest = 8;
+}
+
+message AgentInitializationReceipt {
+  string idempotency_key = 1;
+  string registration_request_digest = 2;
 }
 
 message InitializeAgentResponse {
@@ -1094,6 +1100,7 @@ message InitializeAgentResponse {
   AgentAuditRecord audit = 4;
   ThreadKeyIdentityRule thread_key_rule = 5;
   AgentModelPolicySummary default_model_policy = 6;
+  AgentInitializationReceipt initialization_receipt = 7;
 }
 
 message GetAgentRequest {
@@ -1106,6 +1113,7 @@ message GetAgentResponse {
   AccessCredential active_credential = 3;
   AgentCapabilitySummary capability_summary = 4;
   AgentModelPolicySummary default_model_policy = 5;
+  AgentInitializationReceipt initialization_receipt = 6;
 }
 
 message DestroyAgentRequest {

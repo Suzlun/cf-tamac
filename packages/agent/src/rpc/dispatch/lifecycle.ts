@@ -68,6 +68,7 @@ export async function dispatchInitializeAgent(
       request.initialModelPolicy === undefined
         ? undefined
         : mapModelPolicyCommandInput(request.initialModelPolicy),
+    registrationRequestDigest: request.registrationRequestDigest,
   });
   // Durable Object の domain result を generated RPC response init へ変換します。
   return mapInitializeAgentResponse(result);

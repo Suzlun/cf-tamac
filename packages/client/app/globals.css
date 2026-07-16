@@ -1,96 +1,118 @@
 /**
- * Shadcn UI 既定（new-york / neutral / cssVariables）の token block と Tailwind directives のみを保持する。
+ * Shadcn の semantic slot を TAMAC の mineral teal tinted-neutral palette へ接続する。
  *
- * タスク 1.5: 旧 management shell 独自 palette（独自の色/強調/背景 token）、
- * radial gradient 背景、route 固有 visual shim class、custom font override、table-only responsive shim は
- * 全て styling source から除外した。color token は Shadcn 既定の neutral（HSL）light/dark block のみを使用する。
+ * 登録・照合 route は UI 仕様で定めた背景、surface、前景、主要色、border、状態色を共有し、
+ * 画面ごとの色直書きや純粋なグレースケールへ退行しない。書体も同じ共有 token を経由して、
+ * 通常本文と問い合わせ ID の視認性・識別性を揃える。
  */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  /* Shadcn 既定 neutral light theme。色以外の product 固有変数は持たない。 */
+  /* UI 仕様 §8.4 の mineral teal light theme。全ての意味色を semantic slot へ集約する。 */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --background: 180 20% 96.1%;
+    --foreground: 189 39% 12.9%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 189 39% 12.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --popover-foreground: 189 39% 12.9%;
+    --primary: 183 83% 22.7%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 180 24% 90%;
+    --secondary-foreground: 189 39% 12.9%;
+    --muted: 180 20% 92.5%;
+    --muted-foreground: 191 26% 28%;
+    --accent: 181 28% 87%;
+    --accent-foreground: 189 39% 12.9%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 0 0% 9%;
-    --chart-2: 0 0% 30%;
-    --chart-3: 0 0% 50%;
-    --chart-4: 0 0% 70%;
-    --chart-5: 0 0% 90%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 186 17% 76.3%;
+    --input: 186 17% 76.3%;
+    --ring: 183 83% 22.7%;
+    --chart-1: 183 83% 22.7%;
+    --chart-2: 181 53% 61%;
+    --chart-3: 191 26% 28%;
+    --chart-4: 142 23% 56.5%;
+    --chart-5: 40 65% 50%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 180 24% 93%;
+    --sidebar-foreground: 189 39% 12.9%;
+    --sidebar-primary: 183 83% 22.7%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 181 28% 87%;
+    --sidebar-accent-foreground: 189 39% 12.9%;
+    --sidebar-border: 186 17% 76.3%;
+    --sidebar-ring: 181 53% 61%;
+    /* UI 仕様の結果状態を、状態語と組み合わせて識別できる semantic token。 */
+    --operation-success: 143 40% 92.2%;
+    --operation-success-foreground: 147 63% 22%;
+    --operation-success-border: 142 23% 56.5%;
+    --operation-reconciliation: 42 100% 92%;
+    --operation-reconciliation-foreground: 38 86% 22%;
+    --operation-reconciliation-border: 40 65% 50%;
+    --operation-reregistration: 201 49% 93.1%;
+    --operation-reregistration-foreground: 205 57% 24.9%;
+    --operation-reregistration-border: 209 34% 60.6%;
   }
 
-  /* Shadcn 既定 neutral dark theme（class-based dark mode）。 */
+  /* UI 仕様 §8.4 の mineral teal dark theme（class-based dark mode）。 */
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 191 41% 10%;
+    --foreground: 180 31% 93.7%;
+    --card: 191 35% 13%;
+    --card-foreground: 180 31% 93.7%;
+    --popover: 191 35% 13%;
+    --popover-foreground: 180 31% 93.7%;
+    --primary: 181 53% 61%;
+    --primary-foreground: 184 64% 8.8%;
+    --secondary: 191 32% 19%;
+    --secondary-foreground: 180 31% 93.7%;
+    --muted: 191 32% 17%;
+    --muted-foreground: 187 20% 76.9%;
+    --accent: 191 32% 23%;
+    --accent-foreground: 180 31% 93.7%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 0 0% 98%;
-    --chart-2: 0 0% 70%;
-    --chart-3: 0 0% 50%;
-    --chart-4: 0 0% 30%;
-    --chart-5: 0 0% 10%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 187 20% 25%;
+    --input: 187 20% 25%;
+    --ring: 181 53% 61%;
+    --chart-1: 181 53% 61%;
+    --chart-2: 187 20% 76.9%;
+    --chart-3: 142 49% 81.4%;
+    --chart-4: 40 100% 82%;
+    --chart-5: 205 84% 88%;
+    --sidebar-background: 191 41% 10%;
+    --sidebar-foreground: 180 31% 93.7%;
+    --sidebar-primary: 181 53% 61%;
+    --sidebar-primary-foreground: 184 64% 8.8%;
+    --sidebar-accent: 191 32% 23%;
+    --sidebar-accent-foreground: 180 31% 93.7%;
+    --sidebar-border: 187 20% 25%;
+    --sidebar-ring: 181 53% 61%;
+    /* ダークテーマでも UI 仕様の状態前景・背景・border の意味を維持する。 */
+    --operation-success: 151 46% 15.9%;
+    --operation-success-foreground: 142 49% 81.4%;
+    --operation-success-border: 142 23% 56.5%;
+    --operation-reconciliation: 40 57% 18.2%;
+    --operation-reconciliation-foreground: 40 100% 82%;
+    --operation-reconciliation-border: 40 65% 50%;
+    --operation-reregistration: 205 53% 19.2%;
+    --operation-reregistration-foreground: 205 84% 88%;
+    --operation-reregistration-border: 209 34% 60.6%;
   }
 }
 
 @layer base {
-  /* Shadcn 既定の base layer のみ。border と body の色は token 経由で統一する。 */
+  /* border、body、本文書体は共有 token 経由で統一し、route-local styling の再実装を防ぐ。 */
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
   }
 }

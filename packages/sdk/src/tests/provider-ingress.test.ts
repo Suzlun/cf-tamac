@@ -1,6 +1,7 @@
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { TamacSdkOperationError } from '../errors';
 import {
   AgentEventInputSchema,
   PublishDeliveryResultRequestSchema,
@@ -11,6 +12,7 @@ import {
   PublishToolResultResponseSchema,
 } from '../generated/agent-rpc/cftamac/agent/v1_pb';
 import { createTamacProviderIngressClient } from '../provider-ingress';
+import { createTamacProviderIngressTransport } from '../provider-ingress-transport';
 
 import type {
   PublishDeliveryResultRequest,
@@ -210,6 +212,101 @@ describe('TAMAC Provider ingress client', () => {
     expect(signingInputs).toEqual([]);
     expect(captured).toEqual([]);
   });
+
+  it('[TAMAC-SDK-S002] Provider HTTP 429 を resource_exhausted operation error へ正規化する', async () => {
+    // Agent Worker の safe 429 response を再現し、raw response message を SDK consumer へ渡さないようにします。
+    const invocation = createInvocation();
+    const client = createTamacProviderIngressClient({
+      agentRpcOrigin: 'https://agent.example.test',
+      fetch: () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ code: 'resource_exhausted', message: 'rate-limit secret' }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: 429,
+            }
+          )
+        ),
+      invocation,
+      signing: createSigningContext(),
+    });
+
+    // Provider surface の typed call が 429 を stable category と request/service/method context に畳むことを検査します。
+    const error = await client
+      .publishEvent({
+        connectionId: 'connection-001',
+        event: create(AgentEventInputSchema),
+        threadKey: 'thread-001',
+      })
+      .then(
+        () => {
+          throw new TypeError('Provider HTTP 429 request unexpectedly succeeded.');
+        },
+        (error_: unknown) => error_
+      );
+    expect(error).toBeInstanceOf(TamacSdkOperationError);
+    expect(error).toMatchObject({
+      agentId: invocation.agentId,
+      category: 'resource_exhausted',
+      correlationId: invocation.correlationId,
+      idempotencyKey: invocation.idempotencyKey,
+      methodName: 'PublishEvent',
+      requestId: invocation.requestId,
+      serviceName: providerServiceName,
+    });
+  });
+
+  it('[TAMAC-SDK-S002] Provider transport は canonical HTTPS origin だけを受理する', () => {
+    // URL.origin と一致する normal origin と明示的な non-default port は、署名済み request の宛先として受理します。
+    for (const origin of ['https://agent.example.test', 'https://agent.example.test:8443']) {
+      expect(() =>
+        createTamacProviderIngressTransport({
+          agentRpcOrigin: origin,
+          invocation: createInvocation(),
+        })
+      ).not.toThrow();
+    }
+
+    // path、query、fragment、userinfo、HTTP、default port、trailing slash は canonical origin contract 外として拒否します。
+    const rejectedOrigins = [
+      'https://agent.example.test/',
+      'https://agent.example.test/ingress',
+      'https://agent.example.test?target=provider',
+      'https://agent.example.test#provider',
+      'https://provider:password@agent.example.test',
+      'http://agent.example.test',
+      'https://agent.example.test:443',
+    ];
+    for (const origin of rejectedOrigins) {
+      expect(() =>
+        createTamacProviderIngressTransport({
+          agentRpcOrigin: origin,
+          invocation: createInvocation(),
+        })
+      ).toThrow();
+    }
+  });
+
+  it('[TAMAC-SDK-S002] negative Provider timestamp を signer と fetch の前に拒否する', () => {
+    // side effect capture を用意し、canonical detached signature を作る前の validation を検査します。
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    const signDetached = vi.fn(() => Promise.resolve(new Uint8Array([1])));
+    const invocation = { ...createInvocation(), timestampUnixMs: -1 };
+
+    // non-negative safe integer contract に反する timestamp は client construction で fail closed します。
+    expect(() =>
+      createTamacProviderIngressClient({
+        agentRpcOrigin: 'https://agent.example.test',
+        fetch,
+        invocation,
+        signing: { algorithm: 'Ed25519', keyId: 'provider-key-001', signDetached },
+      })
+    ).toThrow('Provider ingress timestampUnixMs must be a non-negative safe integer.');
+    // invalid timestamp は signer callback と external fetch のどちらも開始しないことを確認します。
+    expect(signDetached).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
 
 interface CapturedProviderRequest {
@@ -244,6 +341,15 @@ function createInvocation(): ProviderIngressInvocationContext {
     nonce: ' nonce-e\u0301 ',
     requestId: 'request-001',
     timestampUnixMs: 1_752_200_000_000,
+  };
+}
+
+function createSigningContext() {
+  // Provider private key を test に持ち込まず、detached signer callback の成功結果だけを返します。
+  return {
+    algorithm: 'Ed25519' as const,
+    keyId: 'provider-key-001',
+    signDetached: () => Promise.resolve(new Uint8Array([1])),
   };
 }
 

@@ -8,6 +8,7 @@ import {
 
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
 
+import { createAllowingProviderIngressRateLimitStub } from './provider-ingress-rate-limit-test-helpers';
 import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
@@ -38,6 +39,7 @@ function createTestEnv(): AgentWorkerEnv {
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',
     AI_AGENT: durableObjectNamespace,
+    PROVIDER_INGRESS_RATE_LIMITER: createAllowingProviderIngressRateLimitStub(),
   };
 }
 

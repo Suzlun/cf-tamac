@@ -48,6 +48,7 @@ export type BrowserSafeModelPolicyErrorCategory =
   | 'not_found'
   | 'failed_precondition'
   | 'unavailable'
+  | 'internal'
   | 'unknown';
 
 /**
@@ -146,6 +147,8 @@ export interface BrowserSafeModelPolicyMutationDisplayData extends BrowserSafeOp
   readonly errorCategory?: BrowserSafeModelPolicyErrorCategory;
   readonly formError?: string;
   readonly warnings: readonly BrowserSafeModelPolicyWarning[];
+  /** `true` の間は draft と直前に確認済み summary を保持し、状態確認 action だけを有効化する。 */
+  readonly reconciliationRequired?: boolean;
 }
 
 /**

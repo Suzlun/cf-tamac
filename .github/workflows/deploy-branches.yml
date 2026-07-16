@@ -18,6 +18,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION: ${{ vars.CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION }}
+      CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING: ${{ vars.CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

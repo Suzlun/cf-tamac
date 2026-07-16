@@ -1,6 +1,6 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 
-import type { TamacAgentRpcMethodContext, TamacSdkInvocationContext } from './invocation-context';
+import type { TamacAgentRpcMethodContext } from './invocation-context';
 
 /**
  * Connect failure を consumer が安全に扱うための stable SDK error category です。
@@ -35,20 +35,32 @@ export type TamacSdkErrorCategory =
  * SDK normalized error へ関連付ける secret-free RPC operation identity です。
  *
  * @remarks
- * この context は service/method、Agent、request/idempotency/correlation を保持します。consumer は error
- * category と correlation ID を安全な UI status や server-side log に使えますが、raw Connect error を
+ * この context は service/method、Agent、request/idempotency/correlation を保持します。Client Service JWT と
+ * Provider detached signature のどちらの aggregate も、同じ安全な operation identity へ正規化できます。consumer
+ * は error category と correlation ID を安全な UI status や server-side log に使えますが、raw Connect error を
  * browser payload へ直列化してはなりません。
  *
  * @example
  * ```ts
- * const operation: TamacSdkOperationContext = { invocation, methodContext };
+ * const operation: TamacSdkOperationContext = {
+ *   agentId: 'agent-alpha',
+ *   requestId: 'request-001',
+ *   correlationId: 'correlation-001',
+ *   methodContext,
+ * };
  * ```
  */
 export interface TamacSdkOperationContext {
   /** 失敗した generated Protobuf service/method identity です。 */
   readonly methodContext: TamacAgentRpcMethodContext;
-  /** 失敗した request の Agent、request、correlation、idempotency context です。 */
-  readonly invocation: TamacSdkInvocationContext;
+  /** request body、JWT、または detached signature が scope した Agent aggregate ID です。 */
+  readonly agentId: string;
+  /** server-side observability と Agent audit を結ぶ secret-free request ID です。 */
+  readonly requestId: string;
+  /** consumer/provider の安全な operation log を横断する secret-free correlation ID です。 */
+  readonly correlationId: string;
+  /** command replay と Agent audit に関連付ける optional idempotency key です。 */
+  readonly idempotencyKey?: string;
 }
 
 /**
@@ -102,13 +114,13 @@ export class TamacSdkOperationError extends Error {
     super(input.safeDetail);
     // runtime type discrimination と safe error reporting を一定にします。
     this.name = 'TamacSdkOperationError';
-    this.agentId = input.operation.invocation.agentId;
+    this.agentId = input.operation.agentId;
     this.category = input.category;
     this.connectCode = input.connectCode;
-    this.correlationId = input.operation.invocation.correlationId;
-    this.idempotencyKey = input.operation.invocation.idempotency?.idempotencyKey;
+    this.correlationId = input.operation.correlationId;
+    this.idempotencyKey = input.operation.idempotencyKey;
     this.methodName = input.operation.methodContext.methodName;
-    this.requestId = input.operation.invocation.requestId;
+    this.requestId = input.operation.requestId;
     this.safeDetail = input.safeDetail;
     this.serviceName = input.operation.methodContext.serviceName;
   }
@@ -144,7 +156,7 @@ export function normalizeTamacSdkError(
   // Connect failure だけが wire-level code を持つため、未知の throw は internal code へ閉じます。
   const connectCode = error instanceof ConnectError ? error.code : Code.Internal;
   // code mapping と fixed safe detail を組み合わせ、raw error text を consumer output へ伝えません。
-  const category = resolveErrorCategory(connectCode);
+  const category = parseErrorCategory(connectCode);
   return new TamacSdkOperationError({
     category,
     connectCode,
@@ -195,7 +207,23 @@ const safeDetails = new Map<TamacSdkErrorCategory, string>([
   ['unknown', 'The Agent Service returned an unknown failure.'],
 ]);
 
-function resolveErrorCategory(connectCode: Code): TamacSdkErrorCategory {
+/**
+ * Connect code を SDK consumer 向けの closed error category へ変換します。
+ *
+ * @param connectCode - Connect transport または generated RPC client が返した protocol-level failure code です。
+ * @returns retry、入力修正、権限確認を安全に分岐できる `TamacSdkErrorCategory`。未対応の code は `unknown` です。
+ * @throws この function 自身は例外を投げず、未知の code も `unknown` へ fail closed に正規化します。
+ * @remarks
+ * Provider ingress の HTTP 429 が Connect の `Code.ResourceExhausted` に対応した場合も、ここで
+ * `resource_exhausted` に一意に変換されます。raw response body や message は読み取りません。
+ *
+ * @example
+ * ```ts
+ * const category = parseErrorCategory(Code.ResourceExhausted);
+ * // category === 'resource_exhausted'
+ * ```
+ */
+export function parseErrorCategory(connectCode: Code): TamacSdkErrorCategory {
   // Connect code が将来追加されても unknown へ閉じ、consumer retry policy を推測で広げません。
   return connectCodeCategories.get(connectCode) ?? 'unknown';
 }

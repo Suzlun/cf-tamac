@@ -39,6 +39,13 @@ const agentProfile = sqliteTable('agent_profile', {
   updatedAtMs: integer('updated_at_ms').notNull(),
 });
 
+const agentInitializationReceipts = sqliteTable('agent_initialization_receipts', {
+  agentId: text('agent_id').primaryKey(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  registrationRequestDigest: text('registration_request_digest').notNull(),
+  createdAtMs: integer('created_at_ms').notNull(),
+});
+
 const agentCredentials = sqliteTable(
   'agent_credentials',
   {
@@ -374,6 +381,7 @@ const agentSchedulerWakeState = sqliteTable('agent_scheduler_wake_state', {
  */
 export const agentStorageDrizzleSchema = {
   agentProfile,
+  agentInitializationReceipts,
   agentCredentials,
   agentConfigVersions,
   agentPrincipals,
@@ -435,6 +443,12 @@ export const agentFoundationTableDefinitions = [
     tableName: 'agent_profile',
     purpose: 'Agent aggregate lifecycle profile',
     repositoryName: 'AgentProfileRepository',
+    uniqueKeys: ['agent_id'],
+  },
+  {
+    tableName: 'agent_initialization_receipts',
+    purpose: 'Agent-owned registration initialization reconciliation proof',
+    repositoryName: 'AgentInitializationReceiptRepository',
     uniqueKeys: ['agent_id'],
   },
   {
@@ -567,6 +581,7 @@ export const agentFoundationTableDefinitions = [
  */
 export const agentStorageRepositoryNames = [
   'AgentProfileRepository',
+  'AgentInitializationReceiptRepository',
   'AgentCredentialsRepository',
   'AgentConfigRepository',
   'AgentPrincipalsRepository',

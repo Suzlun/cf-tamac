@@ -6,11 +6,14 @@ import { URL, fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  collectAgentProviderIngressRateLimitIssues,
   collectAgentLayerIssues,
   collectClientBoundaryIssues,
   collectClientD1StoragePolicyIssues,
+  collectClientRegistrationMetadataOwnershipIssues,
   collectOpenCodeWorkflowIssuesFromFiles,
   collectRuntimeCouplingIssues,
+  collectSdkAuthenticationAggregateBoundaryIssues,
   collectSdkPackageBoundaryIssues,
 } from './verify-package-boundaries.mjs';
 
@@ -545,6 +548,211 @@ export const leakedAgentRuntime = AIAgent;
     expect(collectOpenCodeWorkflowIssuesFromFiles(filesWithoutSdkGeneratedPolicy)).toContain(
       'missing generated output policy for packages/sdk/src/generated/agent-rpc/**'
     );
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S015] Agent Provider Rate Limiting binding を環境別 policy として分類する', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'provider-rate-limit-boundary-fixtures-'));
+
+    try {
+      // production/staging が別 namespace の 100/60 simple policy と required runtime binding を持つ正常 fixture を作ります。
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/wrangler.toml',
+        `[[ratelimits]]
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1001"
+
+[ratelimits.simple]
+limit = 100
+period = 60
+
+[[env.staging.ratelimits]]
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1002"
+
+[env.staging.ratelimits.simple]
+limit = 100
+period = 60
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/env.ts',
+        'export interface AgentWorkerBindings {\n  readonly PROVIDER_INGRESS_RATE_LIMITER: RateLimit;\n}\n'
+      );
+
+      expect(collectAgentProviderIngressRateLimitIssues(fixtureRoot)).toEqual([]);
+
+      // policy 値を保ったまま namespace だけを共有すると、environment counter 分離の違反を単独で検出します。
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/wrangler.toml',
+        `[[ratelimits]]
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1001"
+
+[ratelimits.simple]
+limit = 100
+period = 60
+
+[[env.staging.ratelimits]]
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1001"
+
+[env.staging.ratelimits.simple]
+limit = 100
+period = 60
+`
+      );
+
+      expect(collectAgentProviderIngressRateLimitIssues(fixtureRoot)).toContain(
+        'packages/agent/wrangler.toml: Provider ingress Rate Limiting production and staging namespace_id values must differ'
+      );
+
+      // shared namespace と nonconforming staging policy は environment counter 分離を破るため拒否します。
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/wrangler.toml',
+        `[[ratelimits]]
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1001"
+
+[ratelimits.simple]
+limit = 100
+period = 60
+
+[[env.staging.ratelimits]]
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1001"
+
+[env.staging.ratelimits.simple]
+limit = 10
+period = 60
+`
+      );
+
+      expect(collectAgentProviderIngressRateLimitIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('staging must define PROVIDER_INGRESS_RATE_LIMITER'),
+        ])
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S015] Client registration reconciliation metadata を managed Agent ledger ownership として分類する', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'client-registration-metadata-fixtures-'));
+
+    try {
+      // schema descriptor と migration が同じ metadata を client_managed_agents に持つ正常 fixture を構成します。
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/db/schema.ts',
+        `export const clientManagedAgentsTable = sqliteTable('client_managed_agents', {
+  registrationState: text('registration_state'),
+  registrationAttemptId: text('registration_attempt_id'),
+  initializationIdempotencyKey: text('initialization_idempotency_key'),
+  registrationRequestDigest: text('registration_request_digest'),
+});
+
+export const clientManagedAgentsTableMetadata = {
+  columns: [
+    'registration_state',
+    'registration_attempt_id',
+    'initialization_idempotency_key',
+    'registration_request_digest',
+  ],
+} as const;
+`
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/db/migrations/0004_managed_agent_registration_reconciliation.sql',
+        `ALTER TABLE client_managed_agents ADD COLUMN registration_state TEXT NOT NULL;
+ALTER TABLE client_managed_agents ADD COLUMN registration_attempt_id TEXT NOT NULL;
+ALTER TABLE client_managed_agents ADD COLUMN initialization_idempotency_key TEXT NOT NULL;
+ALTER TABLE client_managed_agents ADD COLUMN registration_request_digest TEXT NOT NULL;
+`
+      );
+
+      expect(collectClientRegistrationMetadataOwnershipIssues(fixtureRoot)).toEqual([]);
+
+      // attempt metadata を別 table へ置く fixture は managed ledger ownership を満たさないため拒否します。
+      writeFixture(
+        fixtureRoot,
+        'packages/client/src/server/db/schema.ts',
+        `export const clientManagedAgentsTable = sqliteTable('client_managed_agents', {});
+export const registrationAttempts = sqliteTable('client_registration_attempts', {
+  registrationState: text('registration_state'),
+  registrationAttemptId: text('registration_attempt_id'),
+  initializationIdempotencyKey: text('initialization_idempotency_key'),
+  registrationRequestDigest: text('registration_request_digest'),
+});
+export const clientManagedAgentsTableMetadata = { columns: [] } as const;
+`
+      );
+
+      expect(collectClientRegistrationMetadataOwnershipIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining(
+            'client_managed_agents must own registration metadata registration_state'
+          ),
+          expect.stringContaining(
+            'client managed Agent metadata descriptor must include registration_state'
+          ),
+        ])
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S015] Provider と Client Service SDK aggregate の authentication import を分離する', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'sdk-authentication-boundary-fixtures-'));
+
+    try {
+      // Provider が detached signature implementation、Client Service が JWT implementation だけを使う正常 fixture を構成します。
+      for (const path of [
+        'packages/sdk/src/provider-ingress.ts',
+        'packages/sdk/src/provider-ingress-transport.ts',
+        'packages/sdk/src/provider-ingress-types.ts',
+      ]) {
+        writeFixture(fixtureRoot, path, "import { provider } from './provider-signing';\n");
+      }
+      for (const path of [
+        'packages/sdk/src/client.ts',
+        'packages/sdk/src/transport.ts',
+        'packages/sdk/src/auth/client-service-jwt.ts',
+      ]) {
+        writeFixture(fixtureRoot, path, "import { jwt } from './client-service-jwt';\n");
+      }
+
+      expect(collectSdkAuthenticationAggregateBoundaryIssues(fixtureRoot)).toEqual([]);
+
+      // Provider から JWT signing context、Client Service から Provider ingress transport を import すると境界違反にします。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/provider-ingress.ts',
+        "import { createTamacAgentTransport } from './transport';\n"
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        "import { createTamacProviderIngressTransport } from './provider-ingress-transport';\n"
+      );
+
+      expect(collectSdkAuthenticationAggregateBoundaryIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('Provider SDK aggregate must not import Client Service JWT'),
+          expect.stringContaining(
+            'Client Service SDK aggregate must not import Provider ingress signing'
+          ),
+        ])
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
   });
 
   it('blocks stale demo-only OpenCode workflow fixtures', () => {

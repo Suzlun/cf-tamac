@@ -1,8 +1,15 @@
-import { create, toBinary } from '@bufbuild/protobuf';
+import { Buffer } from 'node:buffer';
+
+import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createTamacAgentClient } from '../client';
-import { CheckHealthResponseSchema } from '../generated/agent-rpc/cftamac/agent/v1_pb';
+import {
+  CheckHealthResponseSchema,
+  GetAgentResponseSchema,
+  InitializeAgentRequestSchema,
+  InitializeAgentResponseSchema,
+} from '../generated/agent-rpc/cftamac/agent/v1_pb';
 
 import type { ClientServiceSigningContext } from '../auth/types';
 import type { TamacSdkInvocationContext } from '../invocation-context';
@@ -21,11 +28,32 @@ describe('TAMAC Agent SDK client aggregate', () => {
       signingContext,
     });
 
-    // generated health method を typed request で呼び、SDK aggregate の result を受け取ります。
-    const response = await client.health.check({
-      agentId: invocation.agentId,
-      includeDependencies: true,
-    });
+    // Web Crypto signer が受ける compact JWS signing input を capture し、protected header を wire 前に検査します。
+    const sign = vi.spyOn(globalThis.crypto.subtle, 'sign');
+    const response = await (async () => {
+      try {
+        // generated health method を typed request で呼び、SDK aggregate の result を受け取ります。
+        const result = await client.health.check({
+          agentId: invocation.agentId,
+          includeDependencies: true,
+        });
+        const signerCall = sign.mock.calls[0];
+        if (signerCall === undefined) {
+          throw new TypeError('Client Service JWT signer was not called.');
+        }
+        // signer callback の input に含まれる protected header を decode し、EdDSA JWT contract を直接検査します。
+        expect(
+          decodeJwtProtectedHeaderFromSigningInput(signerCall[2] as ArrayBuffer)
+        ).toMatchObject({
+          alg: 'EdDSA',
+          typ: 'JWT',
+        });
+        return result;
+      } finally {
+        // global Web Crypto spy を必ず復元し、後続 SDK test の signing behavior を汚染しません。
+        sign.mockRestore();
+      }
+    })();
 
     // Protobuf decoder が返した typed health response の public fields を確認します。
     expect(response.agentId).toBe(invocation.agentId);
@@ -114,7 +142,66 @@ describe('TAMAC Agent SDK client aggregate', () => {
     expect(request.authorization).toContain('Bearer ');
   });
 
-  it('rejects injection that could override the binary Connect protocol before fetch', async () => {
+  it('[AGENT-LIFECYCLE-S001] generated lifecycle client は必須 registration digest をbinary requestへ送信する', async () => {
+    const signingContext = await createSigningContext();
+    const invocation = createInvocation();
+    const captured: CapturedRequest[] = [];
+    const client = createTamacAgentClient({
+      agentRpcOrigin: 'https://agent.example.test',
+      fetch: createLifecycleFetch(captured),
+      invocation,
+      signingContext,
+    });
+
+    const response = await client.lifecycle.initializeAgent({
+      agentId: invocation.agentId,
+      idempotencyKey: 'registration-attempt-001',
+      registrationRequestDigest: 'sha256:registration-request-001',
+    });
+
+    expect(response.initializationReceipt).toMatchObject({
+      idempotencyKey: 'registration-attempt-001',
+      registrationRequestDigest: 'sha256:registration-request-001',
+    });
+    const request = captured.find((entry) => entry.methodName === 'InitializeAgent');
+    if (request?.body === undefined) {
+      throw new TypeError('InitializeAgent binary request was not captured.');
+    }
+    const wireRequest = fromBinary(InitializeAgentRequestSchema, request.body);
+    expect(wireRequest.registrationRequestDigest).toBe('sha256:registration-request-001');
+    expect(request).toMatchObject({
+      contentType: 'application/proto',
+      method: 'POST',
+      pathname: '/cftamac.agent.v1.AgentLifecycleService/InitializeAgent',
+    });
+  });
+
+  it('[AGENT-LIFECYCLE-S002] generated lifecycle client はInitialize/Get responseのtyped receiptを保持する', async () => {
+    const signingContext = await createSigningContext();
+    const invocation = createInvocation();
+    const captured: CapturedRequest[] = [];
+    const client = createTamacAgentClient({
+      agentRpcOrigin: 'https://agent.example.test',
+      fetch: createLifecycleFetch(captured),
+      invocation,
+      signingContext,
+    });
+
+    const initialized = await client.lifecycle.initializeAgent({
+      agentId: invocation.agentId,
+      idempotencyKey: 'registration-attempt-002',
+      registrationRequestDigest: 'sha256:registration-request-002',
+    });
+    const observed = await client.lifecycle.getAgent({ agentId: invocation.agentId });
+
+    expect(initialized.initializationReceipt?.idempotencyKey).toBe('registration-attempt-002');
+    expect(observed.initializationReceipt).toMatchObject(initialized.initializationReceipt ?? {});
+    expect(
+      captured.filter((entry) => entry.serviceName === 'cftamac.agent.v1.AgentLifecycleService')
+    ).toHaveLength(2);
+  });
+
+  it('[TAMAC-SDK-S001] binary Connect protocol を上書きする injection を fetch 前に拒否する', async () => {
     // binary transport を壊す Content-Type 上書きを返す custom seam と、呼ばれてはならない fetch を作ります。
     const fetch = vi.fn<typeof globalThis.fetch>();
     const client = createTamacAgentClient({
@@ -135,7 +222,7 @@ describe('TAMAC Agent SDK client aggregate', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('rejects an HTTP Agent origin before a bearer token can be created or sent', async () => {
+  it('[TAMAC-SDK-S001] bearer token を作る前に HTTP Agent origin を拒否する', async () => {
     // TLS を持たない origin で aggregate 構築を試み、JWT を平文経路へ送らない transport policy を検査します。
     const signingContext = await createSigningContext();
 
@@ -152,6 +239,7 @@ describe('TAMAC Agent SDK client aggregate', () => {
 
 interface CapturedRequest {
   readonly authorization: string | null;
+  readonly body?: Uint8Array;
   readonly contentType: string | null;
   readonly correlationId: string | null;
   readonly idempotencyKey: string | null;
@@ -228,4 +316,64 @@ function createHealthFetch(captured: CapturedRequest[]): typeof globalThis.fetch
       })
     );
   };
+}
+
+function createLifecycleFetch(captured: CapturedRequest[]): typeof globalThis.fetch {
+  return async (input, init) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    const body = new Uint8Array(await request.arrayBuffer());
+    const pathname = new URL(request.url).pathname;
+    captured.push({
+      authorization: request.headers.get('Authorization'),
+      body,
+      contentType: request.headers.get('Content-Type'),
+      correlationId: request.headers.get('x-agent-correlation-id'),
+      idempotencyKey: request.headers.get('x-agent-idempotency-key'),
+      method: request.method,
+      methodName: request.headers.get('x-agent-rpc-method'),
+      pathname,
+      requestId: request.headers.get('x-request-id'),
+      serviceName: request.headers.get('x-agent-rpc-service'),
+      traceparent: request.headers.get('traceparent'),
+    });
+
+    const receipt = pathname.endsWith('/InitializeAgent')
+      ? fromBinary(InitializeAgentRequestSchema, body)
+      : undefined;
+    const responseMessage = pathname.endsWith('/InitializeAgent')
+      ? create(InitializeAgentResponseSchema, {
+          initializationReceipt: {
+            idempotencyKey: receipt?.idempotencyKey ?? 'registration-attempt-002',
+            registrationRequestDigest:
+              receipt?.registrationRequestDigest ?? 'sha256:registration-request-002',
+          },
+        })
+      : create(GetAgentResponseSchema, {
+          initializationReceipt: {
+            idempotencyKey: 'registration-attempt-002',
+            registrationRequestDigest: 'sha256:registration-request-002',
+          },
+        });
+    const responseSchema = pathname.endsWith('/InitializeAgent')
+      ? InitializeAgentResponseSchema
+      : GetAgentResponseSchema;
+    return new Response(toBinary(responseSchema, responseMessage), {
+      headers: { 'Content-Type': 'application/proto' },
+      status: 200,
+    });
+  };
+}
+
+function decodeJwtProtectedHeaderFromSigningInput(input: ArrayBuffer): Record<string, unknown> {
+  // signer が受ける `base64url(header).base64url(payload)` bytes を UTF-8 compact JWS text へ戻します。
+  const signingInput = new TextDecoder().decode(new Uint8Array(input));
+  const protectedHeader = signingInput.split('.')[0];
+  if (protectedHeader === undefined) {
+    throw new TypeError('JWT protected header segment is missing from signer input.');
+  }
+  // base64url JSON を object として decode し、key material や signature segment を読み取りません。
+  return JSON.parse(Buffer.from(protectedHeader, 'base64url').toString('utf8')) as Record<
+    string,
+    unknown
+  >;
 }

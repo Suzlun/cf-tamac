@@ -1,10 +1,8 @@
 import { createConnectTransport } from '@connectrpc/connect-web';
 
-import {
-  buildClientServiceRequestMetadata,
-  parseConnectMethodContext,
-} from './auth/client-service-jwt';
+import { buildClientServiceRequestMetadata } from './auth/client-service-jwt';
 import { normalizeTamacSdkError } from './errors';
+import { parseConnectMethodContext } from './invocation-context';
 
 import type { ClientServiceSigningContext } from './auth/types';
 import type { TamacAgentRpcMethodContext, TamacSdkInvocationContext } from './invocation-context';
@@ -144,7 +142,13 @@ function createErrorNormalizationInterceptor(invocation: TamacSdkInvocationConte
       return await next(request);
     } catch (error) {
       // raw Connect message を露出せず、stable category と correlation metadata を持つ error に変換します。
-      throw normalizeTamacSdkError(error, { invocation, methodContext });
+      throw normalizeTamacSdkError(error, {
+        agentId: invocation.agentId,
+        correlationId: invocation.correlationId,
+        idempotencyKey: invocation.idempotency?.idempotencyKey,
+        methodContext,
+        requestId: invocation.requestId,
+      });
     }
   };
 }

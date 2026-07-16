@@ -10,6 +10,14 @@ import type { AgentStorageDatabase } from '../database';
  * @remarks
  * この宣言は Agent-owned Durable Object / storage / RPC adapter の型安全な接続点を表します。
  * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
+ * `requestDigest` は同一 principal と idempotency key を payload が異なる command へ再利用することを防ぐ
+ * binding 値です。不一致は repository では上書きせず、domain の `checkAgentIdempotency` が conflict として拒否します。
+ *
+ * @example
+ * ```ts
+ * const record = repository.findRecord('installation-1', 'provider-callback-1');
+ * if (record?.requestDigest !== requestDigest) throw new Error('conflicting idempotency key');
+ * ```
  */
 export interface AgentIdempotencyRecordRow {
   readonly principalId: string;
@@ -28,6 +36,14 @@ export interface AgentIdempotencyRecordRow {
  * @remarks
  * この宣言は Agent-owned Durable Object / storage / RPC adapter の型安全な接続点を表します。
  * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
+ * `requestDigest` は insertion 後に immutable な request binding であり、同じ principal/key の二重 insert は
+ * Durable Object SQLite primary key が拒否します。`responseRef` が未指定の record は recording state として扱い、
+ * 成功 response は `updateRecordResponse` で一度だけ確定します。
+ *
+ * @example
+ * ```ts
+ * repository.insertRecord({ idempotencyKey, principalId, requestDigest, status: 'recording', ...timestamps });
+ * ```
  */
 export interface InsertAgentIdempotencyRecordInput {
   readonly principalId: string;
@@ -46,6 +62,13 @@ export interface InsertAgentIdempotencyRecordInput {
  * @remarks
  * この宣言は Agent-owned Durable Object / storage / RPC adapter の型安全な接続点を表します。
  * Client runtime、生成 RPC 出力、公開 REST surface へ責務を広げません。
+ * `findRecord` は principal/key に束縛した既存 request digest と replay response を返します。呼び出し元は
+ * digest/operation conflict を拒否してから replay し、insert/update failure は storage error として伝播させます。
+ *
+ * @example
+ * ```ts
+ * const existing = repository.findRecord(principalId, idempotencyKey);
+ * ```
  */
 export interface AgentIdempotencyRepository {
   readonly tableName: 'agent_idempotency_records';

@@ -1,7 +1,7 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { describe, expect, it } from 'vitest';
 
-import { TamacSdkOperationError, normalizeTamacSdkError } from '../errors';
+import { parseErrorCategory, TamacSdkOperationError, normalizeTamacSdkError } from '../errors';
 
 import type { TamacSdkOperationContext } from '../errors';
 
@@ -35,22 +35,23 @@ describe('TAMAC SDK error normalization', () => {
     expect(aborted.connectCode).toBe(Code.Aborted);
     expect(aborted.safeDetail).not.toContain('concurrent state changed');
   });
+
+  it('[TAMAC-SDK-S002] Provider rate limit code を resource_exhausted category へ変換する', () => {
+    // Provider ingress safe 429 に対応する Connect code が closed category へ一意に写像されることを検査します。
+    expect(parseErrorCategory(Code.ResourceExhausted)).toBe('resource_exhausted');
+  });
 });
 
 function createOperationContext(): TamacSdkOperationContext {
   // error normalizer が request/Agent/correlation/idempotency を失わない fixture を返します。
   return {
-    invocation: {
-      actingUser: { actingUserId: 'operator-001' },
-      agentId: 'agent-alpha',
-      correlationId: 'correlation-001',
-      idempotency: { idempotencyKey: 'idempotency-001' },
-      requestId: 'request-001',
-      scopes: ['agent:tool:approve'],
-    },
+    agentId: 'agent-alpha',
+    correlationId: 'correlation-001',
+    idempotencyKey: 'idempotency-001',
     methodContext: {
       methodName: 'ApproveInvocation',
       serviceName: 'cftamac.agent.v1.AgentToolService',
     },
+    requestId: 'request-001',
   };
 }

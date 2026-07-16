@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
 import { createAgentRpcRouter } from '../rpc/router';
 
+import { createAllowingProviderIngressRateLimitStub } from './provider-ingress-rate-limit-test-helpers';
 import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
@@ -38,6 +39,7 @@ function createTestEnv(): AgentWorkerEnv {
       get: () => ({}) as DurableObjectStub<AIAgent>,
       idFromName: (name: string) => ({ name }) as unknown as DurableObjectId,
     } as unknown as DurableObjectNamespace<AIAgent>,
+    PROVIDER_INGRESS_RATE_LIMITER: createAllowingProviderIngressRateLimitStub(),
   };
 }
 

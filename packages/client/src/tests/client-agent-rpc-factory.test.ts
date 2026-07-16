@@ -8,6 +8,7 @@ import { createServerAgentRpcClients } from '../server/agent-rpc/create-client';
 import { createE2eFakeAgentRpcClients } from '../server/agent-rpc/e2e-fake-clients';
 import { parseApprovedAgentRpcOrigins } from '../server/agent-rpc/origin-policy';
 import {
+  browserSafeErrorTitle,
   createBrowserSafeAgentRpcFailure,
   createBrowserSafeAgentRpcSuccess,
 } from '../server/agent-rpc/safe-results';
@@ -166,6 +167,16 @@ describe('SDK-backed Management Client Agent RPC adapter', () => {
     expect(serialized).not.toContain('privateKey');
     expect(serialized).not.toContain('Authorization');
     expect(serialized).not.toContain('agentRpcOrigin');
+  });
+
+  it('[TAMAC-SDK-S005] browser-safe error titles distinguish permission, availability, and invalid input', () => {
+    // stable category mapping は raw SDK message を表示せず、利用者が次に取る操作を区別できる固定見出しだけを返す。
+    expect(browserSafeErrorTitle('permission_denied')).toBe('権限を確認してください');
+    expect(browserSafeErrorTitle('unavailable')).toBe('接続状態を確認してください');
+    expect(browserSafeErrorTitle('invalid_argument')).toBe('入力内容を確認してください');
+    expect(browserSafeErrorTitle('permission_denied')).not.toBe(
+      browserSafeErrorTitle('unavailable')
+    );
   });
 
   it('[AGENT-MANAGEMENT-UI-S018] E2E fake preserves safe metadata digest behavior', async () => {

@@ -86,6 +86,8 @@ pnpm gen:deploy-artifacts
 pnpm check:deploy-artifacts
 ```
 
+`pnpm gen:deploy-artifacts` は `CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION` と `CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING` を必須入力として検証し、Agent artifactのWrangler設定へ環境別namespace IDを注入します。運用手順は `docs/operations/self-host-deploy.md` を参照してください。
+
 `pnpm gen:agent:proto && pnpm gen:agent:rpc` は Agent TypeSpec から proto と Agent、Client、SDK の descriptor を生成します。4つの generated roots は mandatory generated-policy target であり、Command-owned outputs を手編集しません。`pnpm check:codegen` は Agent→Client/SDK descriptor parity と contract invariant を確認します。
 
 - `packages/agent/proto/**`

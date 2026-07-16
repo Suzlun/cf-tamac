@@ -10,6 +10,7 @@ import { createAgentEventsRepository } from './events-repository';
 import { createAgentGrantsRepository } from './grants-repository';
 import { createAgentHistoryRepository } from './history-repository';
 import { createAgentIdempotencyRepository } from './idempotency-repository';
+import { createAgentInitializationReceiptRepository } from './initialization-receipt-repository';
 import { createAgentIntegrationsRepository } from './integrations-repository';
 import { createAgentMemoryRepository } from './memory-repository';
 import { createAgentModelInvocationRepository } from './model-invocation-repository';
@@ -35,6 +36,7 @@ import type { AgentEventsRepository } from './events-repository';
 import type { AgentGrantsRepository } from './grants-repository';
 import type { AgentHistoryRepository } from './history-repository';
 import type { AgentIdempotencyRepository } from './idempotency-repository';
+import type { AgentInitializationReceiptRepository } from './initialization-receipt-repository';
 import type { AgentIntegrationsRepository } from './integrations-repository';
 import type { AgentMemoryRepository } from './memory-repository';
 import type { AgentModelInvocationRepository } from './model-invocation-repository';
@@ -66,6 +68,7 @@ export interface AgentStorageRepositories {
   readonly events: AgentEventsRepository;
   readonly grants: AgentGrantsRepository;
   readonly history: AgentHistoryRepository;
+  readonly initializationReceipt: AgentInitializationReceiptRepository;
   readonly idempotency: AgentIdempotencyRepository;
   readonly integrations: AgentIntegrationsRepository;
   readonly memory: AgentMemoryRepository;
@@ -117,6 +120,7 @@ function createAgentStorageRepositorySet(
     events: createAgentEventsRepository(agentId, database),
     grants: createAgentGrantsRepository(agentId, database),
     history: createAgentHistoryRepository(agentId, database),
+    initializationReceipt: createAgentInitializationReceiptRepository(agentId, database),
     idempotency: createAgentIdempotencyRepository(agentId, database),
     integrations: createAgentIntegrationsRepository(agentId, database),
     memory: createAgentMemoryRepository(agentId, database),

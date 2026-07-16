@@ -116,11 +116,14 @@ const artifactSpecs = [
  * @param {object} options 生成時の入力設定。
  * @param {string} options.root repository root。テストでは fixture ではなく実 repository を読む。
  * @param {string} options.outDir 生成先 directory。通常は `.deploy`、テストでは一時 directory。
+ * @param {{ production: string; staging: string }} options.rateLimitNamespaceIds
+ *   production/staging の Cloudflare Rate Limiting namespace ID。未指定時は対応する環境変数を使う。
  * @returns {{ name: string; branchName: string; path: string }[]} 生成した artifact の名前、branch、path。
  */
 export function generateDeployArtifacts(options = {}) {
   const root = options.root ?? projectRoot;
   const outDir = options.outDir ?? resolve(root, '.deploy');
+  const rateLimitNamespaceIds = resolveRateLimitNamespaceIds(options);
 
   // 生成 directory を先に消し、前回の不要 file が deploy branch に残らないようにする。
   rmSync(outDir, { recursive: true, force: true });
@@ -137,7 +140,7 @@ export function generateDeployArtifacts(options = {}) {
     // artifact root を作り、各 Worker に必要な runtime source と設定だけをコピーする。
     mkdirSync(targetRoot, { recursive: true });
     for (const entry of spec.copyEntries) {
-      copyProjectEntry(root, targetRoot, entry);
+      copyProjectEntry(root, targetRoot, entry, rateLimitNamespaceIds);
     }
 
     // package.json と tsconfig.json は monorepo path alias を self-contained root 用に書き換える。
@@ -157,6 +160,9 @@ export function generateDeployArtifacts(options = {}) {
 
     // 必須 file と禁止 path を検査し、壊れた artifact branch を CI から publish しない。
     validateArtifact(targetRoot, spec);
+    if (spec.name === 'agent') {
+      validateAgentRateLimitNamespaces(targetRoot, rateLimitNamespaceIds);
+    }
     artifacts.push({ name: spec.name, branchName: spec.branchName, path: targetRoot });
   }
 
@@ -304,10 +310,11 @@ function createAgentReadme() {
 
 1. Cloudflare Deploy Button でこの branch を選択します。
 2. \`AGENT_RPC_AUDIENCE\` が \`AGENT_CONTROL_PLANE_TRUST.audiences\` と一致することを確認します。
-3. Worker Secret \`AGENT_AUDIT_HASH_PEPPER\` を長いランダム値で設定します。
-4. Management Client の Trust Config Export で生成した public-only JSON を \`AGENT_CONTROL_PLANE_TRUST\` に設定します。
-5. \`AGENT_CONTROL_PLANE_TRUST\` には Ed25519 private key parameter \`d\`、private JWK、encrypted private JWK、生 JWT を含めません。
-6. Deploy 後、Management Client から \`AgentHealthService.Check\` を実行して issuer/kid/fingerprint と trust config fingerprint を確認します。
+3. Worker configuration に production/staging の専用 Rate Limiting namespace ID が注入済みであることを確認します。artifactへ source repository のfixture値はコピーされません。
+4. Worker Secret \`AGENT_AUDIT_HASH_PEPPER\` を長いランダム値で設定します。
+5. Management Client の Trust Config Export で生成した public-only JSON を \`AGENT_CONTROL_PLANE_TRUST\` に設定します。
+6. \`AGENT_CONTROL_PLANE_TRUST\` には Ed25519 private key parameter \`d\`、private JWK、encrypted private JWK、生 JWT を含めません。
+7. Deploy 後、Management Client から \`AgentHealthService.Check\` を実行して issuer/kid/fingerprint と trust config fingerprint を確認します。
 
 ## Local commands
 
@@ -387,7 +394,7 @@ function selectVersions(rootPackage, sourcePackage, packageNames) {
   return versions;
 }
 
-function copyProjectEntry(root, targetRoot, entry) {
+function copyProjectEntry(root, targetRoot, entry, rateLimitNamespaceIds) {
   const sourcePath = resolve(root, entry.from);
   const targetPath = resolve(targetRoot, entry.to);
   const stats = statSync(sourcePath);
@@ -397,7 +404,94 @@ function copyProjectEntry(root, targetRoot, entry) {
     copyDirectory(root, sourcePath, targetPath, entry.excludes);
     return;
   }
+  if (entry.from === 'packages/agent/wrangler.toml') {
+    // Agent Wrangler は source の例値をそのまま publish せず、release operator の明示入力で置換する。
+    writeText(
+      targetPath,
+      renderAgentWrangler(readFileSync(sourcePath, 'utf8'), rateLimitNamespaceIds)
+    );
+    return;
+  }
   copyFile(targetPath, sourcePath);
+}
+
+function resolveRateLimitNamespaceIds(options) {
+  const production =
+    options.rateLimitNamespaceIds?.production ??
+    options.productionRateLimitNamespaceId ??
+    process.env.CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION;
+  const staging =
+    options.rateLimitNamespaceIds?.staging ??
+    options.stagingRateLimitNamespaceId ??
+    process.env.CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING;
+
+  assertRateLimitNamespaceId(production, 'production');
+  assertRateLimitNamespaceId(staging, 'staging');
+  if (production === staging) {
+    throw new Error(
+      'CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION and CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING must differ'
+    );
+  }
+  return { production, staging };
+}
+
+function assertRateLimitNamespaceId(value, environment) {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/u.test(value)) {
+    throw new Error(
+      `A positive integer Rate Limiting namespace ID is required for ${environment}; pass the explicit generator input or environment variable`
+    );
+  }
+}
+
+function renderAgentWrangler(source, rateLimitNamespaceIds) {
+  const production = replaceNamespaceId(source, '[[ratelimits]]', rateLimitNamespaceIds.production);
+  return replaceNamespaceId(
+    production,
+    '[[env.staging.ratelimits]]',
+    rateLimitNamespaceIds.staging
+  );
+}
+
+function replaceNamespaceId(source, section, namespaceId) {
+  const sectionStart = source.indexOf(section);
+  const sectionBody = sectionStart === -1 ? '' : source.slice(sectionStart);
+  const namespaceMatch = /(namespace_id\s*=\s*")([1-9]\d*)(")/u.exec(sectionBody);
+  if (namespaceMatch?.index === undefined) {
+    throw new Error(`Agent Wrangler is missing ${section} namespace_id`);
+  }
+  const replacement = namespaceMatch[0].replace(namespaceMatch[2], namespaceId);
+  const absoluteStart = sectionStart + namespaceMatch.index;
+  return `${source.slice(0, absoluteStart)}${replacement}${source.slice(
+    absoluteStart + namespaceMatch[0].length
+  )}`;
+}
+
+function validateAgentRateLimitNamespaces(agentRoot, rateLimitNamespaceIds) {
+  const wrangler = readFileSync(resolve(agentRoot, 'wrangler.toml'), 'utf8');
+  const production = extractNamespaceId(wrangler, '[[' + 'ratelimits' + ']]');
+  const staging = extractNamespaceId(wrangler, '[[' + 'env.staging.ratelimits' + ']]');
+  if (
+    production !== rateLimitNamespaceIds.production ||
+    staging !== rateLimitNamespaceIds.staging
+  ) {
+    throw new Error(
+      'Generated Agent artifact does not contain the requested Rate Limiting namespace IDs'
+    );
+  }
+  if (production === staging) {
+    throw new Error(
+      'Generated Agent artifact must keep production and staging Rate Limiting namespaces distinct'
+    );
+  }
+}
+
+function extractNamespaceId(wrangler, section) {
+  const sectionStart = wrangler.indexOf(section);
+  const sectionBody = sectionStart === -1 ? '' : wrangler.slice(sectionStart);
+  const match = /namespace_id\s*=\s*"([1-9]\d*)"/u.exec(sectionBody);
+  if (match?.[1] === undefined)
+    throw new Error(`Generated Agent artifact is missing ${section} namespace_id`);
+  return match[1];
 }
 
 function copyDirectory(projectRootPath, sourceDirectory, targetDirectory, excludes) {
@@ -471,10 +565,17 @@ function main() {
   const { values } = parseArgs({
     options: {
       out: { type: 'string', default: '.deploy' },
+      'production-rate-limit-namespace-id': { type: 'string' },
+      'staging-rate-limit-namespace-id': { type: 'string' },
     },
   });
   const outDir = resolve(projectRoot, values.out);
-  const artifacts = generateDeployArtifacts({ root: projectRoot, outDir });
+  const artifacts = generateDeployArtifacts({
+    root: projectRoot,
+    outDir,
+    productionRateLimitNamespaceId: values['production-rate-limit-namespace-id'],
+    stagingRateLimitNamespaceId: values['staging-rate-limit-namespace-id'],
+  });
 
   // CI log には生成先と deploy branch 名だけを出し、secret value や config body は出力しない。
   for (const artifact of artifacts) {

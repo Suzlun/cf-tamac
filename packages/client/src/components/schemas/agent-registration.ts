@@ -150,6 +150,16 @@ export const registrationSchema = z.object({
 export type RegistrationValues = z.infer<typeof registrationSchema>;
 
 /**
+ * 登録 attempt の server-side 確定状態を Browser-safe 表示へ対応付ける値です。
+ *
+ * @remarks
+ * `active` は Agent の完全一致確認済み、`reconciliation_required` は同じ attempt の確認継続中、
+ * `re_registration_ready` は normalized `not_found` と Client cleanup 完了後に新しい登録を開始できる状態です。
+ * attempt ID、idempotency key、request digest はこの値へ含めません。
+ */
+export type RegistrationOutcome = 'active' | 'reconciliation_required' | 're_registration_ready';
+
+/**
  * Registration flow の policy 検証 button が受け取る browser-safe result です。
  *
  * @remarks
@@ -169,13 +179,23 @@ export type RegistrationPolicyValidationResult = BrowserSafeAgentRpcResult<
  *
  * @remarks
  * 成功時は登録済み Agent ID を返し、失敗時は field-level error と form-level error を返します。
- * credential secret material は含めず、browser-safe な表示情報だけを返す contract です。
+ * credential secret material は含めず、browser-safe な表示情報だけを返す contract です。response loss などで
+ * Agent profile/config 照合が必要な場合は `reconciliationRequired` だけを明示し、固定 idempotency key/digest は Browser に公開しません。
+ *
+ * @example
+ * ```ts
+ * if (result.displayData.reconciliationRequired === true) {
+ *   // 「登録状態を確認」だけを有効化し、入力を保持する。
+ * }
+ * ```
  */
 export type RegistrationSubmitResult = BrowserSafeAgentRpcResult<
   BrowserSafeOperationDisplayData & {
     readonly agentId?: string;
     readonly displayName?: string;
     readonly fieldErrors: Partial<Record<RegistrationFieldName, string>>;
+    readonly reconciliationRequired?: boolean;
+    readonly registrationOutcome?: RegistrationOutcome;
   }
 >;
 

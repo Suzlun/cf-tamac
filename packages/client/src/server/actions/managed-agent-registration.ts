@@ -1,12 +1,6 @@
 import { validateRegistrationModelPolicyValues } from '../../components/schemas/agent-registration';
 
 import type { ModelPolicyDraftValues } from '../../components/schemas/model-policy';
-import type {
-  CredentialReferenceRepository,
-  ManagedAgentRecord,
-  ManagedAgentRepository,
-} from '../db';
-
 const AGENT_ID_PATTERN = /^[\da-z][\da-z-]{0,62}$/;
 const VALID_CREDENTIAL_STATUSES = ['active', 'pending', 'rotating'] as const;
 
@@ -80,31 +74,6 @@ export interface ManagedAgentRegistrationOptions {
 }
 
 /**
- * 検証済み Agent 登録永続化の内部結果です。
- *
- * @remarks
- * この内部結果は Server Action が Browser-safe four-field result へ写像する前にだけ使います。
- */
-export type ManagedAgentRegistrationResult =
-  | { readonly ok: true; readonly agentId: string }
-  | {
-      readonly ok: false;
-      readonly fieldErrors: RegistrationFieldErrors;
-      readonly formError?: string;
-    };
-
-/**
- * 検証済みの管理対象 Agent 登録を保存するための Client D1 repository 集合です。
- *
- * @remarks
- * Agent domain snapshot や秘密情報を保存する repository は含めません。
- */
-export interface RegistrationRepositories {
-  readonly agents: ManagedAgentRepository;
-  readonly credentials: CredentialReferenceRepository;
-}
-
-/**
  * Client D1 書き込み前に行う Server Action 登録検証の結果です。
  *
  * @remarks
@@ -131,42 +100,6 @@ export function validateManagedAgentRegistrationInput(
     return { ok: false, fieldErrors };
   }
   return { ok: true, value: normalized };
-}
-
-/**
- * 検証済みの登録を注入された Client D1 repository で永続化します。
- *
- * @param input - 正規化済みで、呼び出し元が origin policy を確認した登録入力です。
- * @param repositories - managed Agent record と credential reference を保存する Client D1 repository です。
- * @param options - 新規登録または編集登録を決める任意の identity 設定です。
- * @returns 成功時は Agent ID、失敗時は安全な field error を返します。
- * @remarks
- * 部分書き込みを防ぐため、credential 保存が失敗した場合は登録 record を rollback します。
- */
-export async function persistManagedAgentRegistration(
-  input: NormalizedManagedAgentRegistrationInput,
-  repositories: RegistrationRepositories,
-  options: ManagedAgentRegistrationOptions = {}
-): Promise<ManagedAgentRegistrationResult> {
-  const mode = await determineRegistrationMode(input, repositories.agents, options);
-  if (!mode.ok) {
-    return registrationFieldErrorResult(mode.fieldErrors);
-  }
-
-  try {
-    await writeRegistrationRecords(input, repositories, mode.action);
-    return { ok: true, agentId: input.agentId };
-  } catch (error) {
-    await rollbackRegistrationWrite(input, repositories.agents, mode.action, mode.previousAgent);
-    if (isLikelyDuplicateAgentError(error)) {
-      return registrationFieldErrorResult({ agentId: 'Agent ID is already registered.' });
-    }
-    return {
-      ok: false,
-      fieldErrors: {},
-      formError: 'Could not register the Agent. Retrying will not duplicate the record.',
-    };
-  }
 }
 
 function normalizeRegistrationInput(
@@ -339,100 +272,4 @@ function setRegistrationError(
   if (fieldName === 'modelPolicy.temperature') errors['modelPolicy.temperature'] = message;
   if (fieldName === 'modelPolicy.topP') errors['modelPolicy.topP'] = message;
   if (fieldName === 'modelPolicy.maxOutputTokens') errors['modelPolicy.maxOutputTokens'] = message;
-}
-
-function registrationFieldErrorResult(
-  fieldErrors: RegistrationFieldErrors
-): ManagedAgentRegistrationResult {
-  return {
-    ok: false,
-    fieldErrors,
-    formError: 'Correct the highlighted fields before registering the Agent.',
-  };
-}
-
-async function determineRegistrationMode(
-  input: NormalizedManagedAgentRegistrationInput,
-  agents: ManagedAgentRepository,
-  options: ManagedAgentRegistrationOptions
-): Promise<
-  | {
-      readonly ok: true;
-      readonly action: 'create' | 'update';
-      readonly previousAgent?: ManagedAgentRecord;
-    }
-  | { readonly ok: false; readonly fieldErrors: RegistrationFieldErrors }
-> {
-  if (options.existingAgentId !== undefined && options.existingAgentId !== input.agentId) {
-    return { ok: false, fieldErrors: { agentId: 'Agent ID cannot be changed while editing.' } };
-  }
-  const existing = await agents.getManagedAgent(input.agentId);
-  if (options.existingAgentId === undefined && existing !== undefined) {
-    return { ok: false, fieldErrors: { agentId: 'Agent ID is already registered.' } };
-  }
-  // edit mode は既存台帳行の存在を必須とする。存在しない edit target を upsert で新規作成せず、
-  // 安全側で formError を返す (partial row / default-key prerequisite 回避を防ぐ)。
-  if (options.existingAgentId !== undefined && existing === undefined) {
-    return {
-      ok: false,
-      fieldErrors: {
-        agentId: 'This Agent is no longer registered. Refresh the registry and retry.',
-      },
-    };
-  }
-  return {
-    ok: true,
-    action: options.existingAgentId === undefined ? 'create' : 'update',
-    previousAgent: existing,
-  };
-}
-
-async function writeRegistrationRecords(
-  input: NormalizedManagedAgentRegistrationInput,
-  repositories: RegistrationRepositories,
-  action: 'create' | 'update'
-): Promise<void> {
-  const agentInput = {
-    agentId: input.agentId,
-    agentRpcOrigin: input.agentRpcOrigin,
-    displayName: input.displayName,
-    displayOrder: input.displayOrder,
-  };
-  if (action === 'create') {
-    await repositories.agents.createManagedAgent(agentInput);
-  } else {
-    await repositories.agents.upsertManagedAgent(agentInput);
-  }
-  await repositories.credentials.upsertCredentialReference({
-    agentId: input.agentId,
-    credentialRef: input.referenceValue,
-    keyId: input.keyId,
-    publicFingerprint: input.publicFingerprint,
-    maskedHint: input.maskedHint,
-    status: input.status,
-  });
-}
-
-async function rollbackRegistrationWrite(
-  input: NormalizedManagedAgentRegistrationInput,
-  agents: ManagedAgentRepository,
-  action: 'create' | 'update',
-  previousAgent: ManagedAgentRecord | undefined
-): Promise<void> {
-  try {
-    if (action === 'create') {
-      await agents.deleteManagedAgent(input.agentId);
-    } else if (previousAgent !== undefined) {
-      await agents.upsertManagedAgent(previousAgent);
-    }
-  } catch {
-    // The original persistence error remains the user-facing failure cause.
-  }
-}
-
-function isLikelyDuplicateAgentError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  return /unique|constraint|primary key/i.test(error.message);
 }

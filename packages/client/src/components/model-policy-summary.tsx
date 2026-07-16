@@ -31,7 +31,7 @@ export function ModelPolicySummary({
   metadata,
   loading,
   permissionDenied,
-  emptyMessage = 'No default model policy is attached. Save an active Workers AI policy before publishing Events.',
+  emptyMessage = '既定モデルポリシーを設定すると、EventsからのRunsでactiveなWorkers AI policyを利用できます。',
 }: ModelPolicySummaryProps) {
   if (loading) {
     return <ModelPolicySummarySkeleton />;
@@ -42,10 +42,9 @@ export function ModelPolicySummary({
       className="rounded-md border bg-card p-4 text-sm space-y-1"
       aria-labelledby="model-policy-summary-heading"
     >
-      <strong id="model-policy-summary-heading">Default model policy</strong>
+      <strong id="model-policy-summary-heading">既定モデルポリシー</strong>
       <p>
-        Current Agent-owned policy metadata. The policy body and credentials stay inside the Agent
-        service boundary.
+        Agent所有ポリシーの安全なメタデータを表示します。ポリシー本体とcredentialはAgentサービス境界内に保持します。
       </p>
       {metadata === undefined ? (
         <p className="text-xs text-muted-foreground">{emptyMessage}</p>
@@ -54,14 +53,13 @@ export function ModelPolicySummary({
       )}
       {metadata?.status === 'disabled' || metadata?.status === 'archived' ? (
         <p className="text-destructive" role="status">
-          The referenced policy is {metadata.status}. Runs will fail until an active policy is
-          saved.
+          参照ポリシーは{metadata.status}
+          状態です。active状態のポリシーを保存するまでRunsは失敗します。
         </p>
       ) : null}
       {permissionDenied ? (
         <p className="text-xs text-muted-foreground" role="status">
-          You can view safe metadata, but you do not have permission to update the default model
-          policy.
+          安全なメタデータは表示できますが、既定モデルポリシーを更新する権限がありません。
         </p>
       ) : null}
     </section>
@@ -72,19 +70,19 @@ function MetadataList({ metadata }: { readonly metadata: BrowserSafeModelPolicyM
   return (
     <>
       <dl className="grid gap-3 md:grid-cols-2">
-        <SummaryItem label="Policy ref" value={metadata.policyRef} mono />
+        <SummaryItem label="ポリシー参照" value={metadata.policyRef} mono />
         <SummaryItem
-          label="Digest"
+          label="ダイジェスト"
           value={metadata.digest}
           mono
-          helper="Digest verifies the saved policy metadata. It is not a prompt, completion, credential, or provider secret."
+          helper="ダイジェストは保存済みポリシーのメタデータを検証します。prompt、completion、credential、provider secretではありません。"
         />
-        <SummaryItem label="Provider" value={metadata.provider} />
-        <SummaryItem label="Model" value={metadata.model} mono />
-        <SummaryItem label="Policy version" value={`v${metadata.version}`} />
+        <SummaryItem label="プロバイダー" value={metadata.provider} />
+        <SummaryItem label="モデル" value={metadata.model} mono />
+        <SummaryItem label="ポリシーバージョン" value={`v${metadata.version}`} />
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Status
+            状態
           </dt>
           <dd>
             <SignalBadge
@@ -94,13 +92,11 @@ function MetadataList({ metadata }: { readonly metadata: BrowserSafeModelPolicyM
           </dd>
         </div>
         <SummaryItem
-          label="Config version"
-          value={
-            metadata.configVersion === undefined ? 'not attached' : `v${metadata.configVersion}`
-          }
-          helper="Config version increments only after the saved policy ref is attached to AgentConfig.modelPolicyRef."
+          label="設定バージョン"
+          value={metadata.configVersion === undefined ? '未適用' : `v${metadata.configVersion}`}
+          helper="保存済みポリシー参照がAgentConfig.modelPolicyRefへ適用された後だけ設定バージョンが増加します。"
         />
-        <SummaryItem label="Generation parameters" value={formatGenerationParameters(metadata)} />
+        <SummaryItem label="生成パラメーター" value={formatGenerationParameters(metadata)} />
       </dl>
       <WarningsList metadata={metadata} />
     </>
@@ -122,7 +118,7 @@ function SummaryItem({
     <div>
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className={mono === true ? 'font-mono' : undefined} style={{ overflowWrap: 'anywhere' }}>
-        {value === '' ? 'not returned' : value}
+        {value === '' ? '未返却' : value}
       </dd>
       {helper !== undefined ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
     </div>
@@ -131,12 +127,12 @@ function SummaryItem({
 
 function WarningsList({ metadata }: { readonly metadata: BrowserSafeModelPolicyMetadata }) {
   if (metadata.warnings.length === 0) {
-    return <p className="text-xs text-muted-foreground">Warnings: No validation warnings.</p>;
+    return <p className="text-xs text-muted-foreground">検証警告: ありません。</p>;
   }
   return (
     <div role="status" aria-live="polite">
-      <p className="text-xs text-muted-foreground">Warnings: {metadata.warnings.length}</p>
-      <ul className="mt-2 list-disc pl-5 font-mono text-xs">
+      <p className="text-xs text-muted-foreground">検証警告: {metadata.warnings.length}件</p>
+      <ul className="mt-2 list-disc pl-5 text-xs">
         {metadata.warnings.map((warning) => (
           <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>
         ))}
@@ -151,15 +147,15 @@ function ModelPolicySummarySkeleton() {
       className="rounded-md border bg-card p-4 text-sm"
       aria-labelledby="model-policy-summary-heading"
     >
-      <strong id="model-policy-summary-heading">Default model policy</strong>
-      <p>Loading policy metadata…</p>
+      <strong id="model-policy-summary-heading">既定モデルポリシー</strong>
+      <p>ポリシーメタデータを読み込んでいます…</p>
       <dl className="grid gap-3 md:grid-cols-2">
-        {['Policy ref', 'Digest', 'Provider', 'Model'].map((label) => (
+        {['ポリシー参照', 'ダイジェスト', 'プロバイダー', 'モデル'].map((label) => (
           <div key={label}>
             <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {label}
             </dt>
-            <dd className="font-mono">pending server metadata</dd>
+            <dd>サーバーメタデータを待機しています</dd>
           </div>
         ))}
       </dl>
@@ -170,7 +166,7 @@ function ModelPolicySummarySkeleton() {
 function formatGenerationParameters(metadata: BrowserSafeModelPolicyMetadata): string {
   const parameters = metadata.generationParameters;
   if (parameters === undefined) {
-    return 'not returned';
+    return '未返却';
   }
-  return `temperature ${parameters.temperature} · top_p ${parameters.topP} · max_output_tokens ${parameters.maxOutputTokens}`;
+  return `温度 ${parameters.temperature} · top_p ${parameters.topP} · max_output_tokens ${parameters.maxOutputTokens}`;
 }

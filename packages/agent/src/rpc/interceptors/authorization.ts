@@ -74,20 +74,19 @@ export function authorizeAgentRequest(input: AgentAuthorizationInput): AgentRpcG
  * Durable Object へ到達することを防ぎます。Installation、connection、tool、delivery の identity は
  * decoded generated request を受け取る Integration operation で Agent-owned state と照合します。
  *
- * @param input Connect request と不変 raw Protobuf body を含む Provider ingress 入力です。
+ * @param input path classification 済みの generated operation と不変 raw Protobuf body を含む Provider ingress 入力です。
  * @returns identity が妥当な場合は `undefined`、拒否時は公開してよい Connect error 分類です。
  * @example
  * ```ts
- * const rejection = validateProviderIngressRequestIdentity({ rawBody, request });
+ * const rejection = validateProviderIngressRequestIdentity({ operation, rawBody });
  * ```
  */
 export function validateProviderIngressRequestIdentity(input: {
+  readonly operation: { readonly method: string; readonly service: string };
   readonly rawBody: Uint8Array;
-  readonly request: Request;
 }): AgentRpcGuardResult {
   // Provider path 以外をこの validator へ渡す wiring 誤りは fail-closed にし、Client Service policy と混線させません。
-  const operation = getConnectMethodIdentity(new URL(input.request.url).pathname);
-  if (!isProviderIngressOperation(operation)) {
+  if (!isProviderIngressOperation(input.operation)) {
     return {
       code: Code.PermissionDenied,
       message:

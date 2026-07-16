@@ -50,18 +50,55 @@ export function OperationResultRegion<TDisplayData extends BrowserSafeOperationD
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [copyMessage, setCopyMessage] = useState<string | undefined>();
   const [copyUnavailable, setCopyUnavailable] = useState(false);
-  const isComplete = result !== undefined && !pending;
   const clipboard = resolveBrowserClipboard();
   const clipboardAvailable = clipboard !== undefined && !copyUnavailable;
+  const completionKey = getCompletionKey(result, pending);
 
   useEffect(() => {
-    // 非同期完了時に結果見出しへ移動し、視覚・キーボード・スクリーンリーダー利用者の通知位置を一致させます。
-    if (isComplete) {
-      headingRef.current?.focus();
-    }
+    // 新しい安全な結果を一度だけ識別し、pending 中の既存 DOM を対象にして focus を奪わないようにします。
     setCopyMessage(undefined);
     setCopyUnavailable(false);
-  }, [isComplete, result?.correlationId]);
+  }, [completionKey]);
+
+  useEffect(() => {
+    if (completionKey === undefined) {
+      return;
+    }
+
+    // React の commit 後に live region と heading が確実に配置されるよう、次の描画フレームで focus を要求します。
+    let cancelled = false;
+    const focusHeading = (): void => {
+      if (cancelled) {
+        return;
+      }
+      const heading = headingRef.current;
+      if (heading === null) {
+        return;
+      }
+      // preventScroll を優先し、未対応ブラウザーでも結果位置への focus 自体は失わないように fallback します。
+      try {
+        heading.focus({ preventScroll: true });
+      } catch {
+        heading.focus();
+      }
+    };
+    const requestFrame = globalThis.requestAnimationFrame;
+    if (typeof requestFrame === 'function') {
+      const frameId = requestFrame(focusHeading);
+      return () => {
+        cancelled = true;
+        const cancelFrame = globalThis.cancelAnimationFrame;
+        if (typeof cancelFrame === 'function') {
+          cancelFrame(frameId);
+        }
+      };
+    }
+    const timeoutId = globalThis.setTimeout(focusHeading, 0);
+    return () => {
+      cancelled = true;
+      globalThis.clearTimeout(timeoutId);
+    };
+  }, [completionKey]);
 
   const copyCorrelationId = async (): Promise<void> => {
     if (result === undefined || clipboard === undefined) {
@@ -82,52 +119,37 @@ export function OperationResultRegion<TDisplayData extends BrowserSafeOperationD
     return <div aria-hidden="true" className="h-0 overflow-hidden" />;
   }
 
-  if (pending) {
-    return (
-      <div
-        aria-atomic="true"
-        aria-live="polite"
-        className="mb-6 rounded-md border bg-muted px-4 py-3 text-sm text-foreground"
-        role="status"
-      >
-        <h3 className="font-medium">{pendingTitle}</h3>
-        <p className="mt-1">{pendingMessage}</p>
-      </div>
-    );
-  }
-
-  if (result === undefined) {
-    return null;
-  }
-
-  const failed = result.safeStatus === 'failed';
+  const tone = resolveOperationTone(result, pending);
+  // reconciliation 中も直前の correlation ID と補助操作を残し、確認起点の focus と Tab 順を維持します。
+  const failedResult = result?.safeStatus === 'failed' ? result : undefined;
+  const failed = !pending && failedResult !== undefined;
   return (
     <div
       aria-atomic="true"
       aria-live={failed ? undefined : 'polite'}
-      className={
-        failed
-          ? 'mb-6 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-foreground'
-          : 'mb-6 rounded-md border bg-muted px-4 py-3 text-sm text-foreground'
-      }
+      className={resolveRegionClassName(tone)}
       role={failed ? 'alert' : 'status'}
     >
-      <h3 ref={headingRef} tabIndex={-1} className="font-medium outline-none">
-        {result.displayData.title}
+      <h3
+        ref={headingRef}
+        tabIndex={-1}
+        className="rounded-sm font-medium outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+      >
+        {pending ? pendingTitle : result?.displayData.title}
       </h3>
-      <p className="mt-1">{result.displayData.message}</p>
-      {failed ? (
+      <p className="mt-1">{pending ? pendingMessage : result?.displayData.message}</p>
+      {failedResult !== undefined ? (
         <div className="mt-4 space-y-2 border-t pt-3">
           <p className="font-medium">問い合わせID</p>
           <code className="block select-text break-all rounded bg-background px-2 py-1 font-mono text-xs text-foreground">
-            {result.correlationId}
+            {failedResult.correlationId}
           </code>
           {clipboardAvailable ? (
             <Button
               type="button"
               variant="outline"
               className="min-h-11"
-              aria-label={`問い合わせID ${result.correlationId} をコピー`}
+              aria-label={`問い合わせID ${failedResult.correlationId} をコピー`}
               onClick={() => {
                 void copyCorrelationId();
               }}
@@ -147,9 +169,69 @@ export function OperationResultRegion<TDisplayData extends BrowserSafeOperationD
           ) : null}
         </div>
       ) : null}
+      {/* pending 中も既存の確認・次操作を同じ DOM 位置へ保持し、起点ボタンの focus と Tab 順を壊しません。 */}
       {children}
     </div>
   );
+}
+
+function getCompletionKey<TDisplayData extends BrowserSafeOperationDisplayData>(
+  result: BrowserSafeAgentRpcResult<TDisplayData> | undefined,
+  pending: boolean
+): string | undefined {
+  if (pending || result === undefined) {
+    return undefined;
+  }
+  // correlation ID だけに依存せず、同じ operation context の状態変化でも結果見出しを再通知します。
+  return [
+    result.safeStatus,
+    result.safeErrorCategory ?? 'none',
+    result.correlationId,
+    result.displayData.title,
+    result.displayData.message,
+  ].join('\u0000');
+}
+
+type OperationResultTone = 'pending' | 'success' | 'reconciliation' | 'reregistration' | 'failure';
+
+function resolveOperationTone<TDisplayData extends BrowserSafeOperationDisplayData>(
+  result: BrowserSafeAgentRpcResult<TDisplayData> | undefined,
+  pending: boolean
+): OperationResultTone {
+  if (pending || result === undefined) {
+    return 'pending';
+  }
+  if (result.safeStatus === 'succeeded') {
+    return 'success';
+  }
+  const displayData = result.displayData as unknown as Record<string, unknown>;
+  if (displayData.registrationOutcome === 're_registration_ready') {
+    return 'reregistration';
+  }
+  if (
+    displayData.registrationOutcome === 'reconciliation_required' ||
+    displayData.reconciliationRequired === true
+  ) {
+    return 'reconciliation';
+  }
+  return 'failure';
+}
+
+function resolveRegionClassName(tone: OperationResultTone): string {
+  const baseClassName = 'mb-6 rounded-md border px-4 py-3 text-sm';
+  if (tone === 'success') {
+    return `${baseClassName} border-operation-success-border bg-operation-success text-operation-success-foreground`;
+  }
+  if (tone === 'reconciliation') {
+    return `${baseClassName} border-operation-reconciliation-border bg-operation-reconciliation text-operation-reconciliation-foreground`;
+  }
+  if (tone === 'reregistration') {
+    return `${baseClassName} border-operation-reregistration-border bg-operation-reregistration text-operation-reregistration-foreground`;
+  }
+  if (tone === 'failure') {
+    return `${baseClassName} border-destructive/50 bg-destructive/10 text-foreground`;
+  }
+  return `${baseClassName} border-primary/30 bg-primary/5 text-foreground`;
 }
 
 function resolveBrowserClipboard(): Clipboard | undefined {

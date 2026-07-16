@@ -29,6 +29,7 @@ const registrationSchemaPath = new URL(
 const modelPolicySchemaPath = new URL('../components/schemas/model-policy.ts', import.meta.url);
 const dataTablePath = new URL('../components/data-table.tsx', import.meta.url);
 const formFieldPath = new URL('../components/ui/form.tsx', import.meta.url);
+const validationSummaryPath = new URL('../components/validation-summary.tsx', import.meta.url);
 const errorAlertPath = new URL('../components/error-alert.tsx', import.meta.url);
 const signalBadgePath = new URL('../components/signal-badge.tsx', import.meta.url);
 const emptyStatePath = new URL('../components/empty-state.tsx', import.meta.url);
@@ -142,11 +143,11 @@ function readAll(filePaths: readonly URL[]): string {
   return filePaths.map(read).join('\n');
 }
 
-function readNeutralLightness(
+function readTokenHsl(
   styles: string,
   theme: 'light' | 'dark',
   tokenName: 'foreground' | 'muted'
-): number {
+): readonly [number, number, number] {
   // 対象 theme の token block だけを切り出し、他 theme の同名 token を誤って評価しないようにします。
   const declarations =
     theme === 'light'
@@ -156,27 +157,49 @@ function readNeutralLightness(
     throw new Error(`${theme} theme token block is required for contrast verification.`);
   }
 
-  // 現行の Shadcn neutral token から lightness を取得し、foreground/muted の対比を token 定義に追従させます。
+  // TAMAC tinted-neutral token の hue/saturation/lightness を取得し、指定 palette の対比を追従させます。
   const token =
     tokenName === 'foreground'
-      ? /--foreground:\s*0 0% (\d+(?:\.\d+)?)%;/u.exec(declarations)?.[1]
-      : /--muted:\s*0 0% (\d+(?:\.\d+)?)%;/u.exec(declarations)?.[1];
+      ? /--foreground:\s*(\d+(?:\.\d+)?) (\d+(?:\.\d+)?)% (\d+(?:\.\d+)?)%;/u.exec(declarations)
+      : /--muted:\s*(\d+(?:\.\d+)?) (\d+(?:\.\d+)?)% (\d+(?:\.\d+)?)%;/u.exec(declarations);
   if (!token) {
-    throw new Error(`${theme} ${tokenName} must remain a Shadcn neutral token.`);
+    throw new Error(`${theme} ${tokenName} token is required for contrast verification.`);
   }
-
-  return Number(token);
+  return [Number(token[1]), Number(token[2]), Number(token[3])];
 }
 
-function neutralRelativeLuminance(lightness: number): number {
-  // neutral HSL は RGB 三成分が同じになるため、sRGB 線形化後の一成分が相対輝度になります。
-  const channel = lightness / 100;
-  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+function tokenRelativeLuminance([hue, saturation, lightness]: readonly [
+  number,
+  number,
+  number,
+]): number {
+  // HSL を RGB へ変換してから sRGB 線形化し、tinted palette の実際の相対輝度を算出します。
+  const huePrime = hue / 60;
+  const saturationRatio = saturation / 100;
+  const lightnessRatio = lightness / 100;
+  const chroma = (1 - Math.abs(2 * lightnessRatio - 1)) * saturationRatio;
+  const secondary = chroma * (1 - Math.abs((huePrime % 2) - 1));
+  const [red, green, blue] =
+    huePrime < 1
+      ? [chroma, secondary, 0]
+      : huePrime < 2
+        ? [secondary, chroma, 0]
+        : huePrime < 3
+          ? [0, chroma, secondary]
+          : huePrime < 4
+            ? [0, secondary, chroma]
+            : huePrime < 5
+              ? [secondary, 0, chroma]
+              : [chroma, 0, secondary];
+  const match = lightnessRatio - (red + green + blue) / 2;
+  const linearize = (channel: number): number => {
+    const srgb = channel + match;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  };
+  return linearize(red) * 0.2126 + linearize(green) * 0.7152 + linearize(blue) * 0.0722;
 }
 
-function contrastRatio(foregroundLightness: number, backgroundLightness: number): number {
-  const foreground = neutralRelativeLuminance(foregroundLightness);
-  const background = neutralRelativeLuminance(backgroundLightness);
+function contrastRatio(foreground: number, background: number): number {
   return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
 }
 
@@ -275,7 +298,8 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     // FormField uses aria-describedby to link errors to inputs.
     expect(formField).toContain('aria-describedby');
     expect(formField).toContain('aria-invalid');
-    expect(formField).toContain('role="alert"');
+    expect(formField).toContain('formMessageId');
+    expect(formField).not.toContain('aria-live="assertive"');
 
     // The form validates all required fields per wireframe §6.2.
     expect(registrationSources).toContain('validateRegistrationValues');
@@ -305,7 +329,7 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     expect(registrationForm).toContain('className="h-11"');
     expect(registrationActions).toContain('className="min-h-11"');
     expect(modelPolicyFields).toContain('className="h-11"');
-    expect(modelPolicyFields).toContain('className="min-h-11"');
+    expect(modelPolicyFields).toMatch(/className=.*min-h-11/u);
 
     // The form page uses one server-side submit action to avoid partial writes.
     expect(newAgentPage).toContain('submitManagedAgentRegistration');
@@ -326,19 +350,28 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     );
   });
 
+  it('[AGENT-MANAGEMENT-UI-S002] edit RSC props explicitly project browser-safe registration metadata', () => {
+    const newAgentPage = read(newAgentPagePath);
+
+    // ManagedAgentRecord の server-only attempt/key/digest fields を object spread で Client Component へ渡さない。
+    expect(newAgentPage).toContain('const initialAgent =');
+    expect(newAgentPage).toContain('const initialCredential =');
+    expect(newAgentPage).toContain('initialAgent={initialAgent}');
+    expect(newAgentPage).toContain('initialCredential={initialCredential}');
+    expect(newAgentPage).not.toContain('initialAgent={initial?.agent}');
+    expect(newAgentPage).not.toContain('initialCredential={initial?.credential}');
+  });
+
   it('[AGENT-MANAGEMENT-UI-S002] Validation summary items are semantic field anchors that retain RHF focus', () => {
     const registrationForm = read(registrationFormPath);
     const modelPolicyFields = read(modelPolicyFieldsPath);
-    const validationSummary = registrationForm.slice(
-      registrationForm.indexOf('function ValidationSummary'),
-      registrationForm.indexOf('function collectFieldErrorSummaryItems')
-    );
+    const validationSummary = read(validationSummaryPath);
 
     // `a[href]` は click と Enter の両方で native link semantics を持ち、Button は既存 primitive を再利用する。
     expect(validationSummary).toMatch(/<Button\s+asChild\s+variant="link"/u);
     expect(validationSummary).toContain('href={`#${item.fieldName}`}');
     expect(validationSummary).toContain('onClick={() => {');
-    expect(validationSummary).toContain('form.setFocus(item.fieldName);');
+    expect(validationSummary).toContain('onFocusField(item.fieldName);');
     expect(registrationForm).toContain('useFormState({ control: form.control })');
 
     // summary の field path は top-level input、nested policy field、Select trigger の実 ID と一致する。
@@ -361,14 +394,63 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     expect(registrationForm).toContain('registrationPending');
     expect(registrationForm).toContain('policyValidationPending');
     expect(registrationForm).toContain('pending={registrationPending}');
-    expect(registrationActions).toContain('disabled={disabled}');
+    expect(registrationActions).toContain('aria-disabled={disabled}');
+    expect(registrationActions).toContain('aria-busy={pending}');
     expect(registrationActions).toContain('min-h-11');
     expect(modelPolicyFields).toContain('className="h-11"');
-    expect(modelPolicyFields).toContain('className="min-h-11"');
-    expect(modelPolicySettings).toContain('pending={pending}');
-    expect(modelPolicySettings).not.toContain(
-      "pending={pending || validationStatus === 'validating'}"
+    expect(modelPolicyFields).toMatch(/className=.*min-h-11/u);
+    expect(modelPolicySettings).toContain(
+      "pending={pending || reconciliationPending || validationStatus === 'validating'}"
     );
+    expect(modelPolicySettings).toContain('setOperationResult(undefined);');
+    expect(modelPolicySettings).toContain('reconciliationRequired');
+    expect(modelPolicySettings).toContain('focusFirstInvalidModelPolicyField');
+    expect(modelPolicySettings).toContain('<ValidationSummary');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S018] Reconciliation keeps the draft, summary, result, and only confirmation action', () => {
+    const source = read(modelPolicySettingsSectionPath);
+    const reconcileStart = source.indexOf('async function runModelPolicyReconciliation');
+    const reconcileEnd = source.indexOf(
+      '\n\ninterface ModelPolicySettingsEditorProps',
+      reconcileStart
+    );
+    const reconcileHandler = source.slice(reconcileStart, reconcileEnd);
+
+    // 確認開始時に前回結果を消さず、同じ persisted operation key/draft と safe result を保持する。
+    expect(reconcileHandler).not.toContain('setOperationResult(undefined);');
+    expect(reconcileHandler).toContain('reconciliationOperation.draft');
+    expect(reconcileHandler).toContain('setReconciliationPending(true);');
+    expect(reconcileHandler).toContain('setReconciliationPending(false);');
+    expect(source).toContain('reconciliationError');
+    expect(source).toContain(
+      '適用状態を確認できませんでした。時間をおいて「適用状態を確認」を実行してください。'
+    );
+
+    // pending 中・確認失敗後も mutation handler と全 field group は同じ lock 条件を共有する。
+    expect(source).toContain('const mutationLocked =');
+    expect(source).toContain('if (mutationLocked)');
+    expect(source).toContain('disabled={mutationLocked}');
+    expect(source).toContain('aria-disabled={pending || reconciliationPending}');
+    expect(source).toContain(
+      '適用状態を確認できませんでした。時間をおいて「適用状態を確認」を実行してください。'
+    );
+    expect(source).toContain('「適用状態を確認」');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S017] maps definitive not_found cleanup to editable re-registration', () => {
+    const registrationForm = read(registrationFormPath);
+    const registrationActions = read(registrationActionsPath);
+    const managedAgents = read(managedAgentsPath);
+
+    expect(managedAgents).toContain("registrationOutcome: 'active'");
+    expect(managedAgents).toContain("registrationOutcome: 'reconciliation_required'");
+    expect(managedAgents).toContain("registrationOutcome: 're_registration_ready'");
+    expect(registrationForm).toContain(
+      "operationResult?.displayData.registrationOutcome === 're_registration_ready'"
+    );
+    expect(registrationActions).toContain('reRegistrationReady');
+    expect(registrationActions).toContain('Agentを再登録');
   });
 
   it('[AGENT-MANAGEMENT-UI-S002] Operation result preserves a selectable support ID when Clipboard access is rejected', () => {
@@ -380,21 +462,17 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     expect(resultRegion).toContain('role="status"');
   });
 
-  it('[AGENT-MANAGEMENT-UI-S002] Server validation runs before writes and rolls back partial registration', () => {
+  it('[AGENT-MANAGEMENT-UI-S002] Server validation runs before atomic create/edit registration writes', () => {
     const registrationAction = read(registrationActionPath);
     const managedAgents = read(managedAgentsPath);
 
     expect(registrationAction).toContain('validateManagedAgentRegistrationInput');
     expect(registrationAction).toContain('validateRegistrationModelPolicyValues');
     expect(registrationAction).toContain('isValidHttpsUrl');
-    expect(registrationAction).toContain('Agent ID is already registered.');
-    expect(registrationAction).toContain('writeRegistrationRecords');
-    expect(registrationAction).toContain('createManagedAgent');
-    expect(registrationAction).toContain('upsertCredentialReference');
-    expect(registrationAction).toContain('rollbackRegistrationWrite');
-    expect(registrationAction).toContain('deleteManagedAgent');
+    expect(managedAgents).toContain('createManagedAgentRegistrationAttempt');
+    expect(managedAgents).toContain('updateRegistrationMetadata');
+    expect(managedAgents).toContain('reconcileManagedAgentRegistration');
     expect(managedAgents).toContain('validateModelPolicyForRegistration');
-    expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
 
     const submitStart = managedAgents.indexOf(
       'export async function submitManagedAgentRegistration'
@@ -404,14 +482,15 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     );
     const submitAction = managedAgents.slice(submitStart, validateActionStart);
     expect(submitAction).not.toContain('validateModelPolicyForRegistration');
-    expect(submitAction.indexOf('persistManagedAgentRegistration')).toBeLessThan(
-      submitAction.indexOf('initializeAgentWithDefaultModelPolicy')
-    );
+    expect(
+      submitAction.indexOf('const attempt = await createManagedAgentRegistrationAttempt(')
+    ).toBeGreaterThan(submitAction.indexOf('createManagedAgentRegistrationAttemptRepository'));
   });
 
   it('[AGENT-MANAGEMENT-UI-S002] Form has pending, success, and error states', () => {
     const registrationForm = read(registrationFormPath);
     const registrationActions = read(registrationActionsPath);
+    const validationSummary = read(validationSummaryPath);
 
     // Pending state.
     expect(registrationForm).toContain('pending');
@@ -419,13 +498,31 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
 
     // Error state.
     expect(registrationForm).toContain('formError');
-    expect(registrationForm).toContain('role="alert"');
+    expect(validationSummary).toContain('role="alert"');
     expect(registrationForm).toContain('OperationResultRegion');
     expect(registrationForm).toContain('setFocus');
 
     // Success state keeps the route and offers the specified next actions.
     expect(registrationForm).toContain('Agentの概要を開く');
     expect(registrationForm).toContain('Agent一覧に戻る');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S017] Active registration is read-only with only overview/list actions and server failures use ResultRegion only', () => {
+    const registrationForm = read(registrationFormPath);
+
+    expect(registrationForm).toContain('activeRegistration');
+    expect(registrationForm).toContain('registrationLocked');
+    expect(registrationForm).toContain('disabled={isEdit || registrationLocked}');
+    expect(registrationForm).toContain(
+      'onValidate={activeRegistration ? undefined : onValidatePolicy}'
+    );
+    expect(registrationForm).toContain('activeRegistration ? null :');
+    expect(registrationForm).toContain("displayedOperationResult?.safeStatus === 'failed' ? null");
+    expect(registrationForm).toContain('policyValidationResult');
+    expect(registrationForm).toContain(
+      'pending={registrationPending || policyValidationPending || reconciliationPending}'
+    );
+    expect(registrationForm).toContain('createPolicyValidationFailureResult');
   });
 
   it('[AGENT-MANAGEMENT-UI-S002] Form does not persist client-side secrets', () => {
@@ -462,7 +559,7 @@ describe('Add/edit Agent form (AGENT-MANAGEMENT-UI-S002)', () => {
     // The error node has an id that matches the aria-describedby pattern.
     expect(formField).toContain('formMessageId');
     expect(formField).toContain('describedBy');
-    expect(formField).toContain('role="alert"');
+    expect(formField).not.toContain('aria-live="assertive"');
 
     // The helper text also has an id for aria-describedby.
     expect(formField).toContain('formDescriptionId');
@@ -639,8 +736,8 @@ describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MA
     expect(fieldset).toContain('text-foreground');
     expect(fieldset).not.toContain('text-muted-foreground');
     for (const theme of ['light', 'dark'] as const) {
-      const foreground = readNeutralLightness(clientGlobals, theme, 'foreground');
-      const muted = readNeutralLightness(clientGlobals, theme, 'muted');
+      const foreground = tokenRelativeLuminance(readTokenHsl(clientGlobals, theme, 'foreground'));
+      const muted = tokenRelativeLuminance(readTokenHsl(clientGlobals, theme, 'muted'));
       expect(contrastRatio(foreground, muted)).toBeGreaterThanOrEqual(4.5);
     }
   });
@@ -659,7 +756,7 @@ describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MA
     expect(modelPolicyFields).toContain('ポリシーを検証');
     expect(newAgentPage).toContain('validateManagedAgentRegistrationModelPolicy');
     expect(managedAgents).toContain('validateModelPolicyForRegistration');
-    expect(managedAgents).toContain('initializeAgentWithDefaultModelPolicy');
+    expect(managedAgents).toContain('createManagedAgentRegistrationAttempt');
     expect(lifecycleActions).toContain('clients.lifecycle.initializeAgent');
     expect(lifecycleActions).toContain('initialModelPolicy');
     expect(lifecycleActions).toContain('modelPolicyRef: modelPolicy.policyRef');
@@ -684,15 +781,18 @@ describe('Default model policy management UI (AGENT-MANAGEMENT-UI-S017, AGENT-MA
     expect(settingsSection).toContain('既定ポリシーを保存');
     expect(settingsSection).toContain('Agent所有ポリシーを保存してから');
     expect(settingsSection).toContain("result.safeErrorCategory === 'permission_denied'");
-    expect(settingsSection).toContain('disabled={pending || permissionDenied}');
-    expect(summary).toContain('Policy ref');
-    expect(summary).toContain('Digest');
-    expect(summary).toContain('Provider');
-    expect(summary).toContain('Model');
-    expect(summary).toContain('Config version');
-    expect(operations).toContain('upsertModelPolicyForManagedAgent');
+    expect(settingsSection).toContain('disabled={mutationLocked}');
+    expect(summary).toContain('既定モデルポリシー');
+    expect(summary).toContain('ポリシー参照');
+    expect(summary).toContain('ダイジェスト');
+    expect(summary).toContain('プロバイダー');
+    expect(summary).toContain('モデル');
+    expect(summary).toContain('設定バージョン');
+    expect(summary).not.toContain('Warnings:');
+    expect(summary).not.toContain('font-mono text-xs');
+    expect(operations).toContain('upsertModelPolicyWithClients');
     expect(operations).toContain('clients.state.updateConfig');
-    expect(operations.indexOf('upsertModelPolicyForManagedAgent')).toBeLessThan(
+    expect(operations.indexOf('upsertModelPolicyWithClients')).toBeLessThan(
       operations.indexOf('clients.state.updateConfig')
     );
     expect(viewModels).toContain('toBrowserSafeModelPolicyMetadata');
@@ -756,6 +856,34 @@ describe('Agent-owned history tabs (AGENT-MANAGEMENT-UI-S005)', () => {
     expect(eventList).toContain('PaginationBar');
     expect(runList).toContain('PaginationBar');
     expect(compactionView).toContain('PaginationBar');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S005] clears stale detail selection before a new Run, Tool, or Thread request and preserves transition semantics', () => {
+    const runList = read(runListPath);
+    const toolView = read(toolViewPath);
+    const threadList = read(threadListPath);
+
+    // 新 request の開始順序を source contract として固定し、失敗後に前回 detail drawer が残る regression を防ぐ。
+    for (const source of [runList, toolView, threadList]) {
+      expect(source).toContain("import { startTransition, useState } from 'react'");
+      expect(source).toContain('startTransition(() => {');
+      expect(source).toContain('setSelected(undefined);');
+      expect(source).toContain('setPending(true);');
+    }
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S005] keeps successful Runs, Tools, and Invocations visible when an independent sibling section is unavailable', () => {
+    const runsPage = read(agentRunsPagePath);
+    const toolView = read(toolViewPath);
+
+    // Promise.allSettled と section flags により one failed RPC が sibling data を global unavailable state へ巻き戻さない。
+    expect(runsPage).toContain('Promise.allSettled');
+    expect(runsPage).toContain('runsUnavailable');
+    expect(runsPage).toContain('toolsUnavailable');
+    expect(runsPage).toContain('invocationsUnavailable');
+    expect(runsPage).toContain('screenName="Run history"');
+    expect(toolView).toContain('screenName="Tool catalog"');
+    expect(toolView).toContain('screenName="Pending approvals"');
   });
 });
 
@@ -1083,6 +1211,20 @@ describe('Client Service signing key UI and server action boundary', () => {
     expect(source).toContain('Safe diagnostic codes');
     // 自由入力ではなく既存 global key selection。
     expect(source).toContain('Select an existing Global signing key');
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S012] signing-key health panel receives the complete safe result and never labels a transport failure as unregistered', () => {
+    const source = read(agentSigningKeySelectPath);
+
+    // health action の four-field result は共通 ResultRegion に渡し、safe title/message/category/correlation ID と focus を一貫表示する。
+    expect(source).toContain('healthResult={selectionState.healthResult}');
+    expect(source).toContain("healthResult?.safeStatus === 'failed'");
+    expect(source).toContain('OperationResultRegion');
+    expect(source).toContain('result={healthResult}');
+    expect(source).toContain('pending={verifying}');
+    expect(source).toContain('上の安全な結果を確認してから再実行してください。');
+    expect(source).not.toContain('privateJwk');
+    expect(source).not.toContain('raw diagnostic');
   });
 
   it('[AGENT-MANAGEMENT-UI-S013] trust config export produces public-only JSON under Global Settings', () => {

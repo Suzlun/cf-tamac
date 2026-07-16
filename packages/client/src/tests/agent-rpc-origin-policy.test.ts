@@ -3,10 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  persistManagedAgentRegistration,
-  validateManagedAgentRegistrationInput,
-} from '../server/actions/managed-agent-registration';
+import { validateManagedAgentRegistrationInput } from '../server/actions/managed-agent-registration';
 import { registerManagedAgent } from '../server/actions/managed-agents';
 import {
   approveAgentRpcOrigin,
@@ -15,7 +12,7 @@ import {
 import { createBrowserSafeAgentRpcSuccess } from '../server/agent-rpc/safe-results';
 import { generateEd25519SigningKeyMaterial } from '../server/credentials/signing-keys';
 import {
-  createCredentialReferenceRepository,
+  createManagedAgentRegistrationAttemptRepository,
   createManagedAgentRepository,
   createSigningKeyRepository,
 } from '../server/db';
@@ -42,6 +39,7 @@ afterEach(() => {
   // E2E fake はこの test の registration initialization だけに限定し、他 test の signing/transport 経路へ漏らしません。
   delete process.env.E2E_FAKE_AGENT_RPC;
   mocks.getCloudflareContext.mockReset();
+  vi.unstubAllGlobals();
 });
 
 describe('Management Client Agent RPC origin policy', () => {
@@ -85,16 +83,35 @@ describe('Management Client Agent RPC origin policy', () => {
       validation.value.agentRpcOrigin,
       parseApprovedAgentRpcOrigins('["https://agent.example.com"]')
     );
-    const persistedResult = await persistManagedAgentRegistration(
-      { ...validation.value, agentRpcOrigin: approvedOrigin },
-      {
-        agents: createManagedAgentRepository(db),
-        credentials: createCredentialReferenceRepository(db),
-      }
-    );
+    await createManagedAgentRegistrationAttemptRepository(db).createRegistrationAttempt({
+      agent: {
+        agentId: validation.value.agentId,
+        agentRpcOrigin: approvedOrigin,
+        displayName: validation.value.displayName,
+        displayOrder: validation.value.displayOrder,
+      },
+      attempt: {
+        attemptId: 'attempt-origin-001',
+        initializationIdempotencyKey: 'registration:agent-alpha:attempt-origin-001',
+        modelPolicyRef: validation.value.modelPolicy.policyRef,
+        requestDigest: 'sha256:origin-policy-test',
+      },
+      credential: {
+        credentialRef: validation.value.referenceValue,
+        keyId: validation.value.keyId,
+        publicFingerprint: validation.value.publicFingerprint,
+        maskedHint: validation.value.maskedHint,
+        status: validation.value.status,
+      },
+      signing: {
+        issuer: 'client-service',
+        keyId: 'default-key',
+        publicFingerprint: 'sha256:default-signing',
+      },
+    });
     const result = createBrowserSafeAgentRpcSuccess(
       {
-        agentId: persistedResult.ok ? persistedResult.agentId : undefined,
+        agentId: validation.value.agentId,
         displayName: input.displayName,
         fieldErrors: {},
         message: `「${input.displayName}」を管理対象に追加しました。`,
@@ -109,7 +126,6 @@ describe('Management Client Agent RPC origin policy', () => {
       'safeErrorCategory',
       'safeStatus',
     ]);
-    expect(persistedResult.ok).toBe(true);
     expect(result.safeStatus).toBe('succeeded');
     expect(result.safeErrorCategory).toBeNull();
     expect(result.correlationId).not.toBe('');
@@ -185,6 +201,8 @@ describe('Management Client Agent RPC origin policy', () => {
       signingPublicFingerprint: material.publicFingerprint,
     });
     setWorkerEnv(db, '["https://agent.example.com"]');
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
 
     const { validateModelPolicyForManagedAgent } = await import('../server/actions/model-policies');
     const result = await validateModelPolicyForManagedAgent('agent-policy-violation', {
@@ -205,6 +223,8 @@ describe('Management Client Agent RPC origin policy', () => {
       material.keyId
     );
     expect(signingKey?.lastUsedAtMs).toBeUndefined();
+    // stored origin rejection は actual Server Action entry で transport/JWT signing より前に完了するため、外部 fetch と signing-key usage を起こさない。
+    expect(fetchSpy).not.toHaveBeenCalled();
 
     const source = readFileSync(fileURLToPath(loaderPath.href), 'utf8');
     const originValidationStart = source.indexOf('const approvedOrigin');
@@ -213,6 +233,29 @@ describe('Management Client Agent RPC origin policy', () => {
     expect(originValidationStart).toBeLessThan(
       source.indexOf('deriveActingUserContext', originValidationStart)
     );
+  });
+
+  it('[TAMAC-SDK-S008] rejects whitespace-only required configuration without exposing its value', async () => {
+    const db = createTestD1Database();
+    await applyClientMigration(db);
+    setWorkerEnv(db, '["https://agent.example.com"]');
+    mocks.getCloudflareContext.mockReturnValue({
+      env: {
+        AGENT_RPC_ALLOWED_ORIGINS: '["https://agent.example.com"]',
+        AGENT_RPC_AUDIENCE: 'cf-tamac-agent',
+        CLIENT_ACTING_OPERATOR_ID: 'origin-policy-test-operator',
+        CLIENT_ACTING_SCOPES: 'agent:read agent:write',
+        CLIENT_CREDENTIAL_ENCRYPTION_KEY: '   ',
+        CLIENT_DB: db,
+      },
+    });
+
+    const { getClientWorkerEnv } = await import('../server/env');
+    await expect(Promise.resolve().then(getClientWorkerEnv)).rejects.toThrow(
+      'Client Worker environment bindings are not available.'
+    );
+    // error contract は secret value を含まない固定 configuration message だけである。
+    await expect(Promise.resolve().then(getClientWorkerEnv)).rejects.not.toThrow('   ');
   });
 });
 

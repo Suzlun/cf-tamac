@@ -1,43 +1,43 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wireframe Preview</title>
+    <title>ワイヤーフレームプレビュー</title>
     <style>
       :root {
         /* Text */
-        --text-primary: #333;
-        --text-secondary: #555;
-        --text-tertiary: #888;
-        --text-muted: #b0b0b0;
+        --text-primary: #142a2e;
+        --text-secondary: #35535a;
+        --text-tertiary: #526d73;
+        --text-muted: #526d73;
 
         /* Background */
-        --bg-page: #f8f8f8;
+        --bg-page: #f3f7f7;
         --bg-surface: #fff;
-        --bg-panel: #fafafa;
-        --bg-subtle: #f0f0f0;
-        --bg-placeholder: #e8e8e8;
-        --bg-placeholder-dark: #ddd;
-        --bg-dark: #333;
+        --bg-panel: #e7eff0;
+        --bg-subtle: #eef3f3;
+        --bg-placeholder: #dce8e9;
+        --bg-placeholder-dark: #b8cbcd;
+        --bg-dark: #142a2e;
 
         /* Border */
-        --border-default: #e0e0e0;
-        --border-light: #f0f0f0;
+        --border-default: #b8cbcd;
+        --border-light: #d7e2e3;
 
         /* Accent */
-        --accent: #4a90d9;
-        --accent-bg: #e8f0fe;
-        --drop-indicator: #29b3f1;
-        --success-bg: #e8f5e9;
-        --success-border: #a5d6a7;
-        --success-text: #2e7d32;
+        --accent: #0a666a;
+        --accent-bg: #ddeeef;
+        --drop-indicator: #0a666a;
+        --success-bg: #e3f3e9;
+        --success-border: #77a989;
+        --success-text: #155b34;
 
         /* Syntax highlighting */
-        --syntax-key: #0066cc;
-        --syntax-string: #007a3d;
-        --syntax-number: #d97706;
-        --syntax-bool: #8b5cf6;
+        --syntax-key: #075e73;
+        --syntax-string: #155b34;
+        --syntax-number: #805112;
+        --syntax-bool: #5e4b8b;
 
         /* Radius */
         --radius-sm: 4px;
@@ -51,8 +51,8 @@
         --font-xl: 32px;
 
         /* Font family */
-        --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Consolas', monospace;
+        --font-sans: 'IBM Plex Sans JP', 'BIZ UDPGothic', 'Noto Sans JP', sans-serif;
+        --font-mono: 'IBM Plex Mono', 'BIZ UDGothic', 'Cascadia Mono', monospace;
 
         /* Spacing — 8px base grid */
         --space-xs: 4px;
@@ -75,17 +75,25 @@
         color: var(--text-primary);
         display: grid;
         grid-template-rows: 48px 1fr;
-        grid-template-columns: 1fr 420px;
+        grid-template-columns: minmax(0, 1fr) 420px;
         height: 100vh;
         overflow: hidden;
       }
 
       body.json-panel-hidden {
-        grid-template-columns: 1fr 0;
+        grid-template-columns: minmax(0, 1fr) 0;
+        grid-template-rows: 48px auto;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
       }
 
       body.json-panel-hidden #wf-json-panel {
         display: none;
+      }
+
+      body.json-panel-hidden #wf-viewport-wrap {
+        overflow: visible;
       }
 
       /* ── Toolbar ── */
@@ -170,6 +178,7 @@
       /* ── Viewport ── */
       #wf-viewport-wrap {
         grid-column: 1;
+        min-width: 0;
         padding: var(--space-lg);
         overflow-y: auto;
       }
@@ -177,6 +186,7 @@
       .wf-viewport {
         background: var(--bg-surface);
         border: 1px solid var(--border-default);
+        max-width: 100%;
         overflow: hidden;
         margin: 0 auto;
       }
@@ -319,7 +329,7 @@
       .wf-drag-over {
         outline: 4px solid var(--drop-indicator) !important;
         outline-offset: -4px;
-        background: rgba(41, 179, 241, 0.06) !important;
+        background: rgba(10, 102, 106, 0.08) !important;
       }
       .wf-drag-over > .wf-label {
         color: var(--drop-indicator) !important;
@@ -329,7 +339,7 @@
       .wf-selected {
         outline: 2px solid var(--accent) !important;
         outline-offset: -2px;
-        background: rgba(74, 144, 217, 0.06) !important;
+        background: rgba(10, 102, 106, 0.08) !important;
       }
       .wf-selected > .wf-label {
         color: var(--accent) !important;
@@ -354,7 +364,7 @@
       .wf-node:hover {
         outline: 1px dashed var(--text-muted);
         outline-offset: -1px;
-        background: rgba(0, 0, 0, 0.015);
+        background: rgba(10, 102, 106, 0.04);
       }
 
       /* ── Grab bar for compound nodes ── */
@@ -370,7 +380,7 @@
         font-size: var(--font-sm);
         font-weight: 500;
         color: var(--text-tertiary);
-        background: rgba(250, 250, 250, 0.92);
+        background: rgba(238, 243, 243, 0.94);
         border-bottom: 1px solid var(--border-light);
         position: absolute;
         top: 0;
@@ -602,21 +612,35 @@
         background: var(--bg-placeholder-dark);
         border-radius: var(--radius-sm);
       }
+
+      button:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0.01ms !important;
+        }
+      }
     </style>
   </head>
-  <body>
+  <body class="json-panel-hidden">
     <div id="wf-toolbar">
       <div id="wf-toolbar-left">
         <span id="wf-toolbar-title"></span>
-        <span id="wf-edited-badge">Edited</span>
+        <span id="wf-edited-badge">編集済み</span>
       </div>
       <div id="wf-toolbar-actions">
         <button
           class="wf-btn wf-btn-toggle"
           id="wf-toggle-btn"
           onclick="toggleJSONPanel()"
-          aria-pressed="true"
-          title="Toggle JSON panel"
+          aria-pressed="false"
+          aria-label="JSONパネルを開く"
+          title="JSONパネルを開く"
         >
           <svg
             width="16"
@@ -643,10 +667,16 @@
       <div id="wf-json-panel-header">
         <span>JSON</span>
         <div id="wf-json-actions">
-          <button onclick="copyJSON(this)">Copy</button>
-          <button id="wf-save-btn" onclick="saveJSON(this)" style="display: none">Save</button>
-          <button onclick="downloadJSON()">Download</button>
-          <button onclick="toggleJSONPanel()" title="Close panel">&times;</button>
+          <button onclick="copyJSON(this)">コピー</button>
+          <button id="wf-save-btn" onclick="saveJSON(this)" style="display: none">保存</button>
+          <button onclick="downloadJSON()">ダウンロード</button>
+          <button
+            onclick="toggleJSONPanel()"
+            aria-label="JSONパネルを閉じる"
+            title="JSONパネルを閉じる"
+          >
+            &times;
+          </button>
         </div>
       </div>
       <div id="wf-json-content">
@@ -1037,14 +1067,14 @@
       let dragPath = null;
       let dropIndicator = null;
       let fileHandle = null;
-      let jsonPanelHidden = localStorage.getItem('wf-json-panel') === 'hidden';
+      let jsonPanelHidden = true;
       let selectedPath = null;
       let clipboardNode = null;
       const undoStack = [];
       const redoStack = [];
       const MAX_UNDO = 50;
       const originalFilename =
-        (WIREFRAME_DATA?.name || 'wireframe').replace(/\s+/g, '-').toLowerCase() +
+        (WIREFRAME_DATA?.name || 'ワイヤーフレーム').replace(/\s+/g, '-').toLowerCase() +
         '.wireframe.json';
 
       // ── Undo / Redo ──
@@ -1065,7 +1095,7 @@
 
         render();
         updateJSONPanel();
-        showToast('Undo');
+        showToast('編集内容を元に戻しました。');
 
         // undoで全て戻した場合はeditedバッジを消す
         if (undoStack.length === 0) {
@@ -1086,7 +1116,7 @@
 
         render();
         updateJSONPanel();
-        showToast('Redo');
+        showToast('編集内容をやり直しました。');
       }
 
       // ── JSON tree traversal ──
@@ -1321,9 +1351,11 @@
       function toggleJSONPanel() {
         jsonPanelHidden = !jsonPanelHidden;
         document.body.classList.toggle('json-panel-hidden', jsonPanelHidden);
-        document
-          .getElementById('wf-toggle-btn')
-          .setAttribute('aria-pressed', String(!jsonPanelHidden));
+        const toggleButton = document.getElementById('wf-toggle-btn');
+        const toggleLabel = jsonPanelHidden ? 'JSONパネルを開く' : 'JSONパネルを閉じる';
+        toggleButton.setAttribute('aria-pressed', String(!jsonPanelHidden));
+        toggleButton.setAttribute('aria-label', toggleLabel);
+        toggleButton.title = toggleLabel;
         localStorage.setItem('wf-json-panel', jsonPanelHidden ? 'hidden' : 'visible');
       }
 
@@ -1334,7 +1366,7 @@
         navigator.clipboard.writeText(json).then(() => {
           const orig = btn.textContent;
           btn.classList.add('wf-btn-success');
-          btn.textContent = 'Copied!';
+          btn.textContent = 'コピーしました';
           setTimeout(() => {
             btn.classList.remove('wf-btn-success');
             btn.textContent = orig;
@@ -1363,7 +1395,7 @@
               suggestedName: originalFilename,
               types: [
                 {
-                  description: 'JSON Files',
+                  description: 'JSONファイル',
                   accept: { 'application/json': ['.json'] },
                 },
               ],
@@ -1375,16 +1407,16 @@
           await writable.close();
 
           btn.classList.add('wf-btn-success');
-          btn.textContent = 'Saved!';
+          btn.textContent = '保存しました';
           setTimeout(() => {
             btn.classList.remove('wf-btn-success');
-            btn.textContent = 'Save';
+            btn.textContent = '保存';
           }, 1500);
         } catch (err) {
           if (err.name === 'AbortError') return; // User cancelled picker
           fileHandle = null; // Reset handle on error
           downloadJSON();
-          showToast('Downloaded instead (save failed)');
+          showToast('JSONファイルをダウンロードしました。');
         }
       }
 
@@ -1417,7 +1449,8 @@
 
         render();
         updateJSONPanel();
-        showToast(`${node.name}: ${node.direction}`);
+        const directionLabel = node.direction === 'vertical' ? '縦方向' : '横方向';
+        showToast(`「${node.name}」を${directionLabel}に整列しました。`);
       }
 
       // ── Selection & Copy/Paste ──
@@ -1442,10 +1475,10 @@
         }
       }
 
-      // ノードのディープコピー（nameに " (copy)" を付与）
+      // ノードのディープコピー（nameに「（複製）」を付与）
       function deepCopyNode(node) {
         const copy = JSON.parse(JSON.stringify(node));
-        copy.name = (copy.name || '') + ' (copy)';
+        copy.name = (copy.name || '') + '（複製）';
         return copy;
       }
 
@@ -1454,7 +1487,7 @@
         const info = getNodeByPath(selectedPath);
         if (!info) return;
         clipboardNode = JSON.parse(JSON.stringify(info.node));
-        showToast(`Copied: ${clipboardNode.name}`);
+        showToast(`「${clipboardNode.name}」をコピーしました。`);
       }
 
       function handlePaste() {
@@ -1478,7 +1511,7 @@
         render();
         updateSelection();
         updateJSONPanel();
-        showToast(`Pasted: ${copy.name}`);
+        showToast(`「${copy.name}」を貼り付けました。`);
       }
 
       function handleDelete() {
@@ -1497,7 +1530,7 @@
 
         render();
         updateJSONPanel();
-        showToast(`Deleted: ${name}`);
+        showToast(`レイアウトを更新しました: ${name}`);
       }
 
       function handleKeyDown(e) {
@@ -1562,7 +1595,7 @@
         if (direction) {
           const toggle = document.createElement('button');
           toggle.className = 'wf-dir-toggle';
-          toggle.title = direction === 'vertical' ? 'Switch to horizontal' : 'Switch to vertical';
+          toggle.title = direction === 'vertical' ? '横方向に整列' : '縦方向に整列';
           toggle.textContent = direction === 'vertical' ? '↕' : '↔';
           toggle.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1605,7 +1638,7 @@
           if (node.maxWidth) el.style.maxWidth = `${node.maxWidth}px`;
 
           // Grab bar (compound node)
-          el.appendChild(createGrabBar(node.name || 'Table', path, null));
+          el.appendChild(createGrabBar(node.name || 'テーブル', path, null));
 
           // Header row
           const header = document.createElement('div');
@@ -1696,7 +1729,7 @@
         if (node.type && !hasChildren) {
           switch (node.type) {
             case 'text':
-              el.textContent = node.name || 'Text';
+              el.textContent = node.name || 'テキスト';
               if (node.variant) el.dataset.variant = node.variant;
               break;
             case 'image':
@@ -1708,18 +1741,18 @@
               if (!node.height) el.style.height = '32px';
               break;
             case 'button':
-              el.textContent = node.name || 'Button';
+              el.textContent = node.name || 'ボタン';
               break;
             case 'link':
-              el.textContent = node.name || 'Link';
+              el.textContent = node.name || 'リンク';
               break;
             case 'input':
-              el.textContent = node.name || 'Input';
+              el.textContent = node.name || '入力欄';
               break;
             case 'card':
               const cardLabel = document.createElement('span');
               cardLabel.className = 'wf-card-label';
-              cardLabel.textContent = node.name || 'Card';
+              cardLabel.textContent = node.name || 'カード';
               el.appendChild(cardLabel);
               break;
           }
@@ -1763,7 +1796,9 @@
             if (WIREFRAME_DATA.root.wrap) viewport.style.flexWrap = 'wrap';
 
             // rootノード用のgrab bar（direction切り替え用）
-            viewport.appendChild(createGrabBar(WIREFRAME_DATA.root.name || 'Root', null, rootDir));
+            viewport.appendChild(
+              createGrabBar(WIREFRAME_DATA.root.name || 'ルート', null, rootDir)
+            );
 
             WIREFRAME_DATA.root.children.forEach((child, i) => {
               renderNode(child, viewport, `${i}`);
@@ -1777,13 +1812,14 @@
 
       function init() {
         if (!WIREFRAME_DATA) {
-          document.getElementById('wf-root').textContent = 'No wireframe data found.';
+          document.getElementById('wf-root').textContent =
+            'ワイヤーフレームデータを読み込むとプレビューを表示します。';
           return;
         }
 
         document.getElementById('wf-toolbar-title').textContent =
-          WIREFRAME_DATA.name || 'Wireframe';
-        document.title = WIREFRAME_DATA.name || 'Wireframe Preview';
+          WIREFRAME_DATA.name || 'ワイヤーフレーム';
+        document.title = WIREFRAME_DATA.name || 'ワイヤーフレームプレビュー';
 
         // Restore panel state
         if (jsonPanelHidden) {

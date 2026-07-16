@@ -21,6 +21,11 @@ import {
   getBinaryConnectRequestRejection,
   getMalformedProtobufRequestRejection,
 } from './interceptors/binary-content';
+import {
+  inspectProviderIngressRateLimit,
+  type ProviderIngressRateLimitDenial,
+  type ProviderIngressRateLimitDenialObserver,
+} from './interceptors/provider-ingress-rate-limit';
 import { inspectAgentRateLimit } from './interceptors/rate-limit';
 import {
   createReplayProtectionContext,
@@ -31,16 +36,50 @@ import { createAgentRpcRouter } from './router';
 
 import type { AgentWorkerEnv } from '../env';
 
+interface ConnectOperation {
+  readonly method: string;
+  readonly service: string;
+}
+
+/**
+ * Agent Connect Worker handler の明示的な wiring option です。
+ *
+ * @remarks
+ * `allowTestSeam` は unit test の Client Service authentication seam だけを明示的に開きます。
+ * `onProviderIngressRateLimitDenied` は pre-auth denial の safe field だけを Worker outer layer へ通知し、
+ * raw IP、Agent ID、Installation ID、payload、signature、credential を受け取りません。
+ *
+ * @example
+ * ```ts
+ * handleAgentConnectRequest(request, env, { onProviderIngressRateLimitDenied: observe });
+ * ```
+ */
+export interface AgentConnectHandlerOptions {
+  readonly allowTestSeam?: boolean;
+  readonly onProviderIngressRateLimitDenied?: ProviderIngressRateLimitDenialObserver;
+}
+
 /**
  * 生成済み Agent Connect RPC service 用の Worker fetch handler を作成します。
  *
- * @param env - Agent Worker binding と trust config を含む実行環境です。
- * @param options - unit test 専用 seam を明示的に許可する任意設定です。本番既定では test seam を開きません。
+ * @remarks
+ * Provider path は binary profile/path classification、Authorization 拒否、trusted source/rate limit、raw wire/
+ * identity、detached signature/DO routing の順に処理します。Client Service path は既存の Ed25519 JWT boundary を
+ * 保ち、いずれも Protobuf RPC 以外を公開しません。
+ *
+ * @param env Agent Worker binding と trust config を含む実行環境です。
+ * @param options test seam と safe denial observer を指定する任意設定です。本番既定では test seam を開きません。
  * @returns Connect binary Protobuf request だけを処理する fetch handler です。
+ * @throws handler 構築時に generated router の初期化が失敗した場合は例外を送出します。request 処理の失敗は safe Connect response に変換します。
+ * @example
+ * ```ts
+ * const fetchHandler = createAgentConnectFetchHandler(env, { onProviderIngressRateLimitDenied: observe });
+ * const response = await fetchHandler(request);
+ * ```
  */
 export function createAgentConnectFetchHandler(
   env: AgentWorkerEnv,
-  options: { readonly allowTestSeam?: boolean } = {}
+  options: AgentConnectHandlerOptions = {}
 ): (request: Request) => Promise<Response> {
   const router = createAgentRpcRouter(env);
   const handlersByPath = new Map<string, (request: Request) => Promise<Response>>();
@@ -60,9 +99,10 @@ export function createAgentConnectFetchHandler(
       return createUnimplementedResponse(`Unsupported Agent RPC path: ${path}`);
     }
 
-    const operation = getConnectMethodIdentity(path);
-    if (isProviderIngressOperation(operation)) {
-      return handleProviderIngressRequest(request, handler);
+    const operation = getRequestOperation(path);
+    const providerOperation = getProviderIngressOperation(operation);
+    if (providerOperation !== undefined) {
+      return handleProviderIngressRequest(request, env, handler, options, providerOperation);
     }
     return handleClientServiceRequest(request, env, options, handler);
   };
@@ -70,7 +110,10 @@ export function createAgentConnectFetchHandler(
 
 async function handleProviderIngressRequest(
   request: Request,
-  handler: (request: Request) => Promise<Response>
+  env: AgentWorkerEnv,
+  handler: (request: Request) => Promise<Response>,
+  options: AgentConnectHandlerOptions,
+  operation: ConnectOperation
 ): Promise<Response> {
   // Provider ingress は Client Service JWT aggregate と完全に分離し、Bearer header を受け取った時点で停止します。
   if (request.headers.has('Authorization')) {
@@ -79,13 +122,25 @@ async function handleProviderIngressRequest(
       'Integration ingress RPC does not accept Client Service bearer authentication.'
     );
   }
+  // trusted source と procedure-scoped allowance は body decode より先に評価し、pre-auth DoS を Agent state へ到達させません。
+  const rateLimitInspection = await inspectProviderIngressRateLimit({ env, operation, request });
+  if (rateLimitInspection.status === 'denied') {
+    observeProviderIngressRateLimitDenial(
+      options.onProviderIngressRateLimitDenied,
+      rateLimitInspection.denial
+    );
+    return createConnectErrorResponse(
+      rateLimitInspection.rejection.code,
+      rateLimitInspection.rejection.message
+    );
+  }
   // generated request decode 前に raw Protobuf の Agent identity を検証し、曖昧な aggregate routing を防ぎます。
   const rawBody = new Uint8Array(await request.clone().arrayBuffer());
   const protobufRejection = getMalformedProtobufRequestRejection(rawBody);
   if (protobufRejection !== undefined) {
     return createConnectErrorResponse(protobufRejection.code, protobufRejection.message);
   }
-  const identityRejection = validateProviderIngressRequestIdentity({ rawBody, request });
+  const identityRejection = validateProviderIngressRequestIdentity({ operation, rawBody });
   if (identityRejection !== undefined) {
     return createConnectErrorResponse(identityRejection.code, identityRejection.message);
   }
@@ -96,7 +151,7 @@ async function handleProviderIngressRequest(
 async function handleClientServiceRequest(
   request: Request,
   env: AgentWorkerEnv,
-  options: { readonly allowTestSeam?: boolean },
+  options: AgentConnectHandlerOptions,
   handler: (request: Request) => Promise<Response>
 ): Promise<Response> {
   // Client Service path だけが AGENT_CONTROL_PLANE_TRUST と Ed25519 bearer JWT を利用します。
@@ -156,27 +211,17 @@ async function handleAgentRpcHandlerError(operation: () => Promise<Response>): P
     return await operation();
   } catch (error) {
     if (error instanceof ConnectError) {
-      if (error.code === Code.Internal && isMalformedProtobufDescription(error.rawMessage)) {
-        return createConnectErrorResponse(
-          Code.InvalidArgument,
-          'Agent RPC received malformed Protobuf bytes.'
-        );
-      }
+      // Connect が typed generated decode error として分類した code は保ち、business/internal message を文字列で再分類しません。
       return createConnectErrorResponse(error.code, error.rawMessage);
     }
-    if (isMalformedProtobufError(error)) {
-      return createConnectErrorResponse(
-        Code.InvalidArgument,
-        'Agent RPC received malformed Protobuf bytes.'
-      );
-    }
+    // raw wire rejection は handler 前の getMalformedProtobufRequestRejection だけで扱い、未知 error は domain taxonomy へ閉じます。
     return createConnectErrorResponseFromDomainError(normalizeUnknownAgentError(error));
   }
 }
 
 function createAuthenticationOptions(
   env: AgentWorkerEnv,
-  options: { readonly allowTestSeam?: boolean }
+  options: AgentConnectHandlerOptions
 ): { readonly allowTestSeam?: boolean; readonly env: AgentWorkerEnv } {
   if (options.allowTestSeam === undefined) {
     return { env };
@@ -184,37 +229,51 @@ function createAuthenticationOptions(
   return { allowTestSeam: options.allowTestSeam, env };
 }
 
-function isMalformedProtobufError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  return isMalformedProtobufDescription(`${error.name}: ${error.message}`);
+function getRequestOperation(path: string): ConnectOperation {
+  // path 解析はこの helper に集約し、Provider Event/Tool/Delivery が同じ generated identity 経路を通ります。
+  return getConnectMethodIdentity(path);
 }
 
-function isMalformedProtobufDescription(description: string): boolean {
-  const normalizedDescription = description.toLowerCase();
-  return (
-    normalizedDescription.includes('protobuf') ||
-    normalizedDescription.includes('parse') ||
-    normalizedDescription.includes('wire') ||
-    normalizedDescription.includes('buffer') ||
-    normalizedDescription.includes('rangeerror') ||
-    normalizedDescription.includes('truncated')
-  );
+function getProviderIngressOperation(operation: ConnectOperation): ConnectOperation | undefined {
+  // generated Provider inventory 外の path は Client Service path として後続 policy に渡し、Provider pre-auth guard を広げません。
+  return isProviderIngressOperation(operation) ? operation : undefined;
+}
+
+function observeProviderIngressRateLimitDenial(
+  observer: ProviderIngressRateLimitDenialObserver | undefined,
+  denial: ProviderIngressRateLimitDenial
+): void {
+  if (observer === undefined) return;
+  try {
+    // observability failure が rate-limit response を変えないよう、outer callback は best-effort に限定します。
+    observer(denial);
+  } catch {
+    // observer の diagnostic は response/log へ出さず、pre-auth error schema と source secrecy を保ちます。
+  }
 }
 
 /**
  * 単一の Agent Worker request を Connect facade 経由で処理します。
  *
- * @param request - Worker が受け取った HTTP request です。
- * @param env - Agent Worker binding と trust config を含む実行環境です。
- * @param options - unit test 専用 seam を明示的に許可する任意設定です。本番既定では test seam を開きません。
+ * @remarks
+ * Provider ingress は pre-auth rate-limit denial を body decode、signature、Durable Object routing より先に
+ * fixed `resource_exhausted` response へ変換します。Client Service JWT aggregate と Provider detached-signature
+ * aggregate を同じ authentication surface として扱いません。
+ *
+ * @param request Worker が受け取った HTTP request です。
+ * @param env Agent Worker binding と trust config を含む実行環境です。
+ * @param options unit test seam と safe rate-limit observer を指定する任意設定です。本番既定では test seam を開きません。
  * @returns Connect response、または fail-closed な Connect error response です。
+ * @throws router 初期化のプログラム上の失敗以外は response へ正規化するため、通常の request 拒否では送出しません。
+ * @example
+ * ```ts
+ * const response = await handleAgentConnectRequest(request, env);
+ * ```
  */
 export function handleAgentConnectRequest(
   request: Request,
   env: AgentWorkerEnv,
-  options: { readonly allowTestSeam?: boolean } = {}
+  options: AgentConnectHandlerOptions = {}
 ): Promise<Response> {
   return createAgentConnectFetchHandler(env, options)(request);
 }

@@ -6,7 +6,10 @@ import {
   rotateAgentCredential,
   updateAgentConfig,
 } from '@cf-tamac/client/server/actions/agent-lifecycle';
-import { saveDefaultModelPolicy } from '@cf-tamac/client/server/actions/agent-operations';
+import {
+  reconcileDefaultModelPolicy,
+  saveDefaultModelPolicy,
+} from '@cf-tamac/client/server/actions/agent-operations';
 import {
   getActingOperatorId,
   getManagedAgentForEdit,
@@ -144,6 +147,7 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
           onUpdateConfig={updateAgentConfig}
           onValidateModelPolicy={validateModelPolicyForManagedAgent}
           onSaveDefaultModelPolicy={saveDefaultModelPolicy}
+          onReconcileDefaultModelPolicy={reconcileDefaultModelPolicy}
           onRotateCredential={rotateAgentCredential}
           onSaveAccessLookup={saveSettingsCredentialReference}
           onDestroy={destroyAgent}

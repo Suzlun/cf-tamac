@@ -23,6 +23,29 @@ export type BrowserSafeAgentRpcStatus = 'failed' | 'succeeded';
 export type BrowserSafeAgentRpcErrorCategory = TamacSdkErrorCategory | 'configuration';
 
 /**
+ * Browser-safe error category を固定の利用者向け見出しへ対応付けます。
+ *
+ * @param category - raw transport diagnostic を含まない Server Action failure category です。
+ * @returns 権限、可用性、入力不備を区別する固定安全見出しです。
+ * @remarks
+ * Browser は SDK/Connect error message を表示せず、この mapping と action 固有の安全本文を組み合わせます。
+ * `permission_denied`、`unavailable`、`invalid_argument` を同じ generic title に畳み込まないことを保証します。
+ *
+ * @example
+ * ```ts
+ * const title = browserSafeErrorTitle('permission_denied');
+ * // '権限を確認してください'
+ * ```
+ */
+export function browserSafeErrorTitle(category: BrowserSafeAgentRpcErrorCategory): string {
+  if (category === 'permission_denied') return '権限を確認してください';
+  if (category === 'unavailable') return '接続状態を確認してください';
+  if (category === 'invalid_argument') return '入力内容を確認してください';
+  if (category === 'configuration') return '接続設定を確認してください';
+  return '操作結果を確認してください';
+}
+
+/**
  * SDK-backed Agent RPC 成功時に Browser へ返す安全な envelope です。
  *
  * @typeParam TDisplayData - Server Action が許可 field だけへ map 済みの表示データです。

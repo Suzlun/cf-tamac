@@ -31,6 +31,27 @@ const sdkGeneratedDescriptorEntry = `${sdkGeneratedDescriptorRoot}/cftamac/agent
 const sdkDescriptorExportPath = './agent-rpc/*';
 const sdkDescriptorExportTarget = './src/generated/agent-rpc/*';
 const sdkBufGenerationTarget = '../sdk/src/generated/agent-rpc';
+const providerIngressRateLimitBindingName = 'PROVIDER_INGRESS_RATE_LIMITER';
+const providerIngressRateLimitProfiles = [
+  { label: 'production', section: '[[ratelimits]]' },
+  { label: 'staging', section: '[[env.staging.ratelimits]]' },
+];
+const clientRegistrationMetadata = [
+  ['registrationState', 'registration_state'],
+  ['registrationAttemptId', 'registration_attempt_id'],
+  ['initializationIdempotencyKey', 'initialization_idempotency_key'],
+  ['registrationRequestDigest', 'registration_request_digest'],
+];
+const providerSdkSourcePaths = [
+  'packages/sdk/src/provider-ingress.ts',
+  'packages/sdk/src/provider-ingress-transport.ts',
+  'packages/sdk/src/provider-ingress-types.ts',
+];
+const clientServiceSdkSourcePaths = [
+  'packages/sdk/src/client.ts',
+  'packages/sdk/src/transport.ts',
+  'packages/sdk/src/auth/client-service-jwt.ts',
+];
 
 // 既存 domain の storage 依存は Phase 0 の開始時点でこの 5 ファイルに閉じているため、
 // 新規 domain ファイルへ同じ例外が広がらないよう normalized path で固定する。
@@ -52,7 +73,10 @@ export function collectPackageBoundaryIssues(root = projectRoot) {
     ...collectAgentLayerIssues(root),
     ...collectClientBoundaryIssues(root),
     ...collectClientD1StoragePolicyIssues(root),
+    ...collectClientRegistrationMetadataOwnershipIssues(root),
     ...collectBindingIssues(root),
+    ...collectAgentProviderIngressRateLimitIssues(root),
+    ...collectSdkAuthenticationAggregateBoundaryIssues(root),
     ...collectOpenCodeWorkflowIssues(root),
   ];
 }
@@ -461,6 +485,61 @@ export function collectClientD1StoragePolicyIssues(root) {
   return [...new Set(issues)];
 }
 
+/**
+ * Client registration reconciliation metadata が Client-owned managed Agent ledger に閉じていることを検査します。
+ * 入力は workspace root、出力は schema、metadata descriptor、migration の ownership 違反を示す issue 配列です。
+ * Agent domain snapshot や credential secret を読み書きせず、静的な source text だけを検査します。
+ */
+export function collectClientRegistrationMetadataOwnershipIssues(root) {
+  const issues = [];
+  const schemaPath = `${root}/packages/client/src/server/db/schema.ts`;
+
+  // schema が存在しない場合は、Client-owned registration state を分類できないため詳細解析をせず fail closed にします。
+  if (!existsSync(schemaPath)) {
+    return ['packages/client/src/server/db/schema.ts: missing Client registration metadata schema'];
+  }
+
+  const schema = readFileSync(schemaPath, 'utf8');
+  const managedAgentTable = extractClientManagedAgentTable(schema);
+  // registration metadata は Client management ledger の行だけが所有し、別 table へ横流ししてはなりません。
+  for (const [propertyName, columnName] of clientRegistrationMetadata) {
+    if (
+      !managedAgentTable.includes(`${propertyName}:`) ||
+      !managedAgentTable.includes(`'${columnName}'`)
+    ) {
+      issues.push(
+        `packages/client/src/server/db/schema.ts: client_managed_agents must own registration metadata ${columnName}`
+      );
+    }
+  }
+
+  const metadataDescriptor = extractClientManagedAgentMetadataDescriptor(schema);
+  // public metadata descriptor も同じ Client-owned columns を列挙し、repository/test が ownership を観測できるようにします。
+  for (const [, columnName] of clientRegistrationMetadata) {
+    if (!metadataDescriptor.includes(`'${columnName}'`)) {
+      issues.push(
+        `packages/client/src/server/db/schema.ts: client managed Agent metadata descriptor must include ${columnName}`
+      );
+    }
+  }
+
+  const migrationsRoot = `${root}/packages/client/src/server/db/migrations`;
+  const migrationText = collectFiles(migrationsRoot)
+    .filter((filePath) => filePath.endsWith('.sql'))
+    .map((filePath) => readFileSync(filePath, 'utf8'))
+    .join('\n');
+  // D1 deploy で同じ columns が実際に作られることを確認し、schema type だけの phantom metadata を防ぎます。
+  for (const [, columnName] of clientRegistrationMetadata) {
+    if (!migrationText.includes(columnName)) {
+      issues.push(
+        `packages/client/src/server/db/migrations: Client registration migration must define ${columnName}`
+      );
+    }
+  }
+
+  return [...new Set(issues)];
+}
+
 function collectTableNames(content) {
   return [
     ...content.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(["'`]?)(\w+)\1/gi),
@@ -524,6 +603,102 @@ function collectBindingIssues(root) {
     );
   }
   return issues;
+}
+
+/**
+ * Agent Provider ingress Rate Limiting binding が production/staging の専用 100 requests/60 seconds policyであることを検査します。
+ * 入力は workspace root、出力は Wrangler binding と Agent runtime type の違反を示す issue 配列です。
+ * namespace ID の実値、request payload、source IP、secret は読み取らず、設定の安全な構造だけを分類します。
+ */
+export function collectAgentProviderIngressRateLimitIssues(root) {
+  const issues = [];
+  const wranglerPath = `${root}/packages/agent/wrangler.toml`;
+  const envPath = `${root}/packages/agent/src/env.ts`;
+
+  // binding config が欠けると Provider pre-auth guard を実行できないため、Wrangler file 不在を個別に報告します。
+  if (!existsSync(wranglerPath)) {
+    return ['packages/agent/wrangler.toml: missing Provider ingress Rate Limiting configuration'];
+  }
+
+  const wrangler = readFileSync(wranglerPath, 'utf8');
+  const namespaceIds = [];
+  for (const profile of providerIngressRateLimitProfiles) {
+    // profile stanza を単位に読むことで、production と staging が同じ global config を暗黙共有しないようにします。
+    const profileConfig = extractTomlArrayTable(wrangler, profile.section);
+    const namespaceId = readProviderRateLimitNamespaceId(profileConfig);
+    if (!isProviderRateLimitProfile(profileConfig) || namespaceId === undefined) {
+      issues.push(
+        `packages/agent/wrangler.toml: ${profile.label} must define ${providerIngressRateLimitBindingName} with a dedicated positive namespace_id and 100/60 policy`
+      );
+      continue;
+    }
+    namespaceIds.push(namespaceId);
+  }
+
+  // production/staging が同じ namespace を使うと counter を分離できないため、両 profile が揃った場合だけ比較します。
+  if (
+    namespaceIds.length === providerIngressRateLimitProfiles.length &&
+    new Set(namespaceIds).size !== namespaceIds.length
+  ) {
+    issues.push(
+      'packages/agent/wrangler.toml: Provider ingress Rate Limiting production and staging namespace_id values must differ'
+    );
+  }
+
+  // Agent runtime が optional/unknown binding を扱わないよう、required RateLimit type を source から確認します。
+  if (
+    !existsSync(envPath) ||
+    !new RegExp(`readonly\\s+${providerIngressRateLimitBindingName}\\s*:\\s*RateLimit`).test(
+      readFileSync(envPath, 'utf8')
+    )
+  ) {
+    issues.push(
+      `packages/agent/src/env.ts: Agent worker bindings must require ${providerIngressRateLimitBindingName}: RateLimit`
+    );
+  }
+
+  return [...new Set(issues)];
+}
+
+/**
+ * Client Service JWT aggregate と Provider detached-signature aggregate が SDK source import graph で混在しないことを検査します。
+ * 入力は workspace root、出力は Provider/Client Service authentication boundary の違反を示す issue 配列です。
+ * generated descriptors と root re-export は対象外とし、各 server-side aggregate の implementation import だけを検査します。
+ */
+export function collectSdkAuthenticationAggregateBoundaryIssues(root) {
+  const issues = [];
+
+  // Provider ingress surface は Client Service JWT/key context を import せず、detached-signature identity に閉じます。
+  for (const relativePath of providerSdkSourcePaths) {
+    const filePath = `${root}/${relativePath}`;
+    if (!existsSync(filePath)) {
+      issues.push(`${relativePath}: missing Provider SDK authentication boundary source`);
+      continue;
+    }
+    const imports = collectResolvedImports(root, filePath);
+    if (imports.some((importedPath) => isClientServiceSdkAuthenticationPath(importedPath))) {
+      issues.push(
+        `${relativePath}: Provider SDK aggregate must not import Client Service JWT or signing context`
+      );
+    }
+  }
+
+  // Client Service aggregate は Provider signer/ingress transport を import せず、JWT execution context を維持します。
+  for (const relativePath of clientServiceSdkSourcePaths) {
+    const filePath = `${root}/${relativePath}`;
+    if (!existsSync(filePath)) {
+      issues.push(`${relativePath}: missing Client Service SDK authentication boundary source`);
+      continue;
+    }
+    const imports = collectResolvedImports(root, filePath);
+    if (imports.some((importedPath) => isProviderSdkAuthenticationPath(importedPath))) {
+      issues.push(
+        `${relativePath}: Client Service SDK aggregate must not import Provider ingress signing or transport context`
+      );
+    }
+  }
+
+  return [...new Set(issues)];
 }
 
 function collectOpenCodeWorkflowIssues(root) {
@@ -768,6 +943,67 @@ function hasSdkDescriptorExports(packageManifest) {
   return (
     packageManifest.exports['.'] === './src/index.ts' &&
     packageManifest.exports[sdkDescriptorExportPath] === sdkDescriptorExportTarget
+  );
+}
+
+function extractClientManagedAgentTable(content) {
+  // Drizzle schema の managed Agent table block だけを抽出し、別 Client table の同名 column では ownership を満たしません。
+  const tableStart = content.indexOf("sqliteTable('client_managed_agents'");
+  if (tableStart === -1) {
+    return '';
+  }
+  const tableEnd = content.indexOf('});', tableStart);
+  return tableEnd === -1 ? content.slice(tableStart) : content.slice(tableStart, tableEnd + 3);
+}
+
+function extractClientManagedAgentMetadataDescriptor(content) {
+  // public descriptor block を table schema と別に抽出し、runtime schema と test/documentation contract の双方を検査します。
+  return (
+    /export const clientManagedAgentsTableMetadata\s*=\s*{[\S\s]*?}\s*as const/m.exec(
+      content
+    )?.[0] ?? ''
+  );
+}
+
+function extractTomlArrayTable(content, section) {
+  // target array-table から次の array-table 手前までを切り出し、nested simple policy も同じ profile の設定として保持します。
+  const start = content.indexOf(section);
+  if (start === -1) {
+    return '';
+  }
+  const nextArrayTable = content.indexOf('\n[[', start + section.length);
+  return nextArrayTable === -1 ? content.slice(start) : content.slice(start, nextArrayTable);
+}
+
+function isProviderRateLimitProfile(content) {
+  // binding 名、namespace、simple policy を同じ profile block で検査し、別環境の設定を誤って合成しません。
+  return (
+    new RegExp(`name\\s*=\\s*"${providerIngressRateLimitBindingName}"`).test(content) &&
+    /\[.*ratelimits\.simple][\S\s]*?limit\s*=\s*100[\S\s]*?period\s*=\s*60/.test(content)
+  );
+}
+
+function readProviderRateLimitNamespaceId(content) {
+  // namespace ID は Cloudflare account が発行する正整数文字列だけを許可し、空値や placeholder を設定として扱いません。
+  return /namespace_id\s*=\s*"([1-9]\d*)"/.exec(content)?.[1];
+}
+
+function isClientServiceSdkAuthenticationPath(importedPath) {
+  // Provider aggregate が Client Service JWT/signing context へ到達する import prefix だけを静的に禁止します。
+  return (
+    hasPathPrefix(importedPath, '/packages/sdk/src/auth/client-service-jwt') ||
+    hasPathPrefix(importedPath, '/packages/sdk/src/auth/types') ||
+    hasPathPrefix(importedPath, '/packages/sdk/src/client') ||
+    hasPathPrefix(importedPath, '/packages/sdk/src/transport')
+  );
+}
+
+function isProviderSdkAuthenticationPath(importedPath) {
+  // Client Service aggregate が Provider signer/transport context へ到達する import prefix だけを静的に禁止します。
+  return (
+    hasPathPrefix(importedPath, '/packages/sdk/src/provider-ingress') ||
+    hasPathPrefix(importedPath, '/packages/sdk/src/provider-ingress-transport') ||
+    hasPathPrefix(importedPath, '/packages/sdk/src/provider-ingress-types')
   );
 }
 

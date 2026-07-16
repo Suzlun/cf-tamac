@@ -90,3 +90,37 @@ export interface TamacAgentRpcMethodContext {
   /** generated Protobuf RPC method name です。 */
   readonly methodName: string;
 }
+
+/**
+ * Connect unary request URL から generated Protobuf service/method identity を読み取ります。
+ *
+ * @param url - Client Service または Provider transport が組み立てた unary RPC request URL です。
+ * @returns fully-qualified service name と generated method name を持つ安全な RPC identity です。
+ * @throws URL が service/method の 2 segment だけを持たない場合に投げ、曖昧な認証・error context を作りません。
+ * @remarks
+ * この parser は JWT metadata と Provider error normalization が同じ Connect path を参照するための共有処理です。
+ * caller supplied metadata を authorization identity に使わず、transport が作った URL だけを入力にします。
+ *
+ * @example
+ * ```ts
+ * const method = parseConnectMethodContext(
+ *   'https://agent.example.com/cftamac.agent.v1.AgentHealthService/Check'
+ * );
+ * ```
+ */
+export function parseConnectMethodContext(url: string): TamacAgentRpcMethodContext {
+  // Connect unary path の空 segment を除外して service と method を明確に分離します。
+  const segments = new URL(url).pathname.split('/').filter((segment) => segment !== '');
+  const [serviceName, methodName, ...extraSegments] = segments;
+  // generated unary method path 以外を拒否し、曖昧な metadata や error context を作らないようにします。
+  if (
+    serviceName === undefined ||
+    methodName === undefined ||
+    extraSegments.length > 0 ||
+    serviceName === '' ||
+    methodName === ''
+  ) {
+    throw new TypeError('Connect request URL must identify exactly one service and method.');
+  }
+  return { methodName, serviceName };
+}

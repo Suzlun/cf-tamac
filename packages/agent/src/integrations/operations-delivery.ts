@@ -71,18 +71,20 @@ export async function publishIntegrationDeliveryResultInStore(input: {
     context: verifiedContext,
     deliveryContextId,
   };
-  // signature 検証後にのみ Delivery/Context/Connection/Installation ownership と state を照合します。
-  const delivery = requireDeliveryResultBinding({
-    command: verifiedCommand,
-    repositories: input.repositories,
-  });
+  // verified identity と request digest が一致する既存 result は mutable Delivery/Connection state より先に replay します。
   const replay = checkAgentIdempotency<PublishIntegrationDeliveryResult>({
     context: verifiedContext,
     operationName: publishDeliveryResultOperationName,
     repositories: input.repositories,
   });
   if (replay.status === 'replay') return { ...replay.response, replayed: true };
+  // 新規 command だけが nonce を予約し、terminal Connection/Tool state へ遷移した後の正当 retry は上の replay を妨げません。
   reserveAgentNonce(input.repositories, verifiedContext);
+  // signature 検証済みの新規 callback だけが Delivery/Context/Connection/Installation ownership と mutable state を照合します。
+  const delivery = requireDeliveryResultBinding({
+    command: verifiedCommand,
+    repositories: input.repositories,
+  });
   authorizeIntegrationOperation(
     input.repositories,
     verifiedContext,
@@ -98,33 +100,59 @@ export async function publishIntegrationDeliveryResultInStore(input: {
     },
     ['integration.delivery.result']
   );
-  const result = input.repositories.transaction((repositories) => {
+  return input.repositories.transaction((repositories) => {
     const classification = classifyDeliveryResult(repositories, delivery, verifiedCommand.status);
-    if (classification === 'stale_callback') {
-      return createDeliveryResultResponse(input.agentId, verifiedCommand, delivery, {
-        replayed: false,
-        resumeAction: classification,
-      });
-    }
-    const updated = repositories.integrations.updateDeliveryStatus({
-      deliveryId: delivery.deliveryId,
-      providerOperationId: verifiedCommand.providerOperationId,
-      status: verifiedCommand.status,
-      updatedAtMs: verifiedContext.requestedAtMs,
+    const result =
+      classification === 'stale_callback'
+        ? createDeliveryResultResponse(input.agentId, verifiedCommand, delivery, {
+            replayed: false,
+            resumeAction: classification,
+          })
+        : updateDeliveryResultAndCreateResponse({
+            agentId: input.agentId,
+            classification,
+            command: verifiedCommand,
+            delivery,
+            repositories,
+          });
+    // delivery mutation と replay record を同一 Agent-owned transaction で確定し、成功 response だけを再送可能にします。
+    recordAgentIdempotency({
+      context: verifiedContext,
+      operationName: publishDeliveryResultOperationName,
+      repositories,
+      response: result,
     });
-    applyDeliveryResumeAction(repositories, updated, classification, verifiedContext.requestedAtMs);
-    return createDeliveryResultResponse(input.agentId, verifiedCommand, updated, {
-      replayed: false,
-      resumeAction: classification,
-    });
+    return result;
   });
-  recordAgentIdempotency({
-    context: verifiedContext,
-    operationName: publishDeliveryResultOperationName,
-    repositories: input.repositories,
-    response: result,
+}
+
+function updateDeliveryResultAndCreateResponse(input: {
+  readonly agentId: string;
+  readonly classification: Exclude<ReturnType<typeof classifyDeliveryResult>, 'stale_callback'>;
+  readonly command: PublishIntegrationDeliveryResultCommand & {
+    readonly deliveryContextId: string;
+  };
+  readonly delivery: AgentAdapterDeliveryRow;
+  readonly repositories: AgentStorageRepositories;
+}): PublishIntegrationDeliveryResult {
+  // mutable delivery status は classification 済みの新規 callback だけで更新し、Provider operation identity を維持します。
+  const updated = input.repositories.integrations.updateDeliveryStatus({
+    deliveryId: input.delivery.deliveryId,
+    providerOperationId: input.command.providerOperationId,
+    status: input.command.status,
+    updatedAtMs: input.command.context.requestedAtMs,
   });
-  return result;
+  // resume/follow-up side effect は status update と同じ transaction 内で実行し、replay record と原子的に揃えます。
+  applyDeliveryResumeAction(
+    input.repositories,
+    updated,
+    input.classification,
+    input.command.context.requestedAtMs
+  );
+  return createDeliveryResultResponse(input.agentId, input.command, updated, {
+    replayed: false,
+    resumeAction: input.classification,
+  });
 }
 
 function createDeliveryResultResponse(

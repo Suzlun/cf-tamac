@@ -33,10 +33,10 @@ NG例: `packages/agent/proto/cftamac/agent/v1.proto`、Client/SDK の generated 
 OK例: `pnpm gen:agent:proto && pnpm gen:agent:rpc` または `pnpm gen` で再生成し、drift がない状態にする。
 
 **Rule: Generated output drift を残さない。**
-Summary: generation 後に tracked proto/RPC output の差分が残ると codegen check は失敗します。
-Enforcement point: `pnpm check:codegen` via `package.json` command `git diff --exit-code -- packages/agent/proto packages/agent/src/generated/rpc packages/client/src/generated/agent-rpc packages/sdk/src/generated/agent-rpc` and `scripts/codegen/check-agent-codegen-drift.mjs`.
+Summary: generation 後に4つのcommand-owned generated rootのhashが変わると codegen check は失敗します。
+Enforcement point: `pnpm check:codegen` via `scripts/codegen/check-generated-output-stability.mjs`（再生成、4 generated rootsのSHA-256比較、`scripts/codegen/check-agent-codegen-drift.mjs`実行）。
 NG例: TypeSpec を変えたのに generated proto/RPC files を更新しない。
-OK例: `pnpm check:codegen` が clean に通るまで source と generated outputs を揃える。
+OK例: `pnpm check:codegen` が再生成後のhash不変とcontract drift検査を通るまで source と generated outputs を揃える。
 
 **Rule: Codegen collector は責務ごとに分割し、complexity gate を通す。**
 Summary: `scripts/codegen/check-agent-codegen-drift.mjs` の collector は input snapshot を一度だけ収集し、contract surface、generated outputs、TypeSpec、proto の責務別 helper を deterministic order で合成します。ESLint の cognitive-complexity warning は zero を acceptance とします。

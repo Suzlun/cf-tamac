@@ -434,6 +434,7 @@ function isModelPolicyErrorCategory(
     category === 'not_found' ||
     category === 'failed_precondition' ||
     category === 'unavailable' ||
+    category === 'internal' ||
     category === 'unknown'
   );
 }

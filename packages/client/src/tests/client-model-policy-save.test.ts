@@ -5,7 +5,7 @@ import type { BrowserSafeModelPolicyMetadata } from '../components/schemas/model
 const mocks = vi.hoisted(() => ({
   loadAgentRpcClients: vi.fn(),
   revalidatePath: vi.fn(),
-  upsertModelPolicyForManagedAgent: vi.fn(),
+  upsertModelPolicyWithClients: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({
@@ -17,7 +17,7 @@ vi.mock('../server/agent-rpc/agent-loader', () => ({
 }));
 
 vi.mock('../server/actions/model-policies', () => ({
-  upsertModelPolicyForManagedAgent: mocks.upsertModelPolicyForManagedAgent,
+  upsertModelPolicyWithClients: mocks.upsertModelPolicyWithClients,
 }));
 
 const ACTIVE_POLICY_METADATA: BrowserSafeModelPolicyMetadata = {
@@ -39,15 +39,21 @@ describe('Default model policy save Server Action', () => {
   beforeEach(() => {
     mocks.loadAgentRpcClients.mockReset();
     mocks.revalidatePath.mockReset();
-    mocks.upsertModelPolicyForManagedAgent.mockReset();
+    mocks.upsertModelPolicyWithClients.mockReset();
   });
 
-  it('[AGENT-MANAGEMENT-UI-S018] returns permission_denied when UpdateConfig rejects after policy upsert', async () => {
+  it('[AGENT-MANAGEMENT-UI-S018] shares one client/correlation and derives :policy/:config keys in order', async () => {
     const { saveDefaultModelPolicy } = await import('../server/actions/agent-operations');
-    const permissionError = { category: 'permission_denied' };
+    const permissionError = new Error('safe test failure');
     const updateConfig = vi.fn().mockRejectedValue(permissionError);
-    mocks.upsertModelPolicyForManagedAgent.mockResolvedValue({
-      correlationId: 'upsert-correlation',
+    const getConfig = vi
+      .fn()
+      .mockResolvedValueOnce({ config: { configVersion: '10', modelPolicyRef: 'previous-policy' } })
+      .mockResolvedValueOnce({
+        config: { configVersion: '10', modelPolicyRef: 'previous-policy' },
+      });
+    mocks.upsertModelPolicyWithClients.mockResolvedValue({
+      correlationId: 'save-correlation',
       displayData: {
         fieldErrors: {},
         message: '既定モデルポリシーを保存しました。',
@@ -61,7 +67,7 @@ describe('Default model policy save Server Action', () => {
     });
     mocks.loadAgentRpcClients.mockResolvedValue({
       clients: {
-        state: { updateConfig },
+        state: { getConfig, updateConfig },
         invocation: {
           actingUser: { actingUserId: 'operator-test' },
           agentId: 'agent-alpha',
@@ -90,8 +96,79 @@ describe('Default model policy save Server Action', () => {
         modelPolicyRef: 'workers-ai-default',
       },
     });
+    expect(mocks.upsertModelPolicyWithClients).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invocation: expect.objectContaining({ correlationId: 'save-correlation' }),
+      }),
+      'agent-alpha',
+      'idem-001:policy',
+      expect.objectContaining({ policyRef: 'workers-ai-default' })
+    );
+    expect(getConfig).toHaveBeenCalledTimes(2);
     expect(result.safeStatus).toBe('failed');
     expect(result.safeErrorCategory).toBe('internal');
+    expect(result.displayData.configVersion).toBeUndefined();
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S018] reconciles an uncertain UpdateConfig response when desired ref and non-empty config version are confirmed', async () => {
+    const { saveDefaultModelPolicy } = await import('../server/actions/agent-operations');
+    const updateConfig = vi.fn().mockRejectedValue(new Error('response lost'));
+    const getConfig = vi
+      .fn()
+      .mockResolvedValueOnce({ config: { configVersion: '9', modelPolicyRef: 'previous-policy' } })
+      .mockResolvedValueOnce({
+        config: { configVersion: ' 11 ', modelPolicyRef: 'workers-ai-default' },
+        defaultModelPolicy: {
+          modelId: '@cf/meta/llama-3.1-8b-instruct',
+          policyDigest: 'sha256:policy',
+          policyRef: 'workers-ai-default',
+          provider: 'workers-ai',
+          status: 'active',
+          version: 1n,
+        },
+      });
+    const clients = createClients(getConfig, updateConfig);
+    mocks.loadAgentRpcClients.mockResolvedValue({ clients });
+    mocks.upsertModelPolicyWithClients.mockResolvedValue(successfulUpsert());
+
+    const result = await saveDefaultModelPolicy('agent-alpha', 'idem-002', createDraft());
+
+    expect(result).toMatchObject({
+      correlationId: 'save-correlation',
+      safeErrorCategory: null,
+      safeStatus: 'succeeded',
+    });
+    expect(result.displayData.configVersion).toBe('11');
+    expect(result.displayData.reconciliationRequired).toBeUndefined();
+    expect(mocks.upsertModelPolicyWithClients).toHaveBeenCalledWith(
+      clients,
+      'agent-alpha',
+      'idem-002:policy',
+      createDraft()
+    );
+    expect(updateConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: 'idem-002:config' })
+    );
+  });
+
+  it('[AGENT-MANAGEMENT-UI-S018] rejects empty or whitespace config versions as invalid_argument instead of unknown', async () => {
+    const { saveDefaultModelPolicy } = await import('../server/actions/agent-operations');
+    const getConfig = vi.fn().mockResolvedValue({
+      config: { configVersion: '8', modelPolicyRef: 'previous-policy' },
+    });
+    const updateConfig = vi.fn().mockResolvedValue({
+      config: { configVersion: '   ', modelPolicyRef: 'workers-ai-default' },
+    });
+    mocks.loadAgentRpcClients.mockResolvedValue({
+      clients: createClients(getConfig, updateConfig),
+    });
+    mocks.upsertModelPolicyWithClients.mockResolvedValue(successfulUpsert());
+
+    const result = await saveDefaultModelPolicy('agent-alpha', 'idem-003', createDraft());
+
+    expect(result.safeStatus).toBe('failed');
+    expect(result.safeErrorCategory).toBe('invalid_argument');
+    expect(result.displayData.errorCategory).toBe('invalid_argument');
     expect(result.displayData.configVersion).toBeUndefined();
   });
 
@@ -136,6 +213,50 @@ describe('Default model policy save Server Action', () => {
     });
   });
 });
+
+function successfulUpsert() {
+  return {
+    correlationId: 'save-correlation',
+    displayData: {
+      fieldErrors: {},
+      message: '既定モデルポリシーを保存しました。',
+      metadata: ACTIVE_POLICY_METADATA,
+      ok: true,
+      title: '既定モデルポリシーを保存しました',
+      warnings: [],
+    },
+    safeErrorCategory: null,
+    safeStatus: 'succeeded' as const,
+  };
+}
+
+function createDraft() {
+  return {
+    policyRef: 'workers-ai-default',
+    provider: 'workers-ai' as const,
+    model: '@cf/meta/llama-3.1-8b-instruct',
+    temperature: '0.20',
+    topP: '0.90',
+    maxOutputTokens: '1024',
+  };
+}
+
+function createClients(
+  getConfig: ReturnType<typeof vi.fn>,
+  updateConfig: ReturnType<typeof vi.fn>
+) {
+  return {
+    state: { getConfig, updateConfig },
+    invocation: {
+      actingUser: { actingUserId: 'operator-test' },
+      agentId: 'agent-alpha',
+      correlationId: 'save-correlation',
+      requestId: 'save-request',
+      scopes: ['agent:write'],
+    },
+    withErrorNormalization: async <T>(callback: () => Promise<T>): Promise<T> => await callback(),
+  };
+}
 
 function readInlineJson(value: Record<string, unknown> | undefined): unknown {
   const inlineBytes = value?.inlineBytes;

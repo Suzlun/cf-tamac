@@ -14,6 +14,7 @@ import {
   createMemoryJwtReplayReservation,
   signEd25519ClientJwt,
 } from './ed25519-jwt-test-helpers';
+import { createAllowingProviderIngressRateLimitStub } from './provider-ingress-rate-limit-test-helpers';
 import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
@@ -65,6 +66,7 @@ function createTestEnv(
           return { name } as unknown as DurableObjectId;
         },
       } as unknown as DurableObjectNamespace<AIAgent>,
+      PROVIDER_INGRESS_RATE_LIMITER: createAllowingProviderIngressRateLimitStub(),
     },
     routedNames,
   };

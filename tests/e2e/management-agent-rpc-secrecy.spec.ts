@@ -4,7 +4,9 @@ import {
   createE2eAgentId,
   E2E_APPROVED_AGENT_RPC_ORIGIN,
   ensureDefaultSigningKeyThroughUi,
+  expectFocusedOperationResult,
   fillManagedAgentRegistrationForm,
+  gotoAgentRegistrationPage,
 } from './managed-agent-fixture';
 
 const FORBIDDEN_BROWSER_SAFE_RESULT_MARKERS = [
@@ -46,7 +48,7 @@ test('[AGENT-MANAGEMENT-UI-S011] Browser never receives signing material from si
   await expect(page.locator('body')).not.toContainText('createCompactJwt');
 });
 
-test('[TAMAC-SDK-S005] Management Client が閉じた Browser-safe result を返す', async ({
+test('[MANAGEMENT-CLIENT-WIREFRAMES-S001] [TAMAC-SDK-S005] Management Client が閉じた Browser-safe result を返す', async ({
   page,
 }, testInfo) => {
   const secrecyProbe = startBrowserSafeResultSecrecyProbe(page);
@@ -54,19 +56,16 @@ test('[TAMAC-SDK-S005] Management Client が閉じた Browser-safe result を返
 
   await ensureDefaultSigningKeyThroughUi(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/agents/new');
+  await gotoAgentRegistrationPage(page);
   await fillManagedAgentRegistrationForm(page, agentId, 'https://unapproved-agent.example.test');
   await page.getByRole('button', { name: 'Agentを登録', exact: true }).click();
 
   // mobile ResultRegion は safe configuration copy、assertive live region、完了後フォーカスを同時に提供する。
-  const failureHeading = page.getByRole('heading', {
-    name: 'Agent RPC originを確認してください',
-  });
-  const failureRegion = failureHeading.locator('..');
-  await expect(failureRegion).toHaveAttribute('role', 'alert');
-  await expect(failureRegion).toHaveAttribute('aria-atomic', 'true');
-  await expect(failureHeading).toHaveAttribute('tabindex', '-1');
-  await expect(failureHeading).toBeFocused();
+  const failureRegion = await expectFocusedOperationResult(
+    page,
+    'Agent RPC originを確認してください',
+    'alert'
+  );
   await expect(failureRegion).toContainText(
     'Agent RPC originを運用ポリシーで確認してください。許可済みのHTTPS originを登録すると操作を続行できます。'
   );
@@ -98,11 +97,7 @@ test('[TAMAC-SDK-S005] Management Client が閉じた Browser-safe result を返
   await page.setViewportSize({ width: 1280, height: 960 });
   await page.getByLabel('Agent RPC origin', { exact: true }).fill(E2E_APPROVED_AGENT_RPC_ORIGIN);
   await page.getByRole('button', { name: 'Agentを登録', exact: true }).click();
-  const successHeading = page.getByRole('heading', { name: 'Agentを登録しました' });
-  const successRegion = successHeading.locator('..');
-  await expect(successRegion).toHaveAttribute('role', 'status');
-  await expect(successRegion).toHaveAttribute('aria-live', 'polite');
-  await expect(successHeading).toBeFocused();
+  await expectFocusedOperationResult(page, 'Agentを登録しました', 'status');
 
   // 成功 state でも同じ Browser payload boundary を再検査し、結果遷移の前後で露出がないことを確認する。
   await assertBrowserSafeResultSurface(page, secrecyProbe);
@@ -139,11 +134,12 @@ function isBrowserDirectAgentRpcRequest(request: Request): boolean {
 
 function isBrowserScriptResponse(response: Response): boolean {
   const request = response.request();
-  // Playwright config が選ぶ専用 E2E origin の script だけを検査し、外部 resource を Browser bundle と誤認しない。
-  return (
-    request.resourceType() === 'script' &&
-    new URL(response.url()).origin === new URL(request.frame().url()).origin
-  );
+  // Service Worker 起点の request は frame を持たず、Playwright の request.frame() 呼び出し自体が例外になる。
+  if (request.resourceType() !== 'script' || request.serviceWorker() !== null) {
+    return false;
+  }
+  // frame を持つ document script だけを E2E origin と照合し、外部 resource を Browser bundle と誤認しない。
+  return new URL(response.url()).origin === new URL(request.frame().url()).origin;
 }
 
 async function readResponseTextSafely(response: Response): Promise<string> {

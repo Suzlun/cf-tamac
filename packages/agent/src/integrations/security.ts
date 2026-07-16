@@ -58,14 +58,7 @@ export interface VerifyIntegrationIngressSignatureInput {
 export async function verifyIntegrationIngressSignature(
   input: VerifyIntegrationIngressSignatureInput
 ): Promise<AgentPrincipalContext> {
-  // Provider contract は Ed25519 専用であり、legacy symmetric algorithm を Installation trust key へ渡しません。
-  if (input.signature.algorithm !== 'Ed25519') {
-    throw createAgentDomainError({
-      kind: 'authorization',
-      message: 'Integration ingress signature algorithm must be Ed25519.',
-      target: 'signature.algorithm',
-    });
-  }
+  // 型 contract が Ed25519 以外を構築不能にするため、legacy symmetric algorithm を trust key resolver へ渡しません。
   const rawBodyDigest = normalizeRawBodyDigest(input.canonicalBodyDigest);
   if (
     !/^[0-9a-f]{64}$/u.test(input.signature.digestHex) ||

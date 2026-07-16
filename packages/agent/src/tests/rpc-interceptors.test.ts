@@ -26,6 +26,7 @@ import { createReplayProtectionContext } from '../rpc/interceptors/replay-protec
 import { createAgentRpcRouter } from '../rpc/router';
 
 import { createEd25519TrustFixture } from './ed25519-jwt-test-helpers';
+import { createAllowingProviderIngressRateLimitStub } from './provider-ingress-rate-limit-test-helpers';
 import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
@@ -70,6 +71,7 @@ function createTestEnv(
       AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
       AGENT_RPC_AUDIENCE: 'test-audience',
       AI_AGENT: durableObjectNamespace,
+      PROVIDER_INGRESS_RATE_LIMITER: createAllowingProviderIngressRateLimitStub(),
     },
     healthCalls,
   };
@@ -456,6 +458,26 @@ describe('Agent RPC interceptors', () => {
     );
 
     expect(await readErrorCode(response)).toBe('unavailable');
+  });
+
+  it('[TAMAC-SDK-S002] business internal error の wire 文言を malformed Protobuf へ誤分類しない', async () => {
+    const { env } = createTestEnv({
+      // Client Service operation 内の安全な internal error が同じ文言を持っても、raw/generated decode error ではありません。
+      throwHealthError: new ConnectError(
+        'invalid wire type while reading Agent policy state.',
+        Code.Internal
+      ),
+    });
+    const response = await handleAgentConnectRequest(
+      createHealthRequest({
+        'x-agent-test-grant': 'allow',
+        'x-agent-test-principal-id': 'principal-1',
+      }),
+      env,
+      { allowTestSeam: true }
+    );
+
+    expect(await readErrorCode(response)).toBe('internal');
   });
 });
 

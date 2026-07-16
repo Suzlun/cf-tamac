@@ -179,10 +179,16 @@ export function ModelPolicyFields<TValues extends FieldValues>({
           <Button
             type="button"
             variant="outline"
-            className="min-h-11"
-            onClick={onValidate}
-            disabled={validateDisabled}
+            className={`min-h-11${validateDisabled ? ' opacity-50' : ''}`}
+            disabled={validateDisabled && !pending}
             aria-disabled={validateDisabled}
+            aria-busy={pending}
+            onClick={() => {
+              // native disabled は起点 focus を失わせるため、二重実行拒否を callback 境界で行います。
+              if (!validateDisabled) {
+                onValidate();
+              }
+            }}
           >
             {pending ? 'ポリシーを検証しています…' : 'ポリシーを検証'}
           </Button>
@@ -299,7 +305,7 @@ function WarningList({
       aria-live="polite"
     >
       <strong>ポリシー検証の警告</strong>
-      <ul className="mt-2 list-disc pl-5 font-mono text-xs">
+      <ul className="mt-2 list-disc pl-5 text-xs">
         {warnings.map((warning) => (
           <li key={`${warning.code}:${warning.message}`}>{warning.message}</li>
         ))}

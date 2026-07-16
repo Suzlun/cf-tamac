@@ -20,6 +20,7 @@ import {
   createMemoryJwtReplayReservation,
   signEd25519ClientJwt,
 } from './ed25519-jwt-test-helpers';
+import { createAllowingProviderIngressRateLimitStub } from './provider-ingress-rate-limit-test-helpers';
 
 import type { AIAgent } from '../AIAgent';
 import type { AgentCoreRequestContext } from '../domain';
@@ -49,6 +50,7 @@ function createTestEnv(input: {
 } {
   const healthCalls: string[] = [];
   const publishContexts: AgentCoreRequestContext[] = [];
+  // JWT replay callback は test ごとに閉じた in-memory ledger を返し、同じ jti の二回目だけを mutation 前に拒否します。
   const reserve = input.replay ?? createMemoryJwtReplayReservation();
   const namespace = {
     get: (id: DurableObjectId) =>
@@ -76,6 +78,7 @@ function createTestEnv(input: {
       AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
       AGENT_RPC_AUDIENCE: 'test-audience',
       AI_AGENT: namespace,
+      PROVIDER_INGRESS_RATE_LIMITER: createAllowingProviderIngressRateLimitStub(),
     },
     healthCalls,
     publishContexts,
@@ -148,6 +151,7 @@ async function createToken(input: {
   readonly kid?: string;
   readonly signaturePrivateKey?: CryptoKey;
 }): Promise<string> {
+  // 署名 callback は fixture の private key だけを test process 内で使い、返値は HTTP metadata 組立用の token 文字列に限定します。
   return signEd25519ClientJwt({
     alg: input.alg,
     kid: input.kid ?? input.fixture.kid,

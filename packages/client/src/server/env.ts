@@ -61,7 +61,7 @@ export function getClientWorkerEnv(): ClientWorkerEnv {
  * @remarks
  * fail-closed な境界として扱い、必須の signing key 暗号化 secret や acting user 設定が
  * 欠落している場合は server-only 処理を進めない。secret 値そのものは比較せず、
- * 非空文字列であることだけを検査する。
+ * trim 後の非空文字列であることだけを検査する。secret 値そのものは error/log へ出さない。
  */
 function isClientWorkerEnv(env: CloudflareEnv): env is ClientWorkerEnv {
   const candidate = env as {
@@ -77,15 +77,15 @@ function isClientWorkerEnv(env: CloudflareEnv): env is ClientWorkerEnv {
     candidate.CLIENT_DB !== null &&
     'prepare' in candidate.CLIENT_DB &&
     typeof candidate.CLIENT_DB.prepare === 'function' &&
-    typeof candidate.AGENT_RPC_ALLOWED_ORIGINS === 'string' &&
-    candidate.AGENT_RPC_ALLOWED_ORIGINS !== '' &&
-    typeof candidate.AGENT_RPC_AUDIENCE === 'string' &&
-    candidate.AGENT_RPC_AUDIENCE !== '' &&
-    typeof candidate.CLIENT_CREDENTIAL_ENCRYPTION_KEY === 'string' &&
-    candidate.CLIENT_CREDENTIAL_ENCRYPTION_KEY !== '' &&
-    typeof candidate.CLIENT_ACTING_OPERATOR_ID === 'string' &&
-    candidate.CLIENT_ACTING_OPERATOR_ID !== '' &&
-    typeof candidate.CLIENT_ACTING_SCOPES === 'string' &&
-    candidate.CLIENT_ACTING_SCOPES !== ''
+    isNonBlankString(candidate.AGENT_RPC_ALLOWED_ORIGINS) &&
+    isNonBlankString(candidate.AGENT_RPC_AUDIENCE) &&
+    isNonBlankString(candidate.CLIENT_CREDENTIAL_ENCRYPTION_KEY) &&
+    isNonBlankString(candidate.CLIENT_ACTING_OPERATOR_ID) &&
+    isNonBlankString(candidate.CLIENT_ACTING_SCOPES)
   );
+}
+
+function isNonBlankString(value: unknown): value is string {
+  // whitespace-only secret/configuration は存在していても安全に利用できないため、値を露出せず configuration error として拒否します。
+  return typeof value === 'string' && value.trim().length > 0;
 }
