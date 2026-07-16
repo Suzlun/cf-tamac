@@ -359,10 +359,16 @@ OK例: `feat: add agent registry shell`、`fix: close proxy route gap`、`docs: 
 ## 8. OpenSpec
 
 **Rule: OpenSpec は strict validation を lint の一部として通す。**
-Summary: `pnpm lint:openspec` は OpenSpec strict validation と Scenario coverage check を実行します。
-Enforcement point: `pnpm lint:openspec` via `package.json` command `pnpm exec openspec validate --all --strict && node scripts/openspec/verify-scenario-coverage.mjs`.
+Summary: `pnpm lint:openspec` は OpenSpec strict validation、Intent確認、Scenario coverage、task scope、wireframe preview checkを実行します。
+Enforcement point: `pnpm lint:openspec` via `package.json`、`scripts/openspec/verify-change-intent.mjs`、`scripts/openspec/verify-scenario-coverage.mjs`、`scripts/openspec/verify-change-task-scope.mjs`、`scripts/openspec/verify-wireframe-previews.mjs`.
 NG例: strict validation に失敗する change/spec artifact を残す。
-OK例: `pnpm lint:openspec` が pass する proposal/spec/design/tasks にする。
+OK例: `pnpm lint:openspec` が pass する intent/proposal/spec/design/tasks にする。
+
+**Rule: downstream artifactは所有者確認済みIntentから作成する。**
+Summary: repositoryの事実、推論、仮定、反証確認を分けた`intent.md`を所有者が確認するまでproposal以降へ進みません。
+Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-intent.mjs`.
+NG例: `Intent-Status: DRAFT`または`Owner-Confirmation: PENDING`のままproposal、spec、design、tasks、wireframeを作成する。
+OK例: 明示確認後に両markerを`CONFIRMED`へ変更し、確認済み成果と制約からdownstream artifactを作成する。
 
 **Rule: Scenario heading は stable Scenario ID で終わる。**
 Summary: `#### Scenario:` heading は `(...-S001)` 形式の stable ID で終わる必要があります。
@@ -406,4 +412,5 @@ OK例: OpenSpec `spec.md` の Scenario ID と `packages/**`、`tests/**`、`scri
 | Agent surface governance            | `scripts/governance/verify-agent-surface.mjs`                                                                                                             |
 | Package boundary governance         | `scripts/governance/verify-package-boundaries.mjs`                                                                                                        |
 | OpenSpec scenario coverage          | `scripts/openspec/verify-scenario-coverage.mjs`                                                                                                           |
+| OpenSpec Intent gate                | `scripts/openspec/verify-change-intent.mjs`                                                                                                               |
 | Supply-chain policy                 | `scripts/security/verify-pnpm-supply-chain.mjs`、`pnpm-workspace.yaml`                                                                                    |

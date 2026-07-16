@@ -5,6 +5,24 @@ context: |
   Tech stack: TypeScript, React, Cloudflare Workers, Hono, Drizzle ORM
   Testing: Vitest (unit/integration), Playwright (e2e)
 
+  Change completion boundary:
+  - A Change is complete when the requested feature is fully implemented and merge-ready with repository-scoped code, configuration, generated artifacts, documentation, review, and reproducible local or CI verification.
+  - Do not include release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation in OpenSpec artifacts, tasks, acceptance criteria, or completion conditions.
+  - Record release impact in the pull request template only. It never blocks Change completion.
+
+  Intent confirmation boundary:
+  - Treat the request as evidence of intent, not as an implementation-ready specification.
+  - Every Change MUST begin with a confirmed `intent.md` before proposal, wireframe, specs, design, or tasks are authored.
+  - Classify solution-shaped terms as a required outcome, a non-negotiable constraint, or a candidate means. Familiarity or common example code is not evidence that a candidate means fits this repository.
+  - Ground the interpretation in repository evidence, separate observations from inferences and assumptions, and check for evidence that would invalidate the interpretation.
+  - The owner MUST explicitly confirm the reconstructed intent. Downstream artifacts preserve that confirmed intent and MUST NOT reinterpret it.
+
+  UI artifact order:
+  - When a Change needs a user-visible UI, create the artifacts in this order: confirmed intent, proposal, wireframe JSON, spec, then design.
+  - `openspec/designer` owns the minimum visible surface in `.wireframe.json`. A matching `.wireframe.html` is generated preview output and is never hand-edited or used as a design source.
+  - Specs define user-observable behavior without adding visible controls, settings, screens, labels, versions, model names, or internal state absent from the wireframe.
+  - During apply, resolve only self-evident implementation details that preserve the visible surface. Escalate contradictions or non-self-evident visible changes.
+
   Spec -> Test contract:
   - Specs live at openspec/specs/**/spec.md (source of truth)
   - Every Scenario heading MUST end with a stable Scenario ID in parentheses:
@@ -21,6 +39,10 @@ context: |
     - Main spec path: openspec/specs/<capability>/spec.md
 
 rules:
+  intent:
+    - Do not write a confirmed intent artifact until the owner explicitly confirms the reconstructed intent.
+    - Cite repository evidence and separate observed facts, inferences, assumptions, and unresolved decisions.
+    - Do not leave decisions that can change customer-visible behavior, contracts, architecture, security, data, dependencies, or scope unresolved in a confirmed intent.
   specs:
     - Every Scenario heading MUST include a Scenario ID suffix in parentheses.
     - Prefer Scenario IDs derived directly from the Spec Unit name (e.g., AGENT-LIFECYCLE-S001).
@@ -28,6 +50,9 @@ rules:
     - 'If a scenario cannot be automated, include `Tags: manual` and explain why in the change proposal/PR.'
   tasks:
     - For each ADDED/MODIFIED Scenario ID, include a task to add/update automated tests that reference the Scenario ID.
+    - Every task MUST be repository-scoped, merge-verifiable, and finish with objective local or CI evidence.
+    - Tasks MUST NOT require release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation.
+    - UI implementation tasks MUST reference the approved `.wireframe.json` source when a wireframe exists. They MUST NOT task direct edits to generated `.wireframe.html` files.
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.

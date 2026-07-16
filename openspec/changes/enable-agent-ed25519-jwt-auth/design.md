@@ -638,19 +638,17 @@ flowchart TD
 - D1 rollback が必要な場合はリリース前 backup を復元する。Deleted signing key の private material は復旧不能として扱うため、復旧後に key generation と trust config 更新を実行する。
 - Agent trust config parse/validation が失敗する場合、Agent Worker は安全側で拒否する。運用復旧は Cloudflare Dashboard/API/Wrangler で valid `AGENT_CONTROL_PLANE_TRUST` を設定し、Client health verification で確認する。
 
-## Release Procedure
+## Merge Verification
 
 - `corepack enable && pnpm install` を実行し、依存状態を確定する。
-- Client D1 migration を local/staging に適用し、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` を secret として設定する。
-- Agent staging Worker に `AGENT_CONTROL_PLANE_TRUST` と `AGENT_RPC_AUDIENCE` を設定する。
 - `pnpm gen:agent:proto && pnpm gen:agent:rpc` を実行し、generated output を更新する。
 - `pnpm check:codegen` を実行し、generated drift がないことを確認する。
 - `pnpm test:agent`、`pnpm test:client`、`pnpm test:governance`、`pnpm test:e2e` を実行する。
 - `pnpm check:agent && pnpm check:client` を実行する。
 - `pnpm build` を実行する。
-- Agent 0 件状態でも Management Client の Global Settings で signing key を生成し、public-only trust config を export できることを確認する。Agent 作成後に Agent Worker secret へ `AGENT_CONTROL_PLANE_TRUST` を設定し、managed Agent に global signing key の issuer/kid/fingerprint を選択し、Agent health verification を実行する。
-- Health verification 成功後、Overview、Threads、Events、Runs、Schedules、Integrations、Settings が server-only Agent RPC 由来の実データを表示し、browser payload/storage/bundle に signing material がないことを smoke/UAT で確認する。
-- Rotation、emergency revoke、break-glass recovery runbook を staging で確認し、本番適用前に public trust config fingerprint を記録する。
+- repository-local fixtureでAgent 0件状態のsigning key生成、public-only trust config export、managed Agent key selection、health verificationを検証する。
+- browser bundle/source guardでOverview、Threads、Events、Runs、Schedules、Integrations、Settingsのserver-only Agent RPC境界とsigning material非露出を検証する。
+- rotation、emergency revoke、break-glass recovery runbookの内容をdocumentation testで検証する。
 
 ## Acceptance Criteria
 
@@ -662,7 +660,7 @@ flowchart TD
 - Management Client は Global Settings 配下で Agent 0 件でも signing key lifecycle、trust config export、rotation/revoke/recovery guidance を提供し、Agent 個別 settings では既存 global key selection と health verification を提供する。
 - Agent health response は認証済み request の trust diagnostic を返し、key material と token body を返さない。認証失敗は通常の Check response ではなく safe Connect error、audit、metric として扱う。
 - Agent 0 件状態の Global Settings signing key 生成、public-only trust export、Agent 作成、managed Agent global signing key selection、Agent Worker trust 設定、Health Check 成功、selected-Agent pages の実データ表示まで一周できる。
-- Docs、governance scripts、scenario-linked automated tests が production credential boundary を検証する。
+- Docs、governance scripts、scenario-linked automated tests がClient Service authentication boundaryを検証する。
 - `pnpm check:codegen`、`pnpm test:agent`、`pnpm test:client`、`pnpm test:governance`、`pnpm check:agent && pnpm check:client` が成功する。
 
 ## Open Issues

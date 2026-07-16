@@ -26,3 +26,6 @@ docs/memo/**
 
 # Next.js generated type helper
 next-env.d.ts
+
+# Serena MCP のローカル state はリポジトリ管理・整形の対象外にする。
+.serena/

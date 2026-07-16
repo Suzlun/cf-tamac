@@ -38,7 +38,7 @@ description: Enforce this repository's real Agent/Client foundation, TypeSpec-to
 - Client destination policy: `packages/client/src/server/agent-rpc/origin-policy.ts`, `packages/client/src/server/agent-rpc/agent-loader.ts`, `packages/client/src/server/agent-rpc/safe-results.ts`
 - Governance: `scripts/governance/verify-agent-surface.mjs`, `scripts/governance/verify-package-boundaries.mjs`, `scripts/security/verify-pnpm-supply-chain.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`
 - Removed demo package graph: old demo contract/server/UI packages are no longer active implementation sources
-- OpenSpec: `scripts/openspec/verify-scenario-coverage.mjs`
+- OpenSpec: `scripts/openspec/verify-change-intent.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`, `scripts/openspec/verify-change-task-scope.mjs`, `scripts/openspec/verify-wireframe-previews.mjs`
 
 ### 2) Classify the change before editing
 

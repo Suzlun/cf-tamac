@@ -6,6 +6,7 @@ Propose a new change - create the change and generate all artifacts in one step.
 
 I'll create a change with artifacts:
 
+- intent.md (owner-confirmed meaning)
 - proposal.md (what & why)
 - design.md (how)
 - tasks.md (implementation steps)
@@ -17,6 +18,8 @@ When ready to implement, run /opsx-apply
 **Input**: The argument after `/opsx-propose` is the change name (kebab-case), OR a description of what the user wants to build.
 
 Before starting, load `openspec-apply-readiness` via the `skill` tool and use it as the definition of apply-ready.
+
+**Intent confirmation boundary**: Treat the request as evidence of intent, not as an implementation-ready specification. Every Change requires one explicit owner confirmation of the reconstructed intent before proposal, wireframe, Specs, design, or tasks are authored.
 
 **Steps**
 
@@ -49,7 +52,22 @@ Before starting, load `openspec-apply-readiness` via the `skill` tool and use it
    - `artifacts`: list of all artifacts with their status and dependencies
    - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context. Use these instead of assuming repo-local paths.
 
-4. **Create artifacts in sequence until apply-ready**
+4. **Reconstruct and confirm intent**
+
+   - Get the intent instructions:
+     ```bash
+     openspec instructions intent --change "<name>" --json
+     ```
+   - Inspect the relevant repository behavior, contracts, paths, and constraints before interpreting the request.
+   - Build an intent candidate containing the actor, situation, problem, desired outcome, priority, request-term classifications, repository evidence, inferences, assumptions, falsification check, invariants, boundaries, and observable success.
+   - Classify solution-shaped terms as `Required Outcome`, `Non-negotiable Constraint`, or `Candidate Means`.
+   - Do not treat familiarity, common practice, searchable examples, or an existing implementation pattern as evidence that a candidate means fits this repository.
+   - Present the complete candidate to the owner with the `question` tool and ask whether to confirm, revise, or cancel.
+   - If corrected, inspect any newly relevant evidence, revise the candidate, and ask again.
+   - Only after explicit confirmation, create `intent.md` with exact `Intent-Status: CONFIRMED` and `Owner-Confirmation: CONFIRMED` markers and record the approved statement under `## Owner Confirmation`.
+   - Do not create any downstream artifact while either status is unconfirmed or a material decision remains unresolved.
+
+5. **Create downstream artifacts in sequence until apply-ready**
 
    Use the **TodoWrite tool** to track progress through the artifacts.
 
@@ -70,6 +88,7 @@ Before starting, load `openspec-apply-readiness` via the `skill` tool and use it
    - Read any completed dependency files for context
    - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
    - Apply `context` and `rules` as constraints - but do NOT copy them into the file
+   - Never select `proposal` or another downstream artifact until `intent.md` is confirmed.
    - Show brief progress: "Created <artifact-id>"
 
    b. **Continue until all `applyRequires` artifacts are complete**
@@ -88,7 +107,7 @@ Before starting, load `openspec-apply-readiness` via the `skill` tool and use it
    - Fix every `NEEDS_FIXES` finding and ask for every required `NEEDS_DECISIONS` item
    - Do not declare the change apply-ready until the result is `READY`
 
-5. **Show final status**
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```
@@ -99,6 +118,7 @@ After completing all artifacts, summarize:
 
 - Change name and location
 - List of artifacts created with brief descriptions
+- Confirmed intent path and owner-approved intent summary
 - Apply-readiness result: `READY`
 - What's ready: "All artifacts created! Ready for implementation."
 - Prompt: "Run `/opsx-apply` to start implementing."
@@ -117,7 +137,7 @@ After completing all artifacts, summarize:
 
 - Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)
 - Always read dependency artifacts before creating a new one
-- If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
+- Never resolve ambiguity about customer outcome, external contracts, architecture, security, data, dependencies, or scope merely to keep momentum; obtain owner confirmation
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
 - Do not add local readiness gates or use expected file counts; use `openspec-apply-readiness`

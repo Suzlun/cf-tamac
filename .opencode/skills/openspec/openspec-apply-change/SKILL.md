@@ -1,12 +1,23 @@
 ---
-description: Implement tasks from an OpenSpec change (Experimental)
+name: openspec-apply-change
+description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.
+license: MIT
+compatibility: Requires openspec CLI.
+metadata:
+  author: openspec
+  version: '1.0'
+  generatedBy: '1.4.1'
 ---
 
 Implement tasks from an OpenSpec change.
 
-Before delegating or implementing, load `openspec-apply-readiness` and require a `READY` result. Read the confirmed `intent.md` from `contextFiles`, preserve its owner-approved outcome and classifications, and do not replace it with a familiar solution pattern or solution-shaped paraphrase.
+Before implementation, load `openspec-apply-readiness` and require a `READY` result. A Change contains repository-scoped work only: never execute, await, or complete a task that requires release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation. Return the violated readiness criteria so `openspec/proposer` can remove the invalid artifact content.
 
-**Input**: Optionally specify a change name (e.g., `/opsx-apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+Read the confirmed `intent.md` from `contextFiles` before implementation. Preserve its owner-approved outcome and classifications; do not replace it with a familiar solution pattern or a solution-shaped paraphrase.
+
+When UI is in scope, treat `.wireframe.json` as the visible-surface source and `.wireframe.html` as generated preview output. Resolve only self-evident implementation details that preserve existing actions, information structure, and copy. Return `BLOCKED` instead of redesigning the surface when artifacts conflict or a non-self-evident visible change is necessary.
+
+**Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -37,13 +48,13 @@ Before delegating or implementing, load `openspec-apply-readiness` and require a
    ```
 
    This returns:
-   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema)
+   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema - could be intent/proposal/specs/design/tasks or spec/tests/implementation/docs)
    - Progress (total, complete, remaining)
    - Task list with status
    - Dynamic instruction based on current state
 
    **Handle states:**
-   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx-continue`
+   - If `state: "blocked"` (missing artifacts): show message, suggest completing the missing artifacts with `/opsx-propose <name>` before retrying apply
    - If `state: "all_done"`: congratulate, suggest archive
    - Otherwise: proceed to implementation
 
@@ -116,7 +127,7 @@ Working on task 4/7: <task description>
 - [x] Task 2
 ...
 
-All tasks complete! You can archive this change with `/opsx-archive`.
+All tasks complete! Ready to archive this change.
 ```
 
 **Output On Pause (Issue Encountered)**

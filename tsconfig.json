@@ -8,6 +8,7 @@
     "eslint.config.js",
     "vitest.config.ts",
     "playwright.config.ts",
+    ".opencode/skills/wireframe/scripts/**/*.mjs",
     "scripts/**/*.mjs",
     "tests/**/*"
   ],

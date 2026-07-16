@@ -1102,7 +1102,7 @@ flowchart TD
 - Provider ingress recovery: 各environmentの`PROVIDER_INGRESS_RATE_LIMITER` namespaceと100/60 policyをdeployment manifestで管理し、binding operation failure時はProvider trafficを`resource_exhausted`へ閉じたままconfigurationとWorkers Logsを照合する。
 - Validation recovery: codegen drift、package boundary、origin policy、deploy artifact validationのreportを修正対象として扱い、全validation pass後のartifact setをpublishする。
 
-## Release Procedure
+## Merge Verification
 
 - `corepack enable && pnpm install` を実行する。
 - Cloudflare account内でproduction/staging専用のRate Limiting `namespace_id`を割り当て、`CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION` と `CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING` へ設定して `pnpm gen:deploy-artifacts` へ渡す。generatorが生成Wranglerへ100 requests/60 seconds policyとenvironment-specific namespaceを注入する。

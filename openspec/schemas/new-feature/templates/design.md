@@ -39,6 +39,15 @@ README.md
 | ----------------------------------------------- | -------------- | ---------------------------------------------------------- |
 | <!-- TODO: 種別。例: Add/Update/Delete/Move --> | `path/to/file` | <!-- TODO: 何をなぜ変更するかを日本語で 1 行記述する。 --> |
 
+## Design Decisions
+
+<!-- Material decisions must trace to confirmed intent, approved Specs, and repository evidence. -->
+<!-- Familiarity, common practice, searchable examples, and generic patterns are not repository evidence. -->
+
+| Decision                                    | Intent / Spec Source                                   | Repository Evidence                             | Selected Approach                           | Why It Fits                                                 | Revisit Trigger                                                     |
+| ------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------- |
+| <!-- TODO: 判断対象を日本語で記述する。 --> | <!-- TODO: Intent項目またはRequirement/Scenario ID --> | <!-- TODO: `path:line` またはcommand output --> | <!-- TODO: 採用方針を日本語で記述する。 --> | <!-- TODO: このsystemに適合する理由を日本語で記述する。 --> | <!-- TODO: 再検討が必要になる証拠または条件を日本語で記述する。 --> |
+
 ## System Diagram
 
 ```mermaid
@@ -170,13 +179,13 @@ flowchart TD
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------- | -------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------- |
 | <!-- TODO: 例: UT-AGENT-MANAGEMENT-UI-BND-003 --> | <!-- TODO: 例: [AGENT-MANAGEMENT-UI-S003] Agent form が connection metadata を検証する --> | <!-- TODO: 例: packages/client/app --> | <!-- TODO: Category。例: HAP/ERR/BND/... --> | <!-- TODO: 概要を日本語で 1 行記述する。 --> | <!-- TODO: Arrange -> Act -> Assert の要点を日本語で記述する。 --> | <!-- TODO: 観測可能な期待挙動を日本語で記述する。 --> |
 
-## Rollback / Migration
+## Migration / Rollback
 
-- <!-- TODO: rollback / migration plan を日本語で記述する。data migration、feature flag、撤退手順、顧客影響の遮断策を含める。N/A の場合は理由を日本語で書く。 -->
+- <!-- TODO: repository-defined migration / rollback design と local または CI の検証根拠を日本語で記述する。外部環境に対する実行手順は書かない。N/A の場合は理由を日本語で書く。 -->
 
-## Release Procedure
+## Merge Verification
 
-- <!-- TODO: release steps を日本語で記述する。commands/order/verification を含む実行可能な runbook にする。 -->
+- <!-- TODO: merge-ready を示す repository-local または CI の command と期待結果を日本語で記述する。release impact は pull request template に記録する。 -->
 
 ## Acceptance Criteria
 

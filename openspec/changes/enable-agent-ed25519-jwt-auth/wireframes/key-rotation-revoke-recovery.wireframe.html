@@ -1,3 +1,4 @@
+<!-- GENERATED FROM key-rotation-revoke-recovery.wireframe.json BY .opencode/skills/wireframe/scripts/generate-preview.mjs; DO NOT EDIT. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -563,7 +564,10 @@
 <script>
 const WIREFRAME_DATA = {
   "name": "Key Rotation Revoke Recovery",
-  "viewport": { "width": 1200, "height": 760 },
+  "viewport": {
+    "width": 1200,
+    "height": 760
+  },
   "root": {
     "name": "Management Shell",
     "direction": "horizontal",
@@ -575,16 +579,34 @@ const WIREFRAME_DATA = {
         "padding": 16,
         "gap": 16,
         "children": [
-          { "name": "cf-tamac Management", "type": "text", "variant": "heading", "height": 40 },
-          { "name": "Agents", "type": "link", "height": 40 },
-          { "name": "Global Settings", "type": "link", "height": 40 },
+          {
+            "name": "cf-tamac Management",
+            "type": "text",
+            "variant": "heading",
+            "height": 40
+          },
+          {
+            "name": "Agents",
+            "type": "link",
+            "height": 40
+          },
+          {
+            "name": "Global Settings",
+            "type": "link",
+            "height": 40
+          },
           {
             "name": "Global Settings / Signing Keys",
             "type": "text",
             "variant": "caption",
             "height": 24
           },
-          { "name": "Rotation and recovery", "type": "text", "variant": "caption", "height": 24 }
+          {
+            "name": "Rotation and recovery",
+            "type": "text",
+            "variant": "caption",
+            "height": 24
+          }
         ]
       },
       {
@@ -653,9 +675,21 @@ const WIREFRAME_DATA = {
                 "gap": 12,
                 "grow": true,
                 "children": [
-                  { "name": "Compromised global key indicator", "type": "card", "height": 96 },
-                  { "name": "Global trust config revoked JSON", "type": "card", "height": 132 },
-                  { "name": "Confirm revoked JWT is rejected", "type": "button", "height": 44 }
+                  {
+                    "name": "Compromised global key indicator",
+                    "type": "card",
+                    "height": 96
+                  },
+                  {
+                    "name": "Global trust config revoked JSON",
+                    "type": "card",
+                    "height": 132
+                  },
+                  {
+                    "name": "Confirm revoked JWT is rejected",
+                    "type": "button",
+                    "height": 44
+                  }
                 ]
               },
               {
@@ -664,9 +698,21 @@ const WIREFRAME_DATA = {
                 "gap": 12,
                 "grow": true,
                 "children": [
-                  { "name": "ADMIN_OPERATOR issuer explanation", "type": "card", "height": 96 },
-                  { "name": "Dashboard API Wrangler update path", "type": "card", "height": 132 },
-                  { "name": "Recovery key outside Client store", "type": "card", "height": 88 }
+                  {
+                    "name": "ADMIN_OPERATOR issuer explanation",
+                    "type": "card",
+                    "height": 96
+                  },
+                  {
+                    "name": "Dashboard API Wrangler update path",
+                    "type": "card",
+                    "height": 132
+                  },
+                  {
+                    "name": "Recovery key outside Client store",
+                    "type": "card",
+                    "height": 88
+                  }
                 ]
               }
             ]
@@ -675,8 +721,7 @@ const WIREFRAME_DATA = {
       }
     ]
   }
-}
-; // %%WIREFRAME_DATA%%
+}; // %%WIREFRAME_DATA%%
 
 let modified = false;
 let dragPath = null;

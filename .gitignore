@@ -54,6 +54,7 @@ coverage/
 
 # Serena MCP Server
 .serena/cache/
+.serena/memories/
 .serena/*.log
 
 # playwright 

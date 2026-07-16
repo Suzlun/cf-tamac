@@ -8,7 +8,8 @@ compatibility: Requires openspec CLI.
 
 This skill is the shared acceptance contract for handing an OpenSpec change to
 `openspec/applier`. It defines whether the artifacts are executable. It does not
-define how to author each artifact or how to implement the change.
+define how to author each artifact, how to implement the change, or how to run
+release operations.
 
 ## Consumers
 
@@ -42,10 +43,13 @@ with artifact evidence showing why the affected domain is outside the change.
 
 - `openspec instructions apply` does not report missing required artifacts.
 - Every path in `contextFiles` exists and is readable.
-- The proposal, specs, design, and tasks describe the same change scope.
+- The confirmed intent, proposal, specs, design, and tasks describe the same change scope.
 
 ### AR-002: Scope and decisions are settled
 
+- `intent.md` records `Intent-Status: CONFIRMED` and `Owner-Confirmation: CONFIRMED` after explicit owner confirmation.
+- The confirmed intent separates repository observations, inferences, assumptions, and candidate means, and includes evidence from a check that could have invalidated the selected interpretation.
+- Solution-shaped terms are classified as required outcomes, non-negotiable constraints, or candidate means; downstream artifacts do not promote candidate means without owner confirmation.
 - No artifact contradiction or unresolved decision can change customer-visible
   behavior, external contracts, architecture ownership, security boundaries,
   persistence, dependencies, or UI behavior.
@@ -59,14 +63,21 @@ with artifact evidence showing why the affected domain is outside the change.
 - Design traces to the specs and does not introduce unstated product behavior.
 - Design resolves cross-layer and domain-specific decisions needed to implement
   the stated behavior.
+- When UI is in scope, the pre-Spec `.wireframe.json` is the source for the
+  visible surface. Specs and design preserve that surface without introducing
+  visible internal concepts, controls, settings, screens, or copy.
+- Wireframes are not requirement-coverage artifacts. Do not require every
+  requirement, internal state, or implementation decision to appear in a
+  wireframe.
 
 ### AR-004: Implementation does not require design rediscovery
 
+- Material implementation choices trace to the confirmed intent, approved specs, repository evidence, or explicit constraints. Familiarity, common practice, and readily available example code are not sufficient evidence.
 - A responsible implementation agent can identify the intended flow,
   ownership boundaries, error handling, data flow, and affected integration
   points from the context files.
 - Applicable generated artifacts, configuration, security boundaries, tests,
-  and operational concerns are addressed.
+  and repository-defined operational interfaces are addressed.
 - There are no placeholders such as `TBD`, `TODO`, `etc`, or implicit decisions
   that would force an implementer to redesign the change.
 
@@ -80,6 +91,11 @@ counts or other size heuristics are not readiness criteria.
   units unless the work must be atomic for a documented reason.
 - Task wording and design references are sufficient for the applier to route
   the task without interpreting product or architecture intent.
+- Every task changes, reviews, or verifies repository content and can finish
+  with objective local or CI evidence.
+- Tasks do not require release execution, deployment, environment
+  provisioning, credential access or probes, external approval, staging or
+  production validation, operational rehearsal, or production observation.
 
 ### AR-006: Dependencies and parallelism are explicit
 
@@ -102,8 +118,10 @@ counts or other size heuristics are not readiness criteria.
 
 Apply only the relevant domain checks:
 
-- UI: screens, states, user-facing copy, component ownership, responsive
-  behavior, accessibility expectations, and required wireframes are explicit.
+- UI: the necessary screens, reachable states, user-facing copy, component
+  ownership, responsive behavior, accessibility expectations, and required
+  wireframe JSON sources are explicit. Do not enumerate unreachable states or
+  expose internal concepts merely because they exist in implementation.
 - API and contracts: TypeSpec ownership, generation order, accepted inputs,
   outputs, and error behavior are explicit.
 - Persistence: schema effects, migration/rollback behavior, consistency, and
@@ -111,13 +129,18 @@ Apply only the relevant domain checks:
 - Cross-domain flows: handoff contracts and ordering between frontend,
   backend, shared UI, generated code, and operations are explicit.
 
-### AR-009: Ask-first boundaries are surfaced
+### AR-009: Repository ask-first boundaries are surfaced
 
 - Dependency or version changes, permission boundary changes, destructive
-  operations, external side effects, and other repository ask-first items are
-  identified before execution.
-- Required approvals are recorded, or the change is reported as requiring a
-  decision rather than apply-ready.
+  operations, and other repository ask-first items are identified before
+  execution.
+- External side effects such as release execution, deployment, environment
+  provisioning, credential access or probes, external approval, staging or
+  production validation, operational rehearsal, and production observation are
+  outside a Change. They MUST NOT be tasks, acceptance criteria, or completion
+  conditions.
+- An artifact that includes an external operation as a Change dependency is
+  `NEEDS_FIXES`; it is not a decision or approval for the applier to await.
 
 ### AR-010: Verification and review can converge
 
@@ -125,7 +148,10 @@ Apply only the relevant domain checks:
   domain-specific verification.
 - The planned work can pass through applicable frontend and backend review
   gates plus the final build review required by the applier.
-- Completion does not depend on unverifiable claims or unavailable evidence.
+- Completion depends only on repository-local or CI evidence, never on
+  unavailable external evidence or a live-environment operation.
+- Generated wireframe HTML previews match their JSON sources and are not
+  hand-edited.
 
 ## Evaluation procedure
 
