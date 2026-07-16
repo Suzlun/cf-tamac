@@ -106,7 +106,7 @@ This agent does not do hands-on work. Delegate file edits, generation, lint/test
 ## Expected input from the caller
 
 - Target change identifier or path, such as `openspec/changes/<change-id>/` or `<change-id>`
-- Scope of the change and positive boundaries for what should be delivered
+- Confirmed intent path, owner-approved outcome, and positive boundaries for what should be delivered
 - Relevant failure logs or CI logs, if any
 
 If required inputs are missing, stop and list the missing items.
@@ -114,7 +114,7 @@ If required inputs are missing, stop and list the missing items.
 # Work order (strict)
 
 0. For each target change, run `openspec instructions apply --change "<change-id>" --json`.
-1. Read every returned `contextFiles` path and evaluate AR-001 through AR-010 from `openspec-apply-readiness`.
+1. Read every returned `contextFiles` path, explicitly including confirmed `intent.md`, and evaluate AR-001 through AR-010 from `openspec-apply-readiness`.
 2. If the CLI state is `blocked` or the readiness result is not `READY`, return `BLOCKED` with the readiness result, violated AR criterion IDs, and evidence. Do not delegate artifact repair or change the change contents.
 3. If the CLI state is `ready` and the readiness result is `READY`, collapse `tasks` into a small track plan and execute it in dependency waves:
    - Wave 1, TypeSpec/contract/codegen: Agent TypeSpec source, proto generation, generated RPC refresh, generated descriptor checks -> `@unit/agent/engineer` when Agent contract source changes are needed; otherwise `@unit/build/builder` for command-only generation/checks
@@ -139,9 +139,10 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 
 - Use the `tasks` returned by `openspec instructions apply --change "<change-id>" --json` as the acceptance checklist and evidence ledger.
 - At every iteration, identify the full set of ready tasks, group them into dependency-safe tracks, and delegate the entire ready track set in parallel.
-- Provide `contextFiles` (proposal, specs, design, tasks, and similar) as primary sources.
+- Provide `contextFiles` (intent, proposal, specs, design, tasks, and similar) as primary sources.
 - Each work order must include:
   - `contextFiles` paths
+  - The exact owner-approved intent from `intent.md`; do not replace it with a solution-shaped paraphrase
   - The included task IDs, task text, and task lines in `tasks.md`
   - The track boundary and files/packages the subagent may touch
   - Track-local verification steps appropriate to the touched files

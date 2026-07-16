@@ -61,7 +61,7 @@ function parseArguments(arguments_) {
     throw new Error('`--output` の後に preview HTML の出力パスを指定してください。');
   }
 
-  if (outputPath && sourcePaths.length !== 1) {
+  if (outputPath !== null && sourcePaths.length !== 1) {
     throw new Error('`--output` は JSON source を 1 つだけ指定する場合に使用できます。');
   }
 
@@ -119,7 +119,7 @@ function renderPreview(sourcePath, outputPath) {
   }
 
   if (
-    !wireframe ||
+    wireframe === null ||
     typeof wireframe !== 'object' ||
     Array.isArray(wireframe) ||
     !('name' in wireframe) ||
@@ -197,7 +197,7 @@ try {
   options = null;
 }
 
-if (options) {
+if (options !== null) {
   if (options.sourcePaths.length === 0) {
     process.stderr.write(
       'Usage: node .opencode/skills/wireframe/scripts/generate-preview.mjs [--check] <source.wireframe.json> [--output <preview.wireframe.html>]\n'
@@ -215,7 +215,7 @@ if (options) {
         continue;
       }
       const error = generateOrCheckPreview(sourcePath, outputPath, options.check);
-      if (error) errors.push(error);
+      if (error !== null) errors.push(error);
     }
 
     if (errors.length > 0) {

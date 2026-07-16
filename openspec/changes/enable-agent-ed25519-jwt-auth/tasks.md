@@ -1,7 +1,7 @@
 ## 1. 基準確認 / 契約準備
 
 - [x] 1.1 `proposal.md`、`design.md`、delta specs、Issue #3 を照合し、対象 Spec Unit、Scenario ID、implementation file list を作業メモに固定する。
-- [x] 1.2 `packages/agent/src/env.ts` と `packages/client/src/server/env.ts` の現在の required secret handling を確認し、`AGENT_CONTROL_PLANE_TRUST` と `CLIENT_CREDENTIAL_ENCRYPTION_KEY` への変更点を整理する。
+- [x] 1.2 `packages/agent/src/env.ts` と `packages/client/src/server/env.ts` の現在の required secret handling を調査し、`AGENT_CONTROL_PLANE_TRUST` と `CLIENT_CREDENTIAL_ENCRYPTION_KEY` への変更点を整理する。
 - [x] 1.3 `packages/agent/src/domain/security/**`、`packages/agent/src/rpc/interceptors/**`、`packages/client/src/server/agent-rpc/**` の既存 test seam と HS256 path を棚卸しし、本番経路と test-only path の分離方針を実装メモに残す。
 
 ## 2. Agent 信頼設定 / 認証
@@ -71,7 +71,7 @@
 - [x] 7.2 `packages/agent/README.md`、`packages/client/README.md`、`AGENTS.md`、`CODING_STANDARDS.md`、`CONTRIBUTING.md` を更新し、required secrets、Client D1 の許可データ集合、encrypted Client Service signing key store、local/staging smoke、health verification、private key 非露出境界を説明する。
 - [x] 7.3 `scripts/governance/verify-agent-surface.mjs` を更新し、Agent REST/JSON auth route、bootstrap RPC、AgentTrustRegistry Durable Object、Client private key Worker Secret 手貼り前提を検出する。
 - [x] 7.4 `scripts/governance/verify-package-boundaries.mjs` を更新し、Browser-visible modules と public Client routes から signing material/server-only Agent RPC module への到達を検出し、Client D1 schema tests が encrypted signing key store を許可しつつ Agent domain snapshots と plaintext secrets を拒否するようにする。
-- [x] 7.5 `scripts/openspec/verify-scenario-coverage.mjs` を確認し、本番 auth Scenario ID と manual tag handling の coverage が維持されるよう fixture を追加する。
+- [x] 7.5 `scripts/openspec/verify-scenario-coverage.mjs` を調査し、Client Service auth Scenario ID と manual tag handling の coverage が維持されるよう fixture を追加する。
 - [x] 7.6 governance fixtures を追加し、HS256 Agent RPC signing、`resolveCredentialSecret` による Agent RPC signing source、`AGENT_CREDENTIAL_*` Agent RPC auth path、public Client Agent proxy route、Client D1 plaintext signing material、Agent domain snapshot table が failure になることを確認する。
 
 ## 8. Agent Scenario Tests
@@ -89,7 +89,7 @@
 - [x] 8.11 `packages/agent/src/tests/health-rpc.test.ts` に `[AGENT-HEALTH-S001] Check が Protobuf RPC 経由で安全な serving 状態を返す` を更新追加する。
 - [x] 8.12 `packages/agent/src/tests/health-rpc.test.ts` に `[AGENT-HEALTH-S002] 公開 REST health endpoint は Agent 公開 API ではない` を更新追加する。
 - [x] 8.13 `packages/agent/src/tests/health-rpc.test.ts` に `[AGENT-HEALTH-S003] Check が issuer kid fingerprint の trust 状態を診断する` を追加する。
-- [x] 8.14 `packages/agent/src/tests/rpc-interceptors.test.ts` を更新し、本番 path が `x-agent-test-*` を credential として扱わないことを確認する。
+- [x] 8.14 `packages/agent/src/tests/rpc-interceptors.test.ts` を更新し、production path が `x-agent-test-*` を authentication input として扱わないことをtestする。
 - [x] 8.15 `packages/agent/src/tests/health-rpc.test.ts` に `[AGENT-HEALTH-S005] 認証失敗は Check 応答ではなく安全な Connect error として診断される` を追加し、unknown issuer/kid、revoked key、fingerprint mismatch、replayed `jti` を覆う。
 
 ## 9. Client Scenario Tests
@@ -119,7 +119,7 @@
 
 - [x] 10.1 `scripts/governance/verify-agent-surface.test.mjs` と documentation checks に `[WORKSPACE-GOVERNANCE-S010] ドキュメントが本番 credential runbook を公開する` を追加する。
 - [x] 10.2 `scripts/governance/verify-agent-surface.test.mjs` と `scripts/governance/verify-package-boundaries.test.mjs` に `[WORKSPACE-GOVERNANCE-S011] ガードレールが browser-visible signing material と禁止 Agent auth surface を拒否する` を追加する。
-- [x] 10.3 `scripts/openspec/verify-scenario-coverage.test.mjs` に `[WORKSPACE-GOVERNANCE-S012] シナリオ coverage が本番認証 specs を検証する` を追加する。
+- [x] 10.3 `scripts/openspec/verify-scenario-coverage.test.mjs` に `[WORKSPACE-GOVERNANCE-S012] シナリオ coverage がClient Service authentication specsを検証する` を追加する。
 - [x] 10.4 `tests/e2e/management-agent-registry.spec.ts` または smoke fixture に `[WORKSPACE-GOVERNANCE-S013] 運用 smoke が Management Client から Agent RPC 実データ表示までを検証する` を追加する。
 
 ## 11. Smoke / UAT
@@ -129,7 +129,7 @@
 - [x] 11.3 Agent 作成後、Agent Worker に `AGENT_CONTROL_PLANE_TRUST` を設定し、managed Agent に既存 global signing issuer/kid/fingerprint を選択する。
 - [x] 11.4 選択済み signing key で `AgentHealthService.Check` を実行し、認証済み response の `serving` または `degraded`、trust config fingerprint、lastVerifiedAt が UI に表示されることを確認する。
 - [x] 11.5 Overview、Threads、Events、Runs、Schedules、Integrations、Settings が safe fallback ではなく server-only Agent RPC 由来の実データを表示することを確認する。
-- [x] 11.6 Browser payload、HTML、storage、bundle、public Client routes に private JWK、encrypted private JWK、生 JWT、signing logic、Agent credential forwarding が含まれないことを確認する。
+- [x] 11.6 Browser payload、HTML、storage、bundle、public Client routes に private JWK、encrypted private JWK、生 JWT、signing logic、Agent auth material forwarding が含まれないことを検査する。
 
   - 2026-06-29 local UAT: AgentBrowser で `CLIENT_CREDENTIAL_ENCRYPTION_KEY` と local D1 migration 済み Management Client を開き、`Global Settings > Signing Keys` の Ed25519 key list/generate、`Global Settings > Trust Config Export` の public-only JSON 生成、managed Agent `uat-agent-03476339` の global signing key selection、local Agent RPC health verification、Overview / Threads / Events / Runs / Schedules / Integrations / Settings の Agent scoped data 表示、HTML / body / localStorage / sessionStorage の signing material 非露出を確認した。
 

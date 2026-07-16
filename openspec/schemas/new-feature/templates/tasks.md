@@ -1,6 +1,8 @@
 ## 1. <!-- TODO: Task group name (e.g., Setup / Agent / Client / Migration / Tests / Docs). -->
 
 <!-- This file contains implementation work only. -->
+<!-- Derive every task from confirmed intent, approved Specs, or a material design decision. -->
+<!-- Do not add work merely because it commonly accompanies a named solution. -->
 <!-- MUST NOT restate requirements using SHALL/MUST blocks or Customer Context. -->
 <!-- Bad: "The system SHALL provide..." -->
 <!-- Good: "Update packages/client/app/agents/page.tsx to..." -->

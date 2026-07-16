@@ -13,6 +13,8 @@ Implement tasks from an OpenSpec change.
 
 Before implementation, load `openspec-apply-readiness` and require a `READY` result. A Change contains repository-scoped work only: never execute, await, or complete a task that requires release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation. Return the violated readiness criteria so `openspec/proposer` can remove the invalid artifact content.
 
+Read the confirmed `intent.md` from `contextFiles` before implementation. Preserve its owner-approved outcome and classifications; do not replace it with a familiar solution pattern or a solution-shaped paraphrase.
+
 When UI is in scope, treat `.wireframe.json` as the visible-surface source and `.wireframe.html` as generated preview output. Resolve only self-evident implementation details that preserve existing actions, information structure, and copy. Return `BLOCKED` instead of redesigning the surface when artifacts conflict or a non-self-evident visible change is necessary.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
@@ -46,7 +48,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and `
    ```
 
    This returns:
-   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema - could be proposal/specs/design/tasks or spec/tests/implementation/docs)
+   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema - could be intent/proposal/specs/design/tasks or spec/tests/implementation/docs)
    - Progress (total, complete, remaining)
    - Task list with status
    - Dynamic instruction based on current state
@@ -62,6 +64,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and `
 
    Read every file path listed under `contextFiles` from the apply instructions output.
    The files depend on the schema being used:
+   - **new-feature**: intent, proposal, specs, design, tasks
    - **spec-driven**: proposal, specs, design, tasks
    - Other schemas: follow the contextFiles from CLI output
 

@@ -1,3 +1,4 @@
+<!-- GENERATED FROM signing-key-management.wireframe.json BY .opencode/skills/wireframe/scripts/generate-preview.mjs; DO NOT EDIT. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -563,7 +564,10 @@
 <script>
 const WIREFRAME_DATA = {
   "name": "Signing Key Management",
-  "viewport": { "width": 1200, "height": 760 },
+  "viewport": {
+    "width": 1200,
+    "height": 760
+  },
   "root": {
     "name": "Management Shell",
     "direction": "horizontal",
@@ -575,10 +579,28 @@ const WIREFRAME_DATA = {
         "padding": 16,
         "gap": 16,
         "children": [
-          { "name": "cf-tamac Management", "type": "text", "variant": "heading", "height": 40 },
-          { "name": "Agents", "type": "link", "height": 40 },
-          { "name": "Global Settings", "type": "link", "height": 40 },
-          { "name": "Global Settings section", "type": "text", "variant": "caption", "height": 24 },
+          {
+            "name": "cf-tamac Management",
+            "type": "text",
+            "variant": "heading",
+            "height": 40
+          },
+          {
+            "name": "Agents",
+            "type": "link",
+            "height": 40
+          },
+          {
+            "name": "Global Settings",
+            "type": "link",
+            "height": 40
+          },
+          {
+            "name": "Global Settings section",
+            "type": "text",
+            "variant": "caption",
+            "height": 24
+          },
           {
             "name": "Client-wide signing keys",
             "type": "text",
@@ -637,25 +659,63 @@ const WIREFRAME_DATA = {
                 "direction": "horizontal",
                 "gap": 8,
                 "children": [
-                  { "name": "Rotation Guide", "type": "button", "height": 44 },
-                  { "name": "Trust Config Export", "type": "button", "height": 44 },
-                  { "name": "Generate Key", "type": "button", "height": 44 }
+                  {
+                    "name": "Rotation Guide",
+                    "type": "button",
+                    "height": 44
+                  },
+                  {
+                    "name": "Trust Config Export",
+                    "type": "button",
+                    "height": 44
+                  },
+                  {
+                    "name": "Generate Key",
+                    "type": "button",
+                    "height": 44
+                  }
                 ]
               }
             ]
           },
-          { "name": "Agent-zero Available Notice", "type": "card", "height": 72 },
-          { "name": "Secret Boundary Notice", "type": "card", "height": 72 },
+          {
+            "name": "Agent-zero Available Notice",
+            "type": "card",
+            "height": 72
+          },
+          {
+            "name": "Secret Boundary Notice",
+            "type": "card",
+            "height": 72
+          },
           {
             "name": "Signing Key List",
             "type": "table",
             "columns": [
-              { "name": "Issuer / kid", "grow": true },
-              { "name": "Public fingerprint", "grow": true },
-              { "name": "Default", "width": 112 },
-              { "name": "Status", "width": 128 },
-              { "name": "Last used", "width": 152 },
-              { "name": "Actions", "width": 196 }
+              {
+                "name": "Issuer / kid",
+                "grow": true
+              },
+              {
+                "name": "Public fingerprint",
+                "grow": true
+              },
+              {
+                "name": "Default",
+                "width": 112
+              },
+              {
+                "name": "Status",
+                "width": 128
+              },
+              {
+                "name": "Last used",
+                "width": 152
+              },
+              {
+                "name": "Actions",
+                "width": 196
+              }
             ],
             "rows": 4
           },
@@ -670,22 +730,31 @@ const WIREFRAME_DATA = {
                 "grow": true,
                 "height": 96
               },
-              { "name": "Default active key state", "type": "card", "grow": true, "height": 96 },
+              {
+                "name": "Default active key state",
+                "type": "card",
+                "grow": true,
+                "height": 96
+              },
               {
                 "name": "Disabled or deleted key state",
                 "type": "card",
                 "grow": true,
                 "height": 96
               },
-              { "name": "Secret-safe error state", "type": "card", "grow": true, "height": 96 }
+              {
+                "name": "Secret-safe error state",
+                "type": "card",
+                "grow": true,
+                "height": 96
+              }
             ]
           }
         ]
       }
     ]
   }
-}
-; // %%WIREFRAME_DATA%%
+}; // %%WIREFRAME_DATA%%
 
 let modified = false;
 let dragPath = null;

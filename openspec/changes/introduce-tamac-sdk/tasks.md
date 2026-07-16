@@ -18,7 +18,7 @@
 - [ ] 2.6 `packages/sdk/src/tests/client.test.ts` に `[TAMAC-SDK-S001] Server-side consumer が SDK で Agent health を確認する` を追加し、health client の binary Connect request、Client Service metadata、typed response を検証する。
 - [ ] 2.7 `packages/sdk/src/tests/client.test.ts` に `[TAMAC-SDK-S002] SDK client 集約が Agent service 群を同じ呼び出し文脈で提供する` を追加し、全 service clients が shared origin、Agent ID、scope、acting user、correlation context を使うことを検証する。
 - [ ] 2.8 `packages/sdk/src/tests/auth.test.ts` に `[TAMAC-SDK-S003] SDK が acting user 付き Client Service JWT を付与する` を追加し、JWT claims と request metadata を検証する。
-- [ ] 2.9 `packages/sdk/src/tests/auth.test.ts` に `[TAMAC-SDK-S004] SDK consumer が自身の server-side storage から signing context を供給する` を追加し、caller-supplied signing context と public credential view を検証する。
+- [ ] 2.9 `packages/sdk/src/tests/auth.test.ts` に `[TAMAC-SDK-S004] SDK consumer が自身の server-side storage から signing context を供給する` を追加し、caller-supplied signing context と public signing context view を検証する。
 - [ ] 2.10 `packages/sdk/src/tests/errors.test.ts` に `[TAMAC-SDK-S006] Permission denied が SDK normalized error として返る` を追加し、`permission_denied` と `aborted` を含む Connect code mapping を検証する。
 
 ## 3. Management Client server-side SDK adapter

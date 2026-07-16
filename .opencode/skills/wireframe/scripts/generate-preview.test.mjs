@@ -39,7 +39,7 @@ const validWireframe = JSON.stringify(
   2
 );
 
-test('JSON source から generated preview を作成する', () => {
+void test('JSON source から generated preview を作成する', () => {
   withWireframeFixture(validWireframe, (_fixtureDirectory, sourcePath, previewPath) => {
     const result = spawnSync(process.execPath, [generatorPath, sourcePath], { encoding: 'utf8' });
 
@@ -51,7 +51,7 @@ test('JSON source から generated preview を作成する', () => {
   });
 });
 
-test('generated preview の直接編集を check で検出する', () => {
+void test('generated preview の直接編集を check で検出する', () => {
   withWireframeFixture(validWireframe, (_fixtureDirectory, sourcePath, previewPath) => {
     const generateResult = spawnSync(process.execPath, [generatorPath, sourcePath], {
       encoding: 'utf8',

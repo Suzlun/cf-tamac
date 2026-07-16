@@ -67,6 +67,9 @@ Read these files before applying `coding-guardian` in this repository.
 ## OpenSpec enforcement
 
 - `scripts/openspec/verify-scenario-coverage.mjs`: Scenario ID coverage checks used by `pnpm lint`
+- `scripts/openspec/verify-change-intent.mjs`: owner-confirmed Intent gate for downstream Change artifacts
+- `scripts/openspec/verify-change-task-scope.mjs`: repository-local completion boundary for Change tasks and acceptance
+- `scripts/openspec/verify-wireframe-previews.mjs`: generated wireframe preview drift check
 
 ## Workspace governance enforcement
 

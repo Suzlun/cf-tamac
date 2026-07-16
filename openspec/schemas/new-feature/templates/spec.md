@@ -1,5 +1,7 @@
 ## ADDED Requirements
 
+<!-- Derive Customer Context, Requirements, and Scenarios from confirmed intent.md and proposal.md. -->
+<!-- Candidate means in intent.md are not Requirements unless the owner confirmed them as outcomes or constraints. -->
 <!-- This file defines enduring specification only. -->
 <!-- MUST NOT write implementation tasks, migration steps, release steps, or change-history prose here. -->
 <!-- Bad: "In this migration, replace packages/client/app routes." -->

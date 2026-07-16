@@ -400,7 +400,7 @@ flowchart TD
 - Contract handling: Agent Protobuf RPC contract は existing `cftamac.agent.v1` を利用する。SDK package release は generated descriptor drift check を通過した commit に限定する。
 - Validation recovery: codegen drift、package boundary、deploy artifact validation の report を修正対象として扱い、publish は validation pass 後に実行する。
 
-## Release Procedure
+## Merge Verification
 
 - `corepack enable && pnpm install` を実行する。
 - `pnpm gen:agent:proto && pnpm gen:agent:rpc` を実行し、Agent と SDK の generated descriptors を生成する。

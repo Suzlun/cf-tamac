@@ -33,7 +33,7 @@ This document is lint-as-rules. Include only rules that are mechanically enforce
    - Agent API source of truth is `packages/agent/src/typespec/main.tsp`
    - Generated outputs are `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, and `packages/client/src/generated/agent-rpc/**`
    - Do not model Agent APIs with OpenAPI or Orval
-7. Mention OpenSpec exactly as implemented today through `pnpm lint:openspec` and `scripts/openspec/verify-scenario-coverage.mjs`.
+7. Mention OpenSpec exactly as implemented today through `pnpm lint:openspec`, `scripts/openspec/verify-change-intent.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`, `scripts/openspec/verify-change-task-scope.mjs`, and `scripts/openspec/verify-wireframe-previews.mjs`.
 8. Use this repo's real file names and paths. Do not make old demo package categories the primary architecture or command model.
 
 ## Required Structure

@@ -33,7 +33,7 @@ description: Enforce this repository's real Agent/Client foundation, TypeSpec-to
 - Client foundation: `packages/client/package.json`, `packages/client/wrangler.toml`, `packages/client/next.config.ts`, `packages/client/open-next.config.ts`, `packages/client/app/**`, `packages/client/src/server/**`
 - Governance: `scripts/governance/verify-agent-surface.mjs`, `scripts/governance/verify-package-boundaries.mjs`, `scripts/security/verify-pnpm-supply-chain.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`
 - Removed demo package graph: old demo contract/server/UI packages are no longer active implementation sources
-- OpenSpec: `scripts/openspec/verify-scenario-coverage.mjs`
+- OpenSpec: `scripts/openspec/verify-change-intent.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`, `scripts/openspec/verify-change-task-scope.mjs`, `scripts/openspec/verify-wireframe-previews.mjs`
 
 ### 2) Classify the change before editing
 

@@ -1,3 +1,4 @@
+<!-- GENERATED FROM trust-config-export.wireframe.json BY .opencode/skills/wireframe/scripts/generate-preview.mjs; DO NOT EDIT. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -563,7 +564,10 @@
 <script>
 const WIREFRAME_DATA = {
   "name": "Trust Config Export",
-  "viewport": { "width": 1200, "height": 760 },
+  "viewport": {
+    "width": 1200,
+    "height": 760
+  },
   "root": {
     "name": "Management Shell",
     "direction": "horizontal",
@@ -575,9 +579,22 @@ const WIREFRAME_DATA = {
         "padding": 16,
         "gap": 16,
         "children": [
-          { "name": "cf-tamac Management", "type": "text", "variant": "heading", "height": 40 },
-          { "name": "Agents", "type": "link", "height": 40 },
-          { "name": "Global Settings", "type": "link", "height": 40 },
+          {
+            "name": "cf-tamac Management",
+            "type": "text",
+            "variant": "heading",
+            "height": 40
+          },
+          {
+            "name": "Agents",
+            "type": "link",
+            "height": 40
+          },
+          {
+            "name": "Global Settings",
+            "type": "link",
+            "height": 40
+          },
           {
             "name": "Public-only trust export",
             "type": "text",
@@ -630,7 +647,11 @@ const WIREFRAME_DATA = {
                   }
                 ]
               },
-              { "name": "Copy Valid JSON", "type": "button", "height": 44 }
+              {
+                "name": "Copy Valid JSON",
+                "type": "button",
+                "height": 44
+              }
             ]
           },
           {
@@ -644,18 +665,46 @@ const WIREFRAME_DATA = {
                 "direction": "vertical",
                 "gap": 16,
                 "children": [
-                  { "name": "Issuer Select", "type": "input", "height": 44 },
-                  { "name": "Global Signing Key Select", "type": "input", "height": 44 },
-                  { "name": "Allowed Agent IDs optional", "type": "input", "height": 44 },
-                  { "name": "Agent-zero export available", "type": "card", "height": 80 },
-                  { "name": "Allowed Scopes", "type": "card", "height": 116 },
+                  {
+                    "name": "Issuer Select",
+                    "type": "input",
+                    "height": 44
+                  },
+                  {
+                    "name": "Global Signing Key Select",
+                    "type": "input",
+                    "height": 44
+                  },
+                  {
+                    "name": "Allowed Agent IDs optional",
+                    "type": "input",
+                    "height": 44
+                  },
+                  {
+                    "name": "Agent-zero export available",
+                    "type": "card",
+                    "height": 80
+                  },
+                  {
+                    "name": "Allowed Scopes",
+                    "type": "card",
+                    "height": 116
+                  },
                   {
                     "name": "Client key status to trust status mapping",
                     "type": "card",
                     "height": 88
                   },
-                  { "name": "Broad Permission Warning", "type": "card", "height": 80 },
-                  { "name": "Schema Validation Result", "type": "card", "height": 80 }
+                  {
+                    "name": "Broad Permission Warning",
+                    "type": "card",
+                    "height": 80
+                  },
+                  {
+                    "name": "Schema Validation Result",
+                    "type": "card",
+                    "height": 80
+                  }
                 ]
               },
               {
@@ -664,7 +713,11 @@ const WIREFRAME_DATA = {
                 "grow": true,
                 "gap": 16,
                 "children": [
-                  { "name": "Public JWK Summary", "type": "card", "height": 112 },
+                  {
+                    "name": "Public JWK Summary",
+                    "type": "card",
+                    "height": 112
+                  },
                   {
                     "name": "Copyable AGENT_CONTROL_PLANE_TRUST JSON",
                     "type": "card",
@@ -684,8 +737,7 @@ const WIREFRAME_DATA = {
       }
     ]
   }
-}
-; // %%WIREFRAME_DATA%%
+}; // %%WIREFRAME_DATA%%
 
 let modified = false;
 let dragPath = null;
