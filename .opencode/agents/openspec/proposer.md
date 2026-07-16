@@ -78,6 +78,7 @@ Caller (primary) provides one or more of:
 - If direct owner interaction is unavailable and the caller did not provide a valid `IntentConfirmation`, return `CALLER_ACTION_REQUIRED` with the complete proposed intent summary and the exact confirmation question
 - A Change contains repository-scoped, merge-verifiable work only. Do not add release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation to artifacts, tasks, acceptance criteria, or completion conditions.
 - When a proposal requires user-visible UI, call `openspec/designer` after the proposal and before authoring Specs. Its `.wireframe.json` is the editable visible-surface source; the matching `.wireframe.html` is generated preview output and must never be hand-edited.
+- Require `openspec/designer` to inspect the implemented target UI and all overlapping active Change wireframe JSON before creating a new surface. Existing routes, components, and wireframe paths supplied by the caller are hints, not substitutes for repository discovery.
 - Do not touch `generated/**`
 - Do not bypass lint
 - Only call `openspec/analyzer`, `researcher`, `unit/agent/engineer`, `unit/client/engineer`, and `unit/client/designer` via `task` (no self-calls, no unapproved agents)
@@ -127,7 +128,7 @@ Caller (primary) provides one or more of:
    - Get instructions via `openspec instructions <artifact-id> --change "<change-id>" --json`
    - Read completed dependency artifacts to build context
    - Create/update the artifact per `template` and `outputPath`
-   - Immediately after proposal completion, determine whether a user-visible UI is required. If so, call `openspec/designer` with the confirmed intent and proposal before authoring Specs; otherwise continue without a wireframe artifact.
+   - Immediately after proposal completion, determine whether a user-visible UI is required. If so, call `openspec/designer` with the confirmed intent, proposal, known target routes or UI source paths, and known overlapping active Change wireframes. Require it to discover missing references, preserve implemented and already planned surface continuity, and report conflicts instead of choosing silently before authoring Specs; otherwise continue without a wireframe artifact.
    - Iterate until all required artifacts are filled
 
 5. External package research when relevant
