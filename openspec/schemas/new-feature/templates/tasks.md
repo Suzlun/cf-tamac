@@ -4,6 +4,7 @@
 <!-- MUST NOT restate requirements using SHALL/MUST blocks or Customer Context. -->
 <!-- Bad: "The system SHALL provide..." -->
 <!-- Good: "Update packages/client/app/agents/page.tsx to..." -->
+<!-- Every task must change, review, or verify repository content with objective local or CI evidence. Do not include live-environment operations, approvals, or release execution. -->
 
 - [ ] 1.1 <!-- TODO: Task description. Be concrete; include scope (modules/files) and a clear done condition. -->
 - [ ] 1.2 <!-- TODO: Task description. Keep it small (one session). Include how to verify. -->

@@ -18,7 +18,7 @@ Wireframing is blueprint work, not painting. The designer intentionally displace
 
 ## Context: What the Wireframer Perceives First
 
-Before layout work begins, establish two things: what the screen is for, and what must exist on it.
+Before layout work begins, establish the user-visible outcome of the screen. Do not derive a screen from an internal model, implementation state, or a complete list of system capabilities.
 
 ### Screen Classification
 
@@ -35,24 +35,15 @@ Classify the screen by the user's primary intent. Intent determines scanning pat
 
 A screen may serve multiple intents. Identify the _primary_ intent — the one that determines the layout skeleton. Secondary intents are accommodated within the structure, not as competing layouts.
 
-### Content Inventory
+### Surface Reduction
 
-Before any spatial reasoning, enumerate what must exist on the screen. This prevents premature commitment to a layout before understanding what needs to fit inside it.
+Before any spatial reasoning, identify only:
 
-For each element, note:
+1. **User outcome** — what the user can accomplish or understand from this screen
+2. **Primary action** — the smallest action that advances that outcome
+3. **Necessary context** — information required to perform the action, understand its result, recover from a failure, avoid irreversible harm, or satisfy accessibility
 
-1. **Primary content** — the reason the screen exists (data table, article, form, dashboard metrics)
-2. **Navigation** — how users arrived and where they can go (sidebar, breadcrumbs, tabs)
-3. **Actions** — what users can do. Classify by prominence:
-   - **Primary actions** — the reason the screen exists (submit, create, confirm). Typically 1–2 per viewport zone. → `button`
-   - **Secondary actions** — navigation, supporting operations (view all, edit, settings, nav items). → `link`
-4. **Chrome** — metadata that supports but isn't the main content (timestamps, status indicators, version info, user avatars)
-5. **Empty/error states** — what appears when primary content is absent or fails
-
-For each element, classify:
-
-- **Priority:** Primary (reason page exists), Secondary (supports primary), Tertiary (metadata/chrome)
-- **Variability:** Fixed content vs. dynamic/variable-length content — this affects sizing decisions later
+Do not make an inventory of everything the system knows. Internal state, configuration, diagnostics, version information, model names, and future options are invisible by default. A candidate item belongs on the screen only when removing it would concretely prevent the user from acting, understanding a necessary result, recovering safely, or using the interface accessibly.
 
 ---
 
@@ -68,17 +59,16 @@ Before touching layout, check your cognitive posture. Ask:
 - Would a user understand the page purpose from boxes and labels alone?
 - Am I thinking about "what looks good" instead of "what works"?
 
-If any answer suggests aesthetic drift, stop and return to the Content Inventory. Wireframes are functional — they answer "where does everything go and why?" not "how does it feel?"
+If any answer suggests aesthetic drift, stop and return to Surface Reduction. Wireframes are functional — they answer "where does everything go and why?" not "how does it feel?"
 
-### Phase 2: Content Inventory
+### Phase 2: Surface Reduction
 
-Produce a flat list of every content element that must appear on the screen. For each element:
+Start with the smallest possible screen that supports the user outcome. For every candidate visible item, ask:
 
-- **What is it?** (text, data, image, control, chrome)
-- **How important is it?** (primary, secondary, tertiary)
-- **Is it variable?** (fixed label vs. dynamic content that changes length)
+- What can the user no longer do, understand, or safely recover from if this is removed?
+- Is the answer about the user's present task rather than implementation convenience, future flexibility, diagnostics, or internal transparency?
 
-Do not decide placement yet. This phase produces a list, not a spatial arrangement. The list becomes the checklist for Phase 7 — every item must appear in the final wireframe.
+If the answer is not concrete, omit the item. Do not decide placement yet. This phase establishes what must remain after subtraction, not a checklist of everything that must appear.
 
 ### Phase 3: Task & Scanning Pattern
 
@@ -102,7 +92,7 @@ The scanning pattern is not a rigid template — it is a prediction of where the
 
 Establish the major zones of the screen:
 
-1. **How many major regions?** Sidebar + content? Full-width? Split pane? This depends on the content inventory and scanning pattern, not on convention. A dashboard does not automatically get a sidebar — a sidebar exists when the content inventory includes persistent navigation that aids the identified task.
+1. **How many major regions?** Sidebar + content? Full-width? Split pane? This depends on the user outcome and scanning pattern, not on convention. A dashboard does not automatically get a sidebar — a sidebar exists only when persistent navigation is necessary for the identified task.
 
 2. **What is fixed vs. flexible?** Navigation is typically fixed-width (its content is predictable). Content areas grow to fill available space. This asymmetry creates a stable frame around dynamic content.
 
@@ -161,7 +151,7 @@ Step back and evaluate the whole wireframe as a composition.
 
 3. **Width consistency.** Are fixed-width elements (sidebar, icon columns, status columns) consistently sized across similar contexts?
 
-4. **Content inventory check.** Does every element from Phase 2 appear in the wireframe? Missing elements mean the wireframe doesn't serve its structural purpose.
+4. **Subtraction check.** Can any visible item be removed without preventing the user from acting, understanding a necessary result, recovering safely, or using the interface accessibly? If yes, remove it.
 
 5. **The squint test.** If you blur your eyes, can you still see the major zones, the hierarchy, and the groupings? If everything blurs into uniform gray, hierarchy assignment (Phase 5) or spacing logic (Phase 6) needs work.
 
@@ -236,9 +226,9 @@ These are failure modes that wireframe designers recognize by their symptoms. Wh
 
 **Symptom:** Everything is the same size. All text is body (16px). Cards are the same height as buttons. Headers don't feel like headers. The page looks like a uniform grid of same-sized boxes.
 
-**Root cause:** Skipped Phase 5 (Hierarchy Assignment). Went directly from content inventory to spatial placement without deciding what's important.
+**Root cause:** Skipped Phase 5 (Hierarchy Assignment). Went directly from surface reduction to spatial placement without deciding what's important.
 
-**Fix:** Return to Phase 5. Rank all content by importance. Assign explicit hierarchy levels — page identity, section identity, content, chrome. If you can't decide what's most important, the Content Inventory (Phase 2) is incomplete — you don't understand the screen's purpose yet.
+**Fix:** Return to Phase 5. Rank the remaining visible content by importance. Assign explicit hierarchy levels — page identity, section identity, content, chrome. If you can't decide what's most important, Surface Reduction (Phase 2) is incomplete — you do not understand the screen's purpose yet.
 
 ### Arbitrary Spacing
 
@@ -289,7 +279,7 @@ After generating the wireframe, verify against these questions. Each maps to a c
 | Question                                                                            | Phase                       |
 | ----------------------------------------------------------------------------------- | --------------------------- |
 | Is the page purpose clear from layout alone (no color, no images, no icons needed)? | Phase 1 (Displacement)      |
-| Does every content element from the inventory appear in the wireframe?              | Phase 2 (Content Inventory) |
+| Can any visible item be removed without harming the user outcome or safe use?       | Phase 2 (Surface Reduction) |
 | Does the layout follow the identified scanning pattern for this user intent?        | Phase 3 (Task & Scanning)   |
 | Are major zones clearly defined with intentional proportions?                       | Phase 4 (Grid)              |
 | Can you identify 2+ hierarchy levels by size alone?                                 | Phase 5 (Hierarchy)         |

@@ -10,6 +10,7 @@ permission:
   task:
     '*': deny
     'openspec/analyzer': allow
+    'openspec/designer': allow
     'unit/agent/engineer': allow
     'unit/client/engineer': allow
     'unit/client/designer': allow
@@ -24,6 +25,7 @@ permission:
     'coding-guardian': allow
     'orchestration-playbook': allow
     'openspec-*': allow
+    'wireframe': allow
   bash:
     '*': allow
     'git add*': deny
@@ -66,6 +68,8 @@ Caller (primary) provides one or more of:
 # Hard rules
 
 - Do not implement during the spec proposal phase (OpenSpec only)
+- A Change contains repository-scoped, merge-verifiable work only. Do not add release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation to artifacts, tasks, acceptance criteria, or completion conditions.
+- When a proposal requires user-visible UI, call `openspec/designer` after the proposal and before authoring Specs. Its `.wireframe.json` is the editable visible-surface source; the matching `.wireframe.html` is generated preview output and must never be hand-edited.
 - Do not touch `generated/**`
 - Do not bypass lint
 - Only call `openspec/analyzer`, `researcher`, `unit/agent/engineer`, `unit/client/engineer`, and `unit/client/designer` via `task` (no self-calls, no unapproved agents)
@@ -102,7 +106,8 @@ Caller (primary) provides one or more of:
    - From `status`, pick the first artifact with `status: "ready"`
    - Get instructions via `openspec instructions <artifact-id> --change "<change-id>" --json`
    - Read completed dependency artifacts to build context
-   - Create/update the artifact per `template` and `outputPath`
+    - Create/update the artifact per `template` and `outputPath`
+    - Immediately after proposal completion, determine whether a user-visible UI is required. If so, call `openspec/designer` before authoring Specs; otherwise continue without a wireframe artifact.
    - Iterate until all required artifacts are filled
 
 4. External package research when relevant
@@ -138,7 +143,8 @@ Caller (primary) provides one or more of:
    - Map implementation tasks to requirements/Scenario IDs
    - Satisfy `rules.tasks` in `openspec/config.yaml` (test tasks for ADDED/MODIFIED Scenario IDs)
    - Frame test tasks only around required positive end-state behavior or constraints; do not create tasks that prove negative existence, non-adoption, removal, replacement, migration, or switching facts
-   - Include verification tasks aligned with repository conventions (lint/test/build and codegen if needed)
+    - Include verification tasks aligned with repository conventions (lint/test/build and codegen if needed)
+    - Do not revise an approved wireframe for preference or implementation convenience. Escalate a serious business-value, safety, accessibility, legal, or artifact contradiction instead.
 
 7. Format convergence
    - Run `openspec validate --type change "<change-id>" --strict --no-interactive`
