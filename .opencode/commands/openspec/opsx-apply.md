@@ -6,6 +6,8 @@ Implement tasks from an OpenSpec change.
 
 Before delegating or implementing, load `openspec-apply-readiness` and require a `READY` result. Read the confirmed `intent.md` from `contextFiles`, preserve its owner-approved outcome and classifications, and do not replace it with a familiar solution pattern or solution-shaped paraphrase.
 
+When UI is in scope, treat `.wireframe.json` as the visible-surface source and the matching `.wireframe.html` and screenshot as `openspec/designer` rendering evidence. Never edit or recapture the evidence during apply. Resolve only self-evident implementation details that preserve existing actions, information structure, and copy. Return `BLOCKED` instead of redesigning the surface when artifacts conflict or a non-self-evident visible change is necessary.
+
 **Input**: Optionally specify a change name (e.g., `/opsx-apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**

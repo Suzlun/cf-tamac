@@ -18,8 +18,8 @@ context: |
   - The owner MUST explicitly confirm the reconstructed intent. Downstream artifacts preserve that confirmed intent and MUST NOT reinterpret it.
 
   UI artifact order:
-  - When a Change needs a user-visible UI, create the artifacts in this order: confirmed intent, proposal, wireframe JSON, spec, then design.
-  - `openspec/designer` owns the minimum visible surface in `.wireframe.json`. A matching `.wireframe.html` is generated preview output and is never hand-edited or used as a design source.
+  - When a Change needs a user-visible UI, create the artifacts in this order: confirmed intent, proposal, wireframe JSON, generated preview, screenshot evidence, spec, then design.
+  - `openspec/designer` owns the minimum visible surface in `.wireframe.json`, generates the matching `.wireframe.html`, and captures the final `.wireframe-screenshot.png`. The JSON is the only design source; HTML and PNG are generated evidence and are never hand-edited.
   - Before creating or revising a wireframe, inspect the implemented target UI and every overlapping `.wireframe.json` in active Changes under `openspec/changes/`, excluding `archive/`.
   - Preserve implemented shell, navigation, information hierarchy, terminology, and interactions outside the requested delta. Preserve visible changes already planned by overlapping active Change wireframes.
   - If implementation, active wireframes, confirmed intent, or proposal conflict on user-visible behavior, stop for owner clarification instead of choosing a source silently.

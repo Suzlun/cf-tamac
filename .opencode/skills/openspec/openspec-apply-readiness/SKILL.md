@@ -66,6 +66,9 @@ with artifact evidence showing why the affected domain is outside the change.
 - When UI is in scope, the pre-Spec `.wireframe.json` is the source for the
   visible surface. Specs and design preserve that surface without introducing
   visible internal concepts, controls, settings, screens, or copy.
+- `openspec/designer` owns the matching generated preview and screenshot
+  evidence. Design references the JSON source, generated preview, and screenshot
+  for every materially distinct screen without treating evidence as a source.
 - Wireframes are not requirement-coverage artifacts. Do not require every
   requirement, internal state, or implementation decision to appear in a
   wireframe.
@@ -152,6 +155,8 @@ Apply only the relevant domain checks:
   unavailable external evidence or a live-environment operation.
 - Generated wireframe HTML previews match their JSON sources and are not
   hand-edited.
+- Required wireframe screenshots were captured by `openspec/designer` from the
+  final generated previews and are referenced by design.
 
 ## Evaluation procedure
 

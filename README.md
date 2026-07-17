@@ -129,6 +129,8 @@ pnpm gen:deploy-artifacts && pnpm check:deploy-artifacts
 ## OpenSpec
 
 - Product contract は OpenSpec の `spec.md` に Scenario ID 付きで記述します。
+- UIを含むChangeでは、`openspec/designer`がSpecsより前にwireframe JSON、生成preview、screenshot evidenceを確定します。
+- 実装とreviewはJSONだけを表示面の正として扱い、生成HTMLとscreenshotを編集・再取得しません。
 - Automated tests は test title に `[SCENARIO-ID]` を含めます。
 - `pnpm lint` は `openspec validate --all --strict` と `scripts/openspec/verify-scenario-coverage.mjs` を実行します。
 
