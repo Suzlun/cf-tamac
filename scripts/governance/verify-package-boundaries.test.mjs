@@ -23,7 +23,6 @@ const workflowFiles = [
   '.opencode/agents/unit/agent/reviewer.md',
   '.opencode/agents/unit/client/engineer.md',
   '.opencode/agents/unit/client/reviewer.md',
-  '.opencode/agents/unit/client/designer.md',
   '.opencode/agents/unit/build/builder.md',
   '.opencode/agents/unit/build/reviewer.md',
 ];

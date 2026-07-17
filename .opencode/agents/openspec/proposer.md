@@ -13,7 +13,6 @@ permission:
     'openspec/designer': allow
     'unit/agent/engineer': allow
     'unit/client/engineer': allow
-    'unit/client/designer': allow
     'researcher': allow
   read: allow
   glob: allow
@@ -77,11 +76,11 @@ Caller (primary) provides one or more of:
 - Do not author proposal, wireframe, Specs, design, or tasks until the owner has explicitly confirmed the reconstructed intent
 - If direct owner interaction is unavailable and the caller did not provide a valid `IntentConfirmation`, return `CALLER_ACTION_REQUIRED` with the complete proposed intent summary and the exact confirmation question
 - A Change contains repository-scoped, merge-verifiable work only. Do not add release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation to artifacts, tasks, acceptance criteria, or completion conditions.
-- When a proposal requires user-visible UI, call `openspec/designer` after the proposal and before authoring Specs. Its `.wireframe.json` is the editable visible-surface source; the matching `.wireframe.html` is generated preview output and must never be hand-edited.
+- When a proposal requires user-visible UI, call `openspec/designer` after the proposal and before authoring Specs. Its `.wireframe.json` is the editable visible-surface source; the matching `.wireframe.html` and screenshot are generated rendering evidence and must never be hand-edited or recaptured by another agent.
 - Require `openspec/designer` to inspect the implemented target UI and all overlapping active Change wireframe JSON before creating a new surface. Existing routes, components, and wireframe paths supplied by the caller are hints, not substitutes for repository discovery.
 - Do not touch `generated/**`
 - Do not bypass lint
-- Only call `openspec/analyzer`, `researcher`, `unit/agent/engineer`, `unit/client/engineer`, and `unit/client/designer` via `task` (no self-calls, no unapproved agents)
+- Only call `openspec/analyzer`, `openspec/designer`, `researcher`, `unit/agent/engineer`, and `unit/client/engineer` via `task` (no self-calls, no unapproved agents)
 - Use `researcher` for external package investigation only when the change could reasonably benefit from a new or changed external package, security-sensitive dependency choice, or maintainability tradeoff that requires current ecosystem evidence.
 - A package may be recommended or adopted only when Researcher verifies every criterion with evidence: GitHub stars >= 1,000, active maintenance, and direct security or maintainability improvement for the change. Package additions must also satisfy repository supply-chain constraints.
 - Do not mention rejected packages or non-adoption outcomes in OpenSpec artifacts. Reflect only qualifying selected package decisions and their implementation tasks; report no-qualifying-candidate outcomes only in the completion report.
@@ -89,7 +88,7 @@ Caller (primary) provides one or more of:
 - Delegate post-Spec detailed implementation design to the relevant unit specialist only when the change has material implementation complexity, cross-domain impact, UI/UX impact, security/persistence/API implications, or decisions that require domain-specific evidence:
   - Agent Service implementation design based on finalized Specs: `unit/agent/engineer`
   - Management Client implementation design based on finalized Specs: `unit/client/engineer`
-  - Management Client UI/UX detailed design, layout, component placement, user-facing copy, and wireframes based on finalized Specs: `unit/client/designer`
+  - Management Client implementation design based on finalized Specs and the approved wireframe: `unit/client/engineer`
 - For simple artifact-only changes, narrow wording/format corrections, or changes fully determined by existing instructions and repository evidence, do not delegate just to satisfy process.
 - Do not invent detailed designs that belong to those specialist domains when specialist delegation is warranted. Reflect specialist outputs into `design.md` and `tasks.md` only; keep `specs/**/*.md` limited to customer/user/external-contract visible behavior.
 - Treat `context` / `rules` returned by `openspec instructions ... --json` as constraints. Do not paste them verbatim into artifacts
@@ -128,7 +127,7 @@ Caller (primary) provides one or more of:
    - Get instructions via `openspec instructions <artifact-id> --change "<change-id>" --json`
    - Read completed dependency artifacts to build context
    - Create/update the artifact per `template` and `outputPath`
-   - Immediately after proposal completion, determine whether a user-visible UI is required. If so, call `openspec/designer` with the confirmed intent, proposal, known target routes or UI source paths, and known overlapping active Change wireframes. Require it to discover missing references, preserve implemented and already planned surface continuity, and report conflicts instead of choosing silently before authoring Specs; otherwise continue without a wireframe artifact.
+   - Immediately after proposal completion, determine whether a user-visible UI is required. If so, call `openspec/designer` with the confirmed intent, proposal, known target routes or UI source paths, and known overlapping active Change wireframes. Require it to discover missing references, preserve implemented and already planned surface continuity, and report conflicts instead of choosing silently. Record its JSON source, generated preview, and screenshot paths before authoring Specs; otherwise continue without wireframe artifacts.
    - Iterate until all required artifacts are filled
 
 5. External package research when relevant
@@ -147,12 +146,10 @@ Caller (primary) provides one or more of:
    - Decide whether specialist delegation is needed; skip delegation for simple artifact-only updates, narrow wording/format corrections, and changes where existing instructions and repository evidence are sufficient
    - Call `unit/agent/engineer` only for materially affected Agent Service design decisions based on finalized Specs, covering TypeSpec/proto source, Connect RPC Worker boundaries, Durable Object aggregate/storage/runtime, Agent-owned observability, and Agent governance scripts when those areas are in scope
    - Call `unit/client/engineer` only for materially affected Management Client implementation decisions based on finalized Specs, covering Next.js App Router integration, Server Components/Server Actions, Client D1 repositories, server-only Agent RPC usage, browser secrecy, and no-proxy boundaries when those areas are in scope
-   - Call `unit/client/designer` only for material Management Client UI/UX decisions based on finalized Specs, covering route-shell wireframes, visual hierarchy, component placement, responsive states, interaction behavior, accessibility, and user-facing copy when those areas are in scope
    - Each specialist request must include the finalized `specs/**/*.md` paths and require the specialist to read those Specs before designing
-   - For UI-affecting changes with material layout, component placement, responsive behavior, accessibility, interaction, or user-facing copy decisions, require `unit/client/designer` to return a page/screen inventory plus `.wireframe.json` and `.wireframe.html` artifacts for every materially distinct page/screen before `design.md` is finalized
-   - For each UI page/screen, use `agent-browser` to open the matching `.wireframe.html` preview and capture `openspec/changes/<change-id>/wireframe-screenshots/<screen-slug>.wireframe-screenshot.png`
-   - Embed only wireframe screenshot image files in `design.md` under `## UI Wireframe Screenshots` using Markdown image syntax. Do not embed wireframe HTML with `<iframe>` and do not generate AI mockup images during the OpenSpec proposal workflow
-   - Include every wireframe screenshot image and its source wireframe artifacts in `design.md` Directory Tree and New / Changed Files
+   - For UI-affecting changes, require the pre-Spec `openspec/designer` JSON source, generated preview, and screenshot evidence for every materially distinct page/screen before `design.md` is finalized. Do not request a second agent to redesign or recapture the same user-visible surface.
+   - Embed only returned wireframe screenshot image files in `design.md` under `## UI Wireframe Screenshots`; do not recapture them, embed wireframe HTML with `<iframe>`, or generate AI mockup images during the OpenSpec proposal workflow
+   - Include every returned wireframe screenshot image, its JSON source, and its generated preview path in `design.md` Directory Tree and New / Changed Files
    - Each delegation must state that the request is design-only for OpenSpec proposal artifacts: do not implement code, do not edit generated outputs, do not propose/define/rewrite Spec Requirements or Scenarios, and return detailed constraints, affected paths, risks, and verification tasks
    - Require specialists to return detailed implementation design, task implications, risks, and verification expectations; they must not implement and must not propose, define, or rewrite Spec Requirements or Scenarios during proposer workflow
    - Reflect every substantive specialist output into `design.md` without omissions before validation, and evaluate scope coverage with AR-003, AR-004, and AR-008 from `openspec-apply-readiness` rather than expected file counts.
@@ -188,7 +185,8 @@ Note: depending on the execution environment, subagents may not be able to use `
 - In that case, return `CALLER_ACTION_REQUIRED` and provide the exact next analyzer/researcher/unit design delegation invocation steps to the caller
 
 11. Decisions
-    - If analyzer returns decision requests, proposer decides
+    - If analyzer identifies a fatal wireframe defect, call `openspec/designer` with the evidence, revise the JSON source, regenerate its preview and screenshot evidence, and repeat Spec/design convergence. Do not revise a wireframe because of preference, implementation convenience, or internal state.
+    - If analyzer returns other decision requests, proposer decides
     - If evidence is needed, call `researcher` via `task` and decide with evidence
     - Reflect the decision into proposal/design/spec deltas/tasks (at least one)
 
