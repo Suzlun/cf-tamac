@@ -1,16 +1,69 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "."
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@cf-tamac/client/*": [
+        "src/*"
+      ],
+      "@cf-tamac/client-agent-rpc/*": [
+        "src/generated/agent-rpc/*"
+      ]
+    },
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": [
+      "@cloudflare/workers-types",
+      "node"
+    ],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   "include": [
-    "commitlint.config.js",
-    "eslint.config.js",
-    "vitest.config.ts",
-    "playwright.config.ts",
-    ".opencode/skills/wireframe/scripts/**/*.mjs",
-    "scripts/**/*.mjs",
-    "tests/**/*"
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "next.config.ts",
+    "open-next.config.ts",
+    "tailwind.config.ts",
+    "postcss.config.mjs",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "dist", "build", ".wrangler", "packages"]
+  "exclude": [
+    "src/generated/**",
+    ".next",
+    ".open-next",
+    "dist",
+    "node_modules"
+  ]
 }

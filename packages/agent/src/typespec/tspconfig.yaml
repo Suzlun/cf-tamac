@@ -1,8 +1,0 @@
-emit:
-  # Agent API emits Protobuf only.
-  - '@typespec/protobuf'
-
-options:
-  '@typespec/protobuf':
-    # Stage 1-8 contract package: cftamac.agent.v1.
-    emitter-output-dir: '{project-root}/../../proto'

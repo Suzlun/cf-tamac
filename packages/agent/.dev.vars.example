@@ -1,4 +1,0 @@
-AGENT_AUDIT_HASH_PEPPER="replace-with-random-32-byte-base64url-pepper"
-AGENT_CONTROL_PLANE_TRUST='{"version":1,"audiences":["cf-tamac-agent"],"issuers":[{"issuer":"cf-tamac-management-client","keys":[{"kid":"client-key-20260623-01","kty":"OKP","crv":"Ed25519","x":"PUBLIC_KEY_BASE64URL","status":"active","principalType":"CLIENT_SERVICE","allowedAgentIds":["*"],"allowedScopes":["agent:read","agent:write","agent:tool:approve","agent:integration:admin"],"fingerprint":"sha256:PUBLIC_KEY_FINGERPRINT"}]}]}'
-AGENT_INTEGRATION_SIGNATURE_KEYS='{"version":1,"keys":[]}'
-AGENT_MODEL_PROVIDER_SECRET_REFS='{"version":1,"providers":[]}'
