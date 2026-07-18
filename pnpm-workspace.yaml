@@ -1,6 +1,5 @@
 packages:
-  - 'packages/agent'
-  - 'packages/client'
+  - '.'
 
 # Wait 72 hours after npm publish before resolving new dependency versions.
 minimumReleaseAge: 4320

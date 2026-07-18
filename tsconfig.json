@@ -1,16 +1,46 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "."
+    "target": "ES2022",
+    "lib": [
+      "ES2022"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@cf-tamac/agent-rpc/*": [
+        "src/generated/rpc/*"
+      ]
+    },
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": [
+      "@cloudflare/workers-types",
+      "node"
+    ]
   },
   "include": [
-    "commitlint.config.js",
-    "eslint.config.js",
-    "vitest.config.ts",
-    "playwright.config.ts",
-    ".opencode/skills/wireframe/scripts/**/*.mjs",
-    "scripts/**/*.mjs",
-    "tests/**/*"
+    "src/**/*.ts"
   ],
-  "exclude": ["node_modules", "dist", "build", ".wrangler", "packages"]
+  "exclude": [
+    "src/generated/**",
+    "node_modules",
+    "dist",
+    ".wrangler"
+  ]
 }
