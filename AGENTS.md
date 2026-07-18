@@ -100,6 +100,6 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
   - Example: `it('[AGENT-LIFECYCLE-S001] Initialize an Agent', async () => { ... })`
 - To explicitly opt out of automation for a scenario, add `Tags: manual` under the scenario heading
 - Guardrails are enforced by `pnpm lint`:
-  - `openspec validate --all --strict`
+  - `pnpm exec openspec validate --all --strict`
   - Scenario ID coverage check (`scripts/openspec/verify-scenario-coverage.mjs`)
   - Coverage check uses `openspec/specs/**` as the contract (sync/archive deltas if you are working in `openspec/changes/**`)

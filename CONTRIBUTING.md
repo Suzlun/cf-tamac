@@ -7,7 +7,7 @@
 - コーディング規則（一次資料）: `CODING_STANDARDS.md`
   - `eslint.config.js` は規約の自動検査（実装）として追従させます
 - 仕様（契約）: OpenSpec の `spec.md`
-  - `pnpm lint` で `openspec validate --all --strict`、Change Intent確認ゲート、Scenario IDカバレッジ検査が走ります
+  - `pnpm lint` で `pnpm exec openspec validate --all --strict`、Change Intent確認ゲート、Scenario IDカバレッジ検査が走ります
 - SDK: `packages/sdk/**` の `@cf-tamac/sdk` は server-side Agent RPC SDK です。Browser-visible module から SDK、Connect runtime、generated RPC descriptor、credential、JWT signing を import しません。
 - SDK surface: `TamacAgentClient` は Client Service Ed25519 JWT operations、`TamacProviderIngressClient` は Provider Ed25519 detached-signature `PublishEvent` / `PublishToolResult` / `PublishDeliveryResult` です。Client D1、acting user、JWT context を Provider surface に渡しません。
 

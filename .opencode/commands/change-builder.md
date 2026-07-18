@@ -26,8 +26,8 @@ Hard rules
 
 Preflight context
 
-- !`openspec list || true`
-- !`openspec list --specs || true`
+- !`pnpm exec openspec list || true`
+- !`pnpm exec openspec list --specs || true`
 - !`ls -la openspec/changes 2>/dev/null || true`
 - !`ls -la openspec/specs 2>/dev/null || true`
 
@@ -95,9 +95,9 @@ Process
 7. Completion check and report
 
 - For every change-id:
-  - Ensure `openspec validate <id> --strict --no-interactive` is PASS
+  - Ensure `pnpm exec openspec validate <id> --strict --no-interactive` is PASS
 - Finally run:
-  - `openspec validate --all --strict --no-interactive`
+  - `pnpm exec openspec validate --all --strict --no-interactive`
 - Report:
   - Created/updated change-ids
   - Any remaining open questions (should be non-blocking)

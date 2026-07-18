@@ -27,11 +27,15 @@ permission:
     'openspec-*': allow
   bash:
     '*': ask
-    'openspec list*': allow
-    'openspec status*': allow
-    'openspec instructions*': allow
-    'openspec show*': allow
-    'openspec validate*': allow
+    'pnpm exec openspec list*': allow
+    'pnpm exec openspec status*': allow
+    'pnpm exec openspec instructions*': allow
+    'pnpm exec openspec show*': allow
+    'pnpm exec openspec validate*': allow
+    'git branch --show-current*': allow
+    'git ls-files*': allow
+    'git rev-parse*': allow
+    'git worktree list*': allow
     'git diff*': allow
     'git status*': allow
     'git log*': allow
@@ -111,7 +115,7 @@ If required inputs are missing, stop and list the missing items.
 
 # Work order (strict)
 
-0. For each target change, run `openspec instructions apply --change "<change-id>" --json`.
+0. For each target change, run `pnpm exec openspec instructions apply --change "<change-id>" --json`.
 1. Read every returned `contextFiles` path, explicitly including confirmed `intent.md`, plus each `.wireframe.json` source under the target change when UI is in scope, and evaluate AR-001 through AR-010 from `openspec-apply-readiness`. Treat generated `.wireframe.html` files and screenshots as `openspec/designer` rendering evidence only.
 2. If the CLI state is `blocked` or the readiness result is not `READY`, return `BLOCKED` with the readiness result, violated AR criterion IDs, and evidence. Do not delegate artifact repair or change the change contents.
 3. If the CLI state is `ready` and the readiness result is `READY`, collapse `tasks` into a small track plan and execute it in dependency waves:
@@ -126,7 +130,7 @@ If required inputs are missing, stop and list the missing items.
 4. After the implementation wave, request one consolidated Agent review from `@unit/agent/reviewer` if any Agent-affecting files changed.
 5. After the implementation wave, request one consolidated Client review from `@unit/client/reviewer` if any Client-affecting files changed.
 6. If Agent and Client reviews are both needed, request them in parallel in the same turn.
-7. Re-run `openspec instructions apply ... --json` after each completed wave and repeat steps 3 to 6 only for incomplete or reviewer-blocked tracks until the state is `all_done`.
+7. Re-run `pnpm exec openspec instructions apply ... --json` after each completed wave and repeat steps 3 to 6 only for incomplete or reviewer-blocked tracks until the state is `all_done`.
 8. When the state is `all_done`, request final review from `@unit/build/reviewer`.
 9. If `@unit/build/reviewer` blocks, send the feedback to the responsible implementer as one narrow fix track, rerun only the affected consolidated reviewer, and iterate.
 10. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
@@ -135,7 +139,7 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 
 # tasks.md-centric operating rules
 
-- Use the `tasks` returned by `openspec instructions apply --change "<change-id>" --json` as the acceptance checklist and evidence ledger.
+- Use the `tasks` returned by `pnpm exec openspec instructions apply --change "<change-id>" --json` as the acceptance checklist and evidence ledger.
 - At every iteration, identify the full set of ready tasks, group them into dependency-safe tracks, and delegate the entire ready track set in parallel.
 - Provide `contextFiles` (intent, proposal, specs, design, tasks, and similar) as primary sources.
 - Each work order must include:
