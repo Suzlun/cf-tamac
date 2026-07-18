@@ -26,7 +26,7 @@ Evaluate readiness against these sources in order:
 
 1. `AGENTS.md` and repository enforcement rules
 2. `openspec/config.yaml` and the active OpenSpec schema
-3. `openspec instructions apply --change "<change-id>" --json`
+3. `pnpm exec openspec instructions apply --change "<change-id>" --json`
 4. The change artifacts listed in `contextFiles`
 5. This readiness contract
 
@@ -41,7 +41,7 @@ with artifact evidence showing why the affected domain is outside the change.
 
 ### AR-001: Apply graph is complete
 
-- `openspec instructions apply` does not report missing required artifacts.
+- `pnpm exec openspec instructions apply` does not report missing required artifacts.
 - Every path in `contextFiles` exists and is readable.
 - The confirmed intent, proposal, specs, design, and tasks describe the same change scope.
 
@@ -160,7 +160,7 @@ Apply only the relevant domain checks:
 
 ## Evaluation procedure
 
-1. Run `openspec instructions apply --change "<change-id>" --json`.
+1. Run `pnpm exec openspec instructions apply --change "<change-id>" --json`.
 2. Read every path returned in `contextFiles`.
 3. Evaluate AR-001 through AR-010 using repository and artifact evidence.
 4. Return one overall result and a finding for each failed criterion.

@@ -7,7 +7,7 @@
 - コーディング規則（一次資料）: `CODING_STANDARDS.md`
   - `eslint.config.js` は規約の自動検査（実装）として追従させます
 - 仕様（契約）: OpenSpec の `spec.md`
-  - `pnpm lint` で `openspec validate --all --strict`、Change Intent確認ゲート、Scenario IDカバレッジ検査が走ります
+  - `pnpm lint` で `pnpm exec openspec validate --all --strict`、Change Intent確認ゲート、Scenario IDカバレッジ検査が走ります
 
 ## 前提環境
 

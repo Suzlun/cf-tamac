@@ -26,14 +26,14 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
    If a name is provided, use it. Otherwise:
    - Infer from conversation context if the user mentioned a change
    - Auto-select if only one active change exists
-   - If ambiguous, run `openspec list --json` to get available changes and use the **AskUserQuestion tool** to let the user select
+   - If ambiguous, run `pnpm exec openspec list --json` to get available changes and use the **AskUserQuestion tool** to let the user select
 
    Always announce: "Using change: <name>" and how to override (e.g., `/opsx-apply <other>`).
 
 2. **Check status to understand the schema**
 
    ```bash
-   openspec status --change "<name>" --json
+   pnpm exec openspec status --change "<name>" --json
    ```
 
    Parse the JSON to understand:
@@ -44,7 +44,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
 3. **Get apply instructions**
 
    ```bash
-   openspec instructions apply --change "<name>" --json
+   pnpm exec openspec instructions apply --change "<name>" --json
    ```
 
    This returns:

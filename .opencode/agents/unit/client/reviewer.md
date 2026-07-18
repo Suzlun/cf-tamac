@@ -19,6 +19,29 @@ permission:
   skill: allow
   bash:
     '*': ask
+    'agent-browser open http://localhost:3000*': allow
+    'agent-browser read http://localhost:3000*': allow
+    'agent-browser snapshot*': allow
+    'agent-browser get *': allow
+    'agent-browser is *': allow
+    'agent-browser hover *': allow
+    'agent-browser focus *': allow
+    'agent-browser scroll*': allow
+    'agent-browser wait*': allow
+    'agent-browser set viewport *': allow
+    'agent-browser set device *': allow
+    'agent-browser set media *': allow
+    'agent-browser screenshot /tmp/opencode/**': allow
+    'agent-browser console*': allow
+    'agent-browser errors*': allow
+    'agent-browser back*': allow
+    'agent-browser forward*': allow
+    'agent-browser reload*': allow
+    'agent-browser close*': allow
+    'git branch --show-current*': allow
+    'git ls-files*': allow
+    'git rev-parse*': allow
+    'git worktree list*': allow
     'git diff*': allow
     'git status*': allow
     'git log*': allow
@@ -32,6 +55,8 @@ permission:
 ---
 
 You are the `unit/client/reviewer` subagent. Based on the change summary and artifact references provided by the caller, review management Client changes under `packages/client/**`, server-only Agent RPC boundaries, browser secrecy/no-proxy behavior, Client D1 ownership, approved wireframe fidelity, and Impeccable/design-audit UI quality gates.
+
+Use `agent-browser` only for read-only inspection of `http://localhost:3000`; do not click controls, submit forms, or persist browser state, and save any screenshot only under `/tmp/opencode/`.
 
 ## First Action
 

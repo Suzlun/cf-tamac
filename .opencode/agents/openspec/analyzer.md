@@ -20,13 +20,17 @@ permission:
     'openspec-*': allow
   bash:
     '*': ask
-    'openspec list*': allow
-    'openspec status*': allow
-    'openspec instructions*': allow
-    'openspec show*': allow
-    'openspec validate*': allow
-    'openspec schemas*': allow
-    'openspec templates*': allow
+    'pnpm exec openspec list*': allow
+    'pnpm exec openspec status*': allow
+    'pnpm exec openspec instructions*': allow
+    'pnpm exec openspec show*': allow
+    'pnpm exec openspec validate*': allow
+    'pnpm exec openspec schemas*': allow
+    'pnpm exec openspec templates*': allow
+    'git branch --show-current*': allow
+    'git ls-files*': allow
+    'git rev-parse*': allow
+    'git worktree list*': allow
     'git status*': allow
     'git diff*': allow
     'git log*': allow
@@ -63,7 +67,7 @@ You are the OpenSpec change analyzer subagent.
 - Do not implement
 - Do not touch `generated/**`
 - Do not use the `task` tool (no delegation and no self-calls)
-- Prefer primary evidence (outputs of `openspec status/instructions/show/validate` and file contents) and cite it
+- Prefer primary evidence (outputs of `pnpm exec openspec status/instructions/show/validate` and file contents) and cite it
 - Report `Blocker` findings when OpenSpec artifact prose is not written in Japanese, except for schema-required labels and terms such as `Requirement` headings, `SHALL`, `MUST`, Scenario IDs, code identifiers, paths, commands, API names, and protocol terms.
 - Report `Blocker` under AR-002 when `intent.md` is absent, is not owner-confirmed, lacks repository evidence, mixes observations with assumptions, omits a falsification check, or leaves a material intent decision unresolved.
 - Own the downstream OpenSpec artifact inspection gate: report `Blocker` findings for negative existence, non-adoption, removal, replacement, migration, or switching statements in proposal, specs, design, or tasks. `intent.md` may classify candidate means and record falsification evidence, but those entries are not product requirements.
@@ -83,13 +87,13 @@ You are the OpenSpec change analyzer subagent.
    - `openspec/config.yaml` (if present)
 
 3. Capture artifact graph evidence (always record as evidence)
-   - `openspec status --change "<change-id>" --json`
-   - `openspec instructions apply --change "<change-id>" --json`
-   - `openspec show --type change "<change-id>" --json --deltas-only`
-   - `openspec validate --type change "<change-id>" --strict --no-interactive`
+   - `pnpm exec openspec status --change "<change-id>" --json`
+   - `pnpm exec openspec instructions apply --change "<change-id>" --json`
+   - `pnpm exec openspec show --type change "<change-id>" --json --deltas-only`
+   - `pnpm exec openspec validate --type change "<change-id>" --strict --no-interactive`
 
 4. Read change contents
-   - Read all artifacts listed in `contextFiles` from `openspec instructions apply ... --json`
+   - Read all artifacts listed in `contextFiles` from `pnpm exec openspec instructions apply ... --json`
    - Always read changed `intent.md`, `proposal.md`, `design.md`, `tasks.md`, and `openspec/changes/<change-id>/specs/**/spec.md` when present
    - For UI changes, read each `.wireframe.json` source and each screenshot referenced by `design.md`. Do not use generated `.wireframe.html` files as design review input.
    - As needed, also read referenced specialist design notes, decision records, or artifact paths named by the change

@@ -111,7 +111,7 @@ Replace `{json_path}` with the absolute JSON path from Step 3. The generator wri
 
 1. Write `.wireframe.json` to the output directory from Step 3
 2. Generate the matching `.wireframe.html` preview with the repository generator
-3. Open the HTML preview in the browser: `open {path}.wireframe.html`
+3. Open the HTML preview in the browser: `agent-browser open file://{absolute_path}.wireframe.html`
 4. Confirm to the user:
    ```
    Wireframe generated:
