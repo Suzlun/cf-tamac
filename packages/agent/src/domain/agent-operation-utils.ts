@@ -88,6 +88,12 @@ export function checkAgentIdempotency<T>(input: {
       message: 'Idempotency key was already used for a different Agent operation.',
     });
   }
+  if (existing.status === 'failed') {
+    throw createAgentDomainError({
+      kind: 'concurrency',
+      message: 'Idempotent Agent command previously failed after its reservation was recorded.',
+    });
+  }
   if (existing.responseRef === null) {
     throw createAgentDomainError({
       kind: 'concurrency',
@@ -167,6 +173,30 @@ export function completeAgentIdempotencyRecord(input: {
     principalId: input.context.principal.principalId,
     responseRef: JSON.stringify(input.response),
     status: 'succeeded',
+  });
+}
+
+/**
+ * 予約済み idempotency record を失敗として確定し、外部副作用の結果が不明な key を fail closed にします。
+ *
+ * @param input command context と、対象 Agent の idempotency ledger を所有する repository set です。
+ * @returns 失敗状態の保存に成功した場合は値を返しません。
+ * @throws AgentDomainError `idempotency_key` が未指定の場合に発生します。repository 更新に失敗した場合は、その永続化エラーを呼び出し元へ伝播します。
+ * @example
+ * ```ts
+ * failAgentIdempotencyRecord({ context, repositories });
+ * ```
+ */
+export function failAgentIdempotencyRecord(input: {
+  readonly context: AgentCoreRequestContext;
+  readonly repositories: AgentStorageRepositories;
+}): void {
+  // 外部書込みが失敗した後は同じ key の再実行を許可せず、別 key による明示的な再試行へ閉じます。
+  input.repositories.idempotency.updateRecordResponse({
+    idempotencyKey: requireAgentIdempotencyKey(input.context),
+    principalId: input.context.principal.principalId,
+    responseRef: null,
+    status: 'failed',
   });
 }
 

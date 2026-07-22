@@ -39,10 +39,17 @@ export default async function AgentIntegrationsPage({
 
   try {
     // Installation 一覧は Agent Service の正本から取得し、Provider secret や raw manifest body は Browser に渡さない。
-    const installations = await listInstallations(agentId, {
+    const installationResult = await listInstallations(agentId, {
       status: status === 'all' ? undefined : status,
       page: { pageToken },
     });
+    if (
+      installationResult.safeStatus === 'failed' ||
+      installationResult.displayData.data === undefined
+    ) {
+      return renderIntegrationsUnavailable(agentId);
+    }
+    const installations = installationResult.displayData.data;
 
     return (
       <IntegrationView
@@ -59,10 +66,15 @@ export default async function AgentIntegrationsPage({
     );
   } catch {
     // Agent RPC / credential resolution failure は route-level safe fallback に変換する。
-    return (
-      <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="integrations">
-        <AgentDataUnavailableAlert screenName="Integrations" />
-      </ControlRoomFrame>
-    );
+    return renderIntegrationsUnavailable(agentId);
   }
+}
+
+function renderIntegrationsUnavailable(agentId: string) {
+  // Browser が利用できるのは envelope の安全状態だけであり、raw SDK error は表示しません。
+  return (
+    <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="integrations">
+      <AgentDataUnavailableAlert screenName="Integrations" />
+    </ControlRoomFrame>
+  );
 }

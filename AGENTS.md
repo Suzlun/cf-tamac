@@ -41,14 +41,14 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - Install: `corepack enable && pnpm install`
 - Dev (Agent Worker): `pnpm dev:agent`
 - Dev (Management Client): `pnpm dev:client`
-- Build Agent/Client: `pnpm build`
+- Build Agent, SDK, and Management Client: `pnpm build`
 - Check Agent/Client: `pnpm check:agent && pnpm check:client`
 
 ## API Contract (TypeSpec)
 
 - Agent public API source of truth: `packages/agent/src/typespec/main.tsp`
 - Agent generated proto: `packages/agent/proto/cftamac/agent/v1.proto`
-- Agent generated RPC outputs: `packages/agent/src/generated/rpc/**` and `packages/client/src/generated/agent-rpc/**`
+- Agent generated RPC outputs: `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, and `packages/sdk/src/generated/agent-rpc/**`
 - Regenerate Agent proto + RPC SDK: `pnpm gen:agent:proto && pnpm gen:agent:rpc`
 - Regenerate all generated API outputs: `pnpm gen`
 - Codegen drift check (CI-style): `pnpm check:codegen`
@@ -86,7 +86,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - Agent API contract direction: implementation must follow `packages/agent/src/typespec`; do not model Agent APIs with OpenAPI or Orval.
 - Agent Worker (`packages/agent`) exposes Protobuf RPC-only via Connect unary binary Protobuf. Accept `POST` + `Content-Type: application/proto`; reject JSON/GET and fail closed for unmapped generated methods.
 - Agent Worker owns `AI_AGENT` Durable Object and Agent blob storage only. It must not use `CLIENT_DB`, Agent-cross D1, Cloudflare Queues bindings, public Durable Object fetch APIs, REST/OpenAPI/Orval Agent surfaces, or ad-hoc JSON DTO APIs.
-- Agent-local Queue is only a scheduler wake/coalescing boundary; accepted Events, pending Runs, Thread identity, replay/idempotency, audit, and rate-limit state stay in `AIAgent` Durable Object SQLite storage.
+- Agent-local Queue is only a scheduler wake/coalescing boundary; accepted Events, pending Runs, Thread identity, replay/idempotency, audit, and authoritative rate-limit state stay in `AIAgent` Durable Object SQLite storage. A Cloudflare `RateLimit` binding may provide a pre-auth edge admission guard only; its external bucket window is not Agent domain state, and its denial path must finish before raw body, signature, or Agent mutation handling.
 - Management Client (`packages/client`) owns `CLIENT_DB`, credential references, and encrypted Client Service signing key store only. It may call Agent RPC from server-only modules, but browser bundles must not contain Agent credentials, private JWK, encrypted private JWK, raw JWT, direct Agent RPC invocation logic, Agent runtime imports, or Agent API proxy routes.
 - Client D1 may store managed Agent records, external credential references, and encrypted Client Service signing key records protected by `CLIENT_CREDENTIAL_ENCRYPTION_KEY`; it must not store Agent domain snapshots, plaintext secrets, or private JWK plaintext.
 - Operations runbook: `docs/operations/agent-control-plane-auth.md` describes `AGENT_CONTROL_PLANE_TRUST`, signing key generation/export, Agent Worker secret setup, rotation, emergency revoke, break-glass recovery, staging smoke, health verification, and private-key non-exposure.

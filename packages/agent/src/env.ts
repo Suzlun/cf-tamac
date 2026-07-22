@@ -57,13 +57,21 @@ export interface AgentWorkersAiBinding {
  * Agent runtime が所有する Cloudflare bindings です。
  *
  * @remarks
- * Agent Worker は Durable Object と Agent-owned blob/model bindings だけを受け取り、Client D1 や
- * Management Client runtime 由来の binding をここに混ぜません。
+ * Agent Worker は Durable Object、Agent-owned blob/model binding、Provider ingress 専用の
+ * Rate Limiting binding だけを受け取り、Client D1 や Management Client runtime 由来の binding を
+ * ここに混ぜません。Rate Limiting binding は Agent domain state の正本ではなく、raw body/signature/state mutation
+ * より前に実行する pre-auth traffic guard が fail-closed で使うため optional にしません。
+ *
+ * @example
+ * ```ts
+ * await env.PROVIDER_INGRESS_RATE_LIMITER.limit({ key: 'pir1:example' });
+ * ```
  */
 export interface AgentWorkerBindings {
   readonly AI_AGENT: DurableObjectNamespace<AIAgent>;
   readonly AGENT_BLOBS: R2Bucket;
   readonly AI?: AgentWorkersAiBinding;
+  readonly PROVIDER_INGRESS_RATE_LIMITER: RateLimit;
 }
 
 /**

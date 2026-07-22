@@ -21,6 +21,19 @@ interface AgentThreadsPageProps {
   }>;
 }
 
+type ThreadListDisplayData = NonNullable<
+  Awaited<ReturnType<typeof listThreads>>['displayData']['data']
+>;
+type CompactionDisplayData = NonNullable<
+  Awaited<ReturnType<typeof getLatestCompaction>>['displayData']['data']
+>;
+type ThreadMemoryDisplayData = NonNullable<
+  Awaited<ReturnType<typeof getThreadMemory>>['displayData']['data']
+>;
+type ThreadHistoryDisplayData = NonNullable<
+  Awaited<ReturnType<typeof searchThreadHistory>>['displayData']['data']
+>;
+
 /**
  * Agent Thread 一覧画面（AGENT-MANAGEMENT-UI-S005 / S019 / S020）。
  *
@@ -35,28 +48,47 @@ export default async function AgentThreadsPage({ params, searchParams }: AgentTh
 
   // Agent RPC / credential resolution の失敗を Next error boundary へ漏らさず、shell を保ったまま安全表示へ落とす。
   let dataUnavailable = false;
-  let threads: Awaited<ReturnType<typeof listThreads>> = { items: [], page: { resultCount: 0 } };
-  let latestCompaction: Awaited<ReturnType<typeof getLatestCompaction>> | undefined;
-  let memory: Awaited<ReturnType<typeof getThreadMemory>> | undefined;
-  let history: Awaited<ReturnType<typeof searchThreadHistory>> | undefined;
+  let threads: ThreadListDisplayData = { items: [], page: { resultCount: 0 } };
+  let latestCompaction: CompactionDisplayData | undefined;
+  let memory: ThreadMemoryDisplayData | undefined;
+  let history: ThreadHistoryDisplayData | undefined;
 
   try {
     // Thread 一覧は selected-Agent scope の入口であり、filter と cursor は server-side RPC にだけ渡す。
-    threads = await listThreads(agentId, {
+    const threadResult = await listThreads(agentId, {
       status: status === 'all' ? undefined : status,
       threadKeyPrefix: q,
       page: { pageToken },
     });
+    if (threadResult.safeStatus === 'failed' || threadResult.displayData.data === undefined) {
+      dataUnavailable = true;
+    } else {
+      threads = threadResult.displayData.data;
+    }
 
     // 選択中 Thread の Compaction/Memory/History を文脈 detail として取得する（未選択時は取得しない）。
     const threadIdForDetail = thread ?? '';
-    if (threadIdForDetail !== '') {
-      [latestCompaction, memory, history] = await Promise.all([
+    if (!dataUnavailable && threadIdForDetail !== '') {
+      const [compactionResult, memoryResult, historyResult] = await Promise.all([
         getLatestCompaction(agentId, threadIdForDetail),
         getThreadMemory(agentId, threadIdForDetail),
         // ThreadCompaction/History を文脈 detail として取得する（safe metadata のみ）。
         searchThreadHistory(agentId, threadIdForDetail, q ?? '', { page: { pageToken } }),
       ]);
+      if (
+        compactionResult.safeStatus === 'failed' ||
+        memoryResult.safeStatus === 'failed' ||
+        historyResult.safeStatus === 'failed' ||
+        compactionResult.displayData.data === undefined ||
+        memoryResult.displayData.data === undefined ||
+        historyResult.displayData.data === undefined
+      ) {
+        dataUnavailable = true;
+      } else {
+        latestCompaction = compactionResult.displayData.data;
+        memory = memoryResult.displayData.data;
+        history = historyResult.displayData.data;
+      }
     }
   } catch {
     // 例外詳細は Browser に出さず、画面構造と navigation を維持する。

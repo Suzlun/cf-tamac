@@ -4,6 +4,12 @@ import { revalidatePath } from 'next/cache';
 
 import { loadAgentRpcClients } from '../../agent-rpc/agent-loader';
 import {
+  createBrowserSafeAgentRpcActionFailure,
+  createBrowserSafeAgentRpcActionSuccess,
+  executeBrowserSafeAgentRpcQuery,
+  type BrowserSafeAgentRpcActionResult,
+} from '../../agent-rpc/safe-results';
+import {
   toBrowserSafeScheduleSummary,
   type BrowserSafeScheduleSummary,
   type ListSchedulesOptions,
@@ -13,6 +19,15 @@ import {
   toBrowserSafePageInfo,
   type BrowserSafePagedResult,
 } from '../browser-safe-helpers';
+
+/**
+ * Schedule 一覧 query が Browser へ返す allowlisted display DTO です。
+ *
+ * @remarks
+ * Schedule row と cursor は明示的な Browser-safe mapper 出力だけで構成します。
+ * Agent-owned schedule response、callback secret、SDK diagnostic は含めません。
+ */
+export type BrowserSafeScheduleListDisplayData = BrowserSafePagedResult<BrowserSafeScheduleSummary>;
 
 /**
  * AgentScheduleService.ListSchedules を cursor pagination 付きで呼び出す。
@@ -25,22 +40,32 @@ import {
 export async function listSchedules(
   agentId: string,
   options: ListSchedulesOptions = {}
-): Promise<BrowserSafePagedResult<BrowserSafeScheduleSummary>> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.schedules.listSchedules({
-      agentId,
-      page: buildScopedPageRequest(agentId, 'schedules', options.page),
-      threadId: options.threadId,
-      installationId: options.installationId,
-      status: options.status,
-    })
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeScheduleListDisplayData>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // Schedule filter と Agent-scoped cursor を server-only SDK request に固定します。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.schedules.listSchedules({
+          agentId,
+          page: buildScopedPageRequest(agentId, 'schedules', options.page),
+          threadId: options.threadId,
+          installationId: options.installationId,
+          status: options.status,
+        })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => ({
+      // generated schedule row を返さず、safe summary と page metadata だけを Browser に投影します。
+      items: response.schedules.map((schedule) => toBrowserSafeScheduleSummary(schedule)),
+      page: toBrowserSafePageInfo(response.page),
+    }),
+    'スケジュール一覧を取得しました',
+    'スケジュールの安全な一覧情報を表示しています。',
+    'スケジュール一覧を確認してください',
+    'スケジュール一覧を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  return {
-    items: response.schedules.map((schedule) => toBrowserSafeScheduleSummary(schedule)),
-    page: toBrowserSafePageInfo(response.page),
-  };
 }
 
 /**
@@ -60,20 +85,34 @@ export async function createSchedule(
   threadId: string,
   scheduleSpec: string,
   overlapPolicy: string
-): Promise<BrowserSafeScheduleSummary> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.schedules.createSchedule({
-      agentId,
-      idempotencyKey,
-      threadId,
-      scheduleSpec,
-      overlapPolicy: overlapPolicy === '' ? undefined : overlapPolicy,
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeScheduleSummary>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const response = await clients.withErrorNormalization(() =>
+      clients.schedules.createSchedule({
+        agentId,
+        idempotencyKey,
+        threadId,
+        scheduleSpec,
+        overlapPolicy: overlapPolicy === '' ? undefined : overlapPolicy,
+      })
+    );
 
-  revalidatePath(`/agents/${agentId}/schedules`);
-  return toBrowserSafeScheduleSummary(response.schedule, undefined, 'active');
+    revalidatePath(`/agents/${agentId}/schedules`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      toBrowserSafeScheduleSummary(response.schedule, undefined, 'active'),
+      'スケジュールを作成しました',
+      'スケジュールを有効にしました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'スケジュールを確認してください',
+      'スケジュールの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
+  }
 }
 
 /**
@@ -91,17 +130,31 @@ export async function cancelSchedule(
   scheduleId: string,
   idempotencyKey: string,
   reason: string
-): Promise<BrowserSafeScheduleSummary> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.schedules.cancelSchedule({
-      agentId,
-      idempotencyKey,
-      scheduleId,
-      reason: reason === '' ? undefined : reason,
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeScheduleSummary>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const response = await clients.withErrorNormalization(() =>
+      clients.schedules.cancelSchedule({
+        agentId,
+        idempotencyKey,
+        scheduleId,
+        reason: reason === '' ? undefined : reason,
+      })
+    );
 
-  revalidatePath(`/agents/${agentId}/schedules`);
-  return toBrowserSafeScheduleSummary(response.schedule, scheduleId, 'cancelled');
+    revalidatePath(`/agents/${agentId}/schedules`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      toBrowserSafeScheduleSummary(response.schedule, scheduleId, 'cancelled'),
+      'スケジュールをキャンセルしました',
+      'スケジュールの実行を停止しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'スケジュールを確認してください',
+      'スケジュールの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
+  }
 }

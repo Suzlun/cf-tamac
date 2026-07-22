@@ -6,7 +6,10 @@ import {
   rotateAgentCredential,
   updateAgentConfig,
 } from '@cf-tamac/client/server/actions/agent-lifecycle';
-import { saveDefaultModelPolicy } from '@cf-tamac/client/server/actions/agent-operations';
+import {
+  reconcileDefaultModelPolicy,
+  saveDefaultModelPolicy,
+} from '@cf-tamac/client/server/actions/agent-operations';
 import {
   getActingOperatorId,
   getManagedAgentForEdit,
@@ -52,16 +55,8 @@ async function saveSettingsCredentialReference(
   });
 }
 
-function getErrorCategory(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('category' in error)) {
-    return undefined;
-  }
-  const category = (error as { readonly category?: unknown }).category;
-  return typeof category === 'string' ? category : undefined;
-}
-
-function safeSettingsErrorMessage(error: unknown): string {
-  switch (getErrorCategory(error)) {
+function safeSettingsErrorMessage(category: string | undefined): string {
+  switch (category) {
     case 'permission_denied':
       return 'You do not have permission to view Agent settings.';
     case 'not_found':
@@ -103,19 +98,34 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
   ]);
 
   const actingOperatorId = await getActingOperatorId();
-  const overview = overviewResult.status === 'fulfilled' ? overviewResult.value : undefined;
+  // query result は四属性 envelope から成功時の allowlisted DTO だけを取り出します。
+  const configAction = configResult.status === 'fulfilled' ? configResult.value : undefined;
+  const overviewAction = overviewResult.status === 'fulfilled' ? overviewResult.value : undefined;
+  const policyAction = policyResult.status === 'fulfilled' ? policyResult.value : undefined;
+  const config =
+    configAction?.safeStatus === 'succeeded' ? configAction.displayData.data : undefined;
+  const overview =
+    overviewAction?.safeStatus === 'succeeded' ? overviewAction.displayData.data : undefined;
   const defaultPolicy =
-    policyResult.status === 'fulfilled' ? policyResult.value.metadata : undefined;
-  // config / overview / policy のいずれかが signing key 未選択等で失敗しても、
-  // signing key select + Health Check は表示できるように notice に変換する。
-  const agentRpcNotice =
-    configResult.status === 'rejected'
-      ? safeSettingsErrorMessage(configResult.reason)
-      : overviewResult.status === 'rejected'
-        ? safeSettingsErrorMessage(overviewResult.reason)
-        : policyResult.status === 'rejected'
-          ? safeSettingsErrorMessage(policyResult.reason)
+    policyAction?.safeStatus === 'succeeded' ? policyAction.displayData.data?.metadata : undefined;
+  const failedAction =
+    configAction?.safeStatus === 'failed'
+      ? configAction
+      : overviewAction?.safeStatus === 'failed'
+        ? overviewAction
+        : policyAction?.safeStatus === 'failed'
+          ? policyAction
           : undefined;
+  const hasUnexpectedRejection =
+    configResult.status === 'rejected' ||
+    overviewResult.status === 'rejected' ||
+    policyResult.status === 'rejected';
+  // config / overview / policy のいずれかが失敗しても、signing key select + Health Check は表示できるように、
+  // raw detail を読まず安全な notice に変換します。
+  const agentRpcNotice =
+    failedAction === undefined && !hasUnexpectedRejection
+      ? undefined
+      : safeSettingsErrorMessage(failedAction?.safeErrorCategory);
   const currentCredential = {
     generation: overview?.credential?.generation ?? overview?.credentialGeneration,
     status: overview?.credential?.status ?? managedAgent.credential?.status ?? 'unknown',
@@ -125,11 +135,11 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
 
   return (
     <div className="space-y-8">
-      {configResult.status === 'fulfilled' ? (
+      {config !== undefined ? (
         <AgentSettingsForm
           agentId={agentId}
           displayName={managedAgent.agent.displayName}
-          initialConfig={configResult.value}
+          initialConfig={config}
           initialModelPolicy={defaultPolicy}
           currentCredential={currentCredential}
           actingOperatorId={actingOperatorId}
@@ -137,6 +147,7 @@ export default async function AgentSettingsPage({ params }: AgentSettingsPagePro
           onUpdateConfig={updateAgentConfig}
           onValidateModelPolicy={validateModelPolicyForManagedAgent}
           onSaveDefaultModelPolicy={saveDefaultModelPolicy}
+          onReconcileDefaultModelPolicy={reconcileDefaultModelPolicy}
           onRotateCredential={rotateAgentCredential}
           onSaveAccessLookup={saveSettingsCredentialReference}
           onDestroy={destroyAgent}

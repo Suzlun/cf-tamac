@@ -6,6 +6,7 @@ import {
   getAIAgentDurableObjectStub,
 } from '../agent-routing';
 
+import { createAllowingProviderIngressRateLimitStub } from './provider-ingress-rate-limit-test-helpers';
 import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
@@ -39,6 +40,7 @@ function createRoutingEnv(): AgentWorkerEnv {
     AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
     AGENT_RPC_AUDIENCE: 'test-audience',
     AI_AGENT: namespace,
+    PROVIDER_INGRESS_RATE_LIMITER: createAllowingProviderIngressRateLimitStub(),
   };
 }
 

@@ -2,9 +2,19 @@ import { create, toBinary } from '@bufbuild/protobuf';
 import { Code, ConnectError } from '@connectrpc/connect';
 import { describe, expect, it } from 'vitest';
 
-import { CheckHealthRequestSchema } from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
+import {
+  CheckHealthRequestSchema,
+  PublishIntegrationEventRequestSchema,
+} from '@cf-tamac/agent-rpc/cftamac/agent/v1_pb';
 
+import { decideAgentFinalAuthorization } from '../domain/final-authorization';
+import { createIntegrationSignatureBase } from '../domain/security';
+import {
+  integrationIngressTimestampWindowMs,
+  verifyIntegrationIngressSignature,
+} from '../integrations/security';
 import { handleAgentConnectRequest } from '../rpc/connect-worker-adapter';
+import { createUnsignedIngressBodyDigest } from '../rpc/dispatch/integration-ingress-signature';
 import { createAgentRpcAuditContext } from '../rpc/interceptors/audit';
 import { authenticateAgentRequest } from '../rpc/interceptors/authentication';
 import {
@@ -15,10 +25,13 @@ import {
 import { createReplayProtectionContext } from '../rpc/interceptors/replay-protection';
 import { createAgentRpcRouter } from '../rpc/router';
 
+import { createEd25519TrustFixture } from './ed25519-jwt-test-helpers';
+import { createAllowingProviderIngressRateLimitStub } from './provider-ingress-rate-limit-test-helpers';
 import { testControlPlaneTrustConfig } from './test-control-plane-trust';
 
 import type { AIAgent } from '../AIAgent';
 import type { AgentWorkerEnv } from '../env';
+import type { AgentStorageRepositories } from '../storage';
 
 const healthPath = '/cftamac.agent.v1.AgentHealthService/Check';
 const baseUrl = 'https://agent.example.test';
@@ -58,6 +71,7 @@ function createTestEnv(
       AGENT_MODEL_PROVIDER_SECRET_REFS: 'test-model-secret',
       AGENT_RPC_AUDIENCE: 'test-audience',
       AI_AGENT: durableObjectNamespace,
+      PROVIDER_INGRESS_RATE_LIMITER: createAllowingProviderIngressRateLimitStub(),
     },
     healthCalls,
   };
@@ -238,6 +252,172 @@ describe('Agent RPC interceptors', () => {
     ]);
   });
 
+  it('[TAMAC-SDK-S002] Client Service SDK と Provider integration surface が専用の認証文脈を使用する', async () => {
+    // Provider の unsigned Protobuf bytes を digest 化し、canonical field order へ bind する Ed25519 signature を作ります。
+    const fixture = await createEd25519TrustFixture({ kid: 'provider-key-1' });
+    const nowUnixMs = Date.now();
+    const rawBodyDigest = await createUnsignedIngressBodyDigest(
+      create(PublishIntegrationEventRequestSchema, {
+        agentId: 'agent-interceptor',
+        connectionId: 'connection-1',
+        idempotencyKey: 'provider-idempotency-1',
+        installationId: 'installation-1',
+        threadKey: 'provider-thread-1',
+      }),
+      'PublishEvent'
+    );
+    const canonical = {
+      agentId: 'agent-interceptor',
+      connectionId: 'connection-1',
+      idempotencyKey: 'provider-idempotency-1',
+      installationId: 'installation-1',
+      method: 'PublishEvent',
+      nonce: 'provider-nonce-1',
+      rawBodyDigest,
+      service: 'cftamac.agent.v1.IntegrationIngressService',
+      timestampUnixMs: nowUnixMs,
+    } as const;
+    const signature = new Uint8Array(
+      await crypto.subtle.sign(
+        { name: 'Ed25519' },
+        fixture.privateKey,
+        new TextEncoder().encode(createIntegrationSignatureBase(canonical))
+      )
+    );
+    // Agent-owned integration repository の最小 seam は active Installation と同じ key_id の public key だけを返します。
+    const repositories = {
+      integrations: {
+        findActiveTrustKey: () => ({ publicKeyMaterial: JSON.stringify(fixture.publicJwk) }),
+        findInstallation: () => ({ status: 'active' }),
+      },
+    } as unknown as AgentStorageRepositories;
+    const verifiedPrincipal = await verifyIntegrationIngressSignature({
+      agentId: canonical.agentId,
+      canonicalBodyDigest: rawBodyDigest,
+      connectionId: canonical.connectionId,
+      idempotencyKey: canonical.idempotencyKey,
+      installationId: canonical.installationId,
+      method: canonical.method,
+      repositories,
+      signature: {
+        algorithm: 'Ed25519',
+        byteLength: rawBodyDigest.byteLength,
+        digestHex: rawBodyDigest.digestHex,
+        keyId: fixture.kid,
+        nonce: canonical.nonce,
+        signature,
+        signedAtMs: nowUnixMs,
+        timestampMs: nowUnixMs,
+      },
+    });
+
+    // 署名検証後にだけ contract 固定の canonical principal が作られ、Client Service JWT claim は混入しません。
+    expect(verifiedPrincipal).toMatchObject({
+      agentId: canonical.agentId,
+      connectionId: canonical.connectionId,
+      installationId: canonical.installationId,
+      keyId: fixture.kid,
+      principalId: canonical.installationId,
+      principalType: 'INTEGRATION_INSTALLATION',
+      scopes: [],
+    });
+    // Agent-owned final authorization は Adapter Connection scoped ingress grant を要求し、verified principal と同じ Installation/Connection に bind します。
+    const authorization = decideAgentFinalAuthorization({
+      agentId: canonical.agentId,
+      capability: {
+        adapterConnectionId: canonical.connectionId,
+        capabilityKind: 'integration',
+        installationId: canonical.installationId,
+        ownerAgentId: canonical.agentId,
+      },
+      credentialState: 'active',
+      lifecycleState: 'active',
+      operation: {
+        action: 'integration.ingress.event',
+        method: canonical.method,
+        service: canonical.service,
+      },
+      principal: {
+        ...verifiedPrincipal,
+        grantDetails: [
+          {
+            capability: 'integration.ingress.event',
+            scopeRef: `adapter_connection:${canonical.connectionId}`,
+          },
+        ],
+        grants: ['integration.ingress.event'],
+      },
+      requiredGrants: ['integration.ingress.event'],
+      requiredPrincipalTypes: ['INTEGRATION_INSTALLATION'],
+      requiredScopes: ['agent.rpc', 'agent.integration'],
+    });
+    expect(authorization).toMatchObject({
+      matchedGrants: ['integration.ingress.event'],
+      status: 'allow',
+    });
+
+    // 存在しない Installation は active key 不在と同じ署名拒否へ畳み込み、未署名 caller が Agent-owned state を列挙できないことを検証します。
+    const missingInstallationRepositories = {
+      integrations: {
+        findActiveTrustKey: () => undefined,
+        findInstallation: () => undefined,
+      },
+    } as unknown as AgentStorageRepositories;
+    await expect(
+      verifyIntegrationIngressSignature({
+        agentId: canonical.agentId,
+        canonicalBodyDigest: rawBodyDigest,
+        connectionId: canonical.connectionId,
+        idempotencyKey: canonical.idempotencyKey,
+        installationId: canonical.installationId,
+        method: canonical.method,
+        repositories: missingInstallationRepositories,
+        signature: {
+          algorithm: 'Ed25519',
+          byteLength: rawBodyDigest.byteLength,
+          digestHex: rawBodyDigest.digestHex,
+          keyId: fixture.kid,
+          nonce: canonical.nonce,
+          signature,
+          signedAtMs: nowUnixMs,
+          timestampMs: nowUnixMs,
+        },
+      })
+    ).rejects.toThrow('Integration ingress signature rejected.');
+
+    // fixed 300_000 ms window を 1 ms 超える timestamp は、正しい Ed25519 key/signature でも検証前に拒否されます。
+    const staleTimestampMs = nowUnixMs - integrationIngressTimestampWindowMs - 1;
+    const staleCanonical = { ...canonical, timestampUnixMs: staleTimestampMs };
+    const staleSignature = new Uint8Array(
+      await crypto.subtle.sign(
+        { name: 'Ed25519' },
+        fixture.privateKey,
+        new TextEncoder().encode(createIntegrationSignatureBase(staleCanonical))
+      )
+    );
+    await expect(
+      verifyIntegrationIngressSignature({
+        agentId: staleCanonical.agentId,
+        canonicalBodyDigest: rawBodyDigest,
+        connectionId: staleCanonical.connectionId,
+        idempotencyKey: staleCanonical.idempotencyKey,
+        installationId: staleCanonical.installationId,
+        method: staleCanonical.method,
+        repositories,
+        signature: {
+          algorithm: 'Ed25519',
+          byteLength: rawBodyDigest.byteLength,
+          digestHex: rawBodyDigest.digestHex,
+          keyId: fixture.kid,
+          nonce: staleCanonical.nonce,
+          signature: staleSignature,
+          signedAtMs: staleTimestampMs,
+          timestampMs: staleTimestampMs,
+        },
+      })
+    ).rejects.toThrow('Integration ingress signature rejected.');
+  });
+
   it('[AGENT-SECURITY-S014] 認可は wildcard principal agent_id でも request agent_id 完全一致を要求する', () => {
     const body = toBinary(
       CheckHealthRequestSchema,
@@ -278,6 +458,26 @@ describe('Agent RPC interceptors', () => {
     );
 
     expect(await readErrorCode(response)).toBe('unavailable');
+  });
+
+  it('[TAMAC-SDK-S002] business internal error の wire 文言を malformed Protobuf へ誤分類しない', async () => {
+    const { env } = createTestEnv({
+      // Client Service operation 内の安全な internal error が同じ文言を持っても、raw/generated decode error ではありません。
+      throwHealthError: new ConnectError(
+        'invalid wire type while reading Agent policy state.',
+        Code.Internal
+      ),
+    });
+    const response = await handleAgentConnectRequest(
+      createHealthRequest({
+        'x-agent-test-grant': 'allow',
+        'x-agent-test-principal-id': 'principal-1',
+      }),
+      env,
+      { allowTestSeam: true }
+    );
+
+    expect(await readErrorCode(response)).toBe('internal');
   });
 });
 

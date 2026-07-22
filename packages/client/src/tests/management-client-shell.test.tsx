@@ -150,10 +150,10 @@ describe('Management Client shell scope separation', () => {
     expect(dataUnavailableAlert).not.toContain('error.message');
     expect(dataUnavailableAlert).not.toContain('stack');
 
-    // Agent RPC を読む selected-Agent routes は Next error boundary に例外を漏らさず、shell 内の alert に変換する。
+    // Agent RPC を読む selected-Agent routes は Next error boundary に例外を漏らさず、catch または section-isolated allSettled で shell 内 alert に変換する。
     for (const page of selectedAgentPages) {
       expect(page).toContain('AgentDataUnavailableAlert');
-      expect(page).toContain('catch');
+      expect(page.includes('catch') || page.includes('Promise.allSettled')).toBe(true);
     }
   });
 

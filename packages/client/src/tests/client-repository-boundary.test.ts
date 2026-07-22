@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createCredentialReferenceRepository,
+  createManagedAgentRegistrationAttemptRepository,
   createManagedAgentRepository,
   forbiddenClientAgentSnapshotTables,
 } from '../server/db';
@@ -13,6 +14,7 @@ const repositoryFiles = [
   new URL('../server/db/index.ts', import.meta.url),
   new URL('../server/db/managed-agents.ts', import.meta.url),
   new URL('../server/db/access-credentials.ts', import.meta.url),
+  new URL('../server/db/managed-agent-registration-attempts.ts', import.meta.url),
   new URL('../server/db/signing-keys.ts', import.meta.url),
 ];
 
@@ -49,6 +51,13 @@ describe('Management Client repository boundary', () => {
       'listCredentialReferences',
       'deleteCredentialReference',
     ]);
+    expect(Object.keys(createManagedAgentRegistrationAttemptRepository({} as D1Database))).toEqual([
+      'createRegistrationAttempt',
+      'updateRegistrationMetadata',
+      'markAttemptActive',
+      'markAttemptReconciliationRequired',
+      'cleanupCreatedAttempt',
+    ]);
 
     const repositorySource = repositoryFiles
       .map((filePath) => readFileSync(fileURLToPath(filePath.href), 'utf8'))
@@ -71,13 +80,15 @@ describe('Management Client repository boundary', () => {
       fileURLToPath(new URL('../server/db/schema.ts', import.meta.url).href),
       'utf8'
     );
-    const migrationSource = readFileSync(
-      fileURLToPath(
-        new URL('../server/db/migrations/0001_client_foundation.sql', import.meta.url).href
+    const migrationSources = [
+      new URL('../server/db/migrations/0001_client_foundation.sql', import.meta.url),
+      new URL('../server/db/migrations/0002_control_plane_signing_keys.sql', import.meta.url),
+      new URL(
+        '../server/db/migrations/0004_managed_agent_registration_reconciliation.sql',
+        import.meta.url
       ),
-      'utf8'
-    );
-    const allD1Sources = `${repositorySource}\n${schemaSource}\n${migrationSource}`;
+    ].map((migration) => readFileSync(fileURLToPath(migration.href), 'utf8'));
+    const allD1Sources = `${repositorySource}\n${schemaSource}\n${migrationSources.join('\n')}`;
 
     expect(allD1Sources).not.toContain('model_policy_body');
     expect(allD1Sources).not.toContain('agent_model_policies');

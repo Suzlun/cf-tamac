@@ -1,13 +1,8 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * Shadcn UI 既定（new-york / neutral / cssVariables）の semantic token mapping と
- * repository content path のみを設定する。
- *
- * タスク 1.6: 旧 management shell 用の独自 palette 別名、
- * 独自 fontFamily、独自 borderRadius は廃止し、
- * Shadcn 既定の semantic slot に集約した。色は全て `hsl(var(--*))` 経由で globals.css の token を参照する。
- * content path は app と src のみを走査する。
+ * TAMAC の mineral teal semantic token、指定書体、repository content path を設定する。
+ * 色と書体は globals.css の共有 token を参照し、route-local な値の重複を防ぐ。
  */
 const config: Config = {
   content: ['./app/**/*.{ts,tsx}', './src/**/*.{ts,tsx}'],
@@ -72,6 +67,27 @@ const config: Config = {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        operation: {
+          success: {
+            DEFAULT: 'hsl(var(--operation-success))',
+            foreground: 'hsl(var(--operation-success-foreground))',
+            border: 'hsl(var(--operation-success-border))',
+          },
+          reconciliation: {
+            DEFAULT: 'hsl(var(--operation-reconciliation))',
+            foreground: 'hsl(var(--operation-reconciliation-foreground))',
+            border: 'hsl(var(--operation-reconciliation-border))',
+          },
+          reregistration: {
+            DEFAULT: 'hsl(var(--operation-reregistration))',
+            foreground: 'hsl(var(--operation-reregistration-foreground))',
+            border: 'hsl(var(--operation-reregistration-border))',
+          },
+        },
+      },
+      fontFamily: {
+        sans: ['IBM Plex Sans JP', 'BIZ UDPGothic', 'Noto Sans JP', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'BIZ UDGothic', 'monospace'],
       },
       borderRadius: {
         lg: 'var(--radius)',

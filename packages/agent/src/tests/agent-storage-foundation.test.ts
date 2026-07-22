@@ -168,7 +168,7 @@ describe('Agent DO SQLite storage foundation', () => {
     expect(aiAgentSource).toContain('payload: AgentLocalQueueProcessPayload');
     expect(aiAgentSource).toContain('checkHealth(): AgentFoundationHealth');
     expect(aiAgentSource).not.toMatch(/\n\s*fetch\s*\(/);
-    expect(workerSource).toContain('handleAgentConnectRequest(request, env)');
+    expect(workerSource).toContain('handleAgentConnectRequest(request, env, {');
     expect(workerSource).not.toMatch(/AI_AGENT\.get\([^)]*\)\.fetch/);
   });
 });

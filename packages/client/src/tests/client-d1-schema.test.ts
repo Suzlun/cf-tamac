@@ -14,12 +14,20 @@ const signingKeysMigrationPath = new URL(
   '../server/db/migrations/0002_control_plane_signing_keys.sql',
   import.meta.url
 );
+const registrationReconciliationMigrationPath = new URL(
+  '../server/db/migrations/0004_managed_agent_registration_reconciliation.sql',
+  import.meta.url
+);
 
 describe('Management Client D1 schema', () => {
   it('[MANAGEMENT-CLIENT-SHELL-S003] Client D1 exposes only management tables', () => {
     const migration = readFileSync(fileURLToPath(migrationPath.href), 'utf8');
     const signingKeysMigration = readFileSync(fileURLToPath(signingKeysMigrationPath.href), 'utf8');
-    const combinedMigration = `${migration}\n${signingKeysMigration}`;
+    const registrationReconciliationMigration = readFileSync(
+      fileURLToPath(registrationReconciliationMigrationPath.href),
+      'utf8'
+    );
+    const combinedMigration = `${migration}\n${signingKeysMigration}\n${registrationReconciliationMigration}`;
     const tableNames = clientD1Tables.map((table) => table.tableName);
 
     expect(tableNames).toEqual([
@@ -150,6 +158,44 @@ describe('Management Client D1 schema', () => {
       expect(managedAgentColumns).toContain('signing_last_verified_at_ms');
 
       expect(signingKeysMigration).not.toMatch(/private_key|shared_secret|secret_material/i);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('[CLIENT-REGISTRY-S001] registration reconciliation migration adds Client-owned attempt metadata without Agent snapshots', () => {
+    const foundationMigration = readFileSync(fileURLToPath(migrationPath.href), 'utf8');
+    const signingKeysMigration = readFileSync(fileURLToPath(signingKeysMigrationPath.href), 'utf8');
+    const reconciliationMigration = readFileSync(
+      fileURLToPath(registrationReconciliationMigrationPath.href),
+      'utf8'
+    );
+    const db = new DatabaseSync(':memory:');
+    try {
+      // Foundation/signing schema を適用してから 0004 を適用し、既存 registry row を壊さない ALTER TABLE contract を検証する。
+      db.exec(foundationMigration);
+      db.exec(signingKeysMigration);
+      db.exec(reconciliationMigration);
+      const columns = (
+        db.prepare(`PRAGMA table_info(client_managed_agents)`).all() as { name: string }[]
+      ).map((column) => column.name);
+
+      expect(columns).toEqual(
+        expect.arrayContaining([
+          'registration_state',
+          'registration_attempt_id',
+          'initialization_idempotency_key',
+          'registration_request_digest',
+          'registration_last_failure_phase',
+          'registration_last_failure_category',
+          'registration_last_failure_correlation_id',
+        ])
+      );
+      expect(reconciliationMigration).toContain("DEFAULT 'active'");
+      expect(reconciliationMigration).toContain("'reconciliation_required'");
+      expect(reconciliationMigration).not.toContain('agent_events');
+      expect(reconciliationMigration).not.toContain('agent_model_policies');
+      expect(reconciliationMigration).not.toContain('private_jwk');
     } finally {
       db.close();
     }

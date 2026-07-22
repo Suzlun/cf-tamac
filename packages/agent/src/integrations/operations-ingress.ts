@@ -13,7 +13,10 @@ import {
   requireInstallation,
   resolveIngressConnection,
 } from './operation-shared';
-import { verifyIntegrationIngressSignature } from './security';
+import {
+  verifyIntegrationIngressSignature,
+  withVerifiedIntegrationIngressPrincipal,
+} from './security';
 
 import type { AgentEventBlobWriter } from '../events';
 import type { AgentAdapterConnectionRow, AgentStorageRepositories } from '../storage';
@@ -42,69 +45,72 @@ export async function publishIntegrationEventInStore(input: {
   readonly storageUsagePercent?: number;
 }): Promise<PublishIntegrationEventResult> {
   assertAgentContext(input.agentId, input.command.context);
-  const connection = resolveIngressConnection(input.repositories, input.command);
-  const ingressContext = {
-    ...input.command.context,
-    principal: {
-      ...input.command.context.principal,
-      connectionId: connection.connectionId,
-      installationId: connection.installationId,
-    },
-  };
-  const adapter = requireAdapterDefinition(
-    input.repositories,
-    connection.installationId,
-    connection.adapterId
-  );
-  await verifyIntegrationIngressSignature({
+  // Connection の存在・状態は signature 成功前に読まず、署名済み request identity 自体を canonical input にします。
+  const verifiedPrincipal = await verifyIntegrationIngressSignature({
     agentId: input.agentId,
-    canonicalBodyDigest: ingressContext.bodyDigest,
-    connectionId: connection.connectionId,
-    idempotencyKey: requireContextIdempotency(ingressContext),
+    canonicalBodyDigest: input.command.context.bodyDigest,
+    connectionId: input.command.connectionId,
+    idempotencyKey: requireContextIdempotency(input.command.context),
     installationId: input.command.installationId,
     method: 'PublishEvent',
     repositories: input.repositories,
     signature: input.command.signature,
   });
+  // Provider が自己申告した principal は使わず、active Installation trust key が検証した principal を後続処理へ固定します。
+  const verifiedContext = withVerifiedIntegrationIngressPrincipal(
+    input.command.context,
+    verifiedPrincipal
+  );
+  const verifiedCommand = { ...input.command, context: verifiedContext };
+  // detached signature 成功後に初めて Connection/Adapter ownership を照合し、未署名 caller への state enumeration を防ぎます。
+  const connection = resolveIngressConnection(input.repositories, verifiedCommand);
+  const adapter = requireAdapterDefinition(
+    input.repositories,
+    connection.installationId,
+    connection.adapterId
+  );
   assertIntegrationModelPolicyOverrideAllowed(
     input.repositories,
     connection,
     adapter,
-    input.command.modelPolicyRef
-  );
-  authorizeIntegrationOperation(
-    input.repositories,
-    ingressContext,
-    'integration.ingress.event',
-    'PublishEvent',
-    'ingress',
-    createConnectionCapability(input.agentId, connection),
-    [adapter.ingressGrant, 'agent.event']
+    verifiedCommand.modelPolicyRef
   );
   const deliveryInput = normalizeDeliveryContextInput({
     connectionDeliveryCapabilityId: connection.deliveryCapabilityId ?? undefined,
-    requestedCapability: input.command.deliveryCapability,
-    requestedExpiresAtMs: input.command.deliveryExpiresAtMs,
-    requestedMetadataRef: input.command.deliveryMetadataRef,
+    requestedCapability: verifiedCommand.deliveryCapability,
+    requestedExpiresAtMs: verifiedCommand.deliveryExpiresAtMs,
+    requestedMetadataRef: verifiedCommand.deliveryMetadataRef,
   });
   const deliveryContextId = deliveryInput === undefined ? undefined : crypto.randomUUID();
   const eventResult = await publishEventInStore({
     agentId: input.agentId,
     blobWriter: input.blobWriter,
     command: {
-      context: ingressContext,
+      context: verifiedContext,
       deliveryContextId,
-      eventType: input.command.eventType,
-      modelPolicyRef: input.command.modelPolicyRef,
-      occurredAtMs: input.command.occurredAtMs,
-      payload: input.command.payload,
-      payloadContentType: input.command.payloadContentType,
-      payloadReference: input.command.payloadReference,
-      source: input.command.source,
-      threadKey: input.command.threadKey,
+      eventType: verifiedCommand.eventType,
+      modelPolicyRef: verifiedCommand.modelPolicyRef,
+      occurredAtMs: verifiedCommand.occurredAtMs,
+      payload: verifiedCommand.payload,
+      payloadContentType: verifiedCommand.payloadContentType,
+      payloadReference: verifiedCommand.payloadReference,
+      source: verifiedCommand.source,
+      threadKey: verifiedCommand.threadKey,
     },
     repositories: input.repositories,
     storageUsagePercent: input.storageUsagePercent,
+    // idempotency/nonce reservation の後に Connection 固有 ingress grant を検査し、generic Event grant との両方を要求します。
+    authorizeAfterReplayReservation: (context) => {
+      authorizeIntegrationOperation(
+        input.repositories,
+        context,
+        'integration.ingress.event',
+        'PublishEvent',
+        'ingress',
+        createConnectionCapability(input.agentId, connection),
+        [adapter.ingressGrant]
+      );
+    },
   });
   const deliveryContext =
     deliveryInput === undefined || deliveryContextId === undefined
@@ -237,18 +243,8 @@ export async function publishIntegrationToolResultInStore(input: {
   readonly repositories: AgentStorageRepositories;
 }) {
   assertAgentContext(input.agentId, input.command.context);
-  const invocation = input.repositories.tools.findInvocation(input.command.invocationId);
-  if (invocation === undefined) {
-    throw createAgentDomainError({ kind: 'not_found', message: 'ToolInvocation not found.' });
-  }
-  if (invocation.installationId !== input.command.installationId) {
-    throw createAgentDomainError({
-      kind: 'authorization',
-      message: 'Tool result installation does not own invocation.',
-      target: 'installation_id',
-    });
-  }
-  await verifyIntegrationIngressSignature({
+  // Invocation ownership は signature 成功後まで解決せず、未署名 caller へ Tool ledger の存在を露出しません。
+  const verifiedPrincipal = await verifyIntegrationIngressSignature({
     agentId: input.agentId,
     canonicalBodyDigest: input.command.context.bodyDigest,
     idempotencyKey: requireContextIdempotency(input.command.context),
@@ -258,14 +254,31 @@ export async function publishIntegrationToolResultInStore(input: {
     repositories: input.repositories,
     signature: input.command.signature,
   });
+  // final Tool result authorization と Agent-owned idempotency ledger は verified principal を持つ context だけで実行します。
+  const verifiedContext = withVerifiedIntegrationIngressPrincipal(
+    input.command.context,
+    verifiedPrincipal
+  );
+  const verifiedCommand = { ...input.command, context: verifiedContext };
+  const invocation = input.repositories.tools.findInvocation(verifiedCommand.invocationId);
+  if (invocation === undefined) {
+    throw createAgentDomainError({ kind: 'not_found', message: 'ToolInvocation not found.' });
+  }
+  if (invocation.installationId !== verifiedCommand.installationId) {
+    throw createAgentDomainError({
+      kind: 'authorization',
+      message: 'Tool result installation does not own invocation.',
+      target: 'installation_id',
+    });
+  }
   return recordToolResultInStore({
     agentId: input.agentId,
     command: {
-      context: input.command.context,
-      invocationId: input.command.invocationId,
-      outputRef: input.command.outputPayload?.ref ?? input.command.outputRef,
-      providerOperationId: input.command.providerOperationId,
-      status: input.command.status,
+      context: verifiedContext,
+      invocationId: verifiedCommand.invocationId,
+      outputRef: verifiedCommand.outputPayload?.ref ?? verifiedCommand.outputRef,
+      providerOperationId: verifiedCommand.providerOperationId,
+      status: verifiedCommand.status,
     },
     repositories: input.repositories,
   });

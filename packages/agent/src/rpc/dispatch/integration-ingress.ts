@@ -52,20 +52,31 @@ export async function dispatchPublishIntegrationEvent(
   env: AgentWorkerEnv,
   request: PublishIntegrationEventRequest
 ): Promise<PublishIntegrationEventResponseInit> {
-  // Integration ingress は Provider 署名と unsigned body digest を context に固定してから Agent aggregate へ渡します。
+  // generated request の identity を canonical form に固定してから、Provider 署名検証を行う Agent aggregate へ渡します。
   const agentId = requireAgentId(request.agentId);
+  const installationId = requireIngressIdentity(request.installationId, 'installation_id');
+  const connectionId = requireIngressIdentity(request.connectionId, 'connection_id');
+  const idempotencyKey = requireIngressIdentity(request.idempotencyKey, 'idempotency_key');
   const event = request.event;
-  const context = await createIntegrationIngressContext(agentId, request, 'PublishEvent');
+  const context = await createIntegrationIngressContext(
+    {
+      agentId,
+      idempotencyKey,
+      installationId,
+      request,
+    },
+    'PublishEvent'
+  );
 
   // Event payload と delivery context を generated request から domain command へ写像し、modelPolicyRef も既存通り event 側から伝播します。
   const result = await getAIAgentDurableObjectStub(env, agentId).publishIntegrationEvent({
-    connectionId: request.connectionId,
+    connectionId,
     context,
     deliveryCapability: event?.deliveryContext?.capability,
     deliveryExpiresAtMs: toNumber(event?.deliveryContext?.expiresAtUnixMs),
     deliveryMetadataRef: mapPayloadReference(event?.deliveryContext?.metadataRef),
     eventType: event?.eventType ?? '',
-    installationId: request.installationId,
+    installationId,
     modelPolicyRef: event?.modelPolicyRef,
     occurredAtMs: toNumber(event?.occurredAtUnixMs),
     payload: event?.payload,
@@ -94,13 +105,24 @@ export async function dispatchPublishToolResult(
   env: AgentWorkerEnv,
   request: PublishToolResultRequest
 ): Promise<PublishToolResultResponseInit> {
-  // Tool result callback も ingress context を共有し、status は domain が受け付ける値に限定します。
+  // Tool result callback も ingress context を共有し、Provider の installation/invocation identity を NFC へ正規化します。
   const agentId = requireAgentId(request.agentId);
-  const context = await createIntegrationIngressContext(agentId, request, 'PublishToolResult');
+  const installationId = requireIngressIdentity(request.installationId, 'installation_id');
+  const invocationId = requireIngressIdentity(request.invocationId, 'invocation_id');
+  const idempotencyKey = requireIngressIdentity(request.idempotencyKey, 'idempotency_key');
+  const context = await createIntegrationIngressContext(
+    {
+      agentId,
+      idempotencyKey,
+      installationId,
+      request,
+    },
+    'PublishToolResult'
+  );
   const result = await getAIAgentDurableObjectStub(env, agentId).publishIntegrationToolResult({
     context,
-    installationId: request.installationId,
-    invocationId: request.invocationId,
+    installationId,
+    invocationId,
     outputPayload: mapPayloadReference(request.outputPayload),
     outputRef: request.outputRef,
     providerOperationId: request.providerOperationId,
@@ -126,14 +148,25 @@ export async function dispatchPublishDeliveryResult(
   env: AgentWorkerEnv,
   request: PublishDeliveryResultRequest
 ): Promise<PublishDeliveryResultResponseInit> {
-  // Delivery result callback は delivery context と provider operation の一致検証を AIAgent aggregate に委譲します。
+  // Delivery result callback は delivery/installation identity を固定し、解決済み DeliveryContext との照合を AIAgent aggregate に委譲します。
   const agentId = requireAgentId(request.agentId);
-  const context = await createIntegrationIngressContext(agentId, request, 'PublishDeliveryResult');
+  const installationId = requireIngressIdentity(request.installationId, 'installation_id');
+  const deliveryId = requireIngressIdentity(request.deliveryId, 'delivery_id');
+  const idempotencyKey = requireIngressIdentity(request.idempotencyKey, 'idempotency_key');
+  const context = await createIntegrationIngressContext(
+    {
+      agentId,
+      idempotencyKey,
+      installationId,
+      request,
+    },
+    'PublishDeliveryResult'
+  );
   const result = await getAIAgentDurableObjectStub(env, agentId).publishIntegrationDeliveryResult({
     context,
-    deliveryContextId: request.deliveryContextId,
-    deliveryId: request.deliveryId,
-    installationId: request.installationId,
+    deliveryContextId: normalizeOptionalIngressIdentity(request.deliveryContextId),
+    deliveryId,
+    installationId,
     providerOperationId: request.providerOperationId,
     signature: mapSignatureInput(request),
     status: request.status,
@@ -142,32 +175,43 @@ export async function dispatchPublishDeliveryResult(
 }
 
 async function createIntegrationIngressContext(
-  agentId: string,
-  request: PublishDeliveryResultRequest | PublishIntegrationEventRequest | PublishToolResultRequest,
+  input: {
+    readonly agentId: string;
+    readonly idempotencyKey: string;
+    readonly installationId: string;
+    readonly request:
+      | PublishDeliveryResultRequest
+      | PublishIntegrationEventRequest
+      | PublishToolResultRequest;
+  },
   method: 'PublishDeliveryResult' | 'PublishEvent' | 'PublishToolResult'
 ): Promise<AgentCoreRequestContext> {
-  // detached signature metadata と unsigned body digest を context に格納し、以降の監査・replay・署名検証で同じ値を参照させます。
-  const signature = mapSignatureInput(request);
-  const canonicalBodyDigest = await createUnsignedIngressBodyDigest(request, method);
+  // detached metadata を除いた canonical unsigned Protobuf bytes の digest を一度だけ作り、署名・idempotency の同一入力にします。
+  const signature = mapSignatureInput(input.request);
+  const canonicalBodyDigest = await createUnsignedIngressBodyDigest(input.request, method);
   return {
-    agentId,
+    agentId: input.agentId,
     bodyDigest: canonicalBodyDigest,
-    idempotencyKey: request.idempotencyKey,
+    idempotencyKey: input.idempotencyKey,
     method,
     nonce: signature.nonce,
-    principal: createIntegrationIngressPrincipal(agentId, request.installationId, signature),
+    principal: createUnverifiedIntegrationIngressPrincipal(
+      input.agentId,
+      input.installationId,
+      signature
+    ),
     requestTimestampMs: signature.timestampMs,
     requestedAtMs: Date.now(),
     service: integrationIngressServiceName,
   };
 }
 
-function createIntegrationIngressPrincipal(
+function createUnverifiedIntegrationIngressPrincipal(
   agentId: string,
   installationId: string,
   signature: IntegrationIngressSignatureInput
 ): AgentCoreRequestContext['principal'] {
-  // Provider callback の主体は installation trust key に結び付くため、principalId も installation ID で固定します。
+  // dispatch は routing 用 identity だけを保持し、active trust key が検証した principal へ必ず置換されるまで final authorization に使いません。
   return {
     agentId,
     installationId,
@@ -176,6 +220,25 @@ function createIntegrationIngressPrincipal(
     principalType: 'INTEGRATION_INSTALLATION',
     scopes: [],
   };
+}
+
+function requireIngressIdentity(value: string | undefined, target: string): string {
+  // canonical signature base と storage lookup の双方で同じ NFC-trimmed identity を使い、表記揺れを拒否します。
+  const normalized = value?.trim().normalize('NFC');
+  if (normalized === undefined || normalized === '') {
+    throw createAgentDomainError({
+      kind: 'validation',
+      message: `Integration ingress ${target} is required.`,
+      target,
+    });
+  }
+  return normalized;
+}
+
+function normalizeOptionalIngressIdentity(value: string | undefined): string | undefined {
+  // optional identity は空文字を未指定へ揃え、canonical signature base の `-` sentinel と同じ意味にします。
+  const normalized = value?.trim().normalize('NFC');
+  return normalized === undefined || normalized === '' ? undefined : normalized;
 }
 
 function normalizeToolResultStatus(status: string): 'failed' | 'succeeded' {

@@ -22,6 +22,14 @@ interface AgentRunsPageProps {
   }>;
 }
 
+type RunListDisplayData = NonNullable<Awaited<ReturnType<typeof listRuns>>['displayData']['data']>;
+type ToolListDisplayData = NonNullable<
+  Awaited<ReturnType<typeof listTools>>['displayData']['data']
+>;
+type InvocationListDisplayData = NonNullable<
+  Awaited<ReturnType<typeof listInvocations>>['displayData']['data']
+>;
+
 /**
  * Agent Run history 画面（AGENT-MANAGEMENT-UI-S005 / S007 / S019 / S020）。
  *
@@ -37,29 +45,53 @@ export default async function AgentRunsPage({ params, searchParams }: AgentRunsP
 
   // Acting user は Client server-side metadata であり、Agent RPC data の可否と独立して取得する。
   const actingOperatorId = await getActingOperatorId();
-  // Agent RPC / credential resolution の失敗時も Runs route 自体は落とさず、safe fallback を描画する。
-  let dataUnavailable = false;
-  let runs: Awaited<ReturnType<typeof listRuns>> = { items: [], page: { resultCount: 0 } };
-  let tools: Awaited<ReturnType<typeof listTools>> = { items: [], page: { resultCount: 0 } };
-  let invocations: Awaited<ReturnType<typeof listInvocations>> = {
+  // Agent RPC / credential resolution の失敗時も、成功した sibling section を破棄せず section ごとの safe fallback を描画する。
+  let runsUnavailable = false;
+  let toolsUnavailable = false;
+  let invocationsUnavailable = false;
+  let runs: RunListDisplayData = { items: [], page: { resultCount: 0 } };
+  let tools: ToolListDisplayData = { items: [], page: { resultCount: 0 } };
+  let invocations: InvocationListDisplayData = {
     items: [],
     page: { resultCount: 0 },
   };
 
-  try {
-    // Run 一覧と Tool 文脈データを並行取得する。両者とも server-side Agent RPC 経由。
-    [runs, tools, invocations] = await Promise.all([
-      listRuns(agentId, {
-        threadId: thread,
-        status: status === 'all' ? undefined : status,
-        page: { pageToken },
-      }),
-      listTools(agentId, { includeUnavailable: false }),
-      listInvocations(agentId, { status: 'pending_approval', page: {} }),
-    ]);
-  } catch {
-    // 例外詳細は secret-safe ではない可能性があるため Browser payload に含めない。
-    dataUnavailable = true;
+  // Run/Tool/Invocation は独立した Agent RPC result なので allSettled で取得し、1 section の failure を他 section の成功へ伝播させません。
+  const [runSettled, toolSettled, invocationSettled] = await Promise.allSettled([
+    listRuns(agentId, {
+      threadId: thread,
+      status: status === 'all' ? undefined : status,
+      page: { pageToken },
+    }),
+    listTools(agentId, { includeUnavailable: false }),
+    listInvocations(agentId, { status: 'pending_approval', page: {} }),
+  ]);
+  if (
+    runSettled.status === 'fulfilled' &&
+    runSettled.value.safeStatus === 'succeeded' &&
+    runSettled.value.displayData.data !== undefined
+  ) {
+    runs = runSettled.value.displayData.data;
+  } else {
+    runsUnavailable = true;
+  }
+  if (
+    toolSettled.status === 'fulfilled' &&
+    toolSettled.value.safeStatus === 'succeeded' &&
+    toolSettled.value.displayData.data !== undefined
+  ) {
+    tools = toolSettled.value.displayData.data;
+  } else {
+    toolsUnavailable = true;
+  }
+  if (
+    invocationSettled.status === 'fulfilled' &&
+    invocationSettled.value.safeStatus === 'succeeded' &&
+    invocationSettled.value.displayData.data !== undefined
+  ) {
+    invocations = invocationSettled.value.displayData.data;
+  } else {
+    invocationsUnavailable = true;
   }
 
   return (
@@ -69,22 +101,26 @@ export default async function AgentRunsPage({ params, searchParams }: AgentRunsP
       signalLabel={`Agent ${agentId} › Runs`}
       description="Run history with sequence, status, causal links, and contextual Tool approval."
     >
-      {dataUnavailable ? <AgentDataUnavailableAlert screenName="Runs" /> : null}
+      {runsUnavailable ? <AgentDataUnavailableAlert screenName="Run history" /> : null}
       {/* 文脈 detail: Tool catalog と pending ToolInvocation を Runs context で扱う（タスク 2.6 / 3.7）。 */}
-      <RunList
-        agentId={agentId}
-        runs={runs.items}
-        page={runs.page}
-        threadFilter={thread ?? ''}
-        statusFilter={status ?? 'all'}
-        onGetRun={getRun}
-        onCancelRun={cancelRun}
-      />
+      {runsUnavailable ? null : (
+        <RunList
+          agentId={agentId}
+          runs={runs.items}
+          page={runs.page}
+          threadFilter={thread ?? ''}
+          statusFilter={status ?? 'all'}
+          onGetRun={getRun}
+          onCancelRun={cancelRun}
+        />
+      )}
       <ToolView
         agentId={agentId}
         tools={tools.items}
         invocations={invocations.items}
         invocationPage={invocations.page}
+        toolsUnavailable={toolsUnavailable}
+        invocationsUnavailable={invocationsUnavailable}
         statusFilter="pending_approval"
         actingOperatorId={actingOperatorId}
         onGetInvocation={getInvocation}

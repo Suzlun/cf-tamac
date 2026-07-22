@@ -1,4 +1,7 @@
-export { saveDefaultModelPolicy } from './agent-operations/default-model-policy';
+export {
+  reconcileDefaultModelPolicy,
+  saveDefaultModelPolicy,
+} from './agent-operations/default-model-policy';
 export {
   installIntegration,
   listInstallations,

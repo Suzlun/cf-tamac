@@ -2,10 +2,12 @@ import {
   assertAgentContext,
   authorizeAgentOperation,
   checkAgentIdempotency,
+  completeAgentIdempotencyRecord,
+  failAgentIdempotencyRecord,
   mapAgentEventRow,
   mapAgentRunRow,
   mapAgentThreadRow,
-  recordAgentIdempotency,
+  reserveAgentIdempotencyRecord,
   reserveAgentNonce,
 } from '../domain/agent-operation-utils';
 import { createAgentDomainError } from '../domain/errors';
@@ -44,6 +46,8 @@ import type { AgentStorageRepositories } from '../storage';
  */
 export type AgentEventBlobWriter = AgentImmutableBlobWriter;
 
+const publishEventOperationName = 'AgentEventService.PublishEvent';
+
 interface RequestedModelPolicyContext {
   readonly source: 'client_override' | 'integration_override';
   readonly summary: NonNullable<AgentEventView['modelPolicy']>;
@@ -78,6 +82,10 @@ interface RequestedModelPolicyContext {
  */
 export async function publishEventInStore(input: {
   readonly agentId: string;
+  /**
+   * idempotency/nonce reservation 成功後、generic Event authorization より前に実行する追加の Agent-owned authorization です。
+   */
+  readonly authorizeAfterReplayReservation?: (context: AgentCoreRequestContext) => void;
   readonly blobWriter: AgentEventBlobWriter;
   readonly command: PublishAgentEventCommand;
   readonly repositories: AgentStorageRepositories;
@@ -85,23 +93,42 @@ export async function publishEventInStore(input: {
 }): Promise<PublishAgentEventResult> {
   assertAgentContext(input.agentId, input.command.context);
   assertPublicThreadKey(input.command.threadKey);
-  const replay = checkAgentIdempotency<PublishAgentEventResult>({
-    context: input.command.context,
-    operationName: 'AgentEventService.PublishEvent',
-    repositories: input.repositories,
+  // nonce と idempotency record は、外部 blob writer が Durable Object を interleave する前に同じ SQLite transaction で予約します。
+  const replay = input.repositories.transaction((repositories) => {
+    const existing = checkAgentIdempotency<PublishAgentEventResult>({
+      context: input.command.context,
+      operationName: publishEventOperationName,
+      repositories,
+    });
+    if (existing.status === 'replay') return existing;
+
+    // 署名検証済み principal の nonce と command key を同時に確保し、並行 retry が外部書込みへ到達しないようにします。
+    reserveAgentNonce(repositories, input.command.context);
+    reserveAgentIdempotencyRecord({
+      context: input.command.context,
+      operationName: publishEventOperationName,
+      repositories,
+    });
+    // Provider ingress は reservation 後に Connection 固有 grant を検査し、generic Event grant だけの迂回を防ぎます。
+    input.authorizeAfterReplayReservation?.(input.command.context);
+    authorizeEventOperation(repositories, input.command.context, 'event.publish', 'PublishEvent');
+    return existing;
   });
   if (replay.status === 'replay') return { ...replay.response, replayed: true };
-  reserveAgentNonce(input.repositories, input.command.context);
-  authorizeEventOperation(
-    input.repositories,
-    input.command.context,
-    'event.publish',
-    'PublishEvent'
-  );
-  const result = await appendEvent(input);
-  recordAgentIdempotency({
+  let result: PublishAgentEventResult;
+  try {
+    result = await appendEvent(input);
+  } catch (error) {
+    // blob/R2 write など Event commit 前の失敗は ledger に明示し、同一 key の再実行を fail closed にします。
+    failAgentIdempotencyRecord({
+      context: input.command.context,
+      repositories: input.repositories,
+    });
+    throw error;
+  }
+  // Event/Run の durable commit 後だけ replay response を確定し、成功した retry を元の結果へ収束させます。
+  completeAgentIdempotencyRecord({
     context: input.command.context,
-    operationName: 'AgentEventService.PublishEvent',
     repositories: input.repositories,
     response: result,
   });

@@ -22,6 +22,10 @@ import {
 import { DangerZoneSection, DestroyConfirmField } from './settings-danger-zone';
 
 import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
+import type {
   BrowserSafeModelPolicyMetadata,
   BrowserSafeModelPolicyMutationResult,
   BrowserSafeModelPolicySaveResult,
@@ -54,14 +58,16 @@ interface AgentSettingsFormProps {
     agentId: string,
     idempotencyKey: string,
     config: Record<string, unknown>
-  ) => Promise<ConfigSnapshot>;
+  ) => Promise<BrowserSafeActionResult<ConfigSnapshot>>;
   readonly onRotateCredential: (
     agentId: string,
     idempotencyKey: string
-  ) => Promise<{
-    readonly credential?: CredentialSnapshot;
-    readonly previousCredential?: CredentialSnapshot;
-  }>;
+  ) => Promise<
+    BrowserSafeActionResult<{
+      readonly credential?: CredentialSnapshot;
+      readonly previousCredential?: CredentialSnapshot;
+    }>
+  >;
   readonly onSaveAccessLookup: (input: {
     readonly agentId: string;
     readonly referenceValue: string;
@@ -79,12 +85,21 @@ interface AgentSettingsFormProps {
     idempotencyKey: string,
     draft: ModelPolicyDraftValues
   ) => Promise<BrowserSafeModelPolicySaveResult>;
+  readonly onReconcileDefaultModelPolicy: (
+    agentId: string,
+    operationKey: string,
+    draft: ModelPolicyDraftValues
+  ) => Promise<BrowserSafeModelPolicySaveResult>;
   readonly onDestroy: (
     agentId: string,
     idempotencyKey: string,
     reason: string
-  ) => Promise<{ readonly status: string }>;
+  ) => Promise<BrowserSafeActionResult<{ readonly status: string }>>;
 }
+
+type BrowserSafeActionResult<TData> = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: TData }
+>;
 
 interface SettingsState {
   readonly pending: boolean;
@@ -165,7 +180,7 @@ export function AgentSettingsForm(props: AgentSettingsFormProps) {
   };
 
   return (
-    <ControlRoomFrame title={`Agent registry › ${props.agentId}`} signalLabel="settings">
+    <ControlRoomFrame title={`Agentレジストリ › ${props.agentId}`} signalLabel="設定">
       <SettingsContent
         {...props}
         state={state}
@@ -208,18 +223,24 @@ function createSettingsHandlers(
     try {
       // Zod validation 済みでも submit 直前に再 parse し、直接呼び出しや race で壊れた JSON を Server Action へ渡さない。
       parsed = parseAgentConfigJson(configJson);
-    } catch (error_) {
-      updateState({ error: error_ instanceof Error ? error_.message : 'Config update failed.' });
+    } catch {
+      // parser/server exception の message を画面に渡さず、固定安全文言だけを表示します。
+      updateState({ error: 'Config update failed.' });
       return false;
     }
     updateState({ pending: true });
     try {
       const result = await props.onUpdateConfig(props.agentId, generateIdempotencyKey(), parsed);
-      updateState({ success: `Config updated to v${result.configVersion}.` });
+      if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+        updateState({ error: result.displayData.message });
+        return false;
+      }
+      updateState({ success: result.displayData.message });
       router.refresh();
       return true;
-    } catch (error_) {
-      updateState({ error: error_ instanceof Error ? error_.message : 'Config update failed.' });
+    } catch {
+      // Server Action 契約外の rejection でも raw diagnostic を表示しません。
+      updateState({ error: 'Config update failed.' });
       return false;
     } finally {
       updateState({ pending: false });
@@ -229,19 +250,13 @@ function createSettingsHandlers(
   const handleValidateModelPolicy = async (
     draft: ModelPolicyDraftValues
   ): Promise<BrowserSafeModelPolicyMutationResult> => {
-    updateState({ error: undefined, success: undefined, pending: true });
+    // ポリシー検証は保存を伴わないため、設定全体の保存 pending に混在させません。
+    // `ModelPolicyFields` が検証専用の live status と control disabled 状態を担当します。
+    updateState({ error: undefined, success: undefined });
     try {
       return await props.onValidateModelPolicy(props.agentId, draft);
-    } catch (error_) {
-      return {
-        ok: false,
-        fieldErrors: {},
-        formError:
-          error_ instanceof Error ? error_.message : 'Default model policy validation failed.',
-        warnings: [],
-      };
-    } finally {
-      updateState({ pending: false });
+    } catch {
+      return createModelPolicyValidationFailure();
     }
   };
 
@@ -252,20 +267,17 @@ function createSettingsHandlers(
     updateState({ error: undefined, success: undefined, pending: true });
     try {
       const result = await props.onSaveDefaultModelPolicy(props.agentId, idempotencyKey, draft);
-      if (result.ok && result.metadata !== undefined) {
-        updateState({
-          success: `Default model policy saved as ${result.metadata.policyRef}; config updated to v${result.configVersion ?? result.metadata.configVersion ?? 'unknown'}.`,
-        });
+      if (
+        result.safeStatus === 'succeeded' &&
+        result.displayData.ok &&
+        result.displayData.metadata !== undefined
+      ) {
+        // 保存成功の通知と metadata 更新は ModelPolicySettingsSection の単一 ResultRegion が担います。
         router.refresh();
       }
       return result;
-    } catch (error_) {
-      return {
-        ok: false,
-        fieldErrors: {},
-        formError: error_ instanceof Error ? error_.message : 'Default model policy save failed.',
-        warnings: [],
-      };
+    } catch {
+      return createModelPolicySaveFailure();
     } finally {
       updateState({ pending: false });
     }
@@ -275,18 +287,23 @@ function createSettingsHandlers(
     updateState({ error: undefined, success: undefined, pending: true });
     try {
       const result = await props.onRotateCredential(props.agentId, generateIdempotencyKey());
-      const generation = result.credential?.generation ?? 0;
+      if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+        updateState({ error: result.displayData.message });
+        return undefined;
+      }
+      const generation = result.displayData.data.credential?.generation ?? 0;
       updateState({
         success:
-          result.credential !== undefined
+          result.displayData.data.credential !== undefined
             ? `Credential generation ${String(generation)} is active.`
             : 'Credential rotation accepted.',
       });
       router.refresh();
       return { generation };
-    } catch (error_) {
+    } catch {
+      // credential rotation の例外詳細は Browser に出さず、固定安全文言へ丸めます。
       updateState({
-        error: error_ instanceof Error ? error_.message : 'Credential rotation failed.',
+        error: 'Credential rotation failed.',
       });
       return undefined;
     } finally {
@@ -308,9 +325,10 @@ function createSettingsHandlers(
       updateState({ success: 'New credential reference saved.' });
       router.refresh();
       return true;
-    } catch (error_) {
+    } catch {
+      // Client D1 action の内部 detail は管理画面へ返さず、再試行可能な固定文言を使います。
       updateState({
-        error: error_ instanceof Error ? error_.message : 'Could not save credential reference.',
+        error: 'Could not save credential reference.',
       });
       return false;
     } finally {
@@ -321,15 +339,20 @@ function createSettingsHandlers(
   const handleDestroy = async (): Promise<void> => {
     updateState({ error: undefined, success: undefined, pending: true });
     try {
-      await props.onDestroy(
+      const result = await props.onDestroy(
         props.agentId,
         generateIdempotencyKey(),
         'destroyed from management UI'
       );
+      if (result.safeStatus === 'failed') {
+        updateState({ error: result.displayData.message });
+        return;
+      }
       router.push('/agents');
-    } catch (error_) {
+    } catch {
+      // destroy action の raw error は安全な result contract 外なので Browser 表示へ使いません。
       updateState({
-        error: error_ instanceof Error ? error_.message : 'Agent destruction failed.',
+        error: 'Agent destruction failed.',
         pending: false,
       });
     }
@@ -342,6 +365,38 @@ function createSettingsHandlers(
     handleRotate,
     handleSaveNewReference,
     handleDestroy,
+  };
+}
+
+function createModelPolicyValidationFailure(): BrowserSafeModelPolicyMutationResult {
+  return {
+    correlationId: globalThis.crypto.randomUUID(),
+    displayData: {
+      fieldErrors: {},
+      message: 'ポリシーの検証結果を確認できません。時間をおいてもう一度実行してください。',
+      ok: false,
+      title: '操作を再実行できます',
+      warnings: [],
+    },
+    safeErrorCategory: 'internal',
+    safeStatus: 'failed',
+  };
+}
+
+function createModelPolicySaveFailure(): BrowserSafeModelPolicySaveResult {
+  return {
+    correlationId: globalThis.crypto.randomUUID(),
+    displayData: {
+      configVersion: undefined,
+      fieldErrors: {},
+      message:
+        'Agent設定は直前の確定値を保持しています。時間をおいて「もう一度保存」を実行してください。',
+      ok: false,
+      title: '操作を再実行できます',
+      warnings: [],
+    },
+    safeErrorCategory: 'internal',
+    safeStatus: 'failed',
   };
 }
 
@@ -376,6 +431,7 @@ function SettingsContent({
   onSaveConfig,
   onValidatePolicyDraft,
   onSaveDefaultPolicyDraft,
+  onReconcileDefaultModelPolicy,
   onRotate,
   onSaveNewReference,
   onOpenDestroyDialog,
@@ -384,11 +440,10 @@ function SettingsContent({
 }: SettingsContentProps) {
   return (
     <>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Settings</p>
-      <h2>Agent configuration and credentials</h2>
+      <h2>Agent設定とcredential</h2>
       <AgentToken agentId={agentId} />
       <p className="text-sm text-muted-foreground">
-        Managing {displayName}. Changes are sent through server-side Agent RPC.
+        「{displayName}」を管理しています。変更はサーバー側Agent RPCを通じて送信されます。
       </p>
 
       {initialNotice !== undefined ? (
@@ -411,6 +466,9 @@ function SettingsContent({
         pending={state.pending}
         onValidatePolicy={onValidatePolicyDraft}
         onSavePolicy={onSaveDefaultPolicyDraft}
+        onReconcilePolicy={(operationKey, draft) =>
+          onReconcileDefaultModelPolicy(agentId, operationKey, draft)
+        }
       />
 
       <AgentConfigSection

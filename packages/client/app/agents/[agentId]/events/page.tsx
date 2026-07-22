@@ -34,16 +34,27 @@ export default async function AgentEventsPage({ params, searchParams }: AgentEve
   const { thread, type, pageToken } = await searchParams;
   try {
     // Thread 選択肢と Event 一覧は Agent-owned data なので、server-side Agent RPC に閉じて取得する。
-    const threads = await listThreads(agentId);
+    const threadResult = await listThreads(agentId);
+    if (threadResult.safeStatus === 'failed' || threadResult.displayData.data === undefined) {
+      return renderEventsUnavailable(agentId);
+    }
+    const threads = threadResult.displayData.data;
     const selectedThreadId = thread ?? threads.items[0]?.threadId ?? '';
-    const events =
+    const eventResult =
       selectedThreadId === ''
-        ? { items: [], page: { resultCount: 0 } }
+        ? undefined
         : await listEvents(agentId, {
             threadId: selectedThreadId,
             eventType: type === 'all' ? undefined : type,
             page: { pageToken },
           });
+    if (
+      eventResult?.safeStatus === 'failed' ||
+      (eventResult !== undefined && eventResult.displayData.data === undefined)
+    ) {
+      return renderEventsUnavailable(agentId);
+    }
+    const events = eventResult?.displayData.data ?? { items: [], page: { resultCount: 0 } };
 
     return (
       <EventList
@@ -57,10 +68,15 @@ export default async function AgentEventsPage({ params, searchParams }: AgentEve
     );
   } catch {
     // Agent RPC / credential resolution failure は Next error page へ漏らさず、secret-free alert だけを表示する。
-    return (
-      <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="events">
-        <AgentDataUnavailableAlert screenName="Events" />
-      </ControlRoomFrame>
-    );
+    return renderEventsUnavailable(agentId);
   }
+}
+
+function renderEventsUnavailable(agentId: string) {
+  // four-field failure の raw detail は読まず、route shell 内の固定安全 alert だけを表示します。
+  return (
+    <ControlRoomFrame title={`Agent registry › ${agentId}`} signalLabel="events">
+      <AgentDataUnavailableAlert screenName="Events" />
+    </ControlRoomFrame>
+  );
 }

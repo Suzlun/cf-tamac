@@ -51,6 +51,15 @@ export const clientManagedAgentsTable = sqliteTable('client_managed_agents', {
   signingKeyId: text('signing_key_id'),
   signingPublicFingerprint: text('signing_public_fingerprint'),
   signingLastVerifiedAtMs: integer('signing_last_verified_at_ms'),
+  // create attempt の再送・照合に使う Client-owned ledger metadata。Agent profile/config の snapshot は保持しない。
+  registrationState: text('registration_state').notNull().default('active'),
+  registrationAttemptId: text('registration_attempt_id'),
+  initializationIdempotencyKey: text('initialization_idempotency_key'),
+  registrationRequestDigest: text('registration_request_digest'),
+  registrationModelPolicyRef: text('registration_model_policy_ref'),
+  registrationLastFailurePhase: text('registration_last_failure_phase'),
+  registrationLastFailureCategory: text('registration_last_failure_category'),
+  registrationLastFailureCorrelationId: text('registration_last_failure_correlation_id'),
 });
 
 /**
@@ -132,6 +141,14 @@ export const clientManagedAgentsTableMetadata = {
     'signing_key_id',
     'signing_public_fingerprint',
     'signing_last_verified_at_ms',
+    'registration_state',
+    'registration_attempt_id',
+    'initialization_idempotency_key',
+    'registration_request_digest',
+    'registration_model_policy_ref',
+    'registration_last_failure_phase',
+    'registration_last_failure_category',
+    'registration_last_failure_correlation_id',
   ],
 } as const satisfies ClientD1TableDefinition;
 

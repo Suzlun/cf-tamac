@@ -19,6 +19,7 @@ const unstableProtoFixture = new URL(
   '../../../../scripts/codegen/fixtures/protobuf-field-stability/unstable-descriptors.proto',
   import.meta.url
 );
+const agentProtoPath = new URL('../../proto/cftamac/agent/v1.proto', import.meta.url);
 
 function collectFiles(root: URL, suffix: string): string[] {
   const rootPath = fileURLToPath(root.href);
@@ -176,6 +177,23 @@ describe('Agent protobuf field stability', () => {
         expect.stringContaining('duplicate method'),
         expect.stringContaining('duplicate service'),
       ])
+    );
+  });
+
+  it('[AGENT-PLATFORM-S014] pins initialization receipt field numbers across request and responses', () => {
+    const proto = readFileSync(fileURLToPath(agentProtoPath.href), 'utf8');
+
+    expect(proto).toMatch(
+      /message AgentInitializationReceipt \{[\s\S]*string idempotency_key = 1;[\s\S]*string registration_request_digest = 2;/u
+    );
+    expect(proto).toMatch(
+      /message InitializeAgentRequest \{[\s\S]*string registration_request_digest = 8;/u
+    );
+    expect(proto).toMatch(
+      /message InitializeAgentResponse \{[\s\S]*AgentInitializationReceipt initialization_receipt = 7;/u
+    );
+    expect(proto).toMatch(
+      /message GetAgentResponse \{[\s\S]*AgentInitializationReceipt initialization_receipt = 6;/u
     );
   });
 });

@@ -3,11 +3,16 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { OperationResultRegion } from './operation-result-region';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
 import type {
   BrowserSafeHealthVerificationResult,
   BrowserSafeSigningKey,
@@ -33,7 +38,7 @@ export interface AgentSigningKeySelectProps {
     readonly keyId: string;
     readonly publicFingerprint: string;
   }) => Promise<unknown>;
-  readonly runHealthCheckAction: (agentId: string) => Promise<BrowserSafeHealthVerificationResult>;
+  readonly runHealthCheckAction: (agentId: string) => Promise<BrowserSafeHealthActionResult>;
 }
 
 /**
@@ -96,7 +101,8 @@ export function AgentSigningKeySelect(props: AgentSigningKeySelectProps): ReactN
   }
 
   async function runHealthCheck(): Promise<void> {
-    setSelectionState((current) => ({ ...current, verifying: true }));
+    // 新しい Health Check 開始時に前回の結果を消し、pending 表示と最終結果が一つの ResultRegion を共有するようにする。
+    setSelectionState((current) => ({ ...current, healthResult: undefined, verifying: true }));
     try {
       const result = await runHealthCheckAction(agentId);
       setSelectionState((current) => ({ ...current, healthResult: result }));
@@ -126,6 +132,7 @@ export function AgentSigningKeySelect(props: AgentSigningKeySelectProps): ReactN
           lastVerifiedAtMs={lastVerifiedAtMs}
           healthResult={selectionState.healthResult}
           hasSelection={hasSelection}
+          verifying={selectionState.verifying}
         />
       </div>
     </section>
@@ -136,8 +143,12 @@ interface SelectionState {
   readonly selectedRef: string;
   readonly saving: boolean;
   readonly verifying: boolean;
-  readonly healthResult?: BrowserSafeHealthVerificationResult;
+  readonly healthResult?: BrowserSafeHealthActionResult;
 }
+
+type BrowserSafeHealthActionResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: BrowserSafeHealthVerificationResult }
+>;
 
 function initialSelectionState(
   activeKeys: readonly BrowserSafeSigningKey[],
@@ -232,9 +243,13 @@ function AgentSelectionControls({
           onSubmit={onSaveSelection}
         />
       )}
-      <form onSubmit={onRunHealthCheck}>
+      <form onSubmit={onRunHealthCheck} aria-busy={selectionState.verifying}>
         <input type="hidden" name="agentId" value={agentId} />
-        <Button type="submit" disabled={noGlobalKeys || !hasSelection || selectionState.verifying}>
+        <Button
+          type="submit"
+          className="min-h-11"
+          disabled={noGlobalKeys || !hasSelection || selectionState.verifying}
+        >
           {selectionState.verifying ? 'Verifying…' : 'Run Health Check'}
         </Button>
         {noGlobalKeys || !hasSelection ? (
@@ -259,7 +274,7 @@ function NoGlobalKeysCard(): ReactNode {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="min-h-11">
           <Link href="/global-settings/signing-keys">Open Global Settings / Signing Keys</Link>
         </Button>
       </CardContent>
@@ -295,7 +310,7 @@ function SelectionFormCard({
               const ref = encodeSigningKeyRef({ issuer: key.issuer, keyId: key.keyId });
               const inputId = `agent-key-${String(index)}`;
               return (
-                <label key={ref} className="flex items-start gap-2 text-sm">
+                <label key={ref} className="flex min-h-11 items-center gap-2 text-sm">
                   <RadioGroupItem value={ref} id={inputId} />
                   <span>
                     <span className="font-medium">
@@ -309,7 +324,7 @@ function SelectionFormCard({
               );
             })}
           </RadioGroup>
-          <Button type="submit" disabled={saving || selectedRef === ''}>
+          <Button type="submit" className="min-h-11" disabled={saving || selectedRef === ''}>
             {saving ? 'Saving…' : 'Save Agent Selection'}
           </Button>
         </form>
@@ -325,24 +340,43 @@ function AgentVerificationPanel({
   lastVerifiedAtMs,
   healthResult,
   hasSelection,
+  verifying,
 }: {
   readonly selectedIssuer?: string;
   readonly selectedKeyId?: string;
   readonly selectedPublicFingerprint?: string;
   readonly lastVerifiedAtMs?: number;
-  readonly healthResult?: BrowserSafeHealthVerificationResult;
+  readonly healthResult?: BrowserSafeHealthActionResult;
   readonly hasSelection: boolean;
+  readonly verifying: boolean;
 }): ReactNode {
   return (
     <div className="space-y-4">
+      <OperationResultRegion
+        result={healthResult}
+        pending={verifying}
+        pendingTitle="Health Check を実行しています"
+        pendingMessage="Agent Worker の信頼設定と選択済み署名鍵を照合しています…"
+      />
       <SelectedKeySummary
         selectedIssuer={selectedIssuer}
         selectedKeyId={selectedKeyId}
         selectedPublicFingerprint={selectedPublicFingerprint}
       />
       <CurrentTrustMatch healthResult={healthResult} />
-      <LastVerifiedCard lastVerifiedAtMs={lastVerifiedAtMs} healthResult={healthResult} />
-      <DiagnosticCard diagnostic={healthResult?.diagnostic} />
+      <LastVerifiedCard
+        lastVerifiedAtMs={lastVerifiedAtMs}
+        healthResult={
+          healthResult?.safeStatus === 'succeeded' ? healthResult.displayData.data : undefined
+        }
+      />
+      <DiagnosticCard
+        diagnostic={
+          healthResult?.safeStatus === 'succeeded'
+            ? healthResult.displayData.data?.diagnostic
+            : undefined
+        }
+      />
       {!hasSelection ? (
         <Card>
           <CardHeader>
@@ -410,10 +444,25 @@ function SelectedKeySummary({
 function CurrentTrustMatch({
   healthResult,
 }: {
-  readonly healthResult?: BrowserSafeHealthVerificationResult;
+  readonly healthResult?: BrowserSafeHealthActionResult;
 }): ReactNode {
-  const matched = healthResult?.ok === true;
-  const mismatched = healthResult?.ok === false && healthResult.diagnostic !== undefined;
+  if (healthResult?.safeStatus === 'failed') {
+    // failure の通知・focus・support ID は共通 ResultRegion が担当し、この card は trust 未確認を未登録と誤認させない補足だけを示す。
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Trust Match</CardTitle>
+          <CardDescription>
+            最新のHealth
+            Check結果を確認できませんでした。上の安全な結果を確認してから再実行してください。
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+  const displayData = healthResult?.displayData.data;
+  const matched = displayData?.ok === true;
+  const mismatched = displayData?.ok === false && displayData.diagnostic !== undefined;
   return (
     <Card>
       <CardHeader>
@@ -509,7 +558,7 @@ function NextStepGuidance({
   healthResult,
   hasSelection,
 }: {
-  readonly healthResult?: BrowserSafeHealthVerificationResult;
+  readonly healthResult?: BrowserSafeHealthActionResult;
   readonly hasSelection: boolean;
 }): ReactNode {
   return (
@@ -520,7 +569,12 @@ function NextStepGuidance({
       <CardContent className="space-y-1 text-sm text-muted-foreground">
         {!hasSelection ? (
           <p>Save a Global signing key selection for this Agent.</p>
-        ) : healthResult?.ok === true ? (
+        ) : healthResult?.safeStatus === 'failed' ? (
+          <p>
+            安全な結果を確認してから、選択済みの署名鍵と Agent RPC
+            接続設定を見直し、ヘルスチェックを再実行してください。
+          </p>
+        ) : healthResult?.displayData.data?.ok === true ? (
           <p>
             Verification passed. Overview, Threads, Events, Runs, Schedules, Integrations, and
             Settings show live Agent data.

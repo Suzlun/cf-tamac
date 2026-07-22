@@ -6,9 +6,10 @@
 
 - `1 Agent ID = 1 AIAgent Durable Object instance = 1 AI Agent aggregate root` です。
 - `packages/agent` は Agent Service Worker です。Cloudflare Agents SDK、SQLite-backed Durable Objects、Agent-owned blob storage、Connect binary Protobuf RPC facade、Agent-local Queue を持ちます。
-- `packages/client` は Management Client Worker です。Next.js on Cloudflare Workers と Client 専用 D1 により、管理対象 Agent ID、Agent RPC origin、表示設定、credential reference を管理します。
+- `packages/sdk` は `@cf-tamac/sdk` の server-side Agent RPC SDK です。`TamacAgentClient` は Client Service の Ed25519 JWT operation aggregate、`TamacProviderIngressClient` は Provider の Ed25519 detached-signature ingress aggregate であり、両者の principal/context を混在させません。
+- `packages/client` は Management Client Worker です。Next.js on Cloudflare Workers と Client 専用 D1 により、管理対象 Agent ID、canonical Agent RPC origin、表示設定、credential reference を管理します。Client Service JWT の送信先は server-managed `AGENT_RPC_ALLOWED_ORIGINS` で承認済みの origin だけです。
 - Integration Provider は Agent Service の外側に置きます。Discord、Slack、Email、Webhook などの外部 protocol を Adapter/Tool/Delivery capability として Agent Event/RPC に接続します。
-- Browser は Agent RPC を直接呼びません。Management Client の Server Components / Server Actions / server-only modules が Agent RPC を呼びます。
+- Browser は Agent RPC を直接呼びません。Management Client の Server Components / Server Actions / server-only SDK adapter が Agent RPC を呼びます。browser-visible module は SDK、Connect runtime、generated RPC descriptor、credential、JWT signing を import しません。
 
 ## Agent Service
 
@@ -45,6 +46,9 @@
 
 - Agent registry、Agent detail、Thread/Event/Run/Compaction、Schedule、Tool approval、Integration install/uninstall、Agent settings を管理する UI です。
 - Agent credential material、Agent RPC client construction、Agent runtime imports は browser bundle に入りません。
+- Client server-only SDK adapter は Client D1、encrypted Client Service signing key store、acting user policy、managed Agent resolution を所有し、解決した server-side context で `@cf-tamac/sdk` を構築します。これらの Client-owned responsibility を SDK に移しません。
+- `AGENT_RPC_ALLOWED_ORIGINS` は unique canonical HTTPS origin を持つ non-empty JSON array です。登録入力は canonicalize 後に exact match で承認し、Client D1 から読み直した origin も signing key、acting user、SDK transport の解決前に current policy で再検証します。
+- SDK-backed Server Action は成功・失敗とも `displayData`、`safeStatus`、`safeErrorCategory`、secret-free `correlationId` の四属性だけを Browser に返します。raw Connect/SDK diagnostic、credential、JWT、signing key、origin policy detail は返しません。
 - private JWK、encrypted private JWK、生 JWT、Agent RPC signing logic は browser response、bundle、storage、public Client route に入りません。
 - `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding route は公開しません。
 - Server Actions と Server Components は UI 内部の execution boundary であり、Agent public API ではありません。
@@ -56,6 +60,7 @@
 - `Global Settings > Trust Config Export` は Agent Worker の Variables and Secrets に設定できる public-only `AGENT_CONTROL_PLANE_TRUST` JSON を出力します。出力には private key parameter `d`、private JWK、encrypted private JWK、生 JWT を含めません。
 - Agent Worker の監査識別子 hash は `AGENT_AUDIT_HASH_PEPPER` を使う HMAC で生成し、既知 user ID / email の辞書照合を防ぎます。
 - Rotation は新 key 追加、旧 key `retiring`、Agent health verification、旧 key `revoked` の順で進めます。Emergency revoke と break-glass recovery は Dashboard/API/Wrangler で Agent trust config を更新し、Health Check で確認します。
+- Integration Provider は Client Service JWT を使わず、`PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` だけを Ed25519 detached signature で呼びます。Agent は active Installation/trust key、unsigned Protobuf digest、signature、request identity、Agent-owned fixed `300_000` ms timestamp window を検証して `INTEGRATION_INSTALLATION` principal を構築し、その後に nonce/idempotency と Agent-local authorization を処理します。
 
 ## Self-host Deploy
 
@@ -65,7 +70,7 @@
 
 - Primary install path は Cloudflare Dashboard の Deploy flow です。利用者に repository clone、local `pnpm install`、local `wrangler` 操作を要求しません。
 - Agent Deploy Button を先に押し、`AI_AGENT` Durable Object、SQLite migration、`AGENT_BLOBS` R2、Workers AI `AI` binding、`AGENT_RPC_AUDIENCE` を持つ Agent Worker を deploy します。
-- Client Deploy Button を後に押し、`CLIENT_DB` D1、`AGENT_RPC_DEFAULT_ORIGIN`、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` を設定します。
+- Client Deploy Button を後に押し、`CLIENT_DB` D1、canonical HTTPS origins の non-empty JSON array である `AGENT_RPC_ALLOWED_ORIGINS`、`AGENT_RPC_AUDIENCE`、`CLIENT_CREDENTIAL_ENCRYPTION_KEY` を設定します。
 - Client private signing key は Worker Secret へ貼らず、Management Client が生成して Client D1 の encrypted signing key store に保存します。Agent Worker へ渡すのは public-only `AGENT_CONTROL_PLANE_TRUST` だけです。
 - `deploy-agent` と `deploy-client` は generated artifact branch です。source branch から CI が再生成し、branch root が self-contained Worker application になるよう維持します。
 - 手順の詳細は `docs/operations/self-host-deploy.md` を参照してください。
@@ -81,11 +86,14 @@ pnpm gen:deploy-artifacts
 pnpm check:deploy-artifacts
 ```
 
-Command-owned generated outputs は手編集しません。
+`pnpm gen:deploy-artifacts` は `CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION` と `CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING` を必須入力として検証し、Agent artifactのWrangler設定へ環境別namespace IDを注入します。運用手順は `docs/operations/self-host-deploy.md` を参照してください。
+
+`pnpm gen:agent:proto && pnpm gen:agent:rpc` は Agent TypeSpec から proto と Agent、Client、SDK の descriptor を生成します。4つの generated roots は mandatory generated-policy target であり、Command-owned outputs を手編集しません。`pnpm check:codegen` は Agent→Client/SDK descriptor parity と contract invariant を確認します。
 
 - `packages/agent/proto/**`
 - `packages/agent/src/generated/rpc/**`
 - `packages/client/src/generated/agent-rpc/**`
+- `packages/sdk/src/generated/agent-rpc/**`
 
 ## Development Commands
 
@@ -102,7 +110,9 @@ pnpm dev:client
 ```bash
 pnpm check:agent
 pnpm check:client
-pnpm build
+pnpm check                         # Agent、Client、SDK を含む全 workspace package
+pnpm --filter @cf-tamac/sdk check
+pnpm build                         # Agent、SDK、Management Client の build
 ```
 
 ```bash
@@ -111,6 +121,9 @@ pnpm test:agent
 pnpm test:client
 pnpm test:governance
 pnpm test:run
+pnpm --filter @cf-tamac/sdk test
+pnpm check:codegen
+pnpm gen:deploy-artifacts && pnpm check:deploy-artifacts
 ```
 
 ## OpenSpec

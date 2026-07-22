@@ -49,7 +49,11 @@ app.get('/agents', () => new Response('forbidden'));
 `
       );
       writeFixture(fixtureRoot, 'packages/agent/src/openapi/openapi.json', '{}\n');
-      writeFixture(fixtureRoot, 'packages/agent/src/orval/agent-client.ts', 'export const generatedBy = "orval";\n');
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/orval/agent-client.ts',
+        'export const generatedBy = "orval";\n'
+      );
 
       const issues = collectAgentSurfaceIssues(fixtureRoot);
 
@@ -101,7 +105,9 @@ app.get('/agents', () => new Response('forbidden'));
           expect.stringContaining('forbidden json-health-response'),
         ])
       );
-      expect(issues).not.toEqual(expect.arrayContaining([expect.stringContaining('rpc/services/health.ts')]));
+      expect(issues).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('rpc/services/health.ts')])
+      );
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
@@ -144,7 +150,9 @@ export async function callAgentFromServerAction() {
           expect.stringContaining('forbidden Client public Agent proxy route'),
         ])
       );
-      expect(issues).not.toEqual(expect.arrayContaining([expect.stringContaining('app/agents/actions.ts')]));
+      expect(issues).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('app/agents/actions.ts')])
+      );
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
@@ -239,6 +247,212 @@ export async function refreshAgentViaServerAction() {
     }
   });
 
+  it('[WORKSPACE-GOVERNANCE-S015] validates SDK Agent RPC surfaces against generated descriptors and the Connect binary runtime', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'sdk-agent-rpc-surface-fixtures-'));
+
+    try {
+      // generated descriptor、Connect core、Connect transport、binary profile を同じ SDK source fixture に揃えます。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+        'export const AgentHealthService = {};\n'
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        `import { createClient } from '@connectrpc/connect';
+import { createConnectTransport } from '@connectrpc/connect-web';
+
+import { AgentHealthService } from './generated/agent-rpc/cftamac/agent/v1_pb';
+
+const transport = createConnectTransport({ useBinaryFormat: true, useHttpGet: false });
+
+export const healthClient = createClient(AgentHealthService, transport);
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual([]);
+
+      // URL string 内の // の後ろでも実行 code の Orval import は残り、既存 surface guardrail が検出し続けます。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/orval-bypass.ts',
+        `const origin = 'https://example.invalid'; void import('orval');
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([expect.stringContaining('forbidden orval-agent-client')])
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/orval-bypass.ts',
+        'export const sdkOrigin = true;\n'
+      );
+
+      // 正規表現リテラル内の // を comment と誤認せず、同一行の実行 Orval import を検出します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/orval-bypass.ts',
+        `const slash = /[//]/; void import('orval');
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([expect.stringContaining('forbidden orval-agent-client')])
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/orval-bypass.ts',
+        'export const sdkOrigin = true;\n'
+      );
+
+      // template expression の head も AST token として評価し、実行時に Orval へ解決する dynamic import を検出します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/orval-bypass.ts',
+        `void import(\`orval\${''}\`);
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([expect.stringContaining('forbidden orval-agent-client')])
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/orval-bypass.ts',
+        'export const sdkOrigin = true;\n'
+      );
+
+      // 文字列にある factory 名は AST CallExpression ではないため、transport 未構成として fail closed で拒否します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        `import { createClient } from '@connectrpc/connect';
+import { createConnectTransport } from '@connectrpc/connect-web';
+
+import { AgentHealthService } from './generated/agent-rpc/cftamac/agent/v1_pb';
+
+const transportDecoy = 'createConnectTransport({ useBinaryFormat: true, useHttpGet: false })';
+
+export const healthClient = createClient(AgentHealthService, transportDecoy);
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          '/packages/sdk/src: SDK Agent RPC surface must configure every createConnectTransport() call with useBinaryFormat: true and useHttpGet: false',
+        ])
+      );
+
+      // Connect Web import と同名の local factory は binding を shadow するため、正しい options でも trusted transport として数えません。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        `import { createClient } from '@connectrpc/connect';
+import { createConnectTransport } from '@connectrpc/connect-web';
+
+import { AgentHealthService } from './generated/agent-rpc/cftamac/agent/v1_pb';
+
+function createShadowedTransport() {
+  const createConnectTransport = () => ({});
+  return createConnectTransport({ useBinaryFormat: true, useHttpGet: false });
+}
+
+export const healthClient = createClient(AgentHealthService, createShadowedTransport());
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          '/packages/sdk/src: SDK Agent RPC surface must configure every createConnectTransport() call with useBinaryFormat: true and useHttpGet: false',
+        ])
+      );
+
+      // decoy object の binary option と、実 transport の JSON option を分離しても actual call の false を拒否します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        `import { createClient } from '@connectrpc/connect';
+import { createConnectTransport } from '@connectrpc/connect-web';
+
+import { AgentHealthService } from './generated/agent-rpc/cftamac/agent/v1_pb';
+
+const decoy = { useBinaryFormat: true, useHttpGet: false };
+const transport = createConnectTransport({ useBinaryFormat: false, useHttpGet: false });
+
+export const healthClient = createClient(AgentHealthService, transport);
+export const ignoredDecoy = decoy;
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          '/packages/sdk/src: SDK Agent RPC surface must configure every createConnectTransport() call with useBinaryFormat: true and useHttpGet: false',
+        ])
+      );
+
+      // shorthand/variable 経由の GET 値は static validation で false を証明できないため、fail closed で拒否します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        `import { createClient } from '@connectrpc/connect';
+import { createConnectTransport } from '@connectrpc/connect-web';
+
+import { AgentHealthService } from './generated/agent-rpc/cftamac/agent/v1_pb';
+
+const useHttpGet = true;
+const transport = createConnectTransport({ useBinaryFormat: true, useHttpGet });
+
+export const healthClient = createClient(AgentHealthService, transport);
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          '/packages/sdk/src: SDK Agent RPC surface must configure every createConnectTransport() call with useBinaryFormat: true and useHttpGet: false',
+        ])
+      );
+
+      // Connect runtime または generated descriptor import を外すと、SDK が Agent RPC contract に揃わないことを明示的に検証します。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/client.ts',
+        `export const healthClient = {};
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          '/packages/sdk/src: SDK Agent RPC surface must import @connectrpc/connect',
+          '/packages/sdk/src: SDK Agent RPC surface must import @connectrpc/connect-web',
+          '/packages/sdk/src: SDK Agent RPC surface must import its generated Protobuf RPC descriptor',
+          '/packages/sdk/src: SDK Agent RPC surface must configure every createConnectTransport() call with useBinaryFormat: true and useHttpGet: false',
+        ])
+      );
+
+      // REST route を SDK に混入させると既存 Agent public surface guardrail が SDK scan root にも適用されます。
+      writeFixture(
+        fixtureRoot,
+        'packages/sdk/src/rest-route.ts',
+        `import { Hono } from 'hono';
+
+const app = new Hono();
+app.get('/agents', () => new Response('forbidden'));
+`
+      );
+
+      expect(collectAgentSurfaceIssues(fixtureRoot)).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('/packages/sdk/src/rest-route.ts'),
+          expect.stringContaining('forbidden hono-rest-route'),
+        ])
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('[WORKSPACE-GOVERNANCE-S003] Lint rejects forbidden Agent API surface fixtures', () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), 'agent-surface-fixtures-'));
 
@@ -253,8 +467,16 @@ app.get('/agents', () => new Response('forbidden'));
 `
       );
       writeFixture(fixtureRoot, 'packages/agent/src/openapi/openapi.json', '{}\n');
-      writeFixture(fixtureRoot, 'packages/agent/src/orval/agent-client.ts', 'export const generatedBy = "orval";\n');
-      writeFixture(fixtureRoot, 'packages/agent/src/json-dto.ts', 'export const json = () => Response.json({ ok: true });\n');
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/orval/agent-client.ts',
+        'export const generatedBy = "orval";\n'
+      );
+      writeFixture(
+        fixtureRoot,
+        'packages/agent/src/json-dto.ts',
+        'export const json = () => Response.json({ ok: true });\n'
+      );
 
       const issues = collectAgentSurfaceIssues(fixtureRoot);
 
@@ -273,7 +495,9 @@ app.get('/agents', () => new Response('forbidden'));
   });
 
   it('[WORKSPACE-GOVERNANCE-S006] Documentation exposes Agent and Client foundation commands', () => {
-    const docs = rootDocs.map((relativePath) => readFileSync(join(projectRoot, relativePath), 'utf8')).join('\n');
+    const docs = rootDocs
+      .map((relativePath) => readFileSync(join(projectRoot, relativePath), 'utf8'))
+      .join('\n');
     const requiredTerms = [
       'packages/agent/src/typespec/main.tsp',
       'packages/agent/proto/**',
@@ -300,7 +524,10 @@ app.get('/agents', () => new Response('forbidden'));
   });
 
   it('[WORKSPACE-GOVERNANCE-S010] Documentation exposes the production credential runbook', () => {
-    const runbook = readFileSync(join(projectRoot, 'docs/operations/agent-control-plane-auth.md'), 'utf8');
+    const runbook = readFileSync(
+      join(projectRoot, 'docs/operations/agent-control-plane-auth.md'),
+      'utf8'
+    );
     const docs = credentialRunbookDocs
       .map((relativePath) => readFileSync(join(projectRoot, relativePath), 'utf8'))
       .join('\n');

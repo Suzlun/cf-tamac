@@ -31,6 +31,7 @@ import "./src/services/agent-thread.tsp";
 import "./src/services/agent-tool.tsp";
 import "./src/services/integration-delivery.tsp";
 import "./src/services/integration-tool.tsp";
+import "./src/models/initialization-receipt.tsp";
 
 using Protobuf;
 

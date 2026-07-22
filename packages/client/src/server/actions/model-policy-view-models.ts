@@ -17,7 +17,7 @@ import type {
   BrowserSafeModelPolicyErrorCategory,
   BrowserSafeModelPolicyGenerationParameters,
   BrowserSafeModelPolicyMetadata,
-  BrowserSafeModelPolicyMutationResult,
+  BrowserSafeModelPolicyMutationDisplayData,
   BrowserSafeModelPolicyProvider,
   BrowserSafeModelPolicyStatus,
   BrowserSafeModelPolicyWarning,
@@ -53,8 +53,16 @@ export function createModelPolicyFailureResult(
   fieldErrors: BrowserSafeModelPolicyFieldErrors = {},
   warnings: readonly BrowserSafeModelPolicyWarning[] = [],
   errorCategory: BrowserSafeModelPolicyErrorCategory = 'unknown'
-): BrowserSafeModelPolicyMutationResult {
-  return { ok: false, errorCategory, fieldErrors, formError, warnings };
+): BrowserSafeModelPolicyMutationDisplayData {
+  return {
+    errorCategory,
+    fieldErrors,
+    formError,
+    message: formError,
+    ok: false,
+    title: 'ポリシーの入力内容を確認してください',
+    warnings,
+  };
 }
 
 /**
@@ -149,7 +157,7 @@ export function toBrowserSafeModelPolicyValidationResult(
   validation: unknown,
   preview: unknown,
   fallbackDraft: ModelPolicyDraftValues
-): BrowserSafeModelPolicyMutationResult {
+): BrowserSafeModelPolicyMutationDisplayData {
   const record = toSafeRecord(validation);
   const warnings = toBrowserSafeModelPolicyWarnings(record?.warnings);
   const issues = toBrowserSafeModelPolicyWarnings(record?.issues);
@@ -159,7 +167,14 @@ export function toBrowserSafeModelPolicyValidationResult(
   });
   const ok = record?.ok === true;
   if (ok) {
-    return { ok: true, metadata, fieldErrors: {}, warnings };
+    return {
+      fieldErrors: {},
+      message: 'ポリシーの入力内容を確認しました。',
+      metadata,
+      ok: true,
+      title: 'ポリシーを検証しました',
+      warnings,
+    };
   }
   return createModelPolicyFailureResult(
     'The policy draft is invalid. Fix the highlighted fields and validate again.',
@@ -419,6 +434,7 @@ function isModelPolicyErrorCategory(
     category === 'not_found' ||
     category === 'failed_precondition' ||
     category === 'unavailable' ||
+    category === 'internal' ||
     category === 'unknown'
   );
 }

@@ -17,8 +17,10 @@ database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "src/server/db/migrations"
 
 [vars]
-# Deploy Button users replace this with the deployed Agent Worker origin after Agent deployment.
-AGENT_RPC_DEFAULT_ORIGIN = "http://localhost:8787"
+# Client Service JWT を送る destination は、canonical HTTPS origin の明示 allowlist だけに限定する。
+AGENT_RPC_ALLOWED_ORIGINS = '["https://cf-tamac-agent.example.workers.dev"]'
+# Agent Worker の `AGENT_RPC_AUDIENCE` と `AGENT_CONTROL_PLANE_TRUST.audiences` に一致させる公開 audience。
+AGENT_RPC_AUDIENCE = "cf-tamac-agent"
 CLIENT_ACTING_OPERATOR_ID = "client-management-operator"
 CLIENT_ACTING_SCOPES = "agent:read agent:write"
 

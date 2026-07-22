@@ -244,9 +244,39 @@ export interface DeliverToIntegrationProviderCommand {
   readonly runId: string;
 }
 
-/** Ingress 署名検証に必要な request metadata です。 */
+/**
+ * Ingress 署名検証に必要な正規化済み request metadata です。
+ *
+ * @remarks
+ * Provider が指定した時刻許容幅は保持せず、Agent が固定する `300_000` ms window だけで評価します。
+ * `algorithm` は detached signature の trust boundary を Ed25519 だけへ狭め、呼び出し元は key、digest、
+ * nonce、timestamp を既に正規化済みとして渡します。欠損値、digest 不一致、inactive trust key、署名不一致は
+ * `verifyIntegrationIngressSignature` が認証・認可 error として fail-closed にします。
+ *
+ * @property algorithm `Ed25519` に固定された detached signature algorithm です。
+ * @property byteLength unsigned Protobuf binary body の byte length です。
+ * @property digestHex lowercase SHA-256 hex digest です。
+ * @property keyId active Installation trust key を選ぶ NFC 正規化済み ID です。
+ * @property nonce replay reservation に使う NFC 正規化済み nonce です。
+ * @property signature Ed25519 signature bytes です。
+ * @property signedAtMs Provider が signature を生成した Unix epoch milliseconds です。
+ * @property timestampMs canonical signature base と fixed window に使う Unix epoch milliseconds です。
+ * @example
+ * ```ts
+ * const input: IntegrationIngressSignatureInput = {
+ *   algorithm: 'Ed25519',
+ *   byteLength: body.byteLength,
+ *   digestHex,
+ *   keyId: 'provider-key-1',
+ *   nonce: 'nonce-1',
+ *   signature,
+ *   signedAtMs: Date.now(),
+ *   timestampMs: Date.now(),
+ * };
+ * ```
+ */
 export interface IntegrationIngressSignatureInput {
-  readonly algorithm: string;
+  readonly algorithm: 'Ed25519';
   readonly byteLength: number;
   readonly digestHex: string;
   readonly keyId: string;
@@ -254,7 +284,6 @@ export interface IntegrationIngressSignatureInput {
   readonly signature: Uint8Array;
   readonly signedAtMs: number;
   readonly timestampMs: number;
-  readonly acceptedSkewMs?: number;
 }
 
 /** InstallIntegration の mutation 結果です。 */

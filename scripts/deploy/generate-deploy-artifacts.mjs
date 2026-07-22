@@ -22,6 +22,14 @@ const agentRuntimeExcludes = [
 
 const clientRuntimeExcludes = [/^packages\/client\/src\/tests(?:\/|$)/];
 
+const sdkRuntimeExcludes = [/^packages\/sdk\/src\/tests(?:\/|$)/];
+
+// Deploy Button 用の Client 設定例は、origin policy が受理する canonical HTTPS literal を固定する。
+const clientAllowedOriginsExample =
+  'AGENT_RPC_ALLOWED_ORIGINS=\'["https://cf-tamac-agent.example.workers.dev"]\'';
+const clientAllowedOriginsWorkerVariable =
+  'AGENT_RPC_ALLOWED_ORIGINS = \'["https://cf-tamac-agent.example.workers.dev"]\'';
+
 const artifactSpecs = [
   {
     name: 'agent',
@@ -47,6 +55,7 @@ const artifactSpecs = [
     createPackageJson: createAgentPackageJson,
     createTsconfig: createAgentTsconfig,
     createReadme: createAgentReadme,
+    workspacePackages: [],
   },
   {
     name: 'client',
@@ -62,6 +71,8 @@ const artifactSpecs = [
       { from: 'packages/client/tailwind.config.ts', to: 'tailwind.config.ts' },
       { from: 'packages/client/components.json', to: 'components.json' },
       { from: 'packages/client/.dev.vars.example', to: '.dev.vars.example' },
+      { from: 'packages/sdk/src', to: 'sdk/src', excludes: sdkRuntimeExcludes },
+      { from: 'packages/sdk/package.json', to: 'sdk/package.json' },
     ],
     requiredFiles: [
       'package.json',
@@ -74,11 +85,24 @@ const artifactSpecs = [
       'src/server/db/migrations/0001_client_foundation.sql',
       'src/server/db/migrations/0002_control_plane_signing_keys.sql',
       'src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+      'sdk/package.json',
+      'sdk/src/index.ts',
+      'sdk/src/client.ts',
+      'sdk/src/transport.ts',
+      'sdk/src/provider-ingress.ts',
+      'sdk/src/provider-ingress-transport.ts',
+      'sdk/src/provider-ingress-types.ts',
+      'sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+    ],
+    requiredContents: [
+      { path: '.dev.vars.example', content: clientAllowedOriginsExample },
+      { path: 'wrangler.toml', content: clientAllowedOriginsWorkerVariable },
     ],
     forbiddenPaths: ['src/tests'],
     createPackageJson: createClientPackageJson,
     createTsconfig: createClientTsconfig,
     createReadme: createClientReadme,
+    workspacePackages: ['sdk'],
   },
 ];
 
@@ -92,11 +116,14 @@ const artifactSpecs = [
  * @param {object} options 生成時の入力設定。
  * @param {string} options.root repository root。テストでは fixture ではなく実 repository を読む。
  * @param {string} options.outDir 生成先 directory。通常は `.deploy`、テストでは一時 directory。
+ * @param {{ production: string; staging: string }} options.rateLimitNamespaceIds
+ *   production/staging の Cloudflare Rate Limiting namespace ID。未指定時は対応する環境変数を使う。
  * @returns {{ name: string; branchName: string; path: string }[]} 生成した artifact の名前、branch、path。
  */
 export function generateDeployArtifacts(options = {}) {
   const root = options.root ?? projectRoot;
   const outDir = options.outDir ?? resolve(root, '.deploy');
+  const rateLimitNamespaceIds = resolveRateLimitNamespaceIds(options);
 
   // 生成 directory を先に消し、前回の不要 file が deploy branch に残らないようにする。
   rmSync(outDir, { recursive: true, force: true });
@@ -113,7 +140,7 @@ export function generateDeployArtifacts(options = {}) {
     // artifact root を作り、各 Worker に必要な runtime source と設定だけをコピーする。
     mkdirSync(targetRoot, { recursive: true });
     for (const entry of spec.copyEntries) {
-      copyProjectEntry(root, targetRoot, entry);
+      copyProjectEntry(root, targetRoot, entry, rateLimitNamespaceIds);
     }
 
     // package.json と tsconfig.json は monorepo path alias を self-contained root 用に書き換える。
@@ -125,11 +152,17 @@ export function generateDeployArtifacts(options = {}) {
 
     // Deploy Button 上でも運用者が境界と secret handling を読めるよう artifact 固有 README を生成する。
     writeText(resolve(targetRoot, 'README.md'), spec.createReadme());
-    writeText(resolve(targetRoot, 'pnpm-workspace.yaml'), createArtifactPnpmWorkspace(root));
+    writeText(
+      resolve(targetRoot, 'pnpm-workspace.yaml'),
+      createArtifactPnpmWorkspace(root, spec.workspacePackages)
+    );
     writeText(resolve(targetRoot, '.gitignore'), createArtifactGitignore());
 
     // 必須 file と禁止 path を検査し、壊れた artifact branch を CI から publish しない。
     validateArtifact(targetRoot, spec);
+    if (spec.name === 'agent') {
+      validateAgentRateLimitNamespaces(targetRoot, rateLimitNamespaceIds);
+    }
     artifacts.push({ name: spec.name, branchName: spec.branchName, path: targetRoot });
   }
 
@@ -277,10 +310,11 @@ function createAgentReadme() {
 
 1. Cloudflare Deploy Button でこの branch を選択します。
 2. \`AGENT_RPC_AUDIENCE\` が \`AGENT_CONTROL_PLANE_TRUST.audiences\` と一致することを確認します。
-3. Worker Secret \`AGENT_AUDIT_HASH_PEPPER\` を長いランダム値で設定します。
-4. Management Client の Trust Config Export で生成した public-only JSON を \`AGENT_CONTROL_PLANE_TRUST\` に設定します。
-5. \`AGENT_CONTROL_PLANE_TRUST\` には Ed25519 private key parameter \`d\`、private JWK、encrypted private JWK、生 JWT を含めません。
-6. Deploy 後、Management Client から \`AgentHealthService.Check\` を実行して issuer/kid/fingerprint と trust config fingerprint を確認します。
+3. Worker configuration に production/staging の専用 Rate Limiting namespace ID が注入済みであることを確認します。artifactへ source repository のfixture値はコピーされません。
+4. Worker Secret \`AGENT_AUDIT_HASH_PEPPER\` を長いランダム値で設定します。
+5. Management Client の Trust Config Export で生成した public-only JSON を \`AGENT_CONTROL_PLANE_TRUST\` に設定します。
+6. \`AGENT_CONTROL_PLANE_TRUST\` には Ed25519 private key parameter \`d\`、private JWK、encrypted private JWK、生 JWT を含めません。
+7. Deploy 後、Management Client から \`AgentHealthService.Check\` を実行して issuer/kid/fingerprint と trust config fingerprint を確認します。
 
 ## Local commands
 
@@ -303,7 +337,7 @@ function createClientReadme() {
 
 1. Agent Service を先に deploy し、Agent Worker origin を控えます。
 2. Cloudflare Deploy Button でこの branch を選択します。
-3. \`AGENT_RPC_DEFAULT_ORIGIN\` を deployed Agent Worker origin に設定します。
+3. \`AGENT_RPC_ALLOWED_ORIGINS='["https://cf-tamac-agent.example.workers.dev"]'\` の example を、deployed Agent Worker の canonical HTTPS origin だけを含む non-empty JSON array に置き換えます。
 4. D1 binding \`CLIENT_DB\` を作成または選択し、\`src/server/db/migrations\` の migrations を適用します。
 5. Worker Secret \`CLIENT_CREDENTIAL_ENCRYPTION_KEY\` を base64 encoded 32-byte AES key で設定します。
 6. \`CLIENT_CONTROL_PLANE_PRIVATE_KEYS\` は使いません。Ed25519 private JWK は Management Client UI が生成し、\`CLIENT_CREDENTIAL_ENCRYPTION_KEY\` で暗号化して Client D1 に保存します。
@@ -333,11 +367,15 @@ next-env.d.ts
 `;
 }
 
-function createArtifactPnpmWorkspace(root) {
+function createArtifactPnpmWorkspace(root, workspacePackages) {
   const workspaceConfig = readFileSync(resolve(root, 'pnpm-workspace.yaml'), 'utf8');
+  const artifactPackages = ['.', ...workspacePackages]
+    .map((packagePath) => `  - '${packagePath}'`)
+    .join('\n');
 
-  // Deploy artifact root は単一 package workspace として扱い、root repository の supply-chain policy は維持する。
-  return workspaceConfig.replace(/^packages:\n(?:\s+- .+\n)+/m, "packages:\n  - '.'\n");
+  // Client artifact では SDK package も同じ workspace に含め、workspace:* dependency を self-contained root で解決する。
+  // root repository の supply-chain policy は加工せず、artifact にそのまま継承する。
+  return workspaceConfig.replace(/^packages:\n(?:\s+- .+\n)+/m, `packages:\n${artifactPackages}\n`);
 }
 
 function selectVersions(rootPackage, sourcePackage, packageNames) {
@@ -356,7 +394,7 @@ function selectVersions(rootPackage, sourcePackage, packageNames) {
   return versions;
 }
 
-function copyProjectEntry(root, targetRoot, entry) {
+function copyProjectEntry(root, targetRoot, entry, rateLimitNamespaceIds) {
   const sourcePath = resolve(root, entry.from);
   const targetPath = resolve(targetRoot, entry.to);
   const stats = statSync(sourcePath);
@@ -366,7 +404,94 @@ function copyProjectEntry(root, targetRoot, entry) {
     copyDirectory(root, sourcePath, targetPath, entry.excludes);
     return;
   }
+  if (entry.from === 'packages/agent/wrangler.toml') {
+    // Agent Wrangler は source の例値をそのまま publish せず、release operator の明示入力で置換する。
+    writeText(
+      targetPath,
+      renderAgentWrangler(readFileSync(sourcePath, 'utf8'), rateLimitNamespaceIds)
+    );
+    return;
+  }
   copyFile(targetPath, sourcePath);
+}
+
+function resolveRateLimitNamespaceIds(options) {
+  const production =
+    options.rateLimitNamespaceIds?.production ??
+    options.productionRateLimitNamespaceId ??
+    process.env.CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION;
+  const staging =
+    options.rateLimitNamespaceIds?.staging ??
+    options.stagingRateLimitNamespaceId ??
+    process.env.CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING;
+
+  assertRateLimitNamespaceId(production, 'production');
+  assertRateLimitNamespaceId(staging, 'staging');
+  if (production === staging) {
+    throw new Error(
+      'CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_PRODUCTION and CF_TAMAC_AGENT_RATE_LIMIT_NAMESPACE_STAGING must differ'
+    );
+  }
+  return { production, staging };
+}
+
+function assertRateLimitNamespaceId(value, environment) {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/u.test(value)) {
+    throw new Error(
+      `A positive integer Rate Limiting namespace ID is required for ${environment}; pass the explicit generator input or environment variable`
+    );
+  }
+}
+
+function renderAgentWrangler(source, rateLimitNamespaceIds) {
+  const production = replaceNamespaceId(source, '[[ratelimits]]', rateLimitNamespaceIds.production);
+  return replaceNamespaceId(
+    production,
+    '[[env.staging.ratelimits]]',
+    rateLimitNamespaceIds.staging
+  );
+}
+
+function replaceNamespaceId(source, section, namespaceId) {
+  const sectionStart = source.indexOf(section);
+  const sectionBody = sectionStart === -1 ? '' : source.slice(sectionStart);
+  const namespaceMatch = /(namespace_id\s*=\s*")([1-9]\d*)(")/u.exec(sectionBody);
+  if (namespaceMatch?.index === undefined) {
+    throw new Error(`Agent Wrangler is missing ${section} namespace_id`);
+  }
+  const replacement = namespaceMatch[0].replace(namespaceMatch[2], namespaceId);
+  const absoluteStart = sectionStart + namespaceMatch.index;
+  return `${source.slice(0, absoluteStart)}${replacement}${source.slice(
+    absoluteStart + namespaceMatch[0].length
+  )}`;
+}
+
+function validateAgentRateLimitNamespaces(agentRoot, rateLimitNamespaceIds) {
+  const wrangler = readFileSync(resolve(agentRoot, 'wrangler.toml'), 'utf8');
+  const production = extractNamespaceId(wrangler, '[[' + 'ratelimits' + ']]');
+  const staging = extractNamespaceId(wrangler, '[[' + 'env.staging.ratelimits' + ']]');
+  if (
+    production !== rateLimitNamespaceIds.production ||
+    staging !== rateLimitNamespaceIds.staging
+  ) {
+    throw new Error(
+      'Generated Agent artifact does not contain the requested Rate Limiting namespace IDs'
+    );
+  }
+  if (production === staging) {
+    throw new Error(
+      'Generated Agent artifact must keep production and staging Rate Limiting namespaces distinct'
+    );
+  }
+}
+
+function extractNamespaceId(wrangler, section) {
+  const sectionStart = wrangler.indexOf(section);
+  const sectionBody = sectionStart === -1 ? '' : wrangler.slice(sectionStart);
+  const match = /namespace_id\s*=\s*"([1-9]\d*)"/u.exec(sectionBody);
+  if (match?.[1] === undefined)
+    throw new Error(`Generated Agent artifact is missing ${section} namespace_id`);
+  return match[1];
 }
 
 function copyDirectory(projectRootPath, sourceDirectory, targetDirectory, excludes) {
@@ -407,6 +532,16 @@ function validateArtifact(targetRoot, spec) {
       throw new Error(`${spec.name} deploy artifact must not include ${forbiddenPath}`);
     }
   }
+  for (const requiredContent of spec.requiredContents ?? []) {
+    const filePath = resolve(targetRoot, requiredContent.path);
+
+    // copied configuration が canonical example を失うと、deploy root から安全な origin policy を設定できない。
+    if (!readFileSync(filePath, 'utf8').includes(requiredContent.content)) {
+      throw new Error(
+        `${spec.name} deploy artifact is missing canonical configuration in ${requiredContent.path}`
+      );
+    }
+  }
 }
 
 function readJson(path) {
@@ -430,10 +565,17 @@ function main() {
   const { values } = parseArgs({
     options: {
       out: { type: 'string', default: '.deploy' },
+      'production-rate-limit-namespace-id': { type: 'string' },
+      'staging-rate-limit-namespace-id': { type: 'string' },
     },
   });
   const outDir = resolve(projectRoot, values.out);
-  const artifacts = generateDeployArtifacts({ root: projectRoot, outDir });
+  const artifacts = generateDeployArtifacts({
+    root: projectRoot,
+    outDir,
+    productionRateLimitNamespaceId: values['production-rate-limit-namespace-id'],
+    stagingRateLimitNamespaceId: values['staging-rate-limit-namespace-id'],
+  });
 
   // CI log には生成先と deploy branch 名だけを出し、secret value や config body は出力しない。
   for (const artifact of artifacts) {

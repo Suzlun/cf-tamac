@@ -6,17 +6,17 @@
 
 ## 0. 全体方針
 
-**Rule: Active guidance は Agent/Client architecture を向く。**
-Summary: OpenCode guidance は `packages/agent/**` と `packages/client/**` を Cloudflare Workers 上の Agent Service / Management Client scope とし、removed backend/frontend unit agents を参照しません。
+**Rule: Active guidance は Agent/SDK/Client architecture を向く。**
+Summary: OpenCode guidance は `packages/agent/**`、`packages/sdk/**`、`packages/client/**` を Agent Service / server-side SDK / Management Client scope とし、removed backend/frontend unit agents を参照しません。
 Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; fixture coverage in `scripts/governance/verify-package-boundaries.test.mjs`.
 NG例: `.opencode/agents/openspec/applier.md` で `unit/backend/` や `unit/frontend/` を委譲先として残す。
 OK例: `.opencode/agents/unit/agent/engineer.md`、`.opencode/agents/unit/client/engineer.md`、`.opencode/agents/unit/build/builder.md` を現行 scope として使う。
 
 **Rule: Generated output policy を guidance から消さない。**
-Summary: generated proto/RPC paths は command-owned で手編集禁止であることを workflow guidance に残します。
+Summary: generated proto/RPC paths は command-owned で手編集禁止であることを workflow guidance に残します。SDK generated descriptor も同じ policy の対象です。
 Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; checked files include `.opencode/skills/coding-guardian/SKILL.md` and `.opencode/skills/coding-guardian/references/repo-entrypoints.md`.
-NG例: `.opencode` guidance から `packages/agent/proto/**` や `packages/client/src/generated/agent-rpc/**` の手編集禁止を削除する。
-OK例: `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**` を command-owned / no hand-edit と明記する。
+NG例: `.opencode` guidance から `packages/agent/proto/**`、`packages/client/src/generated/agent-rpc/**`、`packages/sdk/src/generated/agent-rpc/**` の手編集禁止を削除する。
+OK例: `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**`、`packages/sdk/src/generated/agent-rpc/**` を command-owned / no hand-edit と明記する。
 
 ## 1. Agent API 契約と生成
 
@@ -26,17 +26,23 @@ Enforcement point: `pnpm gen:agent:proto` via `package.json`, `packages/agent/pa
 NG例: Agent API を `openapi.json`、Orval config、ad-hoc JSON DTO から設計する。
 OK例: `packages/agent/src/typespec/main.tsp` で common/model/service `.tsp` を import し、`@typespec/protobuf` で `cftamac.agent.v1` を emit する。
 
-**Rule: Generated proto/RPC outputs は command-owned とし、手編集しない。**
-Summary: `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**` は generation command の出力として扱います。
+**Rule: Generated proto/RPC outputs は mandatory command-owned target とし、手編集しない。**
+Summary: `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**`、`packages/sdk/src/generated/agent-rpc/**` は generation command の出力として扱います。SDK descriptor root は optional compatibility output ではなく Agent/Client root と同じ mandatory policy target です。
 Enforcement point: `pnpm check:codegen` via `package.json`, `packages/agent/buf.gen.yaml`, and `scripts/codegen/check-agent-codegen-drift.mjs`.
-NG例: `packages/agent/proto/cftamac/agent/v1.proto` や generated `v1_pb.ts` を直接編集する。
+NG例: `packages/agent/proto/cftamac/agent/v1.proto`、Client/SDK の generated `v1_pb.ts` を直接編集する。
 OK例: `pnpm gen:agent:proto && pnpm gen:agent:rpc` または `pnpm gen` で再生成し、drift がない状態にする。
 
 **Rule: Generated output drift を残さない。**
-Summary: generation 後に tracked proto/RPC output の差分が残ると codegen check は失敗します。
-Enforcement point: `pnpm check:codegen` via `package.json` command `git diff --exit-code -- packages/agent/proto packages/agent/src/generated/rpc packages/client/src/generated/agent-rpc` and `scripts/codegen/check-agent-codegen-drift.mjs`.
+Summary: generation 後に4つのcommand-owned generated rootのhashが変わると codegen check は失敗します。
+Enforcement point: `pnpm check:codegen` via `scripts/codegen/check-generated-output-stability.mjs`（再生成、4 generated rootsのSHA-256比較、`scripts/codegen/check-agent-codegen-drift.mjs`実行）。
 NG例: TypeSpec を変えたのに generated proto/RPC files を更新しない。
-OK例: `pnpm check:codegen` が clean に通るまで source と generated outputs を揃える。
+OK例: `pnpm check:codegen` が再生成後のhash不変とcontract drift検査を通るまで source と generated outputs を揃える。
+
+**Rule: Codegen collector は責務ごとに分割し、complexity gate を通す。**
+Summary: `scripts/codegen/check-agent-codegen-drift.mjs` の collector は input snapshot を一度だけ収集し、contract surface、generated outputs、TypeSpec、proto の責務別 helper を deterministic order で合成します。ESLint の cognitive-complexity warning は zero を acceptance とします。
+Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; collector behavior via `pnpm test:governance` and `scripts/codegen/check-agent-codegen-drift.test.mjs`.
+NG例: top-level collector 内で同じ filesystem tree を再走査する、複数の responsibility を深い条件分岐へ混在させる、issue order を不安定にする。
+OK例: `collectAgentCodegenInputs()` の immutable snapshot を responsibility-specific collector で共有し、`pnpm check:codegen` と `pnpm lint:eslint` を通す。
 
 **Rule: Agent OpenAPI output を生成しない。**
 Summary: Agent API output に OpenAPI artifact を追加すると codegen/governance checks が失敗します。
@@ -98,7 +104,7 @@ OK例: binary Protobuf request だけを facade に通し、malformed request �
 Summary: Agent/Client は別 Worker として独立し、runtime source を相互参照しません。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`.
 NG例: `packages/agent/src/**` から `@cf-tamac/client` を import する、または `packages/client/src/**` から `@cf-tamac/agent` runtime source を import する。
-OK例: Client server-only module は `packages/client/src/generated/agent-rpc/**` と Connect runtime を使い、Agent source は Client source を知らない。
+OK例: Client server-only SDK adapter は `@cf-tamac/sdk` を使い、Client D1 と signing-key store の ownership を保ち、Agent source は Client source を知らない。
 
 **Rule: Agent/Client source は ESLint boundary classifier の既知 layer に置く。**
 Summary: Agent runtime、Agent generated RPC、Client runtime、Client generated Agent RPC、Client App のいずれかに分類されない source/import は失敗します。
@@ -114,11 +120,23 @@ OK例: `packages/agent/wrangler.toml` は `AI_AGENT` Durable Object と `AGENT_B
 
 ## 3. Management Client server/browser boundary
 
-**Rule: Browser-visible Client modules は server-only Agent RPC、credentials、generated RPC construction、Connect runtime を import しない。**
-Summary: Browser bundle に Agent RPC credential seam、private JWK、encrypted private JWK、生 JWT、direct Agent RPC invocation logic を入れません。
+**Rule: SDK は server-side Agent RPC consumer に閉じる。**
+Summary: `@cf-tamac/sdk` は Agent/Client runtime source の代替ではなく、SDK 自身の generated descriptor と Connect unary binary Protobuf transport を使う server-side typed consumer です。Client D1、encrypted signing-key store、acting-user policy、Next.js `server-only` boundary は Management Client server adapter が所有します。
+Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs` and `scripts/governance/verify-agent-surface.mjs`; codegen drift via `pnpm check:codegen`.
+NG例: SDK runtime から `packages/agent/src/**` または `packages/client/src/**` を import する、Browser-visible Client module から SDK を import する、Client storage/Next.js ownership を SDK に移す。
+OK例: Client server-only adapter が Client-owned context を解決して `@cf-tamac/sdk` に渡し、SDK が `packages/sdk/src/generated/agent-rpc/**` と Connect binary Protobuf transport で Agent RPC を呼ぶ。
+
+**Rule: Client Service と Provider の authentication surface を混在させない。**
+Summary: `TamacAgentClient` は Client-owned signing context による Client Service Ed25519 JWT operation aggregate です。`TamacProviderIngressClient` は Provider-owned Ed25519 detached signature による `PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` だけの aggregate です。Provider surface は Client D1、acting user、JWT context を受け取りません。
+Enforcement point: `pnpm test:agent` via Provider principal-boundary tests; `pnpm --filter @cf-tamac/sdk test` via SDK surface tests; `pnpm lint:governance` via package boundary validation.
+NG例: Provider ingress へ Client Service bearer JWT を付与する、Client D1/signing-key store を SDK Provider client に移す、Provider に Client lifecycle/config operation を公開する。
+OK例: Provider が unsigned generated Protobuf body digest と canonical text を detached-sign し、Agent が fixed `300_000` ms window、active Installation/trust key、digest、Ed25519 signature、identity を検証してから `INTEGRATION_INSTALLATION` principal を構築し、nonce/idempotency reservation と Agent-local final authorization を実行する。
+
+**Rule: Browser-visible Client modules は server-only SDK、credentials、generated RPC construction、Connect runtime を import しない。**
+Summary: Browser bundle に SDK、Agent RPC credential seam、private JWK、encrypted private JWK、生 JWT、direct Agent RPC invocation logic を入れません。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
-NG例: `packages/client/app/page.tsx` から `@connectrpc/connect`、`@cf-tamac/client-agent-rpc/**`、`packages/client/src/server/**` を import する。
-OK例: Agent RPC client construction は `packages/client/src/server/agent-rpc/**` に閉じ、App Router は Server Components/Server Actions 経由で使う。
+NG例: `packages/client/app/page.tsx` から `@cf-tamac/sdk`、`@connectrpc/connect`、`@cf-tamac/client-agent-rpc/**`、`packages/client/src/server/**` を import する。
+OK例: SDK client construction は `packages/client/src/server/agent-rpc/**` に閉じ、App Router は Server Components/Server Actions 経由で使う。
 
 **Rule: Browser-visible Client modules は direct network call をしない。**
 Summary: Browser-visible Client code で `fetch` や ad-hoc HTTP client を使って Agent/API を直接呼びません。
@@ -138,11 +156,23 @@ Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package
 NG例: `packages/client/src/server/agent-rpc/create-client.ts` から `import 'server-only';` を消す。
 OK例: Client Agent RPC factory modules は先頭で `import 'server-only';` を宣言する。
 
-**Rule: Client server-side Agent RPC は generated Agent RPC code と Connect runtime だけを使う。**
-Summary: Client server-side RPC module は Agent runtime source を import せず、Client 側 generated descriptors を使います。
+**Rule: Client server-side SDK adapter は Client-owned context と SDK を使う。**
+Summary: Client server-side adapter は Agent runtime source を import せず、Client D1、encrypted Client Service signing key store、acting-user policy、managed Agent resolution を Client 側に閉じたまま、解決済み context で `@cf-tamac/sdk` を構築します。
 Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/client-import-graph.test.ts`.
-NG例: `packages/client/src/server/agent-rpc/**` から `packages/agent/src/**` や `@cf-tamac/agent` runtime source を import する。
-OK例: `@cf-tamac/client-agent-rpc/cftamac/agent/v1_pb` と `@connectrpc/connect` を server-only module から使い、binary format を維持する。
+NG例: `packages/client/src/server/agent-rpc/**` から `packages/agent/src/**` や `@cf-tamac/agent` runtime source を import する、または SDK、Connect runtime、generated descriptor を browser-visible module へ渡す。
+OK例: `@cf-tamac/sdk` を server-only module から使い、Client-owned storage/context を SDK input に限定し、SDK が自身の generated descriptor と binary Connect transport を使う。
+
+**Rule: Client Service JWT destination は canonical HTTPS allowlist で fail closed にする。**
+Summary: `AGENT_RPC_ALLOWED_ORIGINS` は unique canonical HTTPS origins の non-empty JSON array です。Browser registration input は canonicalize 後に exact match で承認し、Client D1 の stored origin は signing key、acting user、SDK transport の解決前に current policy で再検証します。
+Enforcement point: `pnpm test:client` via `packages/client/src/tests/agent-rpc-origin-policy.test.ts` and Client Agent RPC factory tests; `pnpm lint:governance` via package boundary validation.
+NG例: `AGENT_RPC_ALLOWED_ORIGINS` に path/query/fragment/userinfo を含む literal、non-canonical literal、重複、空 array を設定する、allowlist 外 origin へ Client Service JWT を送る。
+OK例: `AGENT_RPC_ALLOWED_ORIGINS='["https://agent.example.com"]'` を設定し、canonical origin だけを metadata に保存して、current policy の exact match 後に server-only SDK transport を作る。
+
+**Rule: SDK-backed Server Action は Browser-safe result に閉じる。**
+Summary: 成功・失敗はともに top-level `displayData`、`safeStatus`、`safeErrorCategory`、secret-free `correlationId` の四属性だけを Browser に返します。origin policy/configuration failure は `configuration` category に対応付け、raw diagnostic や security context を直列化しません。
+Enforcement point: `pnpm test:client` via Browser-safe result and Browser Agent RPC secrecy tests; `pnpm lint:governance` via Client browser boundary validation.
+NG例: raw Connect error、SDK diagnostic、origin policy detail、credential、JWT、private/encrypted JWK、signing material、D1 record を action result に入れる。
+OK例: action-specific allowlisted display model と safe category/correlation ID を返し、運用調査は Browser から渡された correlation ID で server-side logs を照合する。
 
 **Rule: Client Worker は Agent API proxy routes を公開しない。**
 Summary: Client App Router に `/api/client/*`、`/api/agent*`、Agent REST proxy、arbitrary RPC forwarding handler を置きません。
@@ -270,11 +300,17 @@ Enforcement point: `pnpm lint:eslint` via `eslint.config.js`.
 NG例: `eval`、implied eval、`new Function`、script URL、`debugger`、`alert`、`var`、array `.forEach`、non-node-protocol builtin import を残す。
 OK例: explicit functions、`node:` protocol、`for...of`、`const`、UI-level error display を使う。
 
-**Rule: Exported production TS/TSX declarations には TSDoc を付ける。**
-Summary: generated output と tests を除く `packages/**/src/**/*.{ts,tsx}` の exported declarations は TSDoc 必須です。
+**Rule: Exported production TS/TSX declarations には日本語の詳細 TSDoc を付ける。**
+Summary: generated output と tests を除く `packages/**/src/**/*.{ts,tsx}` の exported declarations は TSDoc 必須です。著者規約として public API（function、method、type、interface、struct）は日本語の複数行 TSDoc で役割、各引数、戻り値、error cases、usage example を説明します。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js` custom rule `export-tsdoc/require-export-tsdoc`.
 NG例: `packages/agent/src/foo.ts` に `export function buildFoo() {}` だけを書く。
-OK例: `/** Build Foo. */ export function buildFoo() {}` のように exported declaration の直前へ TSDoc を置く。
+OK例: exported declaration の直前へ日本語の複数行 TSDoc を置き、API contract と利用上の失敗条件を説明する。
+
+**Rule: 実装の各処理には日本語コメントで意図を残す。**
+Summary: validation、data transform、storage mutation、external call、security boundary を含む各処理は、日本語コメントで意図、入力/出力、side effect を即座に追えるようにします。コメントは実装と矛盾させず、不要な説明の複製にはしません。
+Enforcement point: `AGENTS.md` authoring rule and code review. ESLint は exported TSDoc の存在を自動検査しますが、コメント内容の充足は変更者と reviewer が確認します。
+NG例: security validation の理由を残さない、外部 call の side effect を説明しない、英語の一行コメントだけで public API の使用条件を省略する。
+OK例: key/material を Browser へ出さない理由、canonicalization の入出力、D1 mutation や network call の影響を日本語で処理直前に説明する。
 
 **Rule: `index.ts` は re-export only にする。**
 Summary: package/source `index.ts` に実装や default export を置きません。
@@ -360,20 +396,21 @@ OK例: OpenSpec `spec.md` の Scenario ID と `packages/**`、`tests/**`、`scri
 
 ## 9. 設定参照
 
-| 領域                                | 参照ファイル                                                                                                                                   |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Root command graph                  | `package.json`                                                                                                                                 |
-| CI order                            | `.github/workflows/ci.yml`                                                                                                                     |
-| Git hooks                           | `.husky/pre-commit`、`.husky/commit-msg`、`.lintstagedrc.json`、`commitlint.config.js`                                                         |
-| Formatting                          | `.prettierrc.json`、`.prettierignore`                                                                                                          |
-| ESLint and package size rules       | `eslint.config.js`、`.eslintrc-maxlines.json`                                                                                                  |
-| Agent TypeSpec-to-proto             | `packages/agent/src/typespec/main.tsp`、`packages/agent/src/typespec/tspconfig.yaml`、`packages/agent/buf.yaml`、`packages/agent/buf.gen.yaml` |
-| Generated outputs                   | `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**`                                 |
-| Agent package tests                 | `packages/agent/src/tests/*.test.ts`                                                                                                           |
-| Management Client package tests     | `packages/client/src/tests/*.test.ts*`                                                                                                         |
-| Codegen drift and schema invariants | `scripts/codegen/check-agent-codegen-drift.mjs`                                                                                                |
-| Agent surface governance            | `scripts/governance/verify-agent-surface.mjs`                                                                                                  |
-| Package boundary governance         | `scripts/governance/verify-package-boundaries.mjs`                                                                                             |
-| OpenSpec scenario coverage          | `scripts/openspec/verify-scenario-coverage.mjs`                                                                                                |
-| OpenSpec Intent gate                | `scripts/openspec/verify-change-intent.mjs`                                                                                                    |
-| Supply-chain policy                 | `scripts/security/verify-pnpm-supply-chain.mjs`、`pnpm-workspace.yaml`                                                                         |
+| 領域                                | 参照ファイル                                                                                                                                              |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root command graph                  | `package.json`                                                                                                                                            |
+| CI order                            | `.github/workflows/ci.yml`                                                                                                                                |
+| Git hooks                           | `.husky/pre-commit`、`.husky/commit-msg`、`.lintstagedrc.json`、`commitlint.config.js`                                                                    |
+| Formatting                          | `.prettierrc.json`、`.prettierignore`                                                                                                                     |
+| ESLint and package size rules       | `eslint.config.js`、`.eslintrc-maxlines.json`                                                                                                             |
+| Agent TypeSpec-to-proto             | `packages/agent/src/typespec/main.tsp`、`packages/agent/src/typespec/tspconfig.yaml`、`packages/agent/buf.yaml`、`packages/agent/buf.gen.yaml`            |
+| SDK server-side Agent RPC package   | `packages/sdk/package.json`、`packages/sdk/src/**`、`packages/sdk/src/generated/agent-rpc/**`                                                             |
+| Generated outputs                   | `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**`、`packages/sdk/src/generated/agent-rpc/**` |
+| Agent package tests                 | `packages/agent/src/tests/*.test.ts`                                                                                                                      |
+| Management Client package tests     | `packages/client/src/tests/*.test.ts*`                                                                                                                    |
+| Codegen drift and schema invariants | `scripts/codegen/check-agent-codegen-drift.mjs`                                                                                                           |
+| Agent surface governance            | `scripts/governance/verify-agent-surface.mjs`                                                                                                             |
+| Package boundary governance         | `scripts/governance/verify-package-boundaries.mjs`                                                                                                        |
+| OpenSpec scenario coverage          | `scripts/openspec/verify-scenario-coverage.mjs`                                                                                                           |
+| OpenSpec Intent gate                | `scripts/openspec/verify-change-intent.mjs`                                                                                                               |
+| Supply-chain policy                 | `scripts/security/verify-pnpm-supply-chain.mjs`、`pnpm-workspace.yaml`                                                                                    |

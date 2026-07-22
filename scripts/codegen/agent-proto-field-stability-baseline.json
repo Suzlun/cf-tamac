@@ -1,0 +1,341 @@
+{
+  "baseline_version": 1,
+  "scope": "all public Agent RPC request messages",
+  "messages": {
+    "ApproveInvocationRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["invocation_id", 3],
+      ["reason", 4],
+      ["security", 5]
+    ],
+    "ArchiveModelPolicyRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["policy_ref", 3],
+      ["reason", 4],
+      ["security", 5]
+    ],
+    "CancelOperationRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["installation_id", 3],
+      ["operation_id", 4],
+      ["invocation_id", 5],
+      ["reason", 6],
+      ["timestamp", 7],
+      ["nonce", 8],
+      ["raw_body_digest", 9],
+      ["signature", 10]
+    ],
+    "CancelRunRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["run_id", 3],
+      ["reason", 4],
+      ["security", 5]
+    ],
+    "CancelScheduleRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["schedule_id", 3],
+      ["reason", 4],
+      ["security", 5]
+    ],
+    "CheckHealthRequest": [
+      ["agent_id", 1],
+      ["include_dependencies", 2]
+    ],
+    "CreateAdapterConnectionRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["installation_id", 3],
+      ["adapter_id", 4],
+      ["connection_key", 5],
+      ["external_subject", 6],
+      ["metadata_ref", 7],
+      ["security", 8]
+    ],
+    "CreateScheduleRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["thread_id", 3],
+      ["schedule_spec", 4],
+      ["thread_key", 5],
+      ["overlap_policy", 6],
+      ["installation_id", 7],
+      ["callback_identity", 8],
+      ["security", 9]
+    ],
+    "DeleteAdapterConnectionRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["connection_id", 3],
+      ["reason", 4],
+      ["security", 5]
+    ],
+    "DeliverRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["installation_id", 3],
+      ["connection_id", 4],
+      ["delivery_context_id", 5],
+      ["delivery_id", 6],
+      ["thread_id", 7],
+      ["run_id", 8],
+      ["payload", 9],
+      ["timestamp", 10],
+      ["nonce", 11],
+      ["raw_body_digest", 12],
+      ["signature", 13]
+    ],
+    "DestroyAgentRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["reason", 3],
+      ["security", 4]
+    ],
+    "GetAgentRequest": [["agent_id", 1]],
+    "GetConfigRequest": [["agent_id", 1]],
+    "GetEventRequest": [
+      ["agent_id", 1],
+      ["event_id", 2],
+      ["include_payload", 3]
+    ],
+    "GetInstallationRequest": [
+      ["agent_id", 1],
+      ["installation_id", 2]
+    ],
+    "GetInvocationRequest": [
+      ["agent_id", 1],
+      ["invocation_id", 2],
+      ["include_payload_refs", 3]
+    ],
+    "GetLatestCompactionRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2]
+    ],
+    "GetModelPolicyRequest": [
+      ["agent_id", 1],
+      ["policy_ref", 2]
+    ],
+    "GetOperationRequest": [
+      ["agent_id", 1],
+      ["installation_id", 2],
+      ["operation_id", 3],
+      ["invocation_id", 4],
+      ["timestamp", 5],
+      ["nonce", 6],
+      ["raw_body_digest", 7],
+      ["signature", 8]
+    ],
+    "GetRunRequest": [
+      ["agent_id", 1],
+      ["run_id", 2]
+    ],
+    "GetScheduleRequest": [
+      ["agent_id", 1],
+      ["schedule_id", 2]
+    ],
+    "GetStateRequest": [["agent_id", 1]],
+    "GetThreadMemoryRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2]
+    ],
+    "GetThreadRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2]
+    ],
+    "InitializeAgentRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["display_name", 3],
+      ["initial_config", 4],
+      ["credential_policy", 5],
+      ["security", 6],
+      ["initial_model_policy", 7],
+      ["registration_request_digest", 8]
+    ],
+    "InstallIntegrationRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["integration_id", 3],
+      ["manifest_ref", 4],
+      ["manifest_payload", 5],
+      ["requested_grants", 6],
+      ["setup_metadata_ref", 7],
+      ["security", 8]
+    ],
+    "InvokeToolRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["installation_id", 3],
+      ["tool_id", 4],
+      ["invocation_id", 5],
+      ["thread_id", 6],
+      ["run_id", 7],
+      ["input", 8],
+      ["timestamp", 9],
+      ["nonce", 10],
+      ["raw_body_digest", 11],
+      ["signature", 12]
+    ],
+    "ListAdapterConnectionsRequest": [
+      ["agent_id", 1],
+      ["installation_id", 2],
+      ["page", 3],
+      ["status", 4],
+      ["adapter_id", 5]
+    ],
+    "ListEventsRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2],
+      ["page", 3],
+      ["section_id", 4],
+      ["time_range", 5],
+      ["event_type", 6]
+    ],
+    "ListInstallationsRequest": [
+      ["agent_id", 1],
+      ["page", 2],
+      ["status", 3]
+    ],
+    "ListInvocationsRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2],
+      ["page", 3],
+      ["run_id", 4],
+      ["status", 5],
+      ["installation_id", 6]
+    ],
+    "ListModelPoliciesRequest": [
+      ["agent_id", 1],
+      ["page", 2],
+      ["status", 3]
+    ],
+    "ListRunsRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2],
+      ["page", 3],
+      ["status", 4],
+      ["time_range", 5]
+    ],
+    "ListSchedulesRequest": [
+      ["agent_id", 1],
+      ["page", 2],
+      ["thread_id", 3],
+      ["installation_id", 4],
+      ["status", 5]
+    ],
+    "ListSectionsRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2],
+      ["page", 3],
+      ["sequence_range", 4]
+    ],
+    "ListThreadsRequest": [
+      ["agent_id", 1],
+      ["page", 2],
+      ["status", 3],
+      ["thread_key_prefix", 4]
+    ],
+    "ListToolsRequest": [
+      ["agent_id", 1],
+      ["page", 2],
+      ["include_unavailable", 3],
+      ["installation_id", 4]
+    ],
+    "PublishDeliveryResultRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["installation_id", 3],
+      ["delivery_id", 4],
+      ["status", 5],
+      ["delivery_context_id", 6],
+      ["provider_operation_id", 7],
+      ["timestamp", 8],
+      ["nonce", 9],
+      ["raw_body_digest", 10],
+      ["signature", 11]
+    ],
+    "PublishEventRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["thread_key", 3],
+      ["event", 4],
+      ["security", 5],
+      ["replay", 6]
+    ],
+    "PublishIntegrationEventRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["thread_key", 3],
+      ["installation_id", 4],
+      ["connection_id", 5],
+      ["event", 6],
+      ["timestamp", 7],
+      ["nonce", 8],
+      ["raw_body_digest", 9],
+      ["signature", 10]
+    ],
+    "PublishToolResultRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["installation_id", 3],
+      ["invocation_id", 4],
+      ["status", 5],
+      ["output_ref", 6],
+      ["provider_operation_id", 7],
+      ["output_payload", 8],
+      ["timestamp", 9],
+      ["nonce", 10],
+      ["raw_body_digest", 11],
+      ["signature", 12]
+    ],
+    "RejectInvocationRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["invocation_id", 3],
+      ["reason", 4],
+      ["security", 5]
+    ],
+    "RotateAgentCredentialRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["credential_id", 3],
+      ["policy", 4],
+      ["security", 5]
+    ],
+    "SearchThreadHistoryRequest": [
+      ["agent_id", 1],
+      ["thread_id", 2],
+      ["query", 3],
+      ["page", 4],
+      ["filter", 5]
+    ],
+    "UninstallIntegrationRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["installation_id", 3],
+      ["reason", 4],
+      ["security", 5]
+    ],
+    "UpdateConfigRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["config", 3],
+      ["security", 4]
+    ],
+    "UpsertModelPolicyRequest": [
+      ["agent_id", 1],
+      ["idempotency_key", 2],
+      ["policy", 3],
+      ["security", 4]
+    ],
+    "ValidateModelPolicyRequest": [
+      ["agent_id", 1],
+      ["policy", 2],
+      ["security", 3]
+    ]
+  }
+}

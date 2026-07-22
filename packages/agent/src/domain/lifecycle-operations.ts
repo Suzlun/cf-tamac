@@ -10,6 +10,7 @@ import {
   mapAgentProfileRow,
   recordAgentIdempotency,
   reserveAgentNonce,
+  requireAgentIdempotencyKey,
 } from './agent-operation-utils';
 import { createAgentDomainError } from './errors';
 import { recordLifecycleAudit } from './lifecycle-audit';
@@ -47,12 +48,25 @@ export function initializeAgentInStore(input: {
   readonly repositories: AgentStorageRepositories;
 }): InitializeAgentResult {
   assertAgentContext(input.agentId, input.command.context);
+  // registration_request_digest は Client の登録意図と Agent-owned receipt を結ぶため、全読み書きより先に空値を拒否します。
+  const registrationRequestDigest = requireRegistrationRequestDigest(
+    input.command.registrationRequestDigest
+  );
   const replay = checkAgentIdempotency<InitializeAgentResult>({
     context: input.command.context,
     operationName: 'AgentLifecycleService.InitializeAgent',
     repositories: input.repositories,
   });
-  if (replay.status === 'replay') return { ...replay.response, replayed: true };
+  if (replay.status === 'replay') {
+    // replay 応答と永続receiptの両方を照合し、片方だけが別の登録意図を示す状態を返さないようにします。
+    assertReplayInitializationReceipt({
+      idempotencyKey: requireAgentIdempotencyKey(input.command.context),
+      registrationRequestDigest,
+      response: replay.response,
+      storedReceipt: input.repositories.initializationReceipt.getReceipt(),
+    });
+    return { ...replay.response, replayed: true };
+  }
   reserveAgentNonce(input.repositories, input.command.context);
   authorizeAgentOperation({
     action: 'agent.initialize',
@@ -67,12 +81,33 @@ export function initializeAgentInStore(input: {
   if (input.repositories.profile.getProfile() !== undefined) {
     throw createAgentDomainError({ kind: 'conflict', message: 'Agent is already initialized.' });
   }
-  const result = createInitializedAgent(input);
-  recordAgentIdempotency({
-    context: input.command.context,
-    operationName: 'AgentLifecycleService.InitializeAgent',
-    repositories: input.repositories,
-    response: result,
+  if (input.repositories.initializationReceipt.getReceipt() !== undefined) {
+    throw createAgentDomainError({
+      kind: 'concurrency',
+      message: 'Agent initialization receipt already exists without an active profile.',
+    });
+  }
+  // Agent profile/config/credential/audit、初期化receipt、idempotency responseを同一SQLite transactionで確定します。
+  const result = input.repositories.transaction((repositories) => {
+    // profile/config/credential/audit/thread/model policy とreceiptを同一transaction内で確定します。
+    const initialized = createInitializedAgent({
+      ...input,
+      registrationRequestDigest,
+      repositories,
+    });
+    repositories.initializationReceipt.upsertReceipt({
+      createdAtMs: input.command.context.requestedAtMs,
+      idempotencyKey: requireAgentIdempotencyKey(input.command.context),
+      registrationRequestDigest,
+    });
+    // receipt repository のpostcondition検証後にだけ、同一transactionへreplay応答を書き込みます。
+    recordAgentIdempotency({
+      context: input.command.context,
+      operationName: 'AgentLifecycleService.InitializeAgent',
+      repositories,
+      response: initialized,
+    });
+    return initialized;
   });
   return result;
 }
@@ -98,13 +133,80 @@ export function getAgentFromStore(input: {
   if (profile === undefined)
     throw createAgentDomainError({ kind: 'not_found', message: 'Agent not found.' });
   const config = getLatestConfigView(input.agentId, input.repositories);
+  // initialized profileにreceiptが欠落している場合は、登録照合不能な成功応答を返さずfail closedします。
+  const initializationReceipt = requireInitializationReceipt(input.repositories);
   return {
     activeCredential: mapOptionalCredential(input.agentId, input.repositories, input.query.context),
     agent: mapAgentProfileRow(profile),
     capabilitySummary: createEmptyCapabilitySummary(input.agentId),
     config,
     defaultModelPolicy: config.defaultModelPolicy,
+    initializationReceipt,
   };
+}
+
+function requireInitializationReceipt(repositories: AgentStorageRepositories) {
+  // receiptをAgent-owned SQLiteから読み、profileとのatomic initialization invariantを再確認します。
+  const receipt = repositories.initializationReceipt.getReceipt();
+  if (receipt === undefined) {
+    throw createAgentDomainError({
+      kind: 'internal',
+      message: 'Initialization receipt is missing for an initialized Agent.',
+    });
+  }
+  return {
+    idempotencyKey: receipt.idempotencyKey,
+    registrationRequestDigest: receipt.registrationRequestDigest,
+  };
+}
+
+function requireRegistrationRequestDigest(registrationRequestDigest: string): string {
+  // 空白だけのdigestは照合証拠にならないため、入力値の前後を変更せず空白判定だけを行います。
+  if (registrationRequestDigest.trim() === '') {
+    throw createAgentDomainError({
+      kind: 'validation',
+      message: 'registration_request_digest must not be empty.',
+    });
+  }
+  return registrationRequestDigest;
+}
+
+function assertReplayInitializationReceipt(input: {
+  readonly idempotencyKey: string;
+  readonly registrationRequestDigest: string;
+  readonly response: InitializeAgentResult;
+  readonly storedReceipt:
+    | { readonly idempotencyKey: string; readonly registrationRequestDigest: string }
+    | undefined;
+}): void {
+  // 永続receiptが欠落している場合はatomicity違反としてfail closedし、active確定に使える応答を返しません。
+  if (input.storedReceipt === undefined) {
+    throw createAgentDomainError({
+      kind: 'internal',
+      message: 'Initialization receipt is missing for an idempotent replay.',
+    });
+  }
+  // 同一keyの別digestは既存idempotency contractと同じconflictとして拒否します。
+  if (
+    input.storedReceipt.idempotencyKey !== input.idempotencyKey ||
+    input.storedReceipt.registrationRequestDigest !== input.registrationRequestDigest
+  ) {
+    throw createAgentDomainError({
+      kind: 'conflict',
+      message: 'Initialization receipt does not match the requested registration command.',
+    });
+  }
+  // responseRef側も同じreceiptを持つことを確認し、storageとreplay応答の乖離を隠しません。
+  if (
+    input.response.initializationReceipt.idempotencyKey !== input.idempotencyKey ||
+    input.response.initializationReceipt.registrationRequestDigest !==
+      input.registrationRequestDigest
+  ) {
+    throw createAgentDomainError({
+      kind: 'internal',
+      message: 'Idempotent replay response does not match the initialization receipt.',
+    });
+  }
 }
 
 /**
@@ -285,6 +387,7 @@ export function getAgentConfigFromStore(input: {
 function createInitializedAgent(input: {
   readonly agentId: string;
   readonly command: InitializeAgentCommand;
+  readonly registrationRequestDigest: string;
   readonly repositories: AgentStorageRepositories;
 }): InitializeAgentResult {
   const now = input.command.context.requestedAtMs;
@@ -331,6 +434,10 @@ function createInitializedAgent(input: {
     config: mapAgentConfigView(input.agentId, input.repositories, config),
     credential: mapAgentCredentialRow(input.agentId, credential),
     defaultModelPolicy,
+    initializationReceipt: {
+      idempotencyKey: requireAgentIdempotencyKey(input.command.context),
+      registrationRequestDigest: input.registrationRequestDigest,
+    },
     replayed: false,
     threadKeyRule,
   };

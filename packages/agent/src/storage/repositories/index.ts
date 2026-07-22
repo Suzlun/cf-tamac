@@ -7,6 +7,7 @@ export * from './events-repository';
 export * from './factory';
 export * from './grants-repository';
 export * from './history-repository';
+export * from './initialization-receipt-repository';
 export * from './idempotency-repository';
 export * from './integrations-repository';
 export * from './integrations-repository-types';

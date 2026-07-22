@@ -5,6 +5,11 @@ import {
   type IntegrationInstallValues,
 } from './schemas/integration-install';
 
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
+
 /**
  * Integration install form から mutation helper が必要とする draft だけを表します。
  *
@@ -58,7 +63,7 @@ export interface ConfirmIntegrationInstallInput<TInstallation extends Integratio
     integrationId: string,
     manifestRef: string,
     requestedGrants: readonly string[]
-  ) => Promise<TInstallation>;
+  ) => Promise<BrowserSafeIntegrationActionResult<TInstallation>>;
   readonly setError: (value: string | undefined) => void;
   readonly setInstallDraft: (value: IntegrationInstallDraft | undefined) => void;
   readonly setPending: (value: boolean) => void;
@@ -83,7 +88,7 @@ export interface UninstallIntegrationInput<TInstallation extends IntegrationMuta
     installationId: string,
     idempotencyKey: string,
     reason: string
-  ) => Promise<TInstallation>;
+  ) => Promise<BrowserSafeIntegrationActionResult<TInstallation>>;
   readonly setError: (value: string | undefined) => void;
   readonly setPending: (value: boolean) => void;
   readonly setSelected: (value: TInstallation | undefined) => void;
@@ -122,12 +127,18 @@ export async function confirmIntegrationInstall<TInstallation extends Integratio
       input.installDraft.manifestUrl,
       requestedGrants
     );
-    input.setSuccess(`Installation ${result.installationId} created.`);
+    if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+      input.setError(result.displayData.message);
+      return;
+    }
+    input.setSuccess(result.displayData.message);
     input.setShowInstall(false);
     input.setInstallDraft(undefined);
-  } catch (error_) {
-    // Server Action 由来の error message だけを UI に反映し、credential material は扱わない。
-    input.setError(error_ instanceof Error ? error_.message : 'Integration install failed.');
+  } catch {
+    // Server Action contract 外の例外も raw detail を表示せず、固定安全文言だけを UI に反映します。
+    input.setError(
+      'Integrationの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
   } finally {
     // 成否に関係なく pending を戻し、再操作可能な UI 状態へ復帰する。
     input.setPending(false);
@@ -158,17 +169,26 @@ export async function uninstallIntegrationFromUi<TInstallation extends Integrati
       generateIdempotencyKey(),
       'uninstalled from UI'
     );
-    input.setSuccess(`Integration ${result.integrationId ?? input.uninstallId} uninstalled.`);
-    input.setSelected(result);
+    if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+      input.setError(result.displayData.message);
+      return;
+    }
+    input.setSuccess(result.displayData.message);
+    input.setSelected(result.displayData.data);
     input.setUninstallId(undefined);
-  } catch (error_) {
-    // Server Action の失敗を UI 状態として提示し、ブラウザで直接 retry transport を組み立てない。
-    input.setError(error_ instanceof Error ? error_.message : 'Integration uninstall failed.');
+  } catch {
+    // Server Action contract 外の例外も UI に raw diagnostic を出さず、固定安全文言へ閉じます。
+    input.setError(
+      'Integrationの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
   } finally {
     // Server Action の結果に関係なく pending を解除し、二重 submit を防いだ状態から復帰する。
     input.setPending(false);
   }
 }
+
+type BrowserSafeIntegrationActionResult<TInstallation extends IntegrationMutationSummary> =
+  BrowserSafeAgentRpcResult<BrowserSafeOperationDisplayData & { readonly data?: TInstallation }>;
 
 function resolveInstallIdempotencyKey(draft: IntegrationInstallDraft): string {
   // operator 入力が空なら browser-safe idempotency key を生成し、二重 submit の replay 境界を保つ。

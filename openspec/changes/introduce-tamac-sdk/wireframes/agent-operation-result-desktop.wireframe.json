@@ -1,0 +1,376 @@
+{
+  "name": "Agent操作結果・デスクトップ状態仕様",
+  "viewport": { "width": 1280, "height": 2500 },
+  "root": {
+    "name": "Agent選択済みManagement Clientシェル",
+    "direction": "vertical",
+    "children": [
+      { "name": "メインコンテンツへ移動", "type": "link", "height": 40 },
+      {
+        "name": "デスクトップ本文",
+        "direction": "horizontal",
+        "grow": true,
+        "children": [
+          {
+            "name": "Agent選択済みサイドバー — 設定を選択中",
+            "direction": "vertical",
+            "width": 256,
+            "padding": 16,
+            "gap": 16,
+            "children": [
+              { "name": "cf-tamac Management", "type": "text", "variant": "heading", "height": 40 },
+              { "name": "グローバル — Agents選択中", "type": "link", "height": 44 },
+              { "name": "Agent: {displayName} / {agentId}", "type": "text", "height": 48 },
+              { "name": "概要", "type": "link", "height": 40 },
+              { "name": "スレッド", "type": "link", "height": 40 },
+              { "name": "イベント", "type": "link", "height": 40 },
+              { "name": "実行", "type": "link", "height": 40 },
+              { "name": "スケジュール", "type": "link", "height": 40 },
+              { "name": "連携", "type": "link", "height": 40 },
+              { "name": "設定 — 選択中", "type": "link", "height": 40 },
+              {
+                "name": "Agent RPCはサーバー側で実行",
+                "type": "text",
+                "variant": "caption",
+                "height": 40
+              }
+            ]
+          },
+          {
+            "name": "設定メインコンテンツ",
+            "direction": "vertical",
+            "grow": true,
+            "padding": 32,
+            "gap": 32,
+            "children": [
+              {
+                "name": "ページヘッダー",
+                "direction": "vertical",
+                "padding": 16,
+                "gap": 8,
+                "children": [
+                  { "name": "設定", "type": "text", "variant": "caption", "height": 24 },
+                  {
+                    "name": "Agentレジストリ › {agentId}",
+                    "type": "text",
+                    "variant": "display",
+                    "height": 56
+                  },
+                  {
+                    "name": "Agent設定とcredential",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "「{displayName}」を管理しています。変更はサーバー側Agent RPCを通じて送信されます。",
+                    "type": "text",
+                    "height": 48
+                  }
+                ]
+              },
+              {
+                "name": "既定モデルポリシー概要",
+                "direction": "vertical",
+                "maxWidth": 900,
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "既定モデルポリシー",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "ポリシー参照 / ダイジェスト / プロバイダー / モデル / バージョン / 状態 / 設定バージョン",
+                    "type": "text",
+                    "height": 56
+                  },
+                  {
+                    "name": "安全化済みメタデータの許可リストを表示",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  }
+                ]
+              },
+              {
+                "name": "既定モデルポリシー編集",
+                "direction": "vertical",
+                "maxWidth": 900,
+                "padding": 24,
+                "gap": 16,
+                "children": [
+                  {
+                    "name": "既定モデルポリシーを編集",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "Agent所有ポリシーを保存してから、保存済みの参照をAgentConfig.modelPolicyRefへ適用します。ブラウザーには安全化済みの結果を返します。",
+                    "type": "text",
+                    "height": 56
+                  },
+                  {
+                    "name": "ResultRegion — 導入文の直後、フィールドの直前。初期状態は高さ0の領域",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  },
+                  {
+                    "name": "ポリシーフィールド",
+                    "direction": "horizontal",
+                    "padding": 16,
+                    "gap": 16,
+                    "wrap": true,
+                    "children": [
+                      {
+                        "name": "ポリシー参照",
+                        "type": "input",
+                        "grow": true,
+                        "maxWidth": 380,
+                        "height": 44
+                      },
+                      {
+                        "name": "プロバイダー — workers-ai",
+                        "type": "input",
+                        "grow": true,
+                        "maxWidth": 380,
+                        "height": 44
+                      },
+                      {
+                        "name": "モデルID",
+                        "type": "input",
+                        "grow": true,
+                        "maxWidth": 380,
+                        "height": 44
+                      },
+                      {
+                        "name": "温度",
+                        "type": "input",
+                        "grow": true,
+                        "maxWidth": 380,
+                        "height": 44
+                      },
+                      {
+                        "name": "Top P",
+                        "type": "input",
+                        "grow": true,
+                        "maxWidth": 380,
+                        "height": 44
+                      },
+                      {
+                        "name": "最大出力トークン数",
+                        "type": "input",
+                        "grow": true,
+                        "maxWidth": 380,
+                        "height": 44
+                      }
+                    ]
+                  },
+                  {
+                    "name": "ポリシー操作",
+                    "direction": "horizontal",
+                    "padding": 8,
+                    "gap": 8,
+                    "children": [
+                      { "name": "ポリシーを検証", "type": "button", "height": 44 },
+                      { "name": "既定ポリシーを保存", "type": "button", "height": 44 }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "後続の設定セクション",
+                "direction": "vertical",
+                "maxWidth": 900,
+                "padding": 24,
+                "gap": 16,
+                "children": [
+                  { "name": "Agent設定", "type": "text", "variant": "heading", "height": 40 },
+                  {
+                    "name": "credentialローテーション",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  { "name": "危険操作領域", "type": "text", "variant": "heading", "height": 40 }
+                ]
+              },
+              {
+                "name": "ResultRegion状態一覧",
+                "type": "text",
+                "variant": "heading",
+                "height": 40
+              },
+              {
+                "name": "処理中",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "既定モデルポリシーを保存しています",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "ポリシーを保存し、Agent設定へ適用しています…",
+                    "type": "text",
+                    "height": 32
+                  },
+                  { "name": "保存しています…", "type": "button", "height": 44 },
+                  {
+                    "name": "設定変更操作は処理中の操作状態",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  }
+                ]
+              },
+              { "name": "処理中と成功の区切り", "type": "divider" },
+              {
+                "name": "成功",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "既定モデルポリシーを保存しました",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "「{policyRef}」を保存し、設定バージョン v{configVersion} を適用しました。",
+                    "type": "text",
+                    "height": 40
+                  },
+                  {
+                    "name": "成功結果 — displayData / safeStatus: succeeded / safeErrorCategory: null / correlationId。成功メッセージを表示",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  }
+                ]
+              },
+              { "name": "成功と権限案内の区切り", "type": "divider" },
+              {
+                "name": "権限案内 — safeErrorCategory: permission_denied",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "更新権限を確認してください",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "既定モデルポリシーの更新には管理権限を使用します。安全なメタデータを確認できます。",
+                    "type": "text",
+                    "height": 48
+                  },
+                  { "name": "問い合わせID: {correlationId}", "type": "text", "height": 32 },
+                  {
+                    "name": "このIDを運用担当者へ伝えると、サーバー側ログを安全に照合できます。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 32
+                  },
+                  { "name": "問い合わせIDをコピー", "type": "button", "height": 44 },
+                  {
+                    "name": "コピー完了通知 — 問い合わせIDをコピーしました。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  },
+                  {
+                    "name": "編集フィールド・検証・保存は権限確認状態",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  }
+                ]
+              },
+              { "name": "権限案内と設定案内の区切り", "type": "divider" },
+              {
+                "name": "設定案内 — safeErrorCategory: configuration",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "Agentの接続設定を確認してください",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "Agent RPC originを運用ポリシーで確認してください。許可済みのHTTPS originを登録すると操作を続行できます。",
+                    "type": "text",
+                    "height": 48
+                  },
+                  { "name": "問い合わせID: {correlationId}", "type": "text", "height": 32 },
+                  {
+                    "name": "このIDを運用担当者へ伝えると、サーバー側ログを安全に照合できます。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 32
+                  },
+                  { "name": "問い合わせIDをコピー", "type": "button", "height": 44 },
+                  {
+                    "name": "コピー完了通知 — 問い合わせIDをコピーしました。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  },
+                  { "name": "登録情報を編集", "type": "link", "height": 44 }
+                ]
+              },
+              { "name": "設定案内とinternal結果の区切り", "type": "divider" },
+              {
+                "name": "internal安全結果 — safeErrorCategory: internal",
+                "direction": "vertical",
+                "padding": 24,
+                "gap": 12,
+                "children": [
+                  {
+                    "name": "操作を再実行できます",
+                    "type": "text",
+                    "variant": "heading",
+                    "height": 40
+                  },
+                  {
+                    "name": "Agent設定は直前の確定値を保持しています。時間をおいて「もう一度保存」を実行してください。運用調査には問い合わせIDを利用できます。",
+                    "type": "text",
+                    "height": 56
+                  },
+                  { "name": "問い合わせID: {correlationId}", "type": "text", "height": 32 },
+                  {
+                    "name": "このIDを運用担当者へ伝えると、サーバー側ログを安全に照合できます。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 32
+                  },
+                  { "name": "問い合わせIDをコピー", "type": "button", "height": 44 },
+                  {
+                    "name": "コピー完了通知 — 問い合わせIDをコピーしました。",
+                    "type": "text",
+                    "variant": "caption",
+                    "height": 24
+                  },
+                  { "name": "もう一度保存", "type": "button", "height": 44 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

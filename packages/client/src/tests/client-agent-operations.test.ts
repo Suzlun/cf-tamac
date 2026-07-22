@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { normalizeTamacSdkError } from '@cf-tamac/sdk';
+
 import {
   toOptionalString,
   toBrowserSafeAgentConfigPreview,
@@ -11,8 +13,10 @@ import {
   toSafeStringFromInt64,
 } from '../server/actions/browser-safe-helpers';
 import { deriveActingUserContext } from '../server/agent-rpc/acting-user';
+import { createServerAgentRpcClients } from '../server/agent-rpc/create-client';
+import { createBrowserSafeAgentRpcFailure } from '../server/agent-rpc/safe-results';
 
-import type { ActingUserContext } from '../server/agent-rpc/authentication';
+import type { ActingUserContext } from '../server/agent-rpc/acting-user';
 
 function readSource(path: URL): string {
   return readFileSync(fileURLToPath(path.href), 'utf8');
@@ -193,32 +197,92 @@ describe('Server Action credential safety with mocked Agent RPC', () => {
     expect(loaderSource).toContain('createSigningKeyRepository');
     expect(loaderSource).toContain('resolveEd25519PrivateKey');
     expect(loaderSource).toContain('createServerAgentRpcClients');
+    expect(loaderSource).toContain('ClientServiceSigningContext');
+    expect(loaderSource).not.toContain('@connectrpc/connect');
+    expect(loaderSource).not.toContain('@cf-tamac/client-agent-rpc');
 
     expect(schemaSource).toContain('clientManagedAgentsTable');
     expect(schemaSource).toContain('clientAgentCredentialRefsTable');
     expect(schemaSource).toContain('forbiddenClientAgentSnapshotTables');
   });
 
-  it('[CLIENT-REGISTRY-S003] error normalization wraps Agent RPC failures', async () => {
-    const { withAgentRpcErrorNormalization, AgentRpcOperationError } =
-      await import('../server/agent-rpc/errors');
+  it('[CLIENT-REGISTRY-S003] Client adapter delegates RPC error normalization to the SDK', () => {
+    const factorySource = readSource(
+      new URL('../server/agent-rpc/create-client.ts', import.meta.url)
+    );
 
-    await expect(
-      withAgentRpcErrorNormalization(() =>
-        Promise.reject(new Error('Agent RPC connection refused'))
-      )
-    ).rejects.toBeInstanceOf(AgentRpcOperationError);
+    expect(factorySource).toContain('@cf-tamac/sdk');
+    expect(factorySource).toContain('createTamacAgentClient');
+    expect(factorySource).toContain('withErrorNormalization');
+    expect(factorySource).not.toContain('@connectrpc/connect');
+    expect(factorySource).not.toContain('@connectrpc/connect-web');
+    expect(factorySource).not.toContain('@cf-tamac/client-agent-rpc');
+  });
+});
 
+describe('Server-only SDK normalization runtime boundary', () => {
+  it('[TAMAC-SDK-S005] normalizes an injected SDK failure through the real Client adapter before producing four safe result fields', async () => {
+    const clients = createServerAgentRpcClients({
+      actingUser: { operatorId: 'runtime-normalization-operator', scopes: ['agent:read'] },
+      agentRpcOrigin: 'https://agent.example.com' as never,
+      // transport を実行しない injected failure test のため、private key material は構築せず Client adapter の context shape だけを与える。
+      signingContext: {
+        credential: {
+          agentId: 'agent-alpha',
+          issuer: 'runtime-test',
+          keyId: 'runtime-key',
+          publicFingerprint: 'sha256:runtime',
+        },
+      } as never,
+    });
+    const normalized = normalizeTamacSdkError(
+      new Error('raw transport failure must not cross boundary'),
+      {
+        agentId: 'agent-alpha',
+        correlationId: clients.invocation.correlationId,
+        methodContext: {
+          methodName: 'GetState',
+          serviceName: 'cftamac.agent.v1.AgentStateService',
+        },
+        requestId: clients.invocation.requestId,
+      }
+    );
+
+    let safeResult:
+      | ReturnType<
+          typeof createBrowserSafeAgentRpcFailure<{
+            readonly message: string;
+            readonly title: string;
+          }>
+        >
+      | undefined;
     try {
-      await withAgentRpcErrorNormalization(() =>
-        Promise.reject(new Error('Agent RPC connection refused'))
-      );
-      expect.fail('should have thrown');
+      // actual Client adapter seam に SDK normalized failure を注入し、source text inspection ではなく runtime value を検証する。
+      await clients.withErrorNormalization(async () => await Promise.reject(normalized));
+      throw new Error('injected SDK failure must reject');
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      expect(message).not.toContain('connection refused');
-      expect(message).not.toContain('Agent RPC');
+      safeResult = createBrowserSafeAgentRpcFailure(error, 'fallback-correlation', {
+        message: '安全な失敗本文',
+        title: '安全な失敗見出し',
+      });
     }
+
+    if (safeResult === undefined) {
+      throw new Error('safe result must be created from the normalized SDK failure');
+    }
+
+    expect(Object.keys(safeResult).sort()).toEqual([
+      'correlationId',
+      'displayData',
+      'safeErrorCategory',
+      'safeStatus',
+    ]);
+    expect(safeResult).toMatchObject({
+      correlationId: clients.invocation.correlationId,
+      safeErrorCategory: 'internal',
+      safeStatus: 'failed',
+    });
+    expect(JSON.stringify(safeResult)).not.toContain('raw transport failure');
   });
 });
 

@@ -15,6 +15,7 @@ import type {
   AgentEventRow,
   AgentEventSequencePair,
   AgentGrantRow,
+  AgentIdempotencyRecordRow,
   AgentImmutableBlobWriteInput,
   AgentImmutableBlobWriteResult,
   AgentModelPolicyInputRecord,
@@ -84,6 +85,112 @@ describe('Agent Stage 4 R2 offload and storage thresholds', () => {
       key: object.objectKey,
       sha256: object.sha256,
     });
+  });
+
+  it('[AGENT-EVENTING-S006] Provider Event reservation excludes concurrent blob writes and records completion or failure', async () => {
+    const harness = new EventOffloadHarness();
+    const payload = new Uint8Array(agentInlineBodyLimitBytes + 32);
+    let allowBlobWrite: () => void = () => undefined;
+    let signalBlobWriterStarted: () => void = () => undefined;
+    let providerAuthorizationCount = 0;
+    let writerCalls = 0;
+    const blobWriterStarted = new Promise<void>((resolve) => {
+      signalBlobWriterStarted = resolve;
+    });
+    const command = {
+      context: createContext('PublishEvent', 'provider-event-race-digest', {
+        idempotencyKey: 'provider-event-race-key',
+        nonce: 'provider-event-race-nonce',
+        principalType: 'INTEGRATION_INSTALLATION',
+      }),
+      eventType: 'integration.message.received',
+      payload,
+      payloadContentType: 'application/octet-stream',
+      source: 'integration' as const,
+      threadKey: 'provider:delayed-blob-write',
+    };
+    const delayedBlobWriter = async (blob: AgentImmutableBlobWriteInput) => {
+      // 外部 R2 write の待機点を固定し、並行 retry が予約状態を観測するようにします。
+      writerCalls += 1;
+      signalBlobWriterStarted();
+      await new Promise<void>((resolve) => {
+        allowBlobWrite = resolve;
+      });
+      return harness.writeBlob(blob);
+    };
+    const publish = () =>
+      publishEventInStore({
+        agentId,
+        // verified Provider principal 用の Connection grant 判定は、reservation 成功後に一度だけ通過します。
+        authorizeAfterReplayReservation: () => {
+          providerAuthorizationCount += 1;
+        },
+        blobWriter: delayedBlobWriter,
+        command,
+        repositories: harness.repositories,
+        storageUsagePercent: 90,
+      });
+
+    const first = publish();
+    await blobWriterStarted;
+
+    // Durable Object SQLite reservation は外部 write 前に nonce/key を記録し、次の retry を fail closed にします。
+    expect(harness.idempotencyRecord('provider-event-race-key')).toMatchObject({
+      responseRef: null,
+      status: 'recording',
+    });
+    expect(harness.nonceReservationCount()).toBe(1);
+    await expect(publish()).rejects.toThrow('still being recorded');
+    expect(providerAuthorizationCount).toBe(1);
+    expect(writerCalls).toBe(1);
+    expect(harness.blobWrites).toHaveLength(0);
+
+    allowBlobWrite();
+    const accepted = await first;
+    expect(harness.idempotencyRecord('provider-event-race-key')).toMatchObject({
+      responseRef: expect.any(String),
+      status: 'succeeded',
+    });
+
+    // 完了済み command は同じ Event result を replay し、blob/Event/Run を重複させません。
+    await expect(publish()).resolves.toMatchObject({
+      event: { eventId: accepted.event.eventId },
+      replayed: true,
+    });
+    expect(harness.blobWrites).toHaveLength(1);
+    expect(harness.events).toHaveLength(1);
+    expect(harness.repositories.pendingRuns.listRuns({ limit: 10 })).toHaveLength(1);
+
+    const failedCommand = {
+      ...command,
+      context: createContext('PublishEvent', 'provider-event-failure-digest', {
+        idempotencyKey: 'provider-event-failure-key',
+        nonce: 'provider-event-failure-nonce',
+        principalType: 'INTEGRATION_INSTALLATION',
+      }),
+      threadKey: 'provider:failed-blob-write',
+    };
+    let failedWriterCalls = 0;
+    const failingPublish = () =>
+      publishEventInStore({
+        agentId,
+        blobWriter: () => {
+          // R2 失敗では Event durable commit 前に ledger を failed へ移し、同一 key を再実行しません。
+          failedWriterCalls += 1;
+          return Promise.reject(new Error('R2 write unavailable'));
+        },
+        command: failedCommand,
+        repositories: harness.repositories,
+        storageUsagePercent: 90,
+      });
+
+    await expect(failingPublish()).rejects.toThrow('R2 write unavailable');
+    expect(harness.idempotencyRecord('provider-event-failure-key')).toMatchObject({
+      responseRef: null,
+      status: 'failed',
+    });
+    await expect(failingPublish()).rejects.toThrow('previously failed');
+    expect(failedWriterCalls).toBe(1);
   });
 
   it('storage threshold policy emits warning priority force-r2 and critical decisions safely', () => {
@@ -226,7 +333,8 @@ describe('Agent Stage 4 R2 offload and storage thresholds', () => {
 
 class EventOffloadHarness {
   private agentSequence = 0;
-  private readonly idempotencyResponses = new Map<string, string>();
+  private readonly idempotencyRecords = new Map<string, AgentIdempotencyRecordRow>();
+  private readonly reservedNonces = new Set<string>();
   private readonly r2Objects = new Map<string, AgentR2ObjectReferenceRow>();
   private readonly sections = new Map<string, AgentSectionRow>();
   private readonly threads = new Map<string, AgentThreadRow>();
@@ -242,6 +350,14 @@ class EventOffloadHarness {
     const row = this.r2Objects.get(objectRef);
     if (row === undefined) throw new Error('Expected indexed R2 object reference.');
     return row;
+  }
+
+  idempotencyRecord(idempotencyKey: string): AgentIdempotencyRecordRow | undefined {
+    return this.idempotencyRecords.get(idempotencyKey);
+  }
+
+  nonceReservationCount(): number {
+    return this.reservedNonces.size;
   }
 
   writeBlob(input: AgentImmutableBlobWriteInput): Promise<AgentImmutableBlobWriteResult> {
@@ -277,27 +393,34 @@ class EventOffloadHarness {
       },
       idempotency: {
         findRecord: (_principalId: string, idempotencyKey: string) => {
-          const responseRef = this.idempotencyResponses.get(idempotencyKey);
-          return responseRef === undefined
-            ? undefined
-            : {
-                createdAtMs: nowMs,
-                expiresAtMs: nowMs + 1_000,
-                idempotencyKey,
-                operationName: 'AgentEventService.PublishEvent',
-                principalId,
-                requestDigest: 'event-large-digest',
-                responseRef,
-                status: 'succeeded',
-              };
+          return this.idempotencyRecords.get(idempotencyKey);
         },
-        insertRecord: (input: {
-          readonly idempotencyKey: string;
-          readonly responseRef?: string;
-        }) => {
-          this.idempotencyResponses.set(input.idempotencyKey, input.responseRef ?? '{}');
+        insertRecord: (
+          input: Parameters<AgentStorageRepositories['idempotency']['insertRecord']>[0]
+        ) => {
+          this.idempotencyRecords.set(input.idempotencyKey, {
+            createdAtMs: input.createdAtMs,
+            expiresAtMs: input.expiresAtMs,
+            idempotencyKey: input.idempotencyKey,
+            operationName: input.operationName,
+            principalId: input.principalId,
+            requestDigest: input.requestDigest,
+            responseRef: input.responseRef ?? null,
+            status: input.status,
+          });
         },
         tableName: 'agent_idempotency_records',
+        updateRecordResponse: (
+          input: Parameters<AgentStorageRepositories['idempotency']['updateRecordResponse']>[0]
+        ) => {
+          const record = this.idempotencyRecords.get(input.idempotencyKey);
+          if (record === undefined) throw new Error('idempotency record missing in harness');
+          this.idempotencyRecords.set(input.idempotencyKey, {
+            ...record,
+            responseRef: input.responseRef,
+            status: input.status,
+          });
+        },
       },
       modelPolicies: this.createModelPoliciesRepository(),
       pendingRuns: this.createPendingRunsRepository(),
@@ -318,7 +441,12 @@ class EventOffloadHarness {
       requestNonces: {
         findNonce: () => undefined,
         insertNonce: unusedRepositoryMethod,
-        reserveNonce: () => ({ status: 'reserved' as const }),
+        reserveNonce: (input: { readonly nonce: string; readonly principalId: string }) => {
+          const key = `${input.principalId}:${input.nonce}`;
+          if (this.reservedNonces.has(key)) return { status: 'replay' as const };
+          this.reservedNonces.add(key);
+          return { status: 'reserved' as const };
+        },
         tableName: 'agent_request_nonces',
       },
       sections: this.createSectionsRepository(),
@@ -567,6 +695,8 @@ function createContext(
   method: string,
   digestHex: string,
   options?: {
+    readonly idempotencyKey?: string;
+    readonly nonce?: string;
     readonly principalId?: string;
     readonly principalType?: 'CLIENT_SERVICE' | 'INTEGRATION_INSTALLATION';
     readonly scopes?: readonly string[];
@@ -575,8 +705,9 @@ function createContext(
   return {
     agentId,
     bodyDigest: { algorithm: 'sha-256', byteLength: 10, digestHex },
-    idempotencyKey: `idem-${method}`,
+    idempotencyKey: options?.idempotencyKey ?? `idem-${method}`,
     method,
+    nonce: options?.nonce,
     principal: {
       agentId,
       principalId: options?.principalId ?? principalId,

@@ -19,7 +19,10 @@ import {
   requireInstallation,
 } from './operation-shared';
 import { getIntegrationDeliveryProviderRequestRecord } from './provider-client';
-import { verifyIntegrationIngressSignature } from './security';
+import {
+  verifyIntegrationIngressSignature,
+  withVerifiedIntegrationIngressPrincipal,
+} from './security';
 
 import type { AgentAdapterDeliveryRow, AgentStorageRepositories } from '../storage';
 import type {
@@ -46,27 +49,45 @@ export async function publishIntegrationDeliveryResultInStore(input: {
   readonly repositories: AgentStorageRepositories;
 }): Promise<PublishIntegrationDeliveryResult> {
   assertAgentContext(input.agentId, input.command.context);
-  const replay = checkAgentIdempotency<PublishIntegrationDeliveryResult>({
-    context: input.command.context,
-    operationName: publishDeliveryResultOperationName,
-    repositories: input.repositories,
-  });
-  if (replay.status === 'replay') return { ...replay.response, replayed: true };
-  const delivery = requireDeliveryResultBinding(input);
-  await verifyIntegrationIngressSignature({
+  // DeliveryContext ID は Provider が署名する canonical identity に必須とし、未署名 caller の delivery lookup を防ぎます。
+  const deliveryContextId = requireSignedDeliveryContextId(input.command.deliveryContextId);
+  const verifiedPrincipal = await verifyIntegrationIngressSignature({
     agentId: input.agentId,
     canonicalBodyDigest: input.command.context.bodyDigest,
-    deliveryContextId: delivery.deliveryContextId,
+    deliveryContextId,
     idempotencyKey: requireContextIdempotency(input.command.context),
     installationId: input.command.installationId,
     method: 'PublishDeliveryResult',
     repositories: input.repositories,
     signature: input.command.signature,
   });
-  reserveAgentNonce(input.repositories, input.command.context);
+  // signature が検証済み principal を返した後に初めて idempotency と nonce を Agent-owned ledger へ予約します。
+  const verifiedContext = withVerifiedIntegrationIngressPrincipal(
+    input.command.context,
+    verifiedPrincipal
+  );
+  const verifiedCommand = {
+    ...input.command,
+    context: verifiedContext,
+    deliveryContextId,
+  };
+  // verified identity と request digest が一致する既存 result は mutable Delivery/Connection state より先に replay します。
+  const replay = checkAgentIdempotency<PublishIntegrationDeliveryResult>({
+    context: verifiedContext,
+    operationName: publishDeliveryResultOperationName,
+    repositories: input.repositories,
+  });
+  if (replay.status === 'replay') return { ...replay.response, replayed: true };
+  // 新規 command だけが nonce を予約し、terminal Connection/Tool state へ遷移した後の正当 retry は上の replay を妨げません。
+  reserveAgentNonce(input.repositories, verifiedContext);
+  // signature 検証済みの新規 callback だけが Delivery/Context/Connection/Installation ownership と mutable state を照合します。
+  const delivery = requireDeliveryResultBinding({
+    command: verifiedCommand,
+    repositories: input.repositories,
+  });
   authorizeIntegrationOperation(
     input.repositories,
-    input.command.context,
+    verifiedContext,
     'integration.delivery.result',
     'PublishDeliveryResult',
     'ingress',
@@ -79,38 +100,59 @@ export async function publishIntegrationDeliveryResultInStore(input: {
     },
     ['integration.delivery.result']
   );
-  const result = input.repositories.transaction((repositories) => {
-    const classification = classifyDeliveryResult(repositories, delivery, input.command.status);
-    if (classification === 'stale_callback') {
-      return createDeliveryResultResponse(input.agentId, input.command, delivery, {
-        replayed: false,
-        resumeAction: classification,
-      });
-    }
-    const updated = repositories.integrations.updateDeliveryStatus({
-      deliveryId: delivery.deliveryId,
-      providerOperationId: input.command.providerOperationId,
-      status: input.command.status,
-      updatedAtMs: input.command.context.requestedAtMs,
-    });
-    applyDeliveryResumeAction(
+  return input.repositories.transaction((repositories) => {
+    const classification = classifyDeliveryResult(repositories, delivery, verifiedCommand.status);
+    const result =
+      classification === 'stale_callback'
+        ? createDeliveryResultResponse(input.agentId, verifiedCommand, delivery, {
+            replayed: false,
+            resumeAction: classification,
+          })
+        : updateDeliveryResultAndCreateResponse({
+            agentId: input.agentId,
+            classification,
+            command: verifiedCommand,
+            delivery,
+            repositories,
+          });
+    // delivery mutation と replay record を同一 Agent-owned transaction で確定し、成功 response だけを再送可能にします。
+    recordAgentIdempotency({
+      context: verifiedContext,
+      operationName: publishDeliveryResultOperationName,
       repositories,
-      updated,
-      classification,
-      input.command.context.requestedAtMs
-    );
-    return createDeliveryResultResponse(input.agentId, input.command, updated, {
-      replayed: false,
-      resumeAction: classification,
+      response: result,
     });
+    return result;
   });
-  recordAgentIdempotency({
-    context: input.command.context,
-    operationName: publishDeliveryResultOperationName,
-    repositories: input.repositories,
-    response: result,
+}
+
+function updateDeliveryResultAndCreateResponse(input: {
+  readonly agentId: string;
+  readonly classification: Exclude<ReturnType<typeof classifyDeliveryResult>, 'stale_callback'>;
+  readonly command: PublishIntegrationDeliveryResultCommand & {
+    readonly deliveryContextId: string;
+  };
+  readonly delivery: AgentAdapterDeliveryRow;
+  readonly repositories: AgentStorageRepositories;
+}): PublishIntegrationDeliveryResult {
+  // mutable delivery status は classification 済みの新規 callback だけで更新し、Provider operation identity を維持します。
+  const updated = input.repositories.integrations.updateDeliveryStatus({
+    deliveryId: input.delivery.deliveryId,
+    providerOperationId: input.command.providerOperationId,
+    status: input.command.status,
+    updatedAtMs: input.command.context.requestedAtMs,
   });
-  return result;
+  // resume/follow-up side effect は status update と同じ transaction 内で実行し、replay record と原子的に揃えます。
+  applyDeliveryResumeAction(
+    input.repositories,
+    updated,
+    input.classification,
+    input.command.context.requestedAtMs
+  );
+  return createDeliveryResultResponse(input.agentId, input.command, updated, {
+    replayed: false,
+    resumeAction: input.classification,
+  });
 }
 
 function createDeliveryResultResponse(
@@ -154,10 +196,7 @@ function requireDeliveryResultBinding(input: {
       target: 'installation_id',
     });
   }
-  if (
-    input.command.deliveryContextId !== undefined &&
-    input.command.deliveryContextId !== delivery.deliveryContextId
-  ) {
+  if (input.command.deliveryContextId !== delivery.deliveryContextId) {
     throw createAgentDomainError({
       kind: 'authorization',
       message: 'Delivery result does not match the original DeliveryContext.',
@@ -200,6 +239,19 @@ function requireDeliveryResultBinding(input: {
   const installation = requireInstallation(input.repositories, delivery.installationId);
   assertInstallationActive(installation);
   return delivery;
+}
+
+function requireSignedDeliveryContextId(value: string | undefined): string {
+  // canonical signature base の delivery_context_id は resolved value と完全一致するため、空 sentinel を Provider callback では許可しません。
+  const normalized = value?.trim().normalize('NFC');
+  if (normalized === undefined || normalized === '') {
+    throw createAgentDomainError({
+      kind: 'validation',
+      message: 'Delivery result delivery_context_id is required.',
+      target: 'delivery_context_id',
+    });
+  }
+  return normalized;
 }
 
 /**

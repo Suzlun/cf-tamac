@@ -159,7 +159,7 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 - Never edit or recapture generated `.wireframe.html` previews or screenshots. Any upstream visual correction returns to `openspec/designer`, changes JSON, and regenerates both evidence artifacts before apply resumes.
 - Do not invent, relax, or privately extend apply-readiness criteria. Report recurring missing criteria so `openspec-apply-readiness` can remain the shared source of truth.
 - Do not hand-edit `generated/**`.
-- Do not hand-edit command-owned Agent outputs: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, or `packages/client/src/generated/agent-rpc/**`.
+- Do not hand-edit command-owned Agent outputs: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, or `packages/sdk/src/generated/agent-rpc/**`.
 - Do not route generated RPC output edits to implementers; route source/config/codegen command changes instead.
 - Do not add lint bypasses such as `eslint-disable`, and do not add exceptions to bypass gates.
 - Dependency changes, version changes, permission boundary changes, and destructive changes are ask-first items. Stop and report instead of executing them.

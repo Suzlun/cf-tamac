@@ -24,9 +24,10 @@ Agent 管理者は、同じ Agent ID への操作が常に同じ自律主体へ�
 #### Scenario: InitializeAgent が指定名の Agent aggregate を作成する (AGENT-LIFECYCLE-S001)
 
 - **GIVEN** 有効な Client Service principal が `agent_id = agent-alpha` に対するライフサイクル scope を持っている
-- **WHEN** 必須 profile、config、idempotency key を指定して `InitializeAgent` を呼ぶ
+- **WHEN** 必須 profile、config、idempotency key、registration request digest を指定して `InitializeAgent` を呼ぶ
 - **THEN** リクエストは `agent-alpha` という名前の AIAgent Durable Object に route される
 - **AND** Agent profile、有効なライフサイクル状態、初期 config 版、credential generation、予約済み system Thread、ライフサイクル監査 Event はその Agent のためだけに永続化される
+- **AND** initialization receipt は request と完全一致する idempotency key と registration request digest を返す
 
 #### Scenario: GetAgent が Agent-local profile と config を返す (AGENT-LIFECYCLE-S002)
 
@@ -34,6 +35,14 @@ Agent 管理者は、同じ Agent ID への操作が常に同じ自律主体へ�
 - **WHEN** 認可済み Client Service principal が `agent-alpha` に対して `GetAgent` を呼ぶ
 - **THEN** 応答には `agent-alpha` が所有する Agent profile、ライフサイクル状態、config 版、credential generation、capability 要約が含まれる
 - **AND** 別 Agent の Thread、Memory、Schedule、ToolInvocation、Integration 状態は含まれない
+- **AND** initialized Agent の initialization receipt は初期化時に確定した idempotency key と registration request digest を含む
+
+#### Scenario: 登録試行を初期化receiptと照合する (AGENT-LIFECYCLE-S010)
+
+- **GIVEN** Management Client が固定した idempotency key と registration request digest で `InitializeAgent` を呼び、登録結果の状態確認を必要としている
+- **WHEN** Management Client が同じ `agent_id` に対して `GetAgent` を呼ぶ
+- **THEN** `GetAgent` は初期化時に確定した idempotency key と registration request digest を持つ initialization receipt を返す
+- **AND** Management Client は receipt、profile、config が登録試行と完全一致したときだけ登録状態を `active` として確定する
 
 ### Requirement: Agent ライフサイクル状態遷移の強制
 
@@ -49,6 +58,8 @@ Agent 管理者は、作成、停止、破棄、credential rotation のような
 - Destroyed Agent は、明示的に許可された監査/照会 operation を除き、変更系公開 RPC を拒否 MUST。
 - Lifecycle command は `agent_id + principal_id + idempotency_key` で冪等である MUST し、異なるリクエスト body digest を持つ同じ key を拒否 MUST。
 - Lifecycle command は予約済み system Thread に監査 Event を追加 MUST。
+- `InitializeAgent` request は `registration_request_digest` を必須入力として受け付け、成功 response は request と完全一致する idempotency key と registration request digest を持つ initialization receipt を返す MUST。
+- `GetAgent` response は initialization receipt を返し、profileが存在する initialized Agentでreceiptが欠落している場合は成功応答にして MUST NOT。
 
 #### Scenario: DestroyAgent が mutating Agent operations を無効化する (AGENT-LIFECYCLE-S003)
 

@@ -19,7 +19,11 @@ describe('Deploy Button artifact generation', () => {
 
     try {
       const outDir = join(fixtureRoot, 'out');
-      const artifacts = generateDeployArtifacts({ root: projectRoot, outDir });
+      const artifacts = generateDeployArtifacts({
+        root: projectRoot,
+        outDir,
+        rateLimitNamespaceIds: { production: '9001', staging: '9002' },
+      });
       const agentRoot = join(outDir, 'agent');
       const clientRoot = join(outDir, 'client');
 
@@ -42,6 +46,10 @@ describe('Deploy Button artifact generation', () => {
       expect(agentTsconfig).not.toContain('../../tsconfig.base.json');
       expect(agentWrangler).toContain('name = "AI_AGENT"');
       expect(agentWrangler).toContain('binding = "AGENT_BLOBS"');
+      expect(agentWrangler).toContain('namespace_id = "9001"');
+      expect(agentWrangler).toContain('namespace_id = "9002"');
+      expect(agentWrangler).not.toContain('namespace_id = "1001"');
+      expect(agentWrangler).not.toContain('namespace_id = "1002"');
       expect(agentDevVars).toContain('AGENT_CONTROL_PLANE_TRUST');
       expect(agentDevVars).not.toContain('PRIVATE_KEY_BASE64URL');
       expect(existsSync(join(agentRoot, 'src/generated/rpc/cftamac/agent/v1_pb.ts'))).toBe(true);
@@ -91,6 +99,108 @@ describe('Deploy Button artifact generation', () => {
       expect(installGuide).toContain('Agent Deploy Button を先に押します');
       expect(installGuide).toContain('Cloudflare Access');
       expect(installGuide).not.toContain('CLIENT_CONTROL_PLANE_PRIVATE_KEYS');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S017] Client deploy artifact が SDK runtime closure を含む', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'cf-tamac-deploy-sdk-artifact-'));
+
+    try {
+      const outDir = join(fixtureRoot, 'out');
+
+      // Client artifact を生成し、workspace dependency を含む deploy root を検査対象として固定する。
+      generateDeployArtifacts({
+        root: projectRoot,
+        outDir,
+        rateLimitNamespaceIds: { production: '9001', staging: '9002' },
+      });
+      const clientRoot = join(outDir, 'client');
+      const clientPackage = JSON.parse(readArtifactFile(clientRoot, 'package.json'));
+      const sdkPackage = JSON.parse(readArtifactFile(clientRoot, 'sdk/package.json'));
+      const clientWorkspace = readArtifactFile(clientRoot, 'pnpm-workspace.yaml');
+      const clientDevVars = readArtifactFile(clientRoot, '.dev.vars.example');
+      const clientWrangler = readArtifactFile(clientRoot, 'wrangler.toml');
+      const clientReadme = readArtifactFile(clientRoot, 'README.md');
+      const sdkIndex = readArtifactFile(clientRoot, 'sdk/src/index.ts');
+      const sdkDescriptor = readArtifactFile(
+        clientRoot,
+        'sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts'
+      );
+
+      // Client と SDK の package metadata が同じ self-contained workspace で解決できることを検証する。
+      expect(clientPackage.dependencies['@cf-tamac/sdk']).toBe('workspace:*');
+      expect(sdkPackage.name).toBe('@cf-tamac/sdk');
+      expect(sdkPackage.main).toBe('src/index.ts');
+      expect(sdkPackage.browser).toBe(false);
+      expect(sdkPackage.exports['./agent-rpc/*']).toBe('./src/generated/agent-rpc/*');
+      expect(clientWorkspace).toContain("- 'sdk'");
+
+      // SDK の runtime source、generated descriptor、Client Worker runtime source/config が artifact 内にあることを検証する。
+      for (const requiredFile of [
+        'sdk/src/index.ts',
+        'sdk/src/client.ts',
+        'sdk/src/transport.ts',
+        'sdk/src/invocation-context.ts',
+        'sdk/src/errors.ts',
+        'sdk/src/auth/client-service-jwt.ts',
+        'sdk/src/auth/types.ts',
+        'sdk/src/provider-ingress.ts',
+        'sdk/src/provider-ingress-transport.ts',
+        'sdk/src/provider-ingress-types.ts',
+        'sdk/src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+        'src/server/agent-rpc/agent-loader.ts',
+        'src/generated/agent-rpc/cftamac/agent/v1_pb.ts',
+        'wrangler.toml',
+        'open-next.config.ts',
+      ]) {
+        expect(existsSync(join(clientRoot, requiredFile))).toBe(true);
+      }
+      expect(existsSync(join(clientRoot, 'sdk/src/tests'))).toBe(false);
+      expect(clientPackage.dependencies.next).toBeDefined();
+      expect(clientPackage.devDependencies['@opennextjs/cloudflare']).toBeDefined();
+      expect(clientPackage.devDependencies.wrangler).toBeDefined();
+      expect(sdkIndex).toContain("export * from './client';");
+      expect(sdkIndex).toContain("export * from './provider-ingress';");
+      expect(sdkDescriptor).toContain('AgentHealthService');
+      expect(sdkDescriptor).toContain('IntegrationIngressService');
+      expect(clientDevVars).toContain(
+        'AGENT_RPC_ALLOWED_ORIGINS=\'["https://cf-tamac-agent.example.workers.dev"]\''
+      );
+      expect(clientWrangler).toContain(
+        'AGENT_RPC_ALLOWED_ORIGINS = \'["https://cf-tamac-agent.example.workers.dev"]\''
+      );
+      expect(clientReadme).toContain('AGENT_RPC_ALLOWED_ORIGINS');
+      expect(clientReadme).toContain('https://cf-tamac-agent.example.workers.dev');
+      expect(clientReadme).not.toContain('AGENT_RPC_DEFAULT_ORIGIN');
+    } finally {
+      // 一時 artifact は test process 外へ残さず、fixture 間の状態干渉を防ぐ。
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WORKSPACE-GOVERNANCE-S014] rejects missing, invalid, or shared Rate Limiting namespace inputs', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'cf-tamac-deploy-namespace-validation-'));
+
+    try {
+      expect(() =>
+        generateDeployArtifacts({ root: projectRoot, outDir: join(fixtureRoot, 'missing') })
+      ).toThrow('positive integer Rate Limiting namespace ID');
+      expect(() =>
+        generateDeployArtifacts({
+          root: projectRoot,
+          outDir: join(fixtureRoot, 'invalid'),
+          rateLimitNamespaceIds: { production: '0', staging: '9002' },
+        })
+      ).toThrow('positive integer Rate Limiting namespace ID');
+      expect(() =>
+        generateDeployArtifacts({
+          root: projectRoot,
+          outDir: join(fixtureRoot, 'shared'),
+          rateLimitNamespaceIds: { production: '9001', staging: '9001' },
+        })
+      ).toThrow('must differ');
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }

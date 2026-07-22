@@ -48,6 +48,12 @@ function ensureIdentityAndSecurityTables(database: AgentStorageDatabase): void {
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL
   )`);
+  void database.run(sql`CREATE TABLE IF NOT EXISTS agent_initialization_receipts (
+    agent_id TEXT PRIMARY KEY,
+    idempotency_key TEXT NOT NULL,
+    registration_request_digest TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL
+  )`);
   void database.run(sql`CREATE TABLE IF NOT EXISTS agent_credentials (
     agent_id TEXT NOT NULL,
     credential_id TEXT NOT NULL,

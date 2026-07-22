@@ -8,6 +8,7 @@ const packageRoot = new URL('../..', import.meta.url);
 const componentsUiDir = new URL('../components/ui/', import.meta.url);
 const componentsDir = new URL('../components', import.meta.url);
 const appDir = new URL('../../app', import.meta.url);
+const layoutPath = new URL('../../app/layout.tsx', import.meta.url);
 const globalsCssPath = new URL('../../app/globals.css', import.meta.url);
 const tailwindConfigPath = new URL('../../tailwind.config.ts', import.meta.url);
 const inventoryPath = new URL('../../shadcn-official-components.json', import.meta.url);
@@ -40,7 +41,7 @@ function collectFiles(root: URL): string[] {
   return files;
 }
 
-// 旧 control-room 独自 token / class / font / gradient。これらが styling source に残っていないか検証する。
+// 旧 control-room 独自 token / class / gradient。これらが styling source に残っていないか検証する。
 const FORBIDDEN_OLD_TOKENS = [
   '--paper',
   '--ink',
@@ -48,7 +49,6 @@ const FORBIDDEN_OLD_TOKENS = [
   '--panel',
   '--signal',
   '--cyan',
-  'IBM Plex Mono',
   'Iowan Old Style',
   'radial-gradient',
   'control-room',
@@ -80,17 +80,25 @@ describe('Management Client design system', () => {
     expect(uiSources).not.toMatch(/ui\.shadcn\.com|registry:ui|shadcn\/registry/i);
   });
 
-  it('[CLIENT-DESIGN-SYSTEM-S002] Shadcn default token だけが styling source である', () => {
+  it('[CLIENT-DESIGN-SYSTEM-S002] TAMAC tinted token と指定書体が styling source である', () => {
     const globals = read(globalsCssPath);
     const tailwindConfig = read(tailwindConfigPath);
+    const layout = read(layoutPath);
 
-    // Shadcn 既定 token block と Tailwind directives が存在する。
+    // TAMAC の mineral teal token block と Tailwind directives が存在する。
     expect(globals).toContain('@tailwind base');
-    expect(globals).toContain('--background:');
-    expect(globals).toContain('--primary:');
+    expect(globals).toContain('--background: 180 20% 96.1%;');
+    expect(globals).toContain('--foreground: 189 39% 12.9%;');
+    expect(globals).toContain('--primary: 183 83% 22.7%;');
+    expect(globals).toContain('--border: 186 17% 76.3%;');
+    expect(globals).toContain('fonts.googleapis.com/css2?family=IBM+Plex+Mono');
+    expect(globals).toContain('family=IBM+Plex+Sans+JP');
     expect(globals).toContain('.dark');
     expect(tailwindConfig).toContain('hsl(var(--background))');
     expect(tailwindConfig).toContain('hsl(var(--primary))');
+    expect(tailwindConfig).toContain('IBM Plex Sans JP');
+    expect(tailwindConfig).toContain('IBM Plex Mono');
+    expect(layout).toContain('<body>');
 
     // 旧 control-room 独自 token / class / font / gradient は styling source に残っていない。
     for (const forbidden of FORBIDDEN_OLD_TOKENS) {

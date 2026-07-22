@@ -84,6 +84,10 @@ export function mapInitializeAgentResponse(
       result.defaultModelPolicy === undefined
         ? undefined
         : mapAgentModelPolicySummary(result.defaultModelPolicy),
+    initializationReceipt: {
+      idempotencyKey: result.initializationReceipt.idempotencyKey,
+      registrationRequestDigest: result.initializationReceipt.registrationRequestDigest,
+    },
     threadKeyRule: {
       agentId: result.agent.agentId,
       caseSensitive: true,
@@ -120,6 +124,10 @@ export function mapGetAgentResponse(
       result.defaultModelPolicy === undefined
         ? undefined
         : mapAgentModelPolicySummary(result.defaultModelPolicy),
+    initializationReceipt: {
+      idempotencyKey: result.initializationReceipt.idempotencyKey,
+      registrationRequestDigest: result.initializationReceipt.registrationRequestDigest,
+    },
   };
 }
 

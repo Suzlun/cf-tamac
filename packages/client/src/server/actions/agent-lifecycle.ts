@@ -3,6 +3,12 @@
 import { revalidatePath } from 'next/cache';
 
 import { loadAgentRpcClients } from '../agent-rpc/agent-loader';
+import {
+  createBrowserSafeAgentRpcActionFailure,
+  createBrowserSafeAgentRpcActionSuccess,
+  executeBrowserSafeAgentRpcQuery,
+  type BrowserSafeAgentRpcActionResult,
+} from '../agent-rpc/safe-results';
 
 import {
   toBrowserSafeAgentConfigPreview,
@@ -90,7 +96,6 @@ export interface BrowserSafeAgentState {
   readonly configVersion?: string;
   readonly storagePercent?: number;
   readonly capabilitySummary?: BrowserSafeAgentCapabilitySummary;
-  readonly state?: Record<string, unknown>;
 }
 
 /**
@@ -146,55 +151,84 @@ function toBrowserSafeCapabilitySummary(
 }
 
 /**
- * Fetch Agent overview (profile, config, credential) via Agent RPC.
+ * Agent RPC から overview を取得し、明示的に許可した表示 DTO を四属性 envelope で返します。
  *
- * The Server Action reads the managed Agent record and credential reference
- * from Client D1, resolves the credential secret server-side, then calls
- * `AgentLifecycleService.GetAgent` using the generated Connect client.
+ * Client D1 の管理対象レコード、署名鍵、acting user は server-only 側で解決します。
+ * generated response は profile/config/credential/capability の許可済み field だけに写像し、
+ * credential lookup material、raw diagnostic、SDK response 全体は Browser へ返しません。
  */
-export async function getAgentOverview(agentId: string): Promise<BrowserSafeAgentOverview> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() =>
-    clients.lifecycle.getAgent({ agentId })
+export async function getAgentOverview(
+  agentId: string
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeAgentOverview>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // managed Agent 解決と SDK invocation は server-only 境界に閉じ、Browser に client を渡しません。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.lifecycle.getAgent({ agentId })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => {
+      // generated response の object をそのまま返さず、overview 描画で必要な allowlisted field だけを抽出します。
+      const agent = response.agent as Record<string, unknown> | undefined;
+      const config = response.config as Record<string, unknown> | undefined;
+      const credential = response.activeCredential as Record<string, unknown> | undefined;
+      const capabilitySummary = toBrowserSafeCapabilitySummary(response.capabilitySummary);
+      return {
+        agentId: toSafeString(agent?.agentId, agentId),
+        displayName: toSafeString(agent?.displayName),
+        status: toSafeString(agent?.status),
+        configVersion: toSafeString(config?.configVersion, toSafeString(agent?.configVersion)),
+        credentialGeneration: toSafeNumber(agent?.credentialGeneration),
+        credential: toBrowserSafeAgentCredential(credential),
+        capabilitySummary,
+        scheduleCount: capabilitySummary?.activeScheduleCount,
+        toolCount: capabilitySummary?.toolCount,
+        installationCount: capabilitySummary?.activeInstallationCount,
+      };
+    },
+    'Agentの概要を取得しました',
+    'Agentの安全な概要情報を表示しています。',
+    'Agentの概要を確認してください',
+    'Agentの概要を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-
-  const agent = response.agent as Record<string, unknown> | undefined;
-  const config = response.config as Record<string, unknown> | undefined;
-  const credential = response.activeCredential as Record<string, unknown> | undefined;
-  const capabilitySummary = toBrowserSafeCapabilitySummary(response.capabilitySummary);
-
-  return {
-    agentId: toSafeString(agent?.agentId, agentId),
-    displayName: toSafeString(agent?.displayName),
-    status: toSafeString(agent?.status),
-    configVersion: toSafeString(config?.configVersion, toSafeString(agent?.configVersion)),
-    credentialGeneration: toSafeNumber(agent?.credentialGeneration),
-    credential: toBrowserSafeAgentCredential(credential),
-    capabilitySummary,
-    scheduleCount: capabilitySummary?.activeScheduleCount,
-    toolCount: capabilitySummary?.toolCount,
-    installationCount: capabilitySummary?.activeInstallationCount,
-  };
 }
 
 /**
- * Fetch Agent config via `AgentStateService.GetConfig`.
+ * Agent RPC から設定を取得し、許可済み config preview を四属性 envelope で返します。
  */
-export async function getAgentConfig(agentId: string): Promise<BrowserSafeAgentConfig> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() => clients.state.getConfig({ agentId }));
-
-  const config = response.config as Record<string, unknown> | undefined;
-  const configVersion = toSafeString(config?.configVersion);
-  return {
-    agentId,
-    configVersion,
-    config: toBrowserSafeAgentConfigPreview(config),
-    defaultModelPolicy: toBrowserSafeModelPolicyMetadata(
-      response.defaultModelPolicy ?? config?.defaultModelPolicy,
-      { configVersion }
-    ),
-  };
+export async function getAgentConfig(
+  agentId: string
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeAgentConfig>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // server-only SDK が Agent config を取得し、correlation ID だけを result envelope に関連付けます。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.state.getConfig({ agentId })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => {
+      // config body や validation/payload reference を除外した preview と safe metadata だけを返します。
+      const config = response.config as Record<string, unknown> | undefined;
+      const configVersion = toSafeString(config?.configVersion);
+      return {
+        agentId,
+        configVersion,
+        config: toBrowserSafeAgentConfigPreview(config),
+        defaultModelPolicy: toBrowserSafeModelPolicyMetadata(
+          response.defaultModelPolicy ?? config?.defaultModelPolicy,
+          { configVersion }
+        ),
+      };
+    },
+    'Agent設定を取得しました',
+    'Agent設定の安全な表示情報を読み込みました。',
+    'Agent設定を確認してください',
+    'Agent設定を確認できませんでした。時間をおいてもう一度表示してください。'
+  );
 }
 
 /**
@@ -214,67 +248,96 @@ export async function initializeAgentWithDefaultModelPolicy(
   idempotencyKey: string,
   displayName: string,
   modelPolicy: ModelPolicyDraftValues
-): Promise<BrowserSafeAgentConfig> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const initialModelPolicy = await buildAgentModelPolicyInput(modelPolicy);
-  const response = await clients.withErrorNormalization(() =>
-    clients.lifecycle.initializeAgent({
-      agentId,
-      idempotencyKey,
-      displayName,
-      initialConfig: {
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeAgentConfig>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const initialModelPolicy = await buildAgentModelPolicyInput(modelPolicy);
+    const response = await clients.withErrorNormalization(() =>
+      clients.lifecycle.initializeAgent({
         agentId,
+        idempotencyKey,
         displayName,
-        modelPolicyRef: modelPolicy.policyRef,
-      } as never,
-      initialModelPolicy: initialModelPolicy as never,
-    })
-  );
+        initialConfig: {
+          agentId,
+          displayName,
+          modelPolicyRef: modelPolicy.policyRef,
+        } as never,
+        initialModelPolicy: initialModelPolicy as never,
+      })
+    );
 
-  const config = response.config as Record<string, unknown> | undefined;
-  const configVersion = toSafeString(config?.configVersion);
-  revalidatePath('/agents');
-  revalidatePath(`/agents/${agentId}`);
-  revalidatePath(`/agents/${agentId}/settings`);
-  return {
-    agentId,
-    configVersion,
-    config: toBrowserSafeAgentConfigPreview(config),
-    defaultModelPolicy: toBrowserSafeModelPolicyMetadata(response.defaultModelPolicy, {
-      configVersion,
-      fallbackGenerationParameters: {
-        temperature: modelPolicy.temperature,
-        topP: modelPolicy.topP,
-        maxOutputTokens: modelPolicy.maxOutputTokens,
+    const config = response.config as Record<string, unknown> | undefined;
+    const configVersion = toSafeString(config?.configVersion);
+    revalidatePath('/agents');
+    revalidatePath(`/agents/${agentId}`);
+    revalidatePath(`/agents/${agentId}/settings`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      {
+        agentId,
+        configVersion,
+        config: toBrowserSafeAgentConfigPreview(config),
+        defaultModelPolicy: toBrowserSafeModelPolicyMetadata(response.defaultModelPolicy, {
+          configVersion,
+          fallbackGenerationParameters: {
+            temperature: modelPolicy.temperature,
+            topP: modelPolicy.topP,
+            maxOutputTokens: modelPolicy.maxOutputTokens,
+          },
+        }),
       },
-    }),
-  };
+      'Agentを初期化しました',
+      '初期の既定モデルポリシーを設定しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'Agentの初期化を確認してください',
+      '登録情報を保持しました。時間をおいてもう一度登録してください。'
+    );
+  }
 }
 
 /**
- * Fetch Agent state via `AgentStateService.GetState`.
+ * Agent RPC から状態を取得し、明示的に許可した state metadata を四属性 envelope で返します。
  */
-export async function getAgentState(agentId: string): Promise<BrowserSafeAgentState> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const response = await clients.withErrorNormalization(() => clients.state.getState({ agentId }));
-
-  const state = response.state as Record<string, unknown> | undefined;
-  const storage = response.storage as Record<string, unknown> | undefined;
-  const capabilitySummary = toBrowserSafeCapabilitySummary(
-    state?.capabilitySummary as Record<string, unknown> | undefined
+export async function getAgentState(
+  agentId: string
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeAgentState>> {
+  return executeBrowserSafeAgentRpcQuery(
+    async () => {
+      // state RPC の raw response は server-only に留め、Browser へ返す前に allowlist mapper を通します。
+      const { clients } = await loadAgentRpcClients(agentId);
+      const response = await clients.withErrorNormalization(() =>
+        clients.state.getState({ agentId })
+      );
+      return { correlationId: clients.invocation.correlationId, response };
+    },
+    (response) => {
+      // 未定義の任意 state object を返さず、overview が表示する固定 metadata だけを投影します。
+      const state = response.state as Record<string, unknown> | undefined;
+      const storage = response.storage as Record<string, unknown> | undefined;
+      const capabilitySummary = toBrowserSafeCapabilitySummary(
+        state?.capabilitySummary as Record<string, unknown> | undefined
+      );
+      return {
+        agentId,
+        status: toSafeString(state?.lifecycleStatus),
+        stateVersion: toOptionalString(state?.stateVersion),
+        currentRunId: toOptionalString(state?.currentRunId),
+        schedulerStatus: toOptionalString(state?.schedulerStatus),
+        storageStatus: toOptionalString(state?.storageStatus),
+        configVersion: toOptionalString(state?.configVersion),
+        storagePercent: storage === undefined ? undefined : toSafeNumber(storage.currentPercent),
+        capabilitySummary,
+      };
+    },
+    'Agent状態を取得しました',
+    'Agent状態の安全な表示情報を読み込みました。',
+    'Agent状態を確認してください',
+    'Agent状態を確認できませんでした。時間をおいてもう一度表示してください。'
   );
-  return {
-    agentId,
-    status: toSafeString(state?.lifecycleStatus),
-    stateVersion: toOptionalString(state?.stateVersion),
-    currentRunId: toOptionalString(state?.currentRunId),
-    schedulerStatus: toOptionalString(state?.schedulerStatus),
-    storageStatus: toOptionalString(state?.storageStatus),
-    configVersion: toOptionalString(state?.configVersion),
-    storagePercent: storage === undefined ? undefined : toSafeNumber(storage.currentPercent),
-    capabilitySummary,
-    state,
-  };
 }
 
 /**
@@ -284,35 +347,49 @@ export async function updateAgentConfig(
   agentId: string,
   idempotencyKey: string,
   config: Record<string, unknown>
-): Promise<BrowserSafeAgentConfig> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const configPayload: Record<string, unknown> = { ...config, agentId };
-  // Default model policy は専用 action が upsert 後に添付するため、汎用 JSON editor からは上書きさせない。
-  delete configPayload.configVersion;
-  delete configPayload.modelPolicyRef;
-  delete configPayload.defaultModelPolicy;
-  delete configPayload.modelPolicyValidation;
-  delete configPayload.configBodyRef;
-  const response = await clients.withErrorNormalization(() =>
-    clients.state.updateConfig({
-      agentId,
-      idempotencyKey,
-      config: configPayload as never,
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeAgentConfig>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const configPayload: Record<string, unknown> = { ...config, agentId };
+    // Default model policy は専用 action が upsert 後に添付するため、汎用 JSON editor からは上書きさせない。
+    delete configPayload.configVersion;
+    delete configPayload.modelPolicyRef;
+    delete configPayload.defaultModelPolicy;
+    delete configPayload.modelPolicyValidation;
+    delete configPayload.configBodyRef;
+    const response = await clients.withErrorNormalization(() =>
+      clients.state.updateConfig({
+        agentId,
+        idempotencyKey,
+        config: configPayload as never,
+      })
+    );
 
-  const updatedConfig = response.config as Record<string, unknown> | undefined;
-  const configVersion = toSafeString(updatedConfig?.configVersion);
-  revalidatePath(`/agents/${agentId}`);
-  revalidatePath(`/agents/${agentId}/settings`);
-  return {
-    agentId,
-    configVersion,
-    config: toBrowserSafeAgentConfigPreview(updatedConfig),
-    defaultModelPolicy: toBrowserSafeModelPolicyMetadata(response.defaultModelPolicy, {
-      configVersion,
-    }),
-  };
+    const updatedConfig = response.config as Record<string, unknown> | undefined;
+    const configVersion = toSafeString(updatedConfig?.configVersion);
+    revalidatePath(`/agents/${agentId}`);
+    revalidatePath(`/agents/${agentId}/settings`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      {
+        agentId,
+        configVersion,
+        config: toBrowserSafeAgentConfigPreview(updatedConfig),
+        defaultModelPolicy: toBrowserSafeModelPolicyMetadata(response.defaultModelPolicy, {
+          configVersion,
+        }),
+      },
+      'Agent設定を保存しました',
+      'Agent設定の変更を適用しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      '操作を再実行できます',
+      'Agent設定は直前の確定値を保持しています。時間をおいてもう一度保存してください。'
+    );
+  }
 }
 
 /**
@@ -321,35 +398,49 @@ export async function updateAgentConfig(
 export async function rotateAgentCredential(
   agentId: string,
   idempotencyKey: string
-): Promise<BrowserSafeCredentialRotationResult> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  const current = await clients.withErrorNormalization(() =>
-    clients.lifecycle.getAgent({ agentId })
-  );
-  const activeCredential = current.activeCredential as Record<string, unknown> | undefined;
-  const credentialId = toSafeString(activeCredential?.credentialId);
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeCredentialRotationResult>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    const current = await clients.withErrorNormalization(() =>
+      clients.lifecycle.getAgent({ agentId })
+    );
+    const activeCredential = current.activeCredential as Record<string, unknown> | undefined;
+    const credentialId = toSafeString(activeCredential?.credentialId);
 
-  if (credentialId === '') {
-    throw new Error('No active Agent credential was returned for rotation.');
+    if (credentialId === '') {
+      throw new Error('No active Agent credential was returned for rotation.');
+    }
+
+    const response = await clients.withErrorNormalization(() =>
+      clients.lifecycle.rotateAgentCredential({
+        agentId,
+        idempotencyKey,
+        credentialId,
+      })
+    );
+
+    const credential = response.credential as Record<string, unknown> | undefined;
+    const previousCredential = response.previousCredential as Record<string, unknown> | undefined;
+
+    revalidatePath(`/agents/${agentId}/settings`);
+    revalidatePath(`/agents/${agentId}`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      {
+        credential: toBrowserSafeAgentCredential(credential),
+        previousCredential: toBrowserSafeAgentCredential(previousCredential),
+      },
+      'credentialをローテーションしました',
+      '新しいcredential世代を有効にしました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      '操作を再実行できます',
+      'credentialの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
   }
-
-  const response = await clients.withErrorNormalization(() =>
-    clients.lifecycle.rotateAgentCredential({
-      agentId,
-      idempotencyKey,
-      credentialId,
-    })
-  );
-
-  const credential = response.credential as Record<string, unknown> | undefined;
-  const previousCredential = response.previousCredential as Record<string, unknown> | undefined;
-
-  revalidatePath(`/agents/${agentId}/settings`);
-  revalidatePath(`/agents/${agentId}`);
-  return {
-    credential: toBrowserSafeAgentCredential(credential),
-    previousCredential: toBrowserSafeAgentCredential(previousCredential),
-  };
 }
 
 /**
@@ -359,17 +450,31 @@ export async function destroyAgent(
   agentId: string,
   idempotencyKey: string,
   reason: string
-): Promise<BrowserSafeAgentOperationResult> {
-  const { clients } = await loadAgentRpcClients(agentId);
-  await clients.withErrorNormalization(() =>
-    clients.lifecycle.destroyAgent({
-      agentId,
-      idempotencyKey,
-      reason: reason === '' ? undefined : reason,
-    })
-  );
+): Promise<BrowserSafeAgentRpcActionResult<BrowserSafeAgentOperationResult>> {
+  try {
+    const { clients } = await loadAgentRpcClients(agentId);
+    await clients.withErrorNormalization(() =>
+      clients.lifecycle.destroyAgent({
+        agentId,
+        idempotencyKey,
+        reason: reason === '' ? undefined : reason,
+      })
+    );
 
-  revalidatePath('/agents');
-  revalidatePath(`/agents/${agentId}`);
-  return { agentId, status: 'destroyed' };
+    revalidatePath('/agents');
+    revalidatePath(`/agents/${agentId}`);
+    return createBrowserSafeAgentRpcActionSuccess(
+      { agentId, status: 'destroyed' },
+      'Agentを削除しました',
+      '管理対象Agentを削除しました。',
+      clients.invocation.correlationId
+    );
+  } catch (error) {
+    return createBrowserSafeAgentRpcActionFailure(
+      error,
+      globalThis.crypto.randomUUID(),
+      'Agentの削除を確認してください',
+      'Agentの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+    );
+  }
 }

@@ -16,6 +16,8 @@ import type {
  */
 export function createTestD1Database(): D1Database {
   const db = new DatabaseSync(':memory:');
+  // D1 と同じ foreign-key 制約を有効にし、credential reference の atomic batch failure を test double でも再現する。
+  db.exec('PRAGMA foreign_keys = ON');
   return createD1FromSqlite(db);
 }
 
@@ -26,10 +28,20 @@ function createD1FromSqlite(db: DatabaseSync): D1Database {
     },
     async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
       const results: D1Result<T>[] = [];
-      for (const stmt of statements) {
-        results.push(await stmt.run<T>());
+      // Cloudflare D1 `batch()` と同じく全 statement を一つの transaction で実行し、phase failure が
+      // managed Agent/credential/signing/attempt metadata の部分更新を残さないことを repository tests で検証する。
+      db.exec('BEGIN');
+      try {
+        for (const stmt of statements) {
+          results.push(await stmt.run<T>());
+        }
+        db.exec('COMMIT');
+        return results;
+      } catch (error) {
+        // 途中 statement が失敗した場合は preimage を完全復元し、test double が production D1 atomicity と異なる挙動にならないようにする。
+        db.exec('ROLLBACK');
+        throw error;
       }
-      return results;
     },
     exec(query: string): Promise<D1ExecResult> {
       db.exec(query);
@@ -61,7 +73,7 @@ function createPreparedStatement(db: DatabaseSync, sql: string): D1PreparedState
     return JSON.stringify(value);
   }
 
-  function buildResult<T>(results: unknown[]): D1Result<T> {
+  function buildResult<T>(results: unknown[], changes = 0): D1Result<T> {
     return {
       success: true,
       results: results.map((row) =>
@@ -75,7 +87,7 @@ function createPreparedStatement(db: DatabaseSync, sql: string): D1PreparedState
         rows_read: 0,
         rows_written: 0,
         last_row_id: 0,
-        changes: 0,
+        changes,
         served_by: 'test',
         timed_out: false,
         changed_db: false,
@@ -105,8 +117,9 @@ function createPreparedStatement(db: DatabaseSync, sql: string): D1PreparedState
       },
       run<T = unknown>(...args: unknown[]): Promise<D1Result<T>> {
         const params = args.length > 0 ? args : values;
-        statement.run(...params.map(toSqlValue));
-        return Promise.resolve(buildResult<T>([]));
+        const execution = statement.run(...params.map(toSqlValue));
+        // node:sqlite の changes を D1 meta へ写し、conditional state transition の postcondition を repository tests で検証可能にする。
+        return Promise.resolve(buildResult<T>([], Number(execution.changes)));
       },
       raw<T = unknown[]>(...args: unknown[]): Promise<T[]> {
         const params = args.length > 0 ? args : values;
@@ -122,8 +135,8 @@ function createPreparedStatement(db: DatabaseSync, sql: string): D1PreparedState
 /**
  * Apply the Client D1 foundation migration to a test database.
  *
- * @remarks 0001 + 0002 を適用し、管理対象 Agent 台帳・外部 credential 参照・
- * 暗号化済み Client Service signing key store と managed Agent の署名 metadata column を揃える。
+ * @remarks 0001 + 0002 + 0004 を適用し、管理対象 Agent 台帳・外部 credential 参照・
+ * 暗号化済み Client Service signing key store、registration attempt/reconciliation metadata を揃える。
  */
 export async function applyClientMigration(db: D1Database): Promise<void> {
   await db.exec(
@@ -136,10 +149,18 @@ export async function applyClientMigration(db: D1Database): Promise<void> {
       last_opened_at_ms INTEGER,
       created_at_ms INTEGER NOT NULL,
       updated_at_ms INTEGER NOT NULL,
-      signing_issuer TEXT,
-      signing_key_id TEXT,
-      signing_public_fingerprint TEXT,
-      signing_last_verified_at_ms INTEGER
+       signing_issuer TEXT,
+       signing_key_id TEXT,
+       signing_public_fingerprint TEXT,
+       signing_last_verified_at_ms INTEGER,
+       registration_state TEXT NOT NULL DEFAULT 'active',
+       registration_attempt_id TEXT,
+       initialization_idempotency_key TEXT,
+        registration_request_digest TEXT,
+        registration_model_policy_ref TEXT,
+       registration_last_failure_phase TEXT,
+       registration_last_failure_category TEXT,
+       registration_last_failure_correlation_id TEXT
     );
 
     CREATE TABLE IF NOT EXISTS client_agent_credential_refs (

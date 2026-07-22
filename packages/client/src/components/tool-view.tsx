@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { startTransition, useState } from 'react';
 
+import { AgentDataUnavailableAlert } from './agent-data-unavailable-alert';
 import { AgentToken } from './agent-token';
 import { ConfirmDialog } from './confirm-dialog';
 import { DataTable } from './data-table';
@@ -12,6 +13,11 @@ import { generateIdempotencyKey } from './generate-idempotency-key';
 import { PaginationBar } from './pagination-bar';
 import { ToolReviewContent } from './tool-review-content';
 import { Button } from './ui/button';
+
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
 
 interface PayloadReference {
   readonly ref: string;
@@ -86,21 +92,34 @@ interface ToolViewProps {
   readonly invocations: readonly InvocationSummary[];
   readonly invocationPage: PageInfo;
   readonly statusFilter: string;
+  readonly toolsUnavailable?: boolean;
+  readonly invocationsUnavailable?: boolean;
   readonly actingOperatorId: string;
-  readonly onGetInvocation: (agentId: string, invocationId: string) => Promise<InvocationDetail>;
+  readonly onGetInvocation: (
+    agentId: string,
+    invocationId: string
+  ) => Promise<BrowserSafeInvocationQueryResult>;
   readonly onApprove: (
     agentId: string,
     invocationId: string,
     idempotencyKey: string,
     reason: string
-  ) => Promise<InvocationSummary>;
+  ) => Promise<BrowserSafeInvocationActionResult>;
   readonly onReject: (
     agentId: string,
     invocationId: string,
     idempotencyKey: string,
     reason: string
-  ) => Promise<InvocationSummary>;
+  ) => Promise<BrowserSafeInvocationActionResult>;
 }
+
+type BrowserSafeInvocationActionResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: InvocationSummary }
+>;
+
+type BrowserSafeInvocationQueryResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: InvocationDetail }
+>;
 
 const TERMINAL_INVOCATION_STATUSES = new Set([
   'approved',
@@ -130,6 +149,8 @@ export function ToolView({
   invocations,
   invocationPage,
   statusFilter,
+  toolsUnavailable = false,
+  invocationsUnavailable = false,
   actingOperatorId,
   onGetInvocation,
   onApprove,
@@ -144,16 +165,37 @@ export function ToolView({
 
   // row click 時に detail Server Action を呼び、input summary/risk/result metadata を drawer に投影する。
   const openInvocation = async (invocation: InvocationSummary) => {
-    setPending(true);
-    setError(undefined);
+    // 新しい detail request に切り替える時点で旧 drawer selection を消し、後続 failure が stale invocation を表示しないようにします。
+    startTransition(() => {
+      setSelected(undefined);
+      setPending(true);
+      setError(undefined);
+    });
     try {
-      const detail = await onGetInvocation(agentId, invocation.invocationId);
-      setSelected(detail);
-    } catch (error_) {
-      setError(error_ instanceof Error ? error_.message : 'Tool invocation detail failed.');
-      setSelected(invocation);
+      const result = await onGetInvocation(agentId, invocation.invocationId);
+      if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+        // Server Action の固定安全文言だけを表示し、raw SDK/Connect diagnostic は描画しません。
+        startTransition(() => {
+          setSelected(undefined);
+          setError(result.displayData.message);
+        });
+        return;
+      }
+      startTransition(() => {
+        setSelected(result.displayData.data);
+      });
+    } catch {
+      // envelope 契約外の例外も raw message を読まず、安全な再試行案内に正規化します。
+      startTransition(() => {
+        setSelected(undefined);
+        setError(
+          'ツール呼び出し詳細を確認できませんでした。時間をおいてもう一度表示してください。'
+        );
+      });
     } finally {
-      setPending(false);
+      startTransition(() => {
+        setPending(false);
+      });
     }
   };
 
@@ -166,18 +208,24 @@ export function ToolView({
     setError(undefined);
     setSuccess(undefined);
     try {
-      await executeApprovalAction(
+      const result = await executeApprovalAction(
         dialogAction,
         agentId,
         selected.invocationId,
         onApprove,
         onReject
       );
-      setSuccess(`Invocation ${selected.invocationId} ${dialogAction}d.`);
+      if (result.safeStatus === 'failed') {
+        setError(result.displayData.message);
+        return;
+      }
+      setSuccess(result.displayData.message);
       setDialogAction(undefined);
       setSelected(undefined);
-    } catch (error_) {
-      setError(error_ instanceof Error ? error_.message : `${dialogAction} failed.`);
+    } catch {
+      setError(
+        'ツール呼び出しの状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。'
+      );
     } finally {
       setPending(false);
     }
@@ -190,6 +238,8 @@ export function ToolView({
       invocations={invocations}
       invocationPage={invocationPage}
       statusFilter={statusFilter}
+      toolsUnavailable={toolsUnavailable}
+      invocationsUnavailable={invocationsUnavailable}
       actingOperatorId={actingOperatorId}
       selected={selected}
       dialogAction={dialogAction}
@@ -214,6 +264,8 @@ interface ToolViewContentProps {
   readonly invocations: readonly InvocationSummary[];
   readonly invocationPage: PageInfo;
   readonly statusFilter: string;
+  readonly toolsUnavailable: boolean;
+  readonly invocationsUnavailable: boolean;
   readonly actingOperatorId: string;
   readonly selected?: InvocationDetail;
   readonly dialogAction?: 'approve' | 'reject';
@@ -232,6 +284,8 @@ function ToolViewContent({
   invocations,
   invocationPage,
   statusFilter,
+  toolsUnavailable,
+  invocationsUnavailable,
   actingOperatorId,
   selected,
   dialogAction,
@@ -264,8 +318,13 @@ function ToolViewContent({
         </div>
       ) : null}
 
-      <ToolCatalogSection tools={tools} />
-      <ApprovalQueueSection invocations={invocations} pending={pending} onReview={onReview} />
+      <ToolCatalogSection tools={tools} unavailable={toolsUnavailable} />
+      <ApprovalQueueSection
+        invocations={invocations}
+        unavailable={invocationsUnavailable}
+        pending={pending}
+        onReview={onReview}
+      />
       <PaginationBar
         basePath={`/agents/${agentId}/runs`}
         page={invocationPage}
@@ -324,7 +383,7 @@ async function executeApprovalAction(
   invocationId: string,
   onApprove: ToolViewProps['onApprove'],
   onReject: ToolViewProps['onReject']
-): Promise<InvocationSummary> {
+): Promise<BrowserSafeInvocationActionResult> {
   const reason = `${action}d from UI`;
   return action === 'approve'
     ? onApprove(agentId, invocationId, generateIdempotencyKey(), reason)
@@ -368,14 +427,22 @@ function InvocationFilterBar({
   );
 }
 
-function ToolCatalogSection({ tools }: { readonly tools: readonly ToolSummary[] }) {
+function ToolCatalogSection({
+  tools,
+  unavailable,
+}: {
+  readonly tools: readonly ToolSummary[];
+  readonly unavailable: boolean;
+}) {
   return (
     <section
       className="rounded-md border bg-card p-4 text-sm space-y-1"
       aria-labelledby="catalog-heading"
     >
       <strong id="catalog-heading">Catalog</strong>
-      {tools.length === 0 ? (
+      {unavailable ? (
+        <AgentDataUnavailableAlert screenName="Tool catalog" />
+      ) : tools.length === 0 ? (
         <EmptyState
           eyebrow="NO TOOLS"
           heading="No Tools in the catalog."
@@ -401,10 +468,12 @@ function ToolCatalogSection({ tools }: { readonly tools: readonly ToolSummary[] 
 
 function ApprovalQueueSection({
   invocations,
+  unavailable,
   pending,
   onReview,
 }: {
   readonly invocations: readonly InvocationSummary[];
+  readonly unavailable: boolean;
   readonly pending: boolean;
   readonly onReview: (invocation: InvocationSummary) => void;
 }) {
@@ -414,7 +483,9 @@ function ApprovalQueueSection({
       aria-labelledby="queue-heading"
     >
       <strong id="queue-heading">Approval queue</strong>
-      {invocations.length === 0 ? (
+      {unavailable ? (
+        <AgentDataUnavailableAlert screenName="Pending approvals" />
+      ) : invocations.length === 0 ? (
         <EmptyState
           eyebrow="NO PENDING APPROVALS"
           heading="No pending approvals."

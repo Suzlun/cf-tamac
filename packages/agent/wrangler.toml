@@ -15,6 +15,15 @@ new_sqlite_classes = ["AIAgent"]
 binding = "AGENT_BLOBS"
 bucket_name = "cf-tamac-agent-blobs"
 
+[[ratelimits]]
+# production ingress の bucket は staging および他の Worker binding から完全に分離します。
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1001"
+
+[ratelimits.simple]
+limit = 100
+period = 60
+
 [ai]
 binding = "AI"
 
@@ -28,3 +37,32 @@ AGENT_RPC_AUDIENCE = "cf-tamac-agent"
 # - AGENT_CONTROL_PLANE_TRUST
 # - AGENT_INTEGRATION_SIGNATURE_KEYS
 # - AGENT_MODEL_PROVIDER_SECRET_REFS
+
+[env.staging]
+
+[[env.staging.durable_objects.bindings]]
+# named environment は top-level binding を継承しないため、staging の Agent aggregate を明示します。
+name = "AI_AGENT"
+class_name = "AIAgent"
+
+[[env.staging.r2_buckets]]
+# staging payload は production blob bucket と混在させず、Agent-owned storage だけを binding します。
+binding = "AGENT_BLOBS"
+bucket_name = "cf-tamac-agent-staging-blobs"
+
+[env.staging.ai]
+# staging でも Agent model execution capability を同じ Worker binding 名で解決します。
+binding = "AI"
+
+[env.staging.vars]
+# Client Service JWT audience は staging Worker 固有値へ固定し、production token の流用を拒否します。
+AGENT_RPC_AUDIENCE = "cf-tamac-agent-staging"
+
+[[env.staging.ratelimits]]
+# staging は専用 namespace を使い、検証 traffic が production allowance を消費しないようにします。
+name = "PROVIDER_INGRESS_RATE_LIMITER"
+namespace_id = "1002"
+
+[env.staging.ratelimits.simple]
+limit = 100
+period = 60

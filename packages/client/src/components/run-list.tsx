@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { startTransition, useState } from 'react';
 
 import { AgentToken } from './agent-token';
 import { ConfirmDialog } from './confirm-dialog';
@@ -11,6 +11,11 @@ import { EmptyState } from './empty-state';
 import { generateIdempotencyKey } from './generate-idempotency-key';
 import { PaginationBar } from './pagination-bar';
 import { Button } from './ui/button';
+
+import type {
+  BrowserSafeAgentRpcResult,
+  BrowserSafeOperationDisplayData,
+} from './schemas/browser-safe-result';
 
 interface PageInfo {
   readonly nextPageToken?: string;
@@ -66,14 +71,22 @@ interface RunListProps {
   readonly page: PageInfo;
   readonly threadFilter: string;
   readonly statusFilter: string;
-  readonly onGetRun: (agentId: string, runId: string) => Promise<RunDetail>;
+  readonly onGetRun: (agentId: string, runId: string) => Promise<BrowserSafeRunQueryResult>;
   readonly onCancelRun: (
     agentId: string,
     runId: string,
     idempotencyKey: string,
     reason: string
-  ) => Promise<RunSummary>;
+  ) => Promise<BrowserSafeRunActionResult>;
 }
+
+type BrowserSafeRunActionResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: RunSummary }
+>;
+
+type BrowserSafeRunQueryResult = BrowserSafeAgentRpcResult<
+  BrowserSafeOperationDisplayData & { readonly data?: RunDetail }
+>;
 
 const CANCELLABLE_STATUSES = ['pending', 'running', 'waiting_tool', 'waiting_approval'];
 
@@ -102,14 +115,38 @@ export function RunList({
   const [pending, setPending] = useState(false);
   const [cancelRunId, setCancelRunId] = useState<string | undefined>();
   const [success, setSuccess] = useState<string | undefined>();
+  const [error, setError] = useState<string | undefined>();
 
   const openRun = async (runId: string) => {
-    setPending(true);
+    // 新しい detail request の開始前に前回 selection/detail/error を transition 内で消し、失敗時に stale Run detail を残しません。
+    startTransition(() => {
+      setSelected(undefined);
+      setError(undefined);
+      setPending(true);
+    });
     try {
-      const detail = await onGetRun(agentId, runId);
-      setSelected(detail);
+      const result = await onGetRun(agentId, runId);
+      if (result.safeStatus === 'failed' || result.displayData.data === undefined) {
+        // envelope 内の固定安全文言だけを表示し、raw SDK/Connect failure は Browser に露出しません。
+        startTransition(() => {
+          setSelected(undefined);
+          setError(result.displayData.message);
+        });
+        return;
+      }
+      startTransition(() => {
+        setSelected(result.displayData.data);
+      });
+    } catch {
+      // envelope 契約外の失敗も raw detail を出さず、利用者へ再表示を案内します。
+      startTransition(() => {
+        setSelected(undefined);
+        setError('Run詳細を確認できませんでした。時間をおいてもう一度表示してください。');
+      });
     } finally {
-      setPending(false);
+      startTransition(() => {
+        setPending(false);
+      });
     }
   };
 
@@ -119,10 +156,21 @@ export function RunList({
     }
     setPending(true);
     try {
-      await onCancelRun(agentId, cancelRunId, generateIdempotencyKey(), 'cancelled from UI');
-      setSuccess(`Run ${cancelRunId} cancellation accepted.`);
+      const result = await onCancelRun(
+        agentId,
+        cancelRunId,
+        generateIdempotencyKey(),
+        'cancelled from UI'
+      );
+      if (result.safeStatus === 'failed') {
+        setError(result.displayData.message);
+        return;
+      }
+      setSuccess(result.displayData.message);
       setCancelRunId(undefined);
       setSelected(undefined);
+    } catch {
+      setError('実行の状態は直前の確定値を保持しています。時間をおいてもう一度実行してください。');
     } finally {
       setPending(false);
     }
@@ -141,6 +189,7 @@ export function RunList({
           {success}
         </p>
       )}
+      {error === undefined ? null : <p role="alert">{error}</p>}
       <RunTable runs={runs} pending={pending} onOpen={openRun} />
       <PaginationBar
         basePath={`/agents/${agentId}/runs`}

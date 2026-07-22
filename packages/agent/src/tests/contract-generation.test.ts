@@ -345,8 +345,10 @@ describe('Agent contract generation', () => {
 
     expect(rootScripts['gen:agent:proto']).toContain('@cf-tamac/agent');
     expect(rootScripts['gen:agent:rpc']).toContain('@cf-tamac/agent');
-    expect(rootScripts['check:codegen']).toContain('scripts/codegen/check-agent-codegen-drift.mjs');
-    expect(rootScripts['check:codegen']).toContain('git diff --exit-code');
+    expect(rootScripts['check:codegen']).toContain(
+      'scripts/codegen/check-generated-output-stability.mjs'
+    );
+    expect(rootScripts['check:codegen']).not.toContain('git diff --exit-code');
     expect(agentScripts['gen:proto']).toBe('tsp compile src/typespec');
     expect(agentScripts['lint:proto']).toBe('buf lint');
     expect(agentScripts['breaking:proto']).toBe('buf breaking --against proto');

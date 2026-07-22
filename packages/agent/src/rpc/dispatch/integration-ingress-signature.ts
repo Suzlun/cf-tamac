@@ -45,22 +45,39 @@ export function mapSignatureInput(
   const timestamp = requireTimestamp(request.timestamp);
   const rawBodyDigest = requireRawBodyDigest(request.rawBodyDigest);
   const signature = requireSignature(request.signature);
-  const nonce = request.nonce?.nonce;
-  if (nonce === undefined || nonce === '') {
-    throw createAgentDomainError({ kind: 'authentication', message: 'Integration nonce missing.' });
+  const nonce = requireIngressIdentity(request.nonce?.nonce, 'nonce');
+  const keyId = requireIngressIdentity(signature.keyId, 'signature.key_id');
+  const digestHex = requireLowercaseSha256Hex(rawBodyDigest.digestHex);
+  const timestampMs = requireSafeMilliseconds(timestamp.unixMs, 'timestamp.unix_ms');
+  const signedAtMs = requireSafeMilliseconds(
+    signature.signedAtUnixMs,
+    'signature.signed_at_unix_ms'
+  );
+  if (signature.algorithm !== 'Ed25519') {
+    throw createAgentDomainError({
+      kind: 'authentication',
+      message: 'Integration signature algorithm must be Ed25519.',
+      target: 'signature.algorithm',
+    });
+  }
+  if (signature.signature.byteLength === 0) {
+    throw createAgentDomainError({
+      kind: 'authentication',
+      message: 'Integration signature bytes are required.',
+      target: 'signature.signature',
+    });
   }
 
-  // protobuf の 64bit 数値表現を domain 層の millisecond/byte 数値へ揃え、署名材料の意味を固定します。
+  // Protobuf の 64bit 値と identity を fail-closed に正規化し、Provider が自己申告する skew は一切採用しません。
   return {
-    acceptedSkewMs: Number(timestamp.acceptedSkewMs),
     algorithm: signature.algorithm,
-    byteLength: Number(rawBodyDigest.byteLength),
-    digestHex: rawBodyDigest.digestHex,
-    keyId: signature.keyId,
+    byteLength: requireSafeByteLength(rawBodyDigest.byteLength),
+    digestHex,
+    keyId,
     nonce,
     signature: signature.signature,
-    signedAtMs: Number(signature.signedAtUnixMs),
-    timestampMs: Number(timestamp.unixMs),
+    signedAtMs,
+    timestampMs,
   };
 }
 
@@ -158,4 +175,53 @@ function requireSignature(signature: SignatureMetadata | undefined): SignatureMe
     });
   }
   return signature;
+}
+
+function requireIngressIdentity(value: string | undefined, target: string): string {
+  // canonical signature base と同じ NFC-trimmed value を context/nonce storage へ渡し、表記揺れを別主体にしません。
+  const normalized = value?.trim().normalize('NFC');
+  if (normalized === undefined || normalized === '') {
+    throw createAgentDomainError({
+      kind: 'authentication',
+      message: `Integration ${target} is required.`,
+      target,
+    });
+  }
+  return normalized;
+}
+
+function requireLowercaseSha256Hex(value: string): string {
+  // digest は canonical text に lowercase hex で入るため、大小文字を補正せず契約外の metadata を拒否します。
+  if (!/^[0-9a-f]{64}$/u.test(value)) {
+    throw createAgentDomainError({
+      kind: 'authentication',
+      message: 'Integration raw body digest must be lowercase SHA-256 hex.',
+      target: 'raw_body_digest.digest_hex',
+    });
+  }
+  return value;
+}
+
+function requireSafeMilliseconds(value: bigint, target: string): number {
+  // JavaScript number へ安全に変換できない値は timestamp window の比較を壊すため、署名前に拒否します。
+  if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw createAgentDomainError({
+      kind: 'authentication',
+      message: `Integration ${target} is outside the supported range.`,
+      target,
+    });
+  }
+  return Number(value);
+}
+
+function requireSafeByteLength(value: bigint): number {
+  // digest metadata の byte length は unsigned Protobuf body length と厳密比較するため、負値・精度喪失を拒否します。
+  if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw createAgentDomainError({
+      kind: 'authentication',
+      message: 'Integration raw body byte length is outside the supported range.',
+      target: 'raw_body_digest.byte_length',
+    });
+  }
+  return Number(value);
 }
