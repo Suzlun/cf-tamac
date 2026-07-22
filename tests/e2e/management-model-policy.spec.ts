@@ -6,7 +6,7 @@ import {
   ensureDefaultSigningKeyThroughUi,
   expectFocusedOperationResult,
   gotoAgentRegistrationPage,
-  gotoAgentRoute,
+  gotoManagementRoute,
   registerManagedAgentThroughUi,
   submitManagedAgentRegistration,
 } from './managed-agent-fixture';
@@ -80,7 +80,7 @@ test('[AGENT-MANAGEMENT-UI-S018] Settings 画面が default model policy を安�
   await fillCreationFormWithSafePolicyDraft(page, agentId, 'workers-ai-default-e2e');
   await submitManagedAgentRegistration(page, agentId);
 
-  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
+  await gotoManagementRoute(page, `/agents/${agentId}/settings`);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('heading', { name: 'Agent設定とcredential' })).toBeVisible();
   await expect(page.getByText(/Agent所有ポリシーの安全なメタデータを表示します/u)).toBeVisible();
@@ -108,7 +108,7 @@ test('[MANAGEMENT-CLIENT-WIREFRAMES-S001] [TAMAC-SDK-S005] Model policy reconcil
   const agentId = createE2eAgentId(testInfo);
 
   await registerManagedAgentThroughUi(page, agentId);
-  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
+  await gotoManagementRoute(page, `/agents/${agentId}/settings`);
   await page.setViewportSize({ width: 390, height: 844 });
   const summary = page.getByRole('region', { name: '既定モデルポリシー', exact: true });
   await expect(summary).toBeVisible();

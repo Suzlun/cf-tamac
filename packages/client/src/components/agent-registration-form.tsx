@@ -116,6 +116,15 @@ export interface RegistrationFormProps {
  * `initialAgent`/`initialCredential` は edit 初期表示、`onSubmit` は通常の登録、`onValidateModelPolicy` は保存前検証、
  * `onReconcileRegistration` は response-loss 時の唯一の状態確認に対応します。成功では ResultRegion が heading へ focus を移し、
  * safe failure では draft を保持して correlation ID と次の安全な操作だけを表示します。
+ *
+ * @example
+ * ```tsx
+ * <AgentRegistrationForm
+ *   onSubmit={submitManagedAgentRegistration}
+ *   onValidateModelPolicy={validateManagedAgentRegistrationModelPolicy}
+ *   onReconcileRegistration={reconcileManagedAgentRegistration}
+ * />
+ * ```
  */
 export function AgentRegistrationForm({
   initialAgent,

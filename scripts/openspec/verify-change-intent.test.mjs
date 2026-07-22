@@ -1,6 +1,6 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
 import { fileURLToPath, URL } from 'node:url';
+
+import { expect, it } from 'vitest';
 
 import { runGuardInFixture } from '#openspec/guard-test-fixture';
 
@@ -56,64 +56,64 @@ Owner-Confirmation: CONFIRMED
 - Confirmation Evidence: 所有者が「この意図で確定する」と回答した
 `;
 
-void test('downstream artifact と完全な確認済み Intent を許可する', () => {
+it('downstream artifact と完全な確認済み Intent を許可する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/intent.md': confirmedIntent,
     'openspec/changes/example/proposal.md': '## Why\n\n確認済み意図から作成する。\n',
   });
 
-  assert.equal(result.status, 0);
-  assert.equal(result.stderr, '');
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
 });
 
-void test('downstream artifact のない DRAFT Intent を許可する', () => {
+it('downstream artifact のない DRAFT Intent を許可する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/intent.md':
       'Intent-Status: DRAFT\nOwner-Confirmation: PENDING\n\n<!-- TODO: 意図候補 -->\n',
   });
 
-  assert.equal(result.status, 0);
-  assert.equal(result.stderr, '');
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
 });
 
-void test('Intent がない downstream artifact を拒否する', () => {
+it('Intent がない downstream artifact を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/proposal.md': '## Why\n',
   });
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /確認済み intent\.md がない/u);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toMatch(/確認済み intent\.md がない/u);
 });
 
-void test('DRAFT Intent より後の downstream artifact を拒否する', () => {
+it('DRAFT Intent より後の downstream artifact を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/intent.md': 'Intent-Status: DRAFT\nOwner-Confirmation: PENDING\n',
     'openspec/changes/example/specs/account/spec.md': '## ADDED Requirements\n',
   });
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Intent が CONFIRMED になる前/u);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toMatch(/Intent が CONFIRMED になる前/u);
 });
 
-void test('Intent と所有者確認の不一致を拒否する', () => {
+it('Intent と所有者確認の不一致を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/intent.md': 'Intent-Status: CONFIRMED\nOwner-Confirmation: PENDING\n',
   });
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /DRAFT\/PENDING または CONFIRMED\/CONFIRMED/u);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toMatch(/DRAFT\/PENDING または CONFIRMED\/CONFIRMED/u);
 });
 
-void test('placeholder が残る確認済み Intent を拒否する', () => {
+it('placeholder が残る確認済み Intent を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/intent.md': `${confirmedIntent}\n<!-- TODO: 未入力 -->\n`,
   });
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /placeholder/u);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toMatch(/placeholder/u);
 });
 
-void test('必須見出しが欠ける確認済み Intent を拒否する', () => {
+it('必須見出しが欠ける確認済み Intent を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/intent.md': confirmedIntent.replace(
       '## Falsification Check',
@@ -121,15 +121,15 @@ void test('必須見出しが欠ける確認済み Intent を拒否する', () =
     ),
   });
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Falsification Check/u);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toMatch(/Falsification Check/u);
 });
 
-void test('archive 配下の履歴は検査しない', () => {
+it('archive 配下の履歴は検査しない', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/archive/example/proposal.md': '## Why\n',
   });
 
-  assert.equal(result.status, 0);
-  assert.equal(result.stderr, '');
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
 });

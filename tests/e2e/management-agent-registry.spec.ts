@@ -7,7 +7,7 @@ import {
   expectFocusedOperationResult,
   fillManagedAgentRegistrationForm,
   gotoAgentRegistrationPage,
-  gotoAgentRoute,
+  gotoManagementRoute,
   registerManagedAgentThroughUi,
   submitManagedAgentRegistrationAttempt,
   submitManagedAgentRegistration,
@@ -28,7 +28,7 @@ test('[MANAGEMENT-CLIENT-SHELL-S001] Agent registry shell renders without demo c
   const agentId = createE2eAgentId(testInfo);
 
   await registerManagedAgentThroughUi(page, agentId);
-  await page.goto('/agents');
+  await gotoManagementRoute(page, '/agents');
 
   await expect(page.getByText('Agent registry').first()).toBeVisible();
   const registeredAgentItem = page
@@ -161,7 +161,7 @@ test('[AGENT-MANAGEMENT-UI-S012] Agent settings verifies issuer kid fingerprint 
   const agentId = createE2eAgentId(testInfo);
 
   await registerManagedAgentThroughUi(page, agentId);
-  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
+  await gotoManagementRoute(page, `/agents/${agentId}/settings`);
 
   await expect(
     page.getByRole('heading', { name: 'Signing Key Selection And Health' })
@@ -181,7 +181,7 @@ test('[AGENT-MANAGEMENT-UI-S013] Trust config export produces public-only JSON u
   page,
 }) => {
   await ensureDefaultSigningKeyThroughUi(page);
-  await page.goto('/global-settings/trust-config-export');
+  await gotoManagementRoute(page, '/global-settings/trust-config-export');
 
   await page.getByRole('button', { name: 'Generate public-only JSON' }).click();
   await expect(page.getByText('Schema validation passed')).toBeVisible({ timeout: 15_000 });
@@ -201,7 +201,7 @@ test('[AGENT-MANAGEMENT-UI-S014] Broad scope selection shows warning and schema 
   page,
 }) => {
   await ensureDefaultSigningKeyThroughUi(page);
-  await page.goto('/global-settings/trust-config-export');
+  await gotoManagementRoute(page, '/global-settings/trust-config-export');
 
   await page.getByText('agent:write', { exact: true }).click();
   await page.getByRole('button', { name: 'Generate public-only JSON' }).click();
@@ -216,7 +216,7 @@ test('[AGENT-MANAGEMENT-UI-S019] Selected-Agent pages render real Agent RPC data
   const agentId = createE2eAgentId(testInfo);
 
   await registerManagedAgentThroughUi(page, agentId);
-  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
+  await gotoManagementRoute(page, `/agents/${agentId}/settings`);
   await page.getByRole('button', { name: 'Run Health Check' }).click();
   await expect(page.getByText('verified', { exact: true })).toBeVisible({ timeout: 15_000 });
 
@@ -248,7 +248,7 @@ test('[AGENT-MANAGEMENT-UI-S020] Agent-zero Global Settings signing operations a
   await expect(page.getByText('Agent-zero availability')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Trust Config Export' }).first()).toBeVisible();
 
-  await page.goto('/global-settings/trust-config-export');
+  await gotoManagementRoute(page, '/global-settings/trust-config-export');
   await expect(
     page.getByRole('heading', { name: 'Public-only Trust Config Export' })
   ).toBeVisible();
@@ -263,16 +263,16 @@ test('[WORKSPACE-GOVERNANCE-S013] Operational smoke reaches Agent RPC real data 
   const agentId = createE2eAgentId(testInfo);
 
   await ensureDefaultSigningKeyThroughUi(page);
-  await page.goto('/global-settings/trust-config-export');
+  await gotoManagementRoute(page, '/global-settings/trust-config-export');
   await page.getByRole('button', { name: 'Generate public-only JSON' }).click();
   await expect(page.getByText('Schema validation passed')).toBeVisible({ timeout: 15_000 });
 
   await registerManagedAgentThroughUi(page, agentId);
-  await gotoAgentRoute(page, `/agents/${agentId}/settings`);
+  await gotoManagementRoute(page, `/agents/${agentId}/settings`);
   await page.getByRole('button', { name: 'Run Health Check' }).click();
   await expect(page.getByText('verified', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  await gotoAgentRoute(page, `/agents/${agentId}`);
+  await gotoManagementRoute(page, `/agents/${agentId}`);
   await expect(page.getByText('Profile + lifecycle')).toBeVisible();
   await expect(page.getByText('Capabilities')).toBeVisible();
   await expect(page.getByText('Storage & health')).toBeVisible();

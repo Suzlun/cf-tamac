@@ -67,37 +67,48 @@ export async function expectFocusedOperationResult(
  * @returns `/agents/new` の load 完了まで待つ Promise です。
  * @throws Server Action の再検証競合以外の navigation error を送出します。
  * @remarks
- * WebKit が同一originの Server Action navigation と次の `page.goto` を同時に観測した場合だけ、1回待機して再実行します。
+ * WebKit または Firefox が同一originの Server Action navigation と次の `page.goto` を同時に観測した場合だけ、
+ * 対象URLへの到達を確認して再実行します。
  * E2E の実際のページ遷移・form submit・Server Action は変更せず、既知の browser scheduling race だけを安定化します。
  */
 export async function gotoAgentRegistrationPage(page: Page): Promise<void> {
-  await gotoAgentRoute(page, '/agents/new');
+  await gotoManagementRoute(page, '/agents/new');
 }
 
 /**
- * Server Action 後の既知の同一origin navigation 競合を避けて managed Agent route へ移動します。
+ * Server Action 後の既知の同一origin navigation 競合を避けてManagement Client routeへ移動します。
  *
  * @param page - 操作対象の Playwright page です。
- * @param path - `/agents/...` 配下の E2E route です。
+ * @param path - `/agents/...`または`/global-settings/...`配下のE2E routeです。
  * @returns 指定 route の load 完了まで待つ Promise です。
  * @throws 既知の navigation interruption 以外の error を送出します。
  * @remarks
  * Server Action による RSC refresh が直前 route の navigation を遅延させる場合があるため、該当する Playwright
- * error だけを1回再試行します。別の失敗を待機や再送で隠さないことで、実際の UI/Server Action failure を保持します。
+ * error だけを最大2回再試行します。Firefoxの`NS_BINDING_ABORTED`を含め、対象URLへ到達済みならReact hydrationが
+ * 安定する`networkidle`まで待ちます。別の失敗を待機や再送で隠さないことで、実際のUI/Server Action failureを保持します。
  */
-export async function gotoAgentRoute(page: Page, path: string): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+export async function gotoManagementRoute(page: Page, path: string): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      await page.goto(path);
+      await page.goto(path, { waitUntil: 'domcontentloaded' });
+      await expect(page).toHaveURL(path, { timeout: 15_000 });
       await page.waitForLoadState('networkidle');
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (attempt > 0 || !message.includes('interrupted by another navigation')) {
+      // Browserが先行navigationを中断しても対象URLへ到達済みなら、React hydrationの安定まで待って成功とします。
+      if (new URL(page.url()).pathname === path) {
+        await page.waitForLoadState('networkidle');
+        return;
+      }
+      const isKnownNavigationInterruption =
+        message.includes('interrupted by another navigation') ||
+        message.includes('NS_BINDING_ABORTED') ||
+        message.includes('maybe frame was detached');
+      if (attempt >= 2 || !isKnownNavigationInterruption) {
         throw error;
       }
-      await page.waitForTimeout(250);
-      await page.waitForLoadState('load').catch(() => undefined);
+      await page.waitForLoadState('domcontentloaded').catch(() => undefined);
     }
   }
 }
@@ -165,8 +176,8 @@ export async function fillManagedAgentRegistrationForm(
   await page
     .getByLabel('マスク済みヒント', { exact: true })
     .fill(`ed25519:${agentId.slice(-8)}`.slice(0, 64));
-  await page.getByRole('combobox', { name: '状態' }).click();
-  await page.getByRole('option', { name: 'active', exact: true }).click();
+  // credential status はcreate formの安全な既定値`active`を利用し、同値の再選択によるoverlay timing競合を避けます。
+  await expect(page.getByRole('combobox', { name: '状態' })).toContainText('active');
 
   // Server Action へ渡す直前にも必須 ID を再入力し、WebKit の hydration / 再描画による値落ちを失敗原因から外す。
   await agentIdInput.fill(agentId);

@@ -165,7 +165,16 @@ export type RegistrationOutcome = 'active' | 'reconciliation_required' | 're_reg
  * @remarks
  * Agent 作成前の draft validation は Server Action 経由で Agent RPC に閉じます。成功時は
  * safe warning だけ、失敗時は registration field 名に変換済みの error だけを返し、credential secret や
- * direct RPC payload は Browser に渡しません。
+ * direct RPC payload は Browser に渡しません。Server Action の検証失敗や transport 障害は例外として
+ * Browser へ送出せず、`safeStatus='failed'` と安全な分類・表示文言へ正規化します。
+ *
+ * @example
+ * ```ts
+ * const result: RegistrationPolicyValidationResult = await validatePolicy(values);
+ * if (result.safeStatus === 'failed') {
+ *   form.setError('root', { message: result.displayData.message });
+ * }
+ * ```
  */
 export type RegistrationPolicyValidationResult = BrowserSafeAgentRpcResult<
   BrowserSafeOperationDisplayData & {
@@ -181,9 +190,12 @@ export type RegistrationPolicyValidationResult = BrowserSafeAgentRpcResult<
  * 成功時は登録済み Agent ID を返し、失敗時は field-level error と form-level error を返します。
  * credential secret material は含めず、browser-safe な表示情報だけを返す contract です。response loss などで
  * Agent profile/config 照合が必要な場合は `reconciliationRequired` だけを明示し、固定 idempotency key/digest は Browser に公開しません。
+ * 入力不正、認証・認可失敗、設定不備、transport 障害、照合継続は例外として送出せず、失敗側の四属性
+ * `displayData`、`safeStatus`、`safeErrorCategory`、`correlationId`で表現します。
  *
  * @example
  * ```ts
+ * const result: RegistrationSubmitResult = await submitRegistration(values);
  * if (result.displayData.reconciliationRequired === true) {
  *   // 「登録状態を確認」だけを有効化し、入力を保持する。
  * }
