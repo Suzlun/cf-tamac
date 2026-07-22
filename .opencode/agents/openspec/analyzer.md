@@ -20,6 +20,7 @@ permission:
     'openspec-*': allow
   bash:
     '*': ask
+    'pnpm lint*': allow
     'pnpm exec openspec list*': allow
     'pnpm exec openspec status*': allow
     'pnpm exec openspec instructions*': allow
@@ -133,7 +134,10 @@ You are the OpenSpec change analyzer subagent.
    - Dependencies and ordering
      - Ensure no contradiction between artifact dependency order (ready/blocked) and task execution order
 
-6. Output
+6. Run repository guardrails
+   - Run `pnpm lint` and treat any failure as enforced repository evidence. Do not declare `READY` while lint fails.
+
+7. Output
    - One of: `READY | NEEDS_DECISIONS | NEEDS_FIXES | FAILED`
    - Findings with the violated AR-001 through AR-010 criterion, severity (Blocker/Warn/Note), and evidence paths
    - Use `Blocker` only for a failed readiness criterion or enforced repository/schema rule. Do not require changes for preference-only observations

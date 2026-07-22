@@ -34,7 +34,6 @@ One editable source and one generated preview per screen:
 **Output path:**
 
 - With design-id: `designs/{design-id}/output/wireframe/` (automatic)
-- With an OpenSpec change path supplied by the caller: `openspec/changes/<change-id>/wireframes/` (automatic)
 - Without: prompted — ask user for directory path
 
 ## Execution Steps
@@ -50,16 +49,7 @@ If a `{design-id}` argument is provided:
 If no argument:
 
 1. Use the conversation context to understand the desired layout
-2. If the caller supplied `openspec/changes/<change-id>/`, use it as the target change path
-3. Ask clarifying questions if the layout description is ambiguous
-
-If the target is an OpenSpec Change:
-
-1. Read the confirmed intent and proposal before interpreting the requested surface
-2. Identify affected routes or existing surfaces and inspect their current UI source, structural components, shared UI, and relevant UI tests
-3. Search every active Change under `openspec/changes/`, excluding `archive/`, and read all `.wireframe.json` sources that overlap the same route, shell, page, dialog, or user journey, including existing wireframes in the target Change
-4. Classify each surface as `new`, `extend`, or confirmed `replace`; preserve implemented and already planned structure outside the requested delta
-5. If implementation, active wireframes, intent, or proposal conflict on user-visible behavior, ask the caller to decide before generating JSON
+2. Ask clarifying questions if the layout description is ambiguous
 
 ### Step 2: Load cognitive model and generate wireframe JSON
 
@@ -83,11 +73,7 @@ Derive the filename from the JSON `name` field (slugified, e.g., "KAI 回答ビ�
 
 - Output directory is `designs/{design-id}/output/wireframe/` (no prompt needed)
 
-**If an OpenSpec change path was provided by the caller:**
-
-- Output directory is `openspec/changes/<change-id>/wireframes/` (no prompt needed)
-
-**If neither a design-id nor an OpenSpec change path was provided:**
+**If no design-id was provided:**
 
 - Ask the user where to save the JSON: "Where should I save the wireframe JSON? Provide a directory path."
 - Use `AskUserQuestion` with a simple text prompt
