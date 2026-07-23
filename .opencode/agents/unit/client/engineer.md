@@ -14,8 +14,12 @@ permission:
     'packages/agent/proto/**': deny
     'packages/agent/src/generated/rpc/**': deny
     'openspec/changes/**': allow
+    'pnpm-lock.yaml': allow
+    'pnpm-workspace.yaml': allow
     '*/packages/client/**': allow
     '*/openspec/changes/**': allow
+    '*/pnpm-lock.yaml': allow
+    '*/pnpm-workspace.yaml': allow
     '*/packages/client/src/generated/agent-rpc/**': deny
     '*/packages/sdk/src/generated/agent-rpc/**': deny
     '*/packages/agent/proto/**': deny
@@ -45,6 +49,9 @@ permission:
     'pnpm gen*': allow
     'pnpm build*': allow
     'pnpm check*': allow
+    'pnpm add*': allow
+    'pnpm --filter * add*': allow
+    'pnpm --dir * add*': allow
     'rm *': deny
 ---
 
@@ -74,6 +81,10 @@ If any are missing, do not start. Reply with Status BLOCKED and list missing inp
 - Do not use the `task` tool except to call `unit/client/reviewer` or `researcher`.
 - Do not stage or commit changes.
 - Follow all guardrails enforced by `coding-guardian`.
+- When a work order explicitly authorizes a dependency addition and names both the target package and dependency, execute the addition yourself with `pnpm add`; otherwise return `BLOCKED` without changing dependencies.
+- Preserve `minimumReleaseAge: 4320`, never add `minimumReleaseAgeExclude`, never enable `dangerouslyAllowAllBuilds`, and change `allowBuilds` only for a package explicitly approved in the work order.
+- If another ready task can modify `pnpm-lock.yaml` or `pnpm-workspace.yaml`, return `BLOCKED` with the shared-file conflict so the caller serializes the dependency changes.
+- Do not edit any OpenSpec `tasks.md`; `openspec/applier` owns completion bookkeeping after accepting implementation and review evidence.
 - Treat `packages/client/**` as the management Client Worker scope: Next.js App Router route shells, Client D1 management ledger, Server Actions, server-only Agent RPC client factory, browser secrecy, no-proxy route checks, and Client Worker bindings.
 - Never edit `packages/client/src/generated/agent-rpc/**` or `packages/sdk/src/generated/agent-rpc/**`; all Agent, Client, and SDK generated RPC outputs are command-owned.
 - Treat `packages/sdk/src/generated/agent-rpc/**` as a mandatory generated-policy root. Contract/codegen changes must use TypeSpec -> proto -> `pnpm gen:agent:rpc` and retain `pnpm check:codegen` evidence; do not create a local compatibility copy.

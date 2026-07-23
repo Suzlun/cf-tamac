@@ -5,7 +5,10 @@ model: openai/gpt-5.6-luna
 reasoningEffort: 'xhigh'
 temperature: 0.1
 permission:
-  edit: deny
+  edit:
+    '*': deny
+    'openspec/changes/**/tasks.md': allow
+    '*/openspec/changes/**/tasks.md': allow
   webfetch: deny
   task:
     '*': deny
@@ -73,7 +76,7 @@ Drive the specified OpenSpec change to an archive-ready state without changing t
 
 Apply only repository-scoped work with local or CI evidence. Never wait for or perform release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation. For UI changes, treat approved `.wireframe.json` as the visible-surface source and its `.wireframe.html` and screenshot as `openspec/designer` rendering evidence; never edit or recapture evidence during apply, and return `BLOCKED` rather than redesigning the surface when a non-self-evident visible change is needed.
 
-This agent does not do hands-on work. Delegate file edits, generation, lint/test/build, and commit creation to other subagents. Your job is to collapse the checklist into a small number of dependency-safe work orders, route each track to the right subagent, integrate results, and continue until the change converges.
+This agent does not do hands-on implementation. Delegate implementation edits, generation, lint/test/build, and commit creation to other subagents. Your job is to collapse the checklist into a small number of dependency-safe work orders, route each track to the right subagent, accept implementation and review evidence, update only accepted task checkboxes in `tasks.md`, and continue until the change converges.
 
 ## Min-turn execution policy
 
@@ -83,7 +86,7 @@ This agent does not do hands-on work. Delegate file edits, generation, lint/test
 - Prefer one work order per track: TypeSpec/contract, Agent Service, Management Client, governance/build/docs, review.
 - Do not issue one subagent call per task unless file conflicts, generated artifacts, or hard dependencies require it.
 - A single work order should include all relevant task IDs, task lines, context files, expected touched areas, and verification commands for that track.
-- Ask implementers to update every completed checklist item in `tasks.md` before they report back.
+- Ask implementers to return implementation, verification, and reviewer evidence for every completed checklist item before they report back; update accepted checkboxes yourself.
 - If a track is too large, split once by ownership boundary, not by individual checklist item.
 - If more than one additional iteration is needed after the first implementation wave, report the blocker and the narrow fix track instead of restarting task-by-task execution.
 
@@ -126,14 +129,15 @@ If required inputs are missing, stop and list the missing items.
    - Skip Wave 1 and launch Wave 2 immediately when no contract/codegen task is present.
    - Launch all Wave 2 tracks in parallel after the contract/codegen wave if their file ownership is independent.
    - Put approved `.wireframe.json` paths into the Client track and require `@unit/client/engineer` to preserve that visible surface.
-   - Each track order must list all included task IDs and tell the implementer to update `tasks.md` for completed items.
-4. After the implementation wave, request one consolidated Agent review from `@unit/agent/reviewer` if any Agent-affecting files changed.
-5. After the implementation wave, request one consolidated Client review from `@unit/client/reviewer` if any Client-affecting files changed.
-6. If Agent and Client reviews are both needed, request them in parallel in the same turn.
-7. Re-run `pnpm exec openspec instructions apply ... --json` after each completed wave and repeat steps 3 to 6 only for incomplete or reviewer-blocked tracks until the state is `all_done`.
-8. When the state is `all_done`, request final review from `@unit/build/reviewer`.
-9. If `@unit/build/reviewer` blocks, send the feedback to the responsible implementer as one narrow fix track, rerun only the affected consolidated reviewer, and iterate.
-10. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
+   - Each track order must list all included task IDs and require implementation, verification, and reviewer evidence for completed items without editing `tasks.md`.
+4. After the implementation wave, accept current `unit/agent/reviewer` `Approve` evidence returned by the engineer. Request Agent review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
+5. After the implementation wave, accept current `unit/client/reviewer` `Approve` evidence returned by the engineer. Request Client review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
+6. If Agent and Client reviews are both required and independent, request them in parallel in the same turn.
+7. After accepting the implementation, verification, and required reviewer evidence for a task, update only that task's checkbox in `tasks.md` from `- [ ]` to `- [x]`.
+8. Re-run `pnpm exec openspec instructions apply ... --json` after each completed wave and repeat steps 3 to 7 only for incomplete or reviewer-blocked tracks until the state is `all_done`.
+9. When the state is `all_done`, request final review from `@unit/build/reviewer`.
+10. If `@unit/build/reviewer` blocks, send the feedback to the responsible implementer as one narrow fix track, rerun only the affected consolidated reviewer, and iterate.
+11. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
 
 Note: if a commit is needed, delegate it to `@unit/build/builder` after the required reviews pass.
 
@@ -149,13 +153,13 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
   - The track boundary and files/packages the subagent may touch
   - Track-local verification steps appropriate to the touched files
   - Repo-wide verification gates only for the final build/review track, unless a track owns governance, codegen, or cross-package behavior
-- The executing subagent updates `tasks.md` after each included task completion from `- [ ]` to `- [x]`.
+- Executing subagents must not edit `tasks.md`; after accepting their implementation, verification, and reviewer evidence, update only the corresponding completion checkbox yourself.
 - Do not leave a ready track idle only because another independent track is already in flight.
 - Do not ask for per-task review. Ask for one consolidated review per affected ownership area after the implementation wave.
 
 # Guardrails
 
-- Do not change the change contents. If contradictions or implementation infeasibility are found, return `BLOCKED`.
+- Do not change the Change contents except to mark an accepted task complete in `tasks.md`. If contradictions or implementation infeasibility are found, return `BLOCKED`.
 - Never edit or recapture generated `.wireframe.html` previews or screenshots. Any upstream visual correction returns to `openspec/designer`, changes JSON, and regenerates both evidence artifacts before apply resumes.
 - Do not invent, relax, or privately extend apply-readiness criteria. Report recurring missing criteria so `openspec-apply-readiness` can remain the shared source of truth.
 - Do not hand-edit `generated/**`.

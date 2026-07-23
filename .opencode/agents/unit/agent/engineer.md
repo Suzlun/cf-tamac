@@ -40,6 +40,9 @@ permission:
     'pnpm gen*': allow
     'pnpm build*': allow
     'pnpm check*': allow
+    'pnpm add*': allow
+    'pnpm --filter * add*': allow
+    'pnpm --dir * add*': allow
     'rm *': deny
 ---
 
@@ -67,6 +70,10 @@ If any are missing, do not start. Reply with Status BLOCKED and list missing inp
 - Do not use the `task` tool except to call `unit/agent/reviewer` or `researcher`.
 - Do not stage or commit changes.
 - Follow all guardrails enforced by `coding-guardian`.
+- When a work order explicitly authorizes a dependency addition and names both the target package and dependency, execute the addition yourself with `pnpm add`; otherwise return `BLOCKED` without changing dependencies.
+- Preserve `minimumReleaseAge: 4320`, never add `minimumReleaseAgeExclude`, never enable `dangerouslyAllowAllBuilds`, and change `allowBuilds` only for a package explicitly approved in the work order.
+- If another ready task can modify `pnpm-lock.yaml` or `pnpm-workspace.yaml`, return `BLOCKED` with the shared-file conflict so the caller serializes the dependency changes.
+- Do not edit any OpenSpec `tasks.md`; `openspec/applier` owns completion bookkeeping after accepting implementation and review evidence.
 - Treat `packages/agent/**` as the Agent Service Worker scope: Cloudflare Agents SDK Durable Object foundation, Connect RPC Worker, Agent TypeSpec/proto source/config, Agent storage, runtime directories, Worker bindings, and Agent governance checks. The Agent codegen track owns the TypeSpec/Buf/configuration path that emits Agent, Client, and SDK descriptors.
 - Keep Agent public API Protobuf RPC-only. Do not add Agent REST/OpenAPI/Orval/ad-hoc JSON/public Durable Object fetch surfaces.
 - Do not hand-edit generated Agent outputs: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, or `packages/sdk/src/generated/agent-rpc/**`; change TypeSpec/config/scripts and run `pnpm gen:agent:proto`, `pnpm gen:agent:rpc`, and `pnpm check:codegen` instead.
