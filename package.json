@@ -9,7 +9,7 @@
     "#openspec/guard-test-fixture": "./scripts/openspec/guard-test-fixture.mjs"
   },
   "license": "MPL-2.0",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.16.0",
   "engines": {
     "node": ">=24.12.0"
   },
