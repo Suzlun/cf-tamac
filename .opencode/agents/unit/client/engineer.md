@@ -3,7 +3,7 @@ description: Management Client implementation specialist for packages/client, Ne
 mode: subagent
 hidden: true
 model: openai/gpt-5.6-luna
-reasoningEffort: 'xhigh'
+reasoningEffort: 'max'
 temperature: 0.1
 permission:
   edit:

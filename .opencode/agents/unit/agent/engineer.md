@@ -3,7 +3,7 @@ description: Agent Service implementation specialist for packages/agent, TypeSpe
 mode: subagent
 hidden: true
 model: openai/gpt-5.6-luna
-reasoningEffort: 'xhigh'
+reasoningEffort: 'max'
 temperature: 0.1
 permission:
   edit:

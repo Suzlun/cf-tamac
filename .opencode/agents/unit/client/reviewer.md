@@ -2,8 +2,8 @@
 description: Management Client review subagent for packages/client, Next.js App Router, Server Actions, Client D1, server-only Agent RPC, browser secrecy, no-proxy routes, approved wireframe fidelity, and Impeccable/design-audit blocking gates.
 mode: subagent
 hidden: true
-model: openai/gpt-5.6-terra
-reasoningEffort: 'xhigh'
+model: openai/gpt-5.6-luna
+reasoningEffort: 'max'
 temperature: 0.1
 permission:
   edit: deny

@@ -2,7 +2,7 @@
 description: Apply an OpenSpec change with track-level TypeSpec, Agent, Client, and review waves until archive-ready.
 mode: subagent
 model: openai/gpt-5.6-luna
-reasoningEffort: 'xhigh'
+reasoningEffort: 'max'
 temperature: 0.1
 permission:
   edit:

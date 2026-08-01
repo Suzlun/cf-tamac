@@ -3,7 +3,7 @@ description: Build agent helper for Agent/Client generation, lint, tests, build,
 mode: subagent
 hidden: false
 model: openai/gpt-5.6-luna
-reasoningEffort: 'xhigh'
+reasoningEffort: 'max'
 permission:
   edit:
     '*': allow
