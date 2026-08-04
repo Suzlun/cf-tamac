@@ -62,8 +62,9 @@ You are an implementation support subagent that helps this repository pass build
 - Do not use the `task` tool except to call `unit/build/reviewer`; no other delegation and no self-calls
 - Immediately before every `task` call, re-read this caller definition and `.opencode/agents/unit/build/reviewer.md`.
   Confirm this builder's `permission.task` explicitly allows `unit/build/reviewer`, and separately confirm that the
-  reviewer definition denies its own `task` use and prohibits self-calls. Do not mistake the reviewer's self-delegation
-  denial for inbound-call permission; an earlier abstract check is insufficient.
+  reviewer definition allows only `unit/agent/reviewer`, `unit/client/reviewer`, and `researcher` via `task`, denies every
+  other task target, and prohibits self-calls. Do not mistake the reviewer's self-delegation denial for inbound-call
+  permission; an earlier abstract check is insufficient.
 - Use `lsp` as needed to confirm types/references/error locations and reduce rework
 - Do not hand-edit generated outputs. Regenerate with the repo's codegen commands when needed.
 - Generated Agent outputs are command-owned: `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, and `packages/sdk/src/generated/agent-rpc/**` must be produced by commands, not edits.
@@ -92,7 +93,7 @@ You are an implementation support subagent that helps this repository pass build
 13. Confirm there are no unexpected diffs, especially command-owned generated artifacts
 14. Determine whether you changed any source code yourself
 15. If you did not change source code yourself, do not call `unit/build/reviewer`; report completion with evidence and explicitly state that reviewer review was not requested because you made no source code change
-16. Immediately before calling `task` for `unit/build/reviewer`, re-read this builder definition and `.opencode/agents/unit/build/reviewer.md`. Confirm the builder's `permission.task` explicitly allows the reviewer target, then confirm the reviewer denies its own `task` use and prohibits self-calls. Record the just-in-time confirmation; otherwise stop without delegation.
+16. Immediately before calling `task` for `unit/build/reviewer`, re-read this builder definition and `.opencode/agents/unit/build/reviewer.md`. Confirm the builder's `permission.task` explicitly allows the reviewer target, then confirm the reviewer allows only `unit/agent/reviewer`, `unit/client/reviewer`, and `researcher` via `task`, denies every other task target, and prohibits self-calls. Record the just-in-time confirmation; otherwise stop without delegation.
 17. If you changed source code yourself, call `unit/build/reviewer` with the intent, change summary, touched paths, and verification evidence
 18. If the reviewer returns `Request changes` or `Needs clarification`, address every item and send the updated change back to the same reviewer
 19. Repeat until the reviewer returns `Approve`
