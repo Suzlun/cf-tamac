@@ -17,9 +17,13 @@ When ready to implement, run /opsx-apply
 
 **Input**: The argument after `/opsx-propose` is the change name (kebab-case), OR a description of what the user wants to build.
 
-Before starting, load `openspec-apply-readiness` via the `skill` tool and use it as the definition of apply-ready.
+Before artifact work, load `openspec-change-review` via the `skill` tool. Use it only for Proposer self-review and independent `openspec/analyzer` review.
 
 **Intent confirmation boundary**: Treat the request as evidence of intent, not as an implementation-ready specification. Every Change requires one explicit owner confirmation of the reconstructed intent before proposal, wireframe, Specs, design, or tasks are authored.
+
+**Artifact meaning boundary**: `intent.md` may record candidate means, rejected interpretations, and falsification evidence. `proposal.md` may describe removal, replacement, and breaking impact. Specs describe enduring observable end-state behavior and lasting safety or contract boundaries. `design.md` may describe deletion, replacement, migration, rollback, and file movement. `tasks.md` may use operations such as `Delete` and `Move`. Tests verify new behavior and enduring boundaries, not merely the absence of historical implementation details. Do not reject text because a particular negative word appears; reject it only when an old implementation or rejected candidate is made into a product requirement.
+
+**Change completion boundary**: Keep artifacts, tasks, acceptance criteria, and completion conditions repository-scoped. Do not include release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, or production observation.
 
 **UI artifact order**: For a user-visible UI, confirm intent first, create the proposal, then ask `openspec/designer` for the minimum `.wireframe.json`, generated `.wireframe.html` preview, and `.wireframe-screenshot.png` evidence, then author Specs and design. The JSON is the editable visible-surface source. The HTML and PNG are generated evidence, never design sources or hand-edit targets. Skip this phase entirely when no user-visible UI is needed.
 
@@ -69,7 +73,7 @@ Before starting, load `openspec-apply-readiness` via the `skill` tool and use it
    - Only after explicit confirmation, create `intent.md` with exact `Intent-Status: CONFIRMED` and `Owner-Confirmation: CONFIRMED` markers and record the approved statement under `## Owner Confirmation`.
    - Do not create any downstream artifact while either status is unconfirmed or a material decision remains unresolved.
 
-5. **Create downstream artifacts in sequence until apply-ready**
+5. **Create downstream artifacts and converge review**
 
    Use the **TodoWrite tool** to track progress through the artifacts.
 
@@ -103,12 +107,18 @@ Before starting, load `openspec-apply-readiness` via the `skill` tool and use it
    - Use **AskUserQuestion tool** to clarify
    - Then continue with creation
 
-   d. **Converge the shared apply-readiness contract**:
+   d. **Converge deterministic format and semantic review**:
+   - Verify required artifacts and sections, unresolved `TODO` or `TBD` placeholders, `Directory Tree` glyphs, agreement with `New / Changed Files`, fixed schema headings/tables/columns, numbered task checkboxes with objective completion conditions, Scenario ID test-task coverage, and UI wireframe paths and artifact order.
+   - Run the existing deterministic validators until they pass:
+     ```bash
+     pnpm exec openspec validate --type change "<name>" --strict --no-interactive
+     pnpm lint:openspec
+     ```
    - Run `pnpm exec openspec instructions apply --change "<name>" --json`
    - Read every returned `contextFiles` path
-   - Evaluate AR-001 through AR-010 from `openspec-apply-readiness`
-   - Fix every `NEEDS_FIXES` finding and ask for every required `NEEDS_DECISIONS` item
-   - Do not declare the change apply-ready until the result is `READY`
+   - Self-review with `openspec-change-review` and correct every actionable finding
+   - Call `openspec/analyzer` only after deterministic validation passes
+   - Continue correction, validation, and review until Analyzer returns `APPROVED`; do not send deterministic format defects to Analyzer
 
 6. **Show final status**
    ```bash
@@ -122,7 +132,7 @@ After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
 - Confirmed intent path and owner-approved intent summary
-- Apply-readiness result: `READY`
+- Strict validation results and the current Analyzer `APPROVED` evidence
 - What's ready: "All artifacts created! Ready for implementation."
 - Prompt: "Run `/opsx-apply` to start implementing."
 
@@ -143,4 +153,5 @@ After completing all artifacts, summarize:
 - Never resolve ambiguity about customer outcome, external contracts, architecture, security, data, dependencies, or scope merely to keep momentum; obtain owner confirmation
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
-- Do not add local readiness gates or use expected file counts; use `openspec-apply-readiness`
+- Do not add semantic finding categories or local review gates beyond `openspec-change-review`
+- Do not declare the Change review complete until Analyzer returns `APPROVED`
