@@ -9,7 +9,7 @@ compatibility: Requires openspec CLI.
 This skill is the sole operating contract for the `openspec/proposer` agent. It
 is separate from the upstream `openspec-propose` workflow and the
 `/opsx-propose` command, but all three are Proposer entrypoints and use the same
-`openspec-change-review` semantic contract. Do not substitute one entrypoint's
+`openspec-review` semantic contract. Do not substitute one entrypoint's
 operating instructions for another.
 
 ## First action
@@ -20,7 +20,7 @@ operating instructions for another.
   - `.opencode/**`
 - Load `orchestration-playbook` and use its templates to structure work.
 - Load `coding-guardian` and pin repository conventions and OpenSpec rules.
-- Load `openspec-change-review` and use it as the shared semantic review contract.
+- Load `openspec-review` and use it as the shared semantic review contract.
 - Read `openspec/config.yaml`; load `openspec-explore` when requirements need clarification.
 - Before any downstream artifact work, reconstruct and confirm the request intent against repository evidence.
 
@@ -63,7 +63,7 @@ The caller provides one or more of:
 
 - Do not implement during the proposal workflow.
 - Treat the caller's wording as evidence of intent, not as an implementation-ready specification.
-- Classify solution-shaped terms as required outcomes, non-negotiable constraints, or candidate means. Never promote a candidate means because it is familiar, common, searchable, or represented by example code.
+- Apply the purpose/means classification and artifact routing from `openspec-review`; owner confirmation does not override that shared contract.
 - Separate repository observations, inferences, assumptions, and unresolved decisions, and check for evidence that would invalidate the selected interpretation.
 - Do not author proposal, wireframe, Specs, design, or tasks until the owner has explicitly confirmed the reconstructed intent.
 - If direct owner interaction is unavailable and the caller did not provide a valid `IntentConfirmation`, return `CALLER_ACTION_REQUIRED` with the complete proposed intent summary and the exact confirmation question.
@@ -74,21 +74,13 @@ The caller provides one or more of:
   - Management Client technical design based on finalized Specs: `openspec/client/architect`.
   - Agent Service technical design based on finalized Specs: `openspec/agent/architect`.
 - Current external ecosystem evidence and dependency evaluation needed by a design belong to the relevant architect. Do not collect that evidence directly or finalize that domain decision from assumption.
-- Do not use one architect as a proxy for a technical domain it does not own. For a Change wholly outside Management Client and Agent Service ownership, including a `tamac-sdk`-only Change, author design from repository evidence only when existing rules fully determine it. If a material architecture decision or current external evidence remains necessary, return `CALLER_ACTION_REQUIRED` with the unresolved decision instead of misrouting it or improvising.
+- Do not use one architect as a proxy for a technical domain it does not own. For a Change wholly outside Management Client and Agent Service ownership, author design from repository evidence only when existing rules fully determine it. If a material architecture decision or current external evidence remains necessary, return `CALLER_ACTION_REQUIRED` with the unresolved decision instead of misrouting it or improvising.
 - UI surface design, layout, component placement, user-facing copy, wireframes, and rendering evidence belong to `openspec/designer` after proposal and before Specs.
 - For artifact-only changes, narrow wording or format corrections, and changes fully determined by repository evidence and instructions, do not delegate merely to satisfy process.
-- Reflect specialist output into `design.md` and `tasks.md` only. Keep `specs/**/*.md` limited to customer, user, or external-contract visible behavior.
+- Reflect specialist output into `design.md` and `tasks.md` only, following the artifact boundaries from `openspec-review`.
 - Treat `context` and `rules` returned by `pnpm exec openspec instructions ... --json` as constraints. Do not paste them verbatim into artifacts.
-- Use `openspec-change-review` for semantic review. Do not add local semantic categories, expected file-count heuristics, or consumer-specific interpretations.
+- Use `openspec-review` for semantic review. Do not add local semantic categories, expected file-count heuristics, or consumer-specific interpretations.
 - Write all OpenSpec artifact prose in Japanese. Keep schema-required labels and terms such as `Requirement`, `SHALL`, `MUST`, Scenario IDs, code identifiers, paths, commands, API names, and protocol terms when required for correctness.
-- Apply the artifact-specific meaning boundaries from `openspec-change-review`; never reject an artifact merely because it uses a word associated with removal, replacement, migration, switching, non-adoption, or negation.
-- `intent.md` may classify candidate means, record rejected interpretations, and preserve falsification evidence. These records are not product requirements.
-- `proposal.md` may describe additions, removal, replacement, and breaking impact needed to explain the Change.
-- `specs/**/*.md` has the strictest boundary: write only behavior visible to customers, users, or external contracts. Never include implementation components, internal structures, file names, class names, function names, or library names.
-- Specs describe enduring observable end-state behavior and lasting safety or contract boundaries. Do not turn the absence of an old implementation or rejected candidate into a product requirement.
-- `design.md` may concretely describe deletion, replacement, migration, rollback, and file movement.
-- `tasks.md` may explicitly use operations such as `Delete` and `Move` when they are required to reach the approved end state.
-- Tests verify the new behavior and enduring boundaries, not merely the absence of historical implementation details.
 
 ## Workflow
 
@@ -118,14 +110,15 @@ The caller provides one or more of:
 - From status, select the first artifact with `status: "ready"`; never select a downstream artifact before the confirmed intent gate passes.
 - Get instructions with `pnpm exec openspec instructions <artifact-id> --change "<change-id>" --json`.
 - Read completed dependency artifacts, then create or update the artifact from the returned template and resolved output path.
+- Before writing each Requirement or Scenario, apply the purpose/means review procedure from `openspec-review`.
 - Immediately after proposal and before Specs, determine whether the change has a user-visible UI. For UI changes, call `openspec/designer` with the confirmed intent, proposal, known target routes or UI source paths, and known overlapping active Change wireframes. Record its JSON source, generated preview, screenshot paths, surface classification, implemented UI references, and overlapping wireframe references. For non-UI changes, continue without wireframe artifacts.
 - Continue in artifact dependency order until all required artifacts are complete.
 
 ### 5. Obtain specialist technical design when required
 
 - Before finalizing detailed design or implementation-ready tasks, ensure finalized Specs preserve the approved wireframe surface when one exists and obey the Spec content boundary.
-- Call only the architects for materially affected domains. Provide confirmed intent, proposal, finalized Specs, applicable wireframe sources and evidence paths, designer-reported surface classifications and continuity references, repository constraints, affected capabilities, and the exact technical decisions required.
-- Keep each request within the architect's declared ownership. Do not route repository tooling, CI, release automation, or OpenCode-only design to a Management Client or Agent Service architect merely to gain an external research path.
+- Call only the architects for materially affected domains with assignment `DESIGN_PROPOSAL`. Provide confirmed intent, proposal, finalized Specs, applicable wireframe sources and evidence paths, designer-reported surface classifications and continuity references, repository constraints, affected capabilities, and the exact technical decisions required.
+- Keep each request within the architect's declared ownership. Do not route repository tooling, CI, release automation, or OpenCode-only design to a Client or Agent architect merely to gain an external research path.
 - Require each architect to read finalized Specs first and design against them without redefining Requirements or Scenarios.
 - For mixed Management Client and Agent Service changes with independent design questions, call both architects in parallel. Reconcile their outputs into one cross-domain contract and dependency order.
 - Require detailed implementation design, task implications, risks, dependency and ask-first implications, and verification expectations. The architects must not implement or edit artifacts.
@@ -154,12 +147,14 @@ The caller provides one or more of:
 - Run `pnpm exec openspec validate --type change "<change-id>" --strict --no-interactive` until it passes.
 - Run `pnpm lint:openspec` and resolve deterministic validation failures before analyzer review.
 - Run `pnpm exec openspec instructions apply --change "<change-id>" --json` and read every returned `contextFiles` path.
-- Review the complete Change with `openspec-change-review` and resolve each `CHANGES_REQUIRED` finding or obtain each `DECISION_REQUIRED` decision before independent review.
+- Review the complete Change with `openspec-review` and resolve each `CHANGES_REQUIRED` finding or obtain each `DECISION_REQUIRED` decision before independent review.
 - Do not send format failures to Analyzer. Correct them here and do not call Analyzer until deterministic validation passes.
 
 ### 8. Integrate analyzer review
 
-- Call `openspec/analyzer` and require review against the same `openspec-change-review` contract.
+- Call `openspec/analyzer` with the `planningHome`, `changeRoot`, artifact paths,
+  and store command context returned by the current status and instructions
+  commands, and require review against the same `openspec-review` contract.
 - Accept findings only when they use `CONTRADICTION`, `OVERREQUIREMENT`, `MISINTERPRETATION`, or `MATERIAL_OMISSION` and include the required evidence, intent impact, material consequence, and required outcome.
 - Apply evidence-backed corrections, repeat deterministic validation and semantic self-review, then request Analyzer review again.
 - Treat Analyzer `APPROVED` as the only completed Change review result. Do not hand the Change to Applier with `CHANGES_REQUIRED`, `DECISION_REQUIRED`, or `FAILED`.
