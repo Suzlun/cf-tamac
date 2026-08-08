@@ -5,7 +5,7 @@ agent: openspec/applier
 
 Implement tasks from an OpenSpec change.
 
-Load `openspec-apply-change` and follow it as the execution contract. Do not load a semantic review workflow or perform a second semantic review.
+Load `openspec-apply-change` and follow it as the execution contract. Do not load or perform a semantic review workflow.
 
 When UI is in scope, treat `.wireframe.json` as the visible-surface source and the matching `.wireframe.html` and screenshot as `openspec/designer` rendering evidence. Never edit or recapture the evidence during apply. Resolve only self-evident implementation details that preserve existing actions, information structure, and copy. Return `BLOCKED` instead of redesigning the surface when artifacts conflict or a non-self-evident visible change is necessary.
 
@@ -62,11 +62,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
 
    If a required artifact is missing or a `contextFiles` path is unreadable, return `BLOCKED` with exact path evidence. Do not delegate planning-artifact creation or repair.
 
-5. **Verify approval handoff**
-
-   Require a current `APPROVED` result from `openspec/proposer` or `openspec/analyzer` for this Change and current artifact contents. If approval evidence is absent, stale, or for another Change, return `ANALYZER_REVIEW_REQUIRED` through the caller. Do not review the Change yourself.
-
-6. **Show current progress**
+5. **Show current progress**
 
    Display:
    - Schema being used
@@ -74,7 +70,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
    - Remaining tasks overview
    - Dynamic instruction from CLI
 
-7. **Delegate tasks (loop until done or blocked)**
+6. **Delegate tasks (loop until done or blocked)**
 
    At each iteration:
    - Determine task ownership and split work only when needed for safe execution
@@ -92,9 +88,9 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
    - Error or blocker encountered → report evidence
    - User interrupts
 
-   Continue independent approved tasks that cannot be affected by a stopped task or unresolved decision. Do not report the Change complete while blocked work remains.
+   Continue independent tasks that cannot be affected by a stopped task or unresolved decision. Do not report the Change complete while blocked work remains.
 
-8. **Run final review and show status**
+7. **Run final review and show status**
 
    When the CLI reports `all_done`, request final review from `unit/build/reviewer`. Route correctable implementation findings back to the responsible implementer and repeat affected unit review. Report archive-ready only after final approval.
 
@@ -159,7 +155,6 @@ What would you like to do?
 
 - Keep going through tasks until done or blocked
 - Always read context files before starting (from the apply instructions output)
-- Require current approval evidence; otherwise request Analyzer review without self-review
 - Do not load a semantic review workflow
 - Compute task ownership, splitting, dependencies, conflicts, and parallel groups at execution time
 - Continue unaffected independent tasks when one task is stopped

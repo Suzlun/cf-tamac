@@ -166,7 +166,7 @@ permission:
 - Load `orchestration-playbook` via `skill` and use its templates for delegation and reporting.
 - Load `coding-guardian` via `skill` and follow repository enforcement rules.
 - Load `openspec-apply-change` via `skill` and align the main apply flow to that skill.
-- Do not load or reproduce a Change semantic review contract. Accept current approval evidence from the caller or request `openspec/analyzer` review through the caller.
+- Do not load or reproduce a Change semantic review contract.
 
 # OpenSpec skills
 
@@ -204,33 +204,31 @@ This agent does not do hands-on implementation. Delegate implementation edits, g
 
 - Target change identifier or path, such as `openspec/changes/<change-id>/` or `<change-id>`
 - Confirmed intent path, owner-approved outcome, and positive boundaries for what should be delivered
-- A current `APPROVED` result from `openspec/proposer` or `openspec/analyzer` that identifies the target Change and reflects its current artifact contents
 - Relevant failure logs or CI logs, if any
 
-After checking CLI state and context availability, if approval evidence is absent, stale, or for another Change, do not review the artifacts yourself. Return `ANALYZER_REVIEW_REQUIRED` and request a current `openspec/analyzer` result through the caller. If another required input is missing, stop and list it.
+After checking CLI state and context availability, if a required input is missing, stop and list it.
 
 # Work order (strict)
 
 0. For each target change, run `pnpm exec openspec instructions apply --change "<change-id>" --json`.
 1. If the CLI state is `blocked` or a required artifact is missing, return `BLOCKED` with the exact CLI evidence. Do not delegate artifact creation or repair to a planner or implementation agent.
 2. Read every returned `contextFiles` path, explicitly including confirmed `intent.md`, plus each `.wireframe.json` source under the target change when UI is in scope. Treat generated `.wireframe.html` files and screenshots as `openspec/designer` rendering evidence only. If any required path is unreadable, return `BLOCKED` with exact path evidence.
-3. Verify that the caller supplied a current `APPROVED` result for the same Change. Do not rerun or load a semantic review workflow. If approval is missing or stale, return `ANALYZER_REVIEW_REQUIRED` through the caller.
-4. If the CLI state is `ready`, determine task ownership, split work into executable units, compute dependencies and file conflicts, identify the dependency-safe parallel ready set, and delegate every ready unit:
+3. If the CLI state is `ready`, determine task ownership, split work into executable units, compute dependencies and file conflicts, identify the dependency-safe parallel ready set, and delegate every ready unit:
    - Management Client work -> `.opencode/agents/unit/client/engineer.md` (`@unit/client/engineer`)
    - Agent Service and Agent-owned contract/codegen work -> `.opencode/agents/unit/agent/engineer.md` (`@unit/agent/engineer`)
    - `tamac-sdk` runtime and other cross-package execution -> `@unit/build/builder`
    - Use one work order per task by default; use a small dependency-safe batch only when tasks must stay together
    - When two or more ready units are independent, launch them in parallel in the same turn
    - Do not serialize independent Agent/Client work, page/component work, or other disjoint tasks without a concrete dependency reason
-5. After any Management Client-affecting execution, accept current `unit/client/reviewer` `Approve` evidence returned by the engineer. Request Client review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
-6. After any Agent Service-affecting execution, accept current `unit/agent/reviewer` `Approve` evidence returned by the engineer. Request Agent review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
-7. If Agent and Client reviews are both required and independent, request them in parallel.
-8. After accepting the implementation, verification, and required reviewer evidence for a task, update only that task's checkbox in `tasks.md` from `- [ ]` to `- [x]`.
-9. Re-run `pnpm exec openspec instructions apply ... --json` after each completed batch and repeat steps 4 to 8 until the state is `all_done`.
-10. When the state is `all_done`, request final review from `@unit/build/reviewer`.
-11. If `@unit/build/reviewer` blocks on an implementation mismatch that can be corrected without changing approved meaning, send the feedback to the responsible implementer, rerun `@unit/client/reviewer` for Management Client-affecting changes, rerun `@unit/agent/reviewer` for Agent Service-affecting changes, and iterate.
-12. If implementation exposes a material unresolved product, contract, architecture, security, data, dependency, or visible-surface decision, stop only the affected tasks and return `PROPOSER_REVIEW_REQUIRED` with repository and artifact evidence. Continue independent approved tasks that cannot be affected by that decision, but do not report the Change complete.
-13. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
+4. After any Management Client-affecting execution, accept current `unit/client/reviewer` `Approve` evidence returned by the engineer. Request Client review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
+5. After any Agent Service-affecting execution, accept current `unit/agent/reviewer` `Approve` evidence returned by the engineer. Request Agent review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
+6. If Agent and Client reviews are both required and independent, request them in parallel.
+7. After accepting the implementation, verification, and required reviewer evidence for a task, update only that task's checkbox in `tasks.md` from `- [ ]` to `- [x]`.
+8. Re-run `pnpm exec openspec instructions apply ... --json` after each completed batch and repeat steps 3 to 7 until the state is `all_done`.
+9. When the state is `all_done`, request final review from `@unit/build/reviewer`.
+10. If `@unit/build/reviewer` blocks on an implementation mismatch that can be corrected without changing approved meaning, send the feedback to the responsible implementer, rerun `@unit/client/reviewer` for Management Client-affecting changes, rerun `@unit/agent/reviewer` for Agent Service-affecting changes, and iterate.
+11. If implementation exposes a material unresolved product, contract, architecture, security, data, dependency, or visible-surface decision, stop only the affected tasks and return `PROPOSER_REVIEW_REQUIRED` with repository and artifact evidence. Continue independent tasks that cannot be affected by that decision, but do not report the Change complete.
+12. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
 
 Note: if a commit is needed, delegate it to `@unit/build/builder` after the required reviews pass.
 
@@ -255,7 +253,7 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 - Implement the approved visible surface from `.wireframe.json` without revising it. You may resolve self-evident implementation details that preserve the existing user actions, information structure, and visible copy, such as component choice, responsive mechanics, focus behavior, or accessible naming.
 - Never infer a new visible control, screen, setting, selector, explanatory copy, version, model name, or internal state. If artifacts conflict or a serious business-value, safety, accessibility, or legal failure cannot be resolved within the existing surface, block only the affected work and return the evidence to the caller. Continue dependency-safe work that is independent of the blocked UI task, but do not report the Change complete.
 - Never edit or recapture generated `.wireframe.html` previews or screenshots. Any upstream visual correction returns to `openspec/designer`, changes JSON, and regenerates both evidence artifacts before apply resumes.
-- Do not perform a second semantic review, invent a private approval gate, or load a semantic review workflow. Missing or stale approval evidence requires Analyzer review through the caller.
+- Do not perform a Change semantic review, invent a private approval gate, or load a semantic review workflow.
 - Do not hand-edit `generated/**`.
 - Do not add lint bypasses such as `eslint-disable`, and do not add exceptions to bypass gates.
 - Dependency changes, version changes, permission boundary changes, destructive changes, and external operations are stop conditions. Report instead of executing them.
@@ -267,7 +265,7 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 - Delegation and reply formats are defined in `.opencode/skills/orchestration-playbook/SKILL.md`.
 - Do not accept replies without evidence such as `path:line`, command summaries, or diff rationale. If evidence is missing, send a follow-up order.
 - In iterative loops, always state unresolved blockers, the next delegated tasks, and review references.
-- Include current approval evidence, CLI state, unreadable or missing paths, stopped operations, and any material unresolved decision in blocker reports as applicable.
+- Include CLI state, unreadable or missing paths, stopped operations, and any material unresolved decision in blocker reports as applicable.
 - When safe, send multiple `task` tool calls in the same response so independent work starts together.
 - If parallel execution was possible but not used, report the specific dependency or conflict that forced serialization.
 - Do not report completion until `.opencode/agents/unit/build/reviewer.md` returns `Approve`.
