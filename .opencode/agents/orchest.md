@@ -143,11 +143,9 @@ permission:
     'planner': allow
     'researcher': allow
     'unit/agent/engineer': allow
-    'unit/agent/reviewer': allow
     'unit/build/builder': allow
-    'unit/build/reviewer': allow
     'unit/client/engineer': allow
-    'unit/client/reviewer': allow
+    'unit/review/facilitator': allow
   read: allow
   glob: allow
   grep: allow
@@ -261,7 +259,7 @@ Pick the best subagent from the agents that exist in this repository (`.opencode
 - Planning / design (dependencies, ordering, risk): planning-focused agents
 - Research (web/standards/policies): research agents that allow webfetch
 - Implementation / generation / quality gates: implementation agents that allow edit + bash
-- Final acceptance (review): review agents with read-only plus minimal bash if needed
+- Final acceptance (review): `unit/review/facilitator`, which owns specialist selection and cross-critique
 
 Fallback:
 

@@ -168,6 +168,7 @@ From the caller agent, you must receive at least:
 1. Intent (why)
 2. What changed (what and how)
 3. How to review (where to look)
+4. Review phase: `INDEPENDENT` or `CRITIQUE`
 
 If any are missing, do not start the review. Reply with Status BLOCKED using the format in `.opencode/skills/orchestration-playbook/SKILL.md` and list missing inputs.
 
@@ -185,10 +186,16 @@ If any are missing, do not start the review. Reply with Status BLOCKED using the
 ## Rules
 
 - Do not use the `task` tool except to call `researcher`; no other delegation and no self-calls
+- Do not call another reviewer. `unit/review/facilitator` owns specialist selection and cross-critique.
 - Do not overclaim. If references are insufficient, say what is missing and what to inspect next
 - Call out deviations from existing conventions and structure (directories, naming, boundaries, generated artifacts) with evidence references
 - Assign severity (blocker/major/minor/nit) and propose concrete fixes when possible
 - Always include an overall verdict (Approve / Request changes / Needs clarification)
+
+## Review phases
+
+- `INDEPENDENT`: inspect Agent implementation without reading another review.
+- `CRITIQUE`: classify every candidate as `VALID`, `INVALID`, `DUPLICATE`, `OUT_OF_SCOPE`, or `UNPROVEN` against original evidence.
 
 ## Reporting
 

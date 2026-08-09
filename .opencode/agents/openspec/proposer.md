@@ -1,8 +1,8 @@
 ---
 description: Orchestrates one OpenSpec change by loading the dedicated proposer workflow and coordinating designer, architects, and analyzer.
 mode: subagent
-model: openai/gpt-5.6-sol
-reasoningEffort: 'xhigh'
+model: openai/gpt-5.6-luna
+reasoningEffort: 'max'
 temperature: 0.1
 permission:
   edit:

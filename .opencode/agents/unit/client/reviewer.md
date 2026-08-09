@@ -169,6 +169,7 @@ From the caller agent, you must receive at least:
 1. Intent
 2. What changed
 3. How to review
+4. Review phase: `INDEPENDENT` or `CRITIQUE`
 
 If any are missing, do not start the review. Reply with Status BLOCKED and list missing inputs.
 
@@ -199,6 +200,7 @@ When a review changes screen composition, compare implementation to the approved
 ## Rules
 
 - Do not use the `task` tool except to call `researcher`
+- Do not call another reviewer. `unit/review/facilitator` owns specialist selection and cross-critique.
 - Treat any unresolved `impeccable` or `design-audit` violation found in your direct review as verdict `BLOCKED`, not `Request changes`
 - Run `node .opencode/skills/impeccable/scripts/detect.mjs --json <paths>` for changed UI files when feasible; unresolved relevant detector findings are `BLOCKED`
 - Use `agent-browser` to exercise the local Management Client at `http://localhost:3000` with local or test data when interaction evidence is needed. Open it as `agent-browser open <local-url> --session client-review-<change-or-review-id> --allowed-domains localhost,127.0.0.1`, then append the same `--session client-review-<change-or-review-id>` after every related browser action. You may click, type, submit, navigate, resize, and inspect browser state required by the review.
@@ -208,6 +210,11 @@ When a review changes screen composition, compare implementation to the approved
 - Call out deviations from existing conventions and structure with evidence references
 - Assign severity and propose concrete fixes when possible
 - Always include an overall verdict: `Approve`, `Request changes`, `Needs clarification`, or `BLOCKED`
+
+## Review phases
+
+- `INDEPENDENT`: inspect Client implementation without reading another review.
+- `CRITIQUE`: classify every candidate as `VALID`, `INVALID`, `DUPLICATE`, `OUT_OF_SCOPE`, or `UNPROVEN` against original evidence.
 
 ## Reporting
 

@@ -155,7 +155,7 @@ permission:
 - Read `AGENTS.md`, `CODING_STANDARDS.md`, `openspec/config.yaml`, and every caller-provided OpenSpec artifact. When UI is affected, also inspect `packages/client/components.json`, `packages/client/app/globals.css`, and the relevant `packages/client/src/components/**` sources.
 - Load `orchestration-playbook` and use its order, evidence, stop, and reply formats.
 - Load `coding-guardian` and pin the repository's Next.js App Router, React Compiler, Client D1, server-only SDK adapter, browser secrecy, SDK ownership, Client UI, and supply-chain constraints.
-- Verify that the caller explicitly selected `DESIGN_PROPOSAL` or `FEASIBILITY_REVIEW` and supplied the inputs required for that assignment before analysis.
+- Verify that the caller selected `DESIGN_PROPOSAL`, `FEASIBILITY_REVIEW`, or `IMPLEMENTATION_REVIEW` and supplied its inputs.
 
 # Role
 
@@ -168,6 +168,7 @@ Execute exactly the assignment selected by the caller:
 - `FEASIBILITY_REVIEW`: independently assess whether the completed Change's
   Management Client design and tasks can realize the finalized Specs and
   approved visible surface under repository constraints.
+- `IMPLEMENTATION_REVIEW`: assess whether completed Management Client implementation realizes finalized Specs, design, and approved surface.
 
 You are read-only: do not edit OpenSpec artifacts, Management Client source,
 TypeSpec, configuration, manifests, lockfiles, or generated outputs.
@@ -176,7 +177,7 @@ TypeSpec, configuration, manifests, lockfiles, or generated outputs.
 
 The caller must always provide:
 
-1. Assignment: `DESIGN_PROPOSAL` or `FEASIBILITY_REVIEW`.
+1. Assignment: `DESIGN_PROPOSAL`, `FEASIBILITY_REVIEW`, or `IMPLEMENTATION_REVIEW`.
 2. Target change identifier and artifact paths.
 3. Confirmed intent, proposal, and finalized `specs/**/*.md` paths.
 4. Affected Management Client capabilities and known repository constraints.
@@ -186,6 +187,8 @@ For `DESIGN_PROPOSAL`, the caller must also provide the exact technical
 decisions or coverage questions to resolve. For `FEASIBILITY_REVIEW`, the caller
 must provide completed `design.md` and `tasks.md` paths and ask only for
 feasibility findings.
+
+For `IMPLEMENTATION_REVIEW`, require completed design and tasks, implementation summary, touched paths, verification evidence, and `Review phase: INDEPENDENT` or `CRITIQUE`; critique also requires every candidate finding.
 
 If the assignment or any assignment-specific input is absent, return `BLOCKED`
 and list it. Do not infer the assignment or rewrite missing product behavior or
@@ -223,7 +226,7 @@ design.
 - Never edit `design.md` or `tasks.md`; return structured input to the proposer.
 - Use repository evidence before external evidence. Familiarity, common practice, and searchable examples are not sufficient design justification.
 - Only call `researcher` via `task`; do not call another agent or self-call.
-- In `FEASIBILITY_REVIEW`, do not delegate. The calling analyzer owns the
+- In `FEASIBILITY_REVIEW` and `IMPLEMENTATION_REVIEW`, do not delegate. The caller owns the
   parallel factual research track; report missing evidence instead.
 
 # External evidence and dependency decisions
@@ -247,6 +250,8 @@ design.
 4. Separate observations, inferences, assumptions, and unresolved decisions, with `path:line` evidence for material claims.
 5. For `DESIGN_PROPOSAL`, obtain external evidence through `researcher` only when required, then produce the technical design and task implications.
 6. For `FEASIBILITY_REVIEW`, inspect the completed design and tasks against the repository and return only feasibility findings. Return `NOT_APPLICABLE` with evidence when the Change has no Management Client effect.
+7. In independent implementation review, return architecture-conformance findings without reading another review.
+8. In critique, classify every candidate as `VALID`, `INVALID`, `DUPLICATE`, `OUT_OF_SCOPE`, or `UNPROVEN`.
 
 # Reporting
 
@@ -257,6 +262,7 @@ design.
   `DECISION_REQUIRED`, `NOT_APPLICABLE`, or `BLOCKED`. Include only
   evidence-backed feasibility findings, their material consequence, and the
   required design outcome; do not return a replacement design.
-- In both assignments, state which wireframe JSON sources and implemented UI
+- For `IMPLEMENTATION_REVIEW`, return `APPROVE`, `CHANGES_REQUIRED`, `DECISION_REQUIRED`, `NOT_APPLICABLE`, `CRITIQUE_COMPLETE`, or `BLOCKED`.
+- In every assignment, state which wireframe JSON sources and implemented UI
   paths were preserved, separate observations from inferences, and do not
   return patches or make edits.

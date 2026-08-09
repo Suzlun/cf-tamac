@@ -79,6 +79,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
    - Progress: "N/M tasks complete"
    - Remaining tasks overview
    - Dynamic instruction from CLI
+   - A complete `## Agent Delegation Timeline` covering every current task, owner, dependency, conflict boundary, and planned verification before the first implementation delegation; reissue it whenever the plan changes and restore it after compaction if absent
 
 6. **Delegate tasks (loop until done or blocked)**
 
@@ -87,8 +88,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
    - Compute dependencies, shared-file or generated-artifact conflicts, and the dependency-safe parallel ready set
    - Delegate Management Client work to `unit/client/engineer`, Agent Service and Agent-owned contract/codegen work to `unit/agent/engineer`, and `tamac-sdk` or other cross-package work to `unit/build/builder`
    - Launch independent ready work in parallel and record the concrete dependency or conflict when serialization is required
-   - Accept current Management Client and Agent Service reviewer approval evidence, requesting the corresponding reviewer when evidence is missing, stale, or invalidated
-   - Mark a task complete in the tasks file only after accepting implementation, verification, and required reviewer evidence: `- [ ]` → `- [x]`
+   - Mark a task complete in the tasks file only after accepting implementation and verification evidence: `- [ ]` → `- [x]`
    - Re-read apply instructions after each accepted batch and continue until `all_done`
 
    **Pause if:**
@@ -102,7 +102,7 @@ When UI is in scope, treat `.wireframe.json` as the visible-surface source and t
 
 7. **Run final review and show status**
 
-   When apply instructions report `all_done`, request final review from `unit/build/reviewer`. Route correctable implementation findings to the responsible implementer and repeat affected unit review. Report archive-ready only after final approval.
+   When apply instructions report `all_done`, request final review from `unit/review/facilitator`. Route valid in-scope findings to the responsible implementer, rerun affected verification, and rerun the complete facilitator review until it returns `APPROVE`. Report archive-ready only after approval.
 
    Display:
    - Tasks completed this session
@@ -138,7 +138,7 @@ Working on task 4/7: <task description>
 - [x] Task 2
 ...
 
-Final build review approved. This change is archive-ready.
+Facilitator review approved. This change is archive-ready.
 ```
 
 **Output On Pause (Issue Encountered)**

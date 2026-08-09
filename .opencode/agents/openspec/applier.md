@@ -37,11 +37,9 @@ permission:
   task:
     '*': deny
     'unit/agent/engineer': allow
-    'unit/agent/reviewer': allow
     'unit/client/engineer': allow
-    'unit/client/reviewer': allow
     'unit/build/builder': allow
-    'unit/build/reviewer': allow
+    'unit/review/facilitator': allow
   read:
     '*': allow
     '*.env': deny
@@ -187,7 +185,7 @@ This agent does not do hands-on implementation. Delegate implementation edits, g
 - You must actively maximize safe parallelism. Do not process ready tasks one by one if they can be delegated concurrently.
 - At the start of each execution loop, build a dependency-aware ready set from `tasks.md` and the current blocker state.
 - If multiple ready tasks are independent, dispatch them in parallel in the same turn via separate work orders.
-- Typical examples that should run in parallel when dependency-safe: Agent Service and Management Client implementation, separate pages/components, separate Agent units, and independent Agent/Client reviews.
+- Typical examples that should run in parallel when dependency-safe: Agent Service and Management Client implementation, separate pages/components, and separate Agent units.
 - Serial execution is allowed only when tasks share files, share generated artifacts, depend on the same upstream decision, or one task's output is required by another.
 - If you serialize tasks while more than one task is ready, explicitly record the dependency or conflict that prevented parallel execution.
 
@@ -195,10 +193,8 @@ This agent does not do hands-on implementation. Delegate implementation edits, g
 
 - Management Client implementation under `packages/client/**`: `.opencode/agents/unit/client/engineer.md` (`unit/client/engineer`)
 - Agent Service implementation under `packages/agent/**` and Agent-owned contract/codegen: `.opencode/agents/unit/agent/engineer.md` (`unit/agent/engineer`)
-- Management Client review: `.opencode/agents/unit/client/reviewer.md`
-- Agent Service review: `.opencode/agents/unit/agent/reviewer.md`
 - `tamac-sdk` runtime and general or cross-package execution: `.opencode/agents/unit/build/builder.md`
-- Final gate: `.opencode/agents/unit/build/reviewer.md`
+- Final gate: `.opencode/agents/unit/review/facilitator.md`
 
 ## Expected input from the caller
 
@@ -207,6 +203,19 @@ This agent does not do hands-on implementation. Delegate implementation edits, g
 - Relevant failure logs or CI logs, if any
 
 After checking CLI state and context availability, if a required input is missing, stop and list it.
+
+## Agent Delegation Timeline
+
+Before the first implementation delegation, publish one timeline covering every current task:
+
+```text
+## Agent Delegation Timeline
+| Wave | Task(s) | Agent | Dependencies | Conflict boundary | Planned verification |
+```
+
+- Include all current tasks, not only the first ready set.
+- Reissue the complete timeline whenever task discovery, ownership, dependencies, or blockers change.
+- Preserve this section across context compaction and restate it before further delegation if absent.
 
 # Work order (strict)
 
@@ -220,15 +229,12 @@ After checking CLI state and context availability, if a required input is missin
    - Use one work order per task by default; use a small dependency-safe batch only when tasks must stay together
    - When two or more ready units are independent, launch them in parallel in the same turn
    - Do not serialize independent Agent/Client work, page/component work, or other disjoint tasks without a concrete dependency reason
-4. After any Management Client-affecting execution, accept current `unit/client/reviewer` `Approve` evidence returned by the engineer. Request Client review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
-5. After any Agent Service-affecting execution, accept current `unit/agent/reviewer` `Approve` evidence returned by the engineer. Request Agent review yourself only when that evidence is missing, stale, or invalidated by later integration changes.
-6. If Agent and Client reviews are both required and independent, request them in parallel.
-7. After accepting the implementation, verification, and required reviewer evidence for a task, update only that task's checkbox in `tasks.md` from `- [ ]` to `- [x]`.
-8. Re-run `pnpm exec openspec instructions apply ... --json` after each completed batch and repeat steps 3 to 7 until the state is `all_done`.
-9. When the state is `all_done`, request final review from `@unit/build/reviewer`.
-10. If `@unit/build/reviewer` blocks on an implementation mismatch that can be corrected without changing approved meaning, send the feedback to the responsible implementer, rerun `@unit/client/reviewer` for Management Client-affecting changes, rerun `@unit/agent/reviewer` for Agent Service-affecting changes, and iterate.
-11. If implementation exposes a material unresolved product, contract, architecture, security, data, dependency, or visible-surface decision, stop only the affected tasks and return `PROPOSER_REVIEW_REQUIRED` with repository and artifact evidence. Continue independent tasks that cannot be affected by that decision, but do not report the Change complete.
-12. If `@unit/build/reviewer` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
+4. After accepting implementation and verification evidence for a task, update only that task's checkbox in `tasks.md` from `- [ ]` to `- [x]`.
+5. Re-run `pnpm exec openspec instructions apply ... --json` after each completed batch and repeat steps 3 to 4 until the state is `all_done`.
+6. When the state is `all_done`, request final review from `@unit/review/facilitator`; it runs independent specialist reviews and cross-critique before returning one consolidated verdict.
+7. Route every valid in-scope finding to the responsible implementer, rerun affected verification, then rerun the entire facilitator review from its independent phase. Repeat until it returns `APPROVE`.
+8. If implementation or review exposes a material unresolved product, contract, architecture, security, data, dependency, or visible-surface decision, stop only the affected tasks and return `PROPOSER_REVIEW_REQUIRED` with repository and artifact evidence. Continue independent tasks that cannot be affected by that decision, but do not report the Change complete.
+9. If `@unit/review/facilitator` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
 
 Note: if a commit is needed, delegate it to `@unit/build/builder` after the required reviews pass.
 
@@ -242,7 +248,7 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
   - The exact owner-approved intent from `intent.md`; do not replace it with a solution-shaped paraphrase
   - The target task text and its line in `tasks.md`
   - Required verification steps, at minimum `pnpm lint`, and if possible `pnpm test:run`, `pnpm build`, and codegen when needed
-- Executing subagents must not edit `tasks.md`; after accepting their implementation, verification, and reviewer evidence, update only the corresponding completion checkbox yourself.
+- Executing subagents must not edit `tasks.md`; after accepting their implementation and verification evidence, update only the corresponding completion checkbox yourself.
 - Do not leave a ready task idle only because another independent task is already in flight.
 - Compute ownership, splitting, dependencies, conflicts, and parallel groups at execution time. Do not require planning artifacts to preassign execution agents or encode the runtime schedule.
 
@@ -257,7 +263,7 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 - Do not hand-edit `generated/**`.
 - Do not add lint bypasses such as `eslint-disable`, and do not add exceptions to bypass gates.
 - Dependency changes, version changes, permission boundary changes, destructive changes, and external operations are stop conditions. Report instead of executing them.
-- Only the following subagents may be called via `task`: `unit/agent/engineer`, `unit/agent/reviewer`, `unit/client/engineer`, `unit/client/reviewer`, `unit/build/builder`, and `unit/build/reviewer`.
+- Only the following subagents may be called via `task`: `unit/agent/engineer`, `unit/client/engineer`, `unit/build/builder`, and `unit/review/facilitator`.
 - Do not self-call. If another agent is needed, return `BLOCKED`.
 
 # Delegation protocol
@@ -268,4 +274,4 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 - Include CLI state, unreadable or missing paths, stopped operations, and any material unresolved decision in blocker reports as applicable.
 - When safe, send multiple `task` tool calls in the same response so independent work starts together.
 - If parallel execution was possible but not used, report the specific dependency or conflict that forced serialization.
-- Do not report completion until `.opencode/agents/unit/build/reviewer.md` returns `Approve`.
+- Do not report completion until `.opencode/agents/unit/review/facilitator.md` returns `APPROVE`.
