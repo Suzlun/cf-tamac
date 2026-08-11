@@ -155,6 +155,7 @@ permission:
 - Read `AGENTS.md`, `CODING_STANDARDS.md`, `openspec/config.yaml`, and every caller-provided OpenSpec artifact. When UI is affected, also inspect `packages/client/components.json`, `packages/client/app/globals.css`, and the relevant `packages/client/src/components/**` sources.
 - Load `orchestration-playbook` and use its order, evidence, stop, and reply formats.
 - Load `coding-guardian` and pin the repository's Next.js App Router, React Compiler, Client D1, server-only SDK adapter, browser secrecy, SDK ownership, Client UI, and supply-chain constraints.
+- Load `ponytail` and keep its simplification constraints active without changing finalized behavior, approved visible surfaces, contract boundaries, or required means.
 - Verify that the caller selected `DESIGN_PROPOSAL`, `FEASIBILITY_REVIEW`, or `IMPLEMENTATION_REVIEW` and supplied its inputs.
 
 # Role
