@@ -138,34 +138,121 @@ Developer guidance は、TypeSpec-to-proto を Agent API contract path として
 - **THEN** Agent Worker、Client Worker、TypeSpec-to-proto generation、Protobuf-ES generation、OpenSpec scenario coverage commands が文書化されている
 - **AND** `hello` と `users` demonstration API routes は supported product APIs として文書化されていない
 
-### Requirement: Deploy Button artifact generation
+### Requirement: Repository production delivery
 
-Workspace governance は、Agent Service と Management Client を Cloudflare Deploy Button から個別に導入できる self-contained artifact branch を生成 MUST。
+Workspace governance は、fork repository の Agent Service と Management Client を独立した security boundary で production 配信し、canonical package publication を検証できる repository contract を提供 MUST。
 
 **Customer Context**
 
-利用者は repository clone、local package install、local Wrangler 操作なしで、Cloudflare Dashboard から Agent Worker と Management Client Worker を順番に導入したい。artifact branch に monorepo 前提や秘密鍵手貼り運用が残ると、導入時の失敗と credential exposure risk が増える。
+fork 利用者は、自分の Cloudflare account、GitHub Environments、service configuration を所有しながら、Agent Service と Management Client を個別に構築・配信したい。Maintainer は package consumer と production configuration を repository-local evidence で検証し、delivery authorityを一意に把握したい。
 
 **Requirement**
 
-Root workspace scripts は `deploy-agent` branch root 用 Agent Worker artifact と `deploy-client` branch root 用 Management Client Worker artifact を生成 SHALL。
+Repository production delivery は Agent Service に `agent-production`、Management Client に `client-production` GitHub Environment を使用 SHALL。
 
-Deploy artifact は runtime source、generated RPC descriptors、Worker config、binding descriptions、`.dev.vars.example`、artifact README を含む SHALL。
+各 service は独立した`workflow_dispatch` entrypoint、検証済み`main` revision trigger、Environment preflight、service-owned production configuration、build compatibility check、fixed concurrency identity、production delivery command contractを提供 SHALL。
 
-Deploy artifact は package tests、TypeSpec source、monorepo parent `tsconfig` dependency を含めて MUST NOT。
+Workspace validation は service workflow の trigger、Environment、enablement、required configuration、permissions、failure boundary、concurrencyを repository-local fixture で検査 SHALL。
 
-Deploy artifact generation は `AGENT_CONTROL_PLANE_TRUST` の public-only 運用、Client encrypted signing key store、Cloudflare Access post-install checklist、Agent health RPC verification を文書化 SHALL。
+Workspace validation は `cf-tamac` と `tamac-sdk` の同一version package artifactsを作成し、isolated Agent Worker consumerとserver-side SDK consumerでESM/type/generated RPC closureを検査 SHALL。
 
-Deploy artifact generation は production/staging の Cloudflare Rate Limiting namespace ID を明示入力として受け取り、各値が正整数で相互に異なることを検証 SHALL。生成された Agent Wrangler configuration へ入力値を注入し、repository source のfixture値をdeploy artifactへ直接コピー MUST NOT。
+Workspace validationはAgent ServiceとManagement Clientのservice-owned production configurationをnative configuration interfaceへ直接渡し、production topology、resource identity、Worker build compatibilityを検査 SHALL。
 
-#### Scenario: Deploy artifact generation creates self-contained Worker roots (WORKSPACE-GOVERNANCE-S014)
+Repository delivery authority は Agent production、Client production、canonical package publicationの三責務で構成 SHALL。Workspace validation は三責務のtrigger、Environment、permissions、concurrency、preflight、provenanceをexact inventoryとして検査 SHALL。
 
-- **GIVEN** repository source と generated Agent RPC descriptors が存在する
-- **WHEN** deploy artifact generation command を実行する
-- **THEN** Agent artifact root は Agent Worker source、`AI_AGENT` Durable Object binding、`AGENT_BLOBS` binding、`AGENT_CONTROL_PLANE_TRUST` example、local generated Agent RPC descriptors を含む
-- **AND** Client artifact root は Next.js App Router source、Client D1 migrations、`CLIENT_DB` binding、`AGENT_RPC_ALLOWED_ORIGINS` example、local generated Client Agent RPC descriptors を含む
-- **AND** Agent artifact root は、明示入力されたproduction/stagingの正整数かつ相互に異なるRate Limiting namespace IDを、source fixture値ではなくWrangler configurationへ含む
-- **AND** artifact roots は package tests、TypeSpec source、parent monorepo `tsconfig` dependency、Client private signing key Worker Secret example を含まない
+Repository documentation は fork Environment setup、service別manual/main gate、Client public trust handoff、package consumer、repository-local verification commandsを説明 SHALL。
+
+#### Scenario: Repository production delivery contractを検証する (WORKSPACE-GOVERNANCE-S014)
+
+- **GIVEN** repository production workflows、production configuration contracts、package build contractsが利用できる
+- **WHEN** workspace validationがdeliveryとpackage consumerのcontractを列挙する
+- **THEN** Agent ServiceとManagement Clientは別Environment、別trigger、別preflight、別concurrency、別service-owned production configurationを持つ独立したproduction gateとして検証される
+- **AND** package consumer validationは`cf-tamac`と`tamac-sdk`の同一version、ESM/type exports、generated RPC closureを検証する
+- **AND** delivery authority inventoryはAgent production、Client production、canonical package publicationの三責務と一致する
+
+#### Scenario: delivery workflow contractをstatic validationする (WORKSPACE-GOVERNANCE-S018)
+
+- **GIVEN** repositoryのproduction deliveryとpackage release workflow definitionsが利用できる
+- **WHEN** governance validationがtrigger、Environment、permissions、preflight、concurrency、provenance contractを列挙する
+- **THEN** Agent ServiceとManagement Clientはservice-owned production configurationをnative configuration inputとして直接使用する独立したproduction gateとして検証される
+- **AND** required configuration failureは対象serviceのCloudflare command eligibilityより前にsafe resultへ確定するcontractとして検証される
+- **AND** package releaseはcanonical upstream tag、OIDC identity、同一package versionのcontractとして検証される
+
+#### Scenario: package artifactsをisolated consumersで検証する (WORKSPACE-GOVERNANCE-S019)
+
+- **GIVEN** workspace sourceとcommand-owned generated RPC outputsが利用できる
+- **WHEN** package validationが一つのignored deterministic build rootで`cf-tamac`と`tamac-sdk`のartifactsを作成してisolated fixturesにinstallする
+- **THEN** Agent consumer fixtureは公開Worker handler、Durable Object class export、Worker構成API、admission contract typesをimportしてbundleと型検査を完了する
+- **AND** SDK consumer fixtureはserver-side SDK APIをimportしてmodule loadと型検査を完了する
+- **AND** 二packageのversion、ESM/type exports、generated RPC closureは一致するcontractとして検証される
+- **AND** validation reportはartifact rootのdeterministic identityとlifecycle completionを確認可能にする
+
+#### Scenario: service-owned production configurationをbuild検証する (WORKSPACE-GOVERNANCE-S020)
+
+- **GIVEN** Agent ServiceとManagement Clientのservice-owned production configurationが利用できる
+- **WHEN** workspace validationが各configurationをnative configuration inputとしてWorker build compatibility checkへ直接渡す
+- **THEN** 各serviceのentrypoint、compatibility settings、binding identity、resource reference、required variable contractが検証される
+- **AND** build compatibility outputはrepository-local evidenceとして完了する
+
+#### Scenario: delivery authorityが三責務へ閉じる (WORKSPACE-GOVERNANCE-S021)
+
+- **GIVEN** repository workflow definitionsとproduction configuration contractsが利用できる
+- **WHEN** workspace validationがdelivery authorityを列挙する
+- **THEN** authority inventoryはAgent production、Client production、canonical package publicationの三責務と一致する
+- **AND** 各責務は専用trigger、permission、failure boundaryへ関連付けられる
+
+### Requirement: 本番 credential operations governance
+
+Workspace governance は本番 credential operations の documentation と guardrail verification を提供 SHALL。
+
+**利用者文脈**
+
+開発者、reviewer、運用者は、Agent trust config、Client signing key、rotation、emergency revoke、break-glass recovery の手順を同じ境界理解で扱う必要がある。ドキュメントや guardrail が認証境界を検査しないと、ブラウザーへの signing material 露出、Agent trust config の誤設定、禁止された認証経路が見逃される。
+
+**要件**
+
+- Repository documentation は `AGENT_CONTROL_PLANE_TRUST` の schema、public-only key material、issuer/key status、allowed Agent、allowed scope、audience、fingerprint を説明 SHALL。
+- Repository documentation は `CLIENT_CREDENTIAL_ENCRYPTION_KEY`、Client D1 encrypted signing key store、server-only JWT signing、Browser 非露出の境界を説明 SHALL。
+- Repository documentation と coding guidance は Client D1 が保持できる Client-owned data を managed Agent records、外部 credential references、encrypted Client Service signing key store として説明 SHALL。
+- Repository documentation と coding guidance は Agent domain snapshots、plaintext secrets、private JWK plaintext が Client D1 に保存されないことを説明 SHALL。
+- Repository documentation は Management Client の Global Settings から Agent の有無に依存せず Ed25519 key pair を生成し、public trust config JSON を取得し、Agent Worker Variables and Secrets に設定する運用を説明 SHALL。
+- Repository documentation は key rotation、emergency revoke、`ADMIN_OPERATOR` break-glass recovery、Cloudflare Dashboard/API/Wrangler による Agent trust config 更新を説明 SHALL。
+- Workspace guardrails は Browser-visible modules、browser-delivered bundles、public Client routes が private JWK、encrypted private JWK、生 JWT、Client signing logic、Agent credential forwarding を含まないことを検査 SHALL。
+- Workspace guardrails は Agent public API が Protobuf RPC-only であり、Client Service production authentication が Ed25519 JWT と `AGENT_CONTROL_PLANE_TRUST` の検証に閉じることを検査 SHALL。
+- Workspace guardrails は Agent RPC Client Service auth path が HS256 signing、`resolveCredentialSecret`、`AGENT_CREDENTIAL_*` Worker Secret、Provider credential 参照、public Client Agent proxy route を使用しないことを検査 SHALL。
+- Workspace guardrails と Client D1 schema tests は encrypted Client Service signing key store を許可しつつ、Agent domain snapshots と plaintext signing material を拒否 SHALL。
+- Workspace smoke/UAT は Management Client の Global Settings signing key generation、public-only trust config export、Agent 作成、managed Agent signing key selection、Agent Worker trust setting、Agent Health Check、selected-Agent real data rendering、browser secrecy boundary を一続きの運用として検証 SHALL。
+- Workspace OpenSpec coverage checks は Agent security、Client registry、Client management、Agent health、Workspace governance の Scenario IDs が automated test title または manual tag と対応することを検査 SHALL。
+
+#### Scenario: ドキュメントが本番 credential runbook を公開する (WORKSPACE-GOVERNANCE-S010)
+
+- **GIVEN** repository documentation と package README を検査できる
+- **WHEN** Agent/Client 認証、trust config、key management、rotation、revoke、recovery sections を読む
+- **THEN** `AGENT_CONTROL_PLANE_TRUST`、`CLIENT_CREDENTIAL_ENCRYPTION_KEY`、Client signing key generation、public trust config export、Agent Worker secret 設定、rotation、emergency revoke、break-glass recovery が説明されている
+- **AND** private key plaintext をブラウザー、D1、logs、Worker vars に出さない境界が明記されている
+- **AND** Client D1 の許可データ集合として managed Agent records、外部 credential references、encrypted Client Service signing key store が説明されている
+
+#### Scenario: ガードレールが browser-visible signing material と禁止 Agent auth surface を拒否する (WORKSPACE-GOVERNANCE-S011)
+
+- **GIVEN** fixture または source graph が Browser-visible module、browser-delivered bundle、public Client route、Agent public route を検査対象として含む
+- **WHEN** workspace lint または governance tests が実行される
+- **THEN** private JWK、encrypted private JWK、生 JWT signing logic、Agent credential forwarding、Client private signing key Worker Secret 手貼りを必須にする経路は failure として報告される
+- **AND** HS256 Agent RPC signing、`resolveCredentialSecret` による Agent RPC signing source 解決、`AGENT_CREDENTIAL_*` Worker Secret を Agent RPC auth source とする経路は failure として報告される
+- **AND** Agent REST/JSON authentication route、bootstrap RPC、AgentTrustRegistry Durable Object、public Client Agent proxy route を production Client Service trust source とする経路は failure として報告される
+
+#### Scenario: シナリオ coverage が本番認証 spec を検証する (WORKSPACE-GOVERNANCE-S012)
+
+- **GIVEN** main specs または delta specs が Ed25519 JWT、Client signing key lifecycle、trust config export、health verification、operations governance の Scenario IDs を含む
+- **WHEN** workspace OpenSpec lint が実行される
+- **THEN** automated scenarios は bracketed Scenario ID notation を使う test title から参照される
+- **AND** 自動化できない operator walkthrough は `Tags: manual` を持つ
+
+#### Scenario: 運用 smoke が Management Client から Agent RPC 実データ表示までを検証する (WORKSPACE-GOVERNANCE-S013)
+
+- **GIVEN** Management Client、Client D1、Agent Worker、`CLIENT_CREDENTIAL_ENCRYPTION_KEY`、`AGENT_CONTROL_PLANE_TRUST` を設定できる staging または test environment がある
+- **WHEN** smoke/UAT が Global Settings で Ed25519 signing key を生成し、public-only trust config を export し、Agent を作成し、managed Agent に issuer/kid/fingerprint を選択し、Agent Worker に trust config を設定し、Agent Health Check を実行し、selected-Agent pages を開く
+- **THEN** Health Check は認証済み Check response として成功し、Overview、Threads、Events、Runs、Schedules、Integrations、Settings は server-only Agent RPC 由来の実データを表示する
+- **AND** browser payload、browser storage、browser bundle、public Client route は private JWK、encrypted private JWK、生 JWT、signing logic、Agent credential forwarding を含まない
 
 ### Requirement: Supply-chain guardrail preservation
 
@@ -192,47 +279,47 @@ Workspace package management は dependency build scripts に対し、`allowBuil
 - **THEN** script は release-age と explicit build approval policies が保持されている場合だけ pass する
 - **AND** policy が弱められている場合は fail する
 
-### Requirement: SDK の workspace governance と deploy artifact validation
+### Requirement: SDK の workspace governance と package consumer validation
 
-Workspace validation は TAMAC server-side SDK、generated Agent RPC contract outputs、deploy artifact closure を maintainer 向け validation report で検査する SHALL。
+Workspace validation は TAMAC server-side SDK、generated Agent RPC contract outputs、package consumer closure を maintainer向けvalidation reportで検査 SHALL。
 
 **Customer Context**
 
-Maintainer は TAMAC SDK を Agent RPC の server-side consumer surface として扱い、Agent Service、SDK、Management Client、Deploy artifact が同じ Protobuf RPC contract を参照していることを検証したい。SDK が第一級の検査対象になることで、生成、lint、execution boundary、deploy artifact の validation report が明確になり、Client と server-side consumer が同じ SDK contract を使える。
+Maintainer は TAMAC SDKをAgent RPCのserver-side consumer surfaceとして扱い、Agent Service、SDK、Management Client、package consumersが同じProtobuf RPC contractとrelease versionを参照していることを検証したい。SDKを第一級の検査対象にすることで、generation、lint、execution boundary、package closureのvalidation reportを一貫させられる。
 
 **Requirement**
 
-Workspace validation は TAMAC SDK usage を server-side Agent RPC execution boundary として報告する SHALL。
+Workspace validation は TAMAC SDK usageをserver-side Agent RPC execution boundaryとして報告 SHALL。
 
-Workspace validation は Agent、SDK、Management Client が参照する generated Agent RPC contract outputs を決定的な generation output として検査 SHALL。
+Workspace validation は Agent、SDK、Management Clientが参照するgenerated Agent RPC contract outputsを決定的なgeneration outputとして検査 SHALL。
 
-SDK generated Agent RPC contract output は codegen drift、generated ownership、execution boundary policy の mandatory validation target として検査される SHALL。
+SDK generated Agent RPC contract output は codegen drift、generated ownership、execution boundary policyのmandatory validation targetとして検査される SHALL。
 
-Workspace validation は SDK usage と server-side execution graph の ownership を関連付ける SHALL。
+Workspace validation は SDK usageとserver-side execution graphのownershipを関連付ける SHALL。
 
-Workspace validation は SDK の server-side execution ownership、generated output consistency、generated policy coverage、Client deploy artifact completeness を一つの validation report で確認 SHALL。
+Workspace validation は SDKのserver-side execution ownership、generated output consistency、generated policy coverage、`tamac-sdk` package closureを一つのvalidation reportで確認 SHALL。
 
-Deploy artifact generation は Management Client artifact に SDK runtime closure、generated Agent RPC contract outputs、Client Worker runtime dependencies、Worker configuration を含める SHALL。生成された Client artifact は Cloudflare Worker deploy root として自己完結する SHALL。
+`tamac-sdk` package consumer validation はSDK runtime、generated Agent RPC contract outputs、ESM/type exports、runtime dependency metadataをisolated server-side consumerで検査 SHALL。
 
-#### Scenario: Workspace validation が SDK usage を server-side Agent RPC boundary として報告する (WORKSPACE-GOVERNANCE-S015)
+#### Scenario: Workspace validationがSDK usageをserver-side Agent RPC boundaryとして報告する (WORKSPACE-GOVERNANCE-S015)
 
-- **GIVEN** maintainer が workspace validation を実行できる
-- **WHEN** workspace validation が Agent、SDK、Management Client の execution ownership を列挙する
-- **THEN** TAMAC SDK usage は server-side Agent RPC execution boundary として報告される
-- **AND** SDK usage は server-side execution ownership として検査される
-- **AND** Browser-delivered graph は UI display data boundary として分類される
+- **GIVEN** maintainerがworkspace validationを実行できる
+- **WHEN** workspace validationがAgent、SDK、Management Clientのexecution ownershipを列挙する
+- **THEN** TAMAC SDK usageはserver-side Agent RPC execution boundaryとして報告される
+- **AND** SDK usageはserver-side execution ownershipとして検査される
+- **AND** Browser-delivered graphはUI display data boundaryとして分類される
 
-#### Scenario: Generated policy が SDK Agent RPC contract output を検査する (WORKSPACE-GOVERNANCE-S016)
+#### Scenario: Generated policyがSDK Agent RPC contract outputを検査する (WORKSPACE-GOVERNANCE-S016)
 
-- **GIVEN** Agent RPC contract source と generated Agent RPC contract outputs が利用できる
-- **WHEN** root codegen drift check と generated package policy validation が実行される
-- **THEN** SDK generated Agent RPC contract output は codegen drift、generated ownership、execution boundary policy の mandatory target として検査される
-- **AND** Agent、SDK、Management Client の generated Agent RPC contract outputs は同じ Protobuf RPC contract から生成された安定 output として検査される
-- **AND** validation report は対象 root、rule、command context を確認可能にする
+- **GIVEN** Agent RPC contract sourceとgenerated Agent RPC contract outputsが利用できる
+- **WHEN** root codegen drift checkとgenerated package policy validationが実行される
+- **THEN** SDK generated Agent RPC contract outputはcodegen drift、generated ownership、execution boundary policyのmandatory targetとして検査される
+- **AND** Agent、SDK、Management Clientのgenerated Agent RPC contract outputsは同じProtobuf RPC contractから生成された安定outputとして検査される
+- **AND** validation reportは対象root、rule、command contextを確認可能にする
 
-#### Scenario: Client deploy artifact が SDK runtime closure を含む (WORKSPACE-GOVERNANCE-S017)
+#### Scenario: SDK package consumerがruntime closureを解決する (WORKSPACE-GOVERNANCE-S017)
 
-- **GIVEN** repository source と generated Agent RPC contract outputs が利用できる
-- **WHEN** deploy artifact generation command が Client artifact を生成する
-- **THEN** Client artifact は Management Client Worker runtime、SDK runtime closure、generated Agent RPC contract outputs、Client Worker configuration を含む
-- **AND** artifact root は Cloudflare Deploy Button から Management Client Worker として deploy できる自己完結した構成になる
+- **GIVEN** `tamac-sdk` package artifactとisolated server-side consumerが利用できる
+- **WHEN** consumerが公開SDK APIとgenerated Agent RPC typesをimportしてtypecheckとmodule loadを実行する
+- **THEN** SDK runtime、generated Agent RPC contract outputs、ESM/type exportsはpackage artifactから解決する
+- **AND** validation reportはpackage version、exports、runtime dependency metadata、consumer resultを確認可能にする

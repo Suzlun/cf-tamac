@@ -33,8 +33,10 @@ This document is lint-as-rules. Include only rules that are mechanically enforce
    - Agent API source of truth is `packages/agent/src/typespec/main.tsp`
    - Generated outputs are `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, and `packages/sdk/src/generated/agent-rpc/**`
    - Do not model Agent APIs with OpenAPI or Orval
-7. Mention OpenSpec exactly as implemented today through `pnpm lint:openspec`, `scripts/openspec/verify-change-intent.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`, `scripts/openspec/verify-change-task-scope.mjs`, and `scripts/openspec/verify-wireframe-previews.mjs`.
+7. Mention OpenSpec exactly as implemented today through the `behavior-change` and `architecture-change` schemas, `pnpm lint:openspec`, `scripts/openspec/verify-change-proposal.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`, and `scripts/openspec/verify-change-task-scope.mjs`.
 8. Use this repo's real file names and paths. Do not make old demo package categories the primary architecture or command model.
+9. Keep OpenSpec documented as the persistent observable behavior contract, not a master implementation plan. Document active-delta Scenario/Test traceability, `--change`, coarse Work Packages, and progressive runtime planning.
+10. Document the independent `Operation Lane`, `UX Mode`, and `Review Depth` vocabulary enforced by `.github/workflows/validate-pr-template.yml`.
 
 ## Required Structure
 
@@ -66,6 +68,7 @@ If a section has no enforceable rules beyond a short scope note, keep it brief.
 
 1. Read repo context docs:
    - `AGENTS.md`
+   - `docs/change-operation.md`
    - `README.md`
    - `CONTRIBUTING.md`
    - `CODING_STANDARDS.md`
@@ -84,13 +87,22 @@ If a section has no enforceable rules beyond a short scope note, keep it brief.
    - `scripts/codegen/check-agent-codegen-drift.mjs`
    - `scripts/governance/verify-agent-surface.mjs`
    - `scripts/governance/verify-package-boundaries.mjs`
+   - `openspec/schemas/behavior-change/schema.yaml`
+   - `openspec/schemas/architecture-change/schema.yaml`
+   - `scripts/openspec/verify-change-proposal.mjs`
    - `scripts/openspec/verify-scenario-coverage.mjs`
+   - `scripts/openspec/verify-change-task-scope.mjs`
+   - `.github/pull_request_template.md`
+   - `.github/workflows/validate-pr-template.yml`
 3. Extract only rules that actually fail in this repo, including repo-specific ones such as:
    - Agent TypeSpec is the source of truth; generated proto/RPC outputs are not hand-edited; codegen drift fails.
    - Agent boundaries: Protobuf RPC-only, no REST/OpenAPI/Orval/ad-hoc JSON/public Durable Object fetch, Worker -> RPC -> service -> runtime -> storage direction.
    - Client boundaries: Next.js App Router/browser-visible modules do not import server-only Agent RPC, credentials, generated RPC construction, or Connect runtime.
    - Workspace governance: Agent/Client runtime coupling, binding separation, OpenSpec Scenario ID coverage, and supply-chain policy are enforced.
    - Exact CI step order and exact git hook behavior.
+   - `DIRECT`, `BEHAVIOR`, and `ARCHITECTURE` are independent from `NONE`, `CONTINUITY`, and `SHAPE`; review depth is independently `STANDARD` or `DEEP`.
+   - `BEHAVIOR` requires `behavior-change`; `ARCHITECTURE` requires `architecture-change`; `DIRECT` changes neither observable behavior nor material architecture.
+   - OpenSpec proposals, active delta Scenario/Test traceability, coarse Work Package scope, material design scope, and selected-Change `--change` verification.
 4. Update `CODING_STANDARDS.md` following the constraints above.
 5. Before finishing, sanity-check that every cited rule maps to a real failing command, test, or hook in this repo and that every referenced file path exists.
 

@@ -11,8 +11,6 @@ permission:
     'packages/agent/src/generated/rpc/**': deny
     'packages/client/src/generated/agent-rpc/**': deny
     'packages/sdk/src/generated/agent-rpc/**': deny
-    'packages/typespec/openapi/openapi.json': deny
-    'packages/frontend/api/src/generated/**': deny
   'github_*': deny
   'github_get_*': allow
   'github_list_*': allow
@@ -195,7 +193,7 @@ You are an implementation support subagent that helps this repository pass build
 2. Check current state via `git status` and `git diff`
 3. Confirm specs as needed (OpenSpec)
 4. Implement
-5. If legacy contract changes were made, run `pnpm gen:api-sdk`
+5. If the current Agent TypeSpec contract changes were made, run `pnpm gen:agent:proto` and `pnpm gen:agent:rpc`
 6. If Agent contract changes were made, run `pnpm gen:agent:proto`, `pnpm gen:agent:rpc`, and `pnpm check:codegen`
 7. If SDK generated policy or codegen collector changes were made, run `pnpm check:codegen`, `pnpm lint:eslint`, and `pnpm test:governance`; do not accept cognitive-complexity warnings
 8. If Client destination policy or Browser-safe result changes were made, run `pnpm test:client` and `pnpm lint:governance`, then staging-smoke canonical allowlist approval, stored-origin revalidation before signing/transport, and correlation ID tracing

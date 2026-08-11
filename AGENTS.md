@@ -81,10 +81,13 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 ## Pull Requests
 
+- Create work branches from `develop` and target ordinary pull requests to `develop`.
 - Always use `.github/pull_request_template.md` when creating a pull request, and fill every template item completely with no blank fields.
 - Write the pull request body in Japanese. Code identifiers, commands, logs, file paths, and issue or PR references may remain in their original form.
 - Do not delete sections or checklist items that do not apply. Instead, write `なし（理由: ...）` or a concrete reason explaining why the item does not apply.
 - Check every checklist item after writing the applicable confirmation or non-applicable reason. Do not leave unchecked items in the pull request body.
+- Record `Operation Lane` as `DIRECT`, `BEHAVIOR`, or `ARCHITECTURE`; record `UX Mode` independently as `NONE`, `CONTINUITY`, or `SHAPE`; and record `Review Depth` as `STANDARD` or `DEEP`.
+- `BEHAVIOR` and `ARCHITECTURE` pull requests MUST identify an OpenSpec Change and at least one Scenario ID. `DIRECT` pull requests may use a reasoned `なし` for both fields.
 - For pull requests with UI / UX changes, attach screenshots in all of these sections: `Desktop Before`, `Desktop After`, `Mobile Before`, and `Mobile After`.
 - The pull request body is validated by `.github/workflows/validate-pr-template.yml`; when using any pull request creation tool, read the template first and prepare a body that passes this validation.
 
@@ -108,15 +111,30 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - Client D1 may store managed Agent records, external credential references, and encrypted Client Service signing key records protected by `CLIENT_CREDENTIAL_ENCRYPTION_KEY`; it must not store Agent domain snapshots, plaintext secrets, or private JWK plaintext.
 - Operations runbook: `docs/operations/agent-control-plane-auth.md` describes `AGENT_CONTROL_PLANE_TRUST`, signing key generation/export, Agent Worker secret setup, rotation, emergency revoke, break-glass recovery, staging smoke, health verification, and private-key non-exposure.
 
-## OpenSpec (Spec -> Test Contract)
+## Change Operation
 
-- Product contract scenarios live in OpenSpec `spec.md` files.
-- Every `#### Scenario:` heading MUST end with a stable Scenario ID: `(...-S001)`
-  - Example: `#### Scenario: Initialize an Agent (AGENT-LIFECYCLE-S001)`
-- Automated tests MUST reference Scenario IDs in the test title using brackets:
-  - Example: `it('[AGENT-LIFECYCLE-S001] Initialize an Agent', async () => { ... })`
-- To explicitly opt out of automation for a scenario, add `Tags: manual` under the scenario heading
-- Guardrails are enforced by `pnpm lint`:
-  - `pnpm exec openspec validate --all --strict`
-  - Scenario ID coverage check (`scripts/openspec/verify-scenario-coverage.mjs`)
-  - Coverage check uses `openspec/specs/**` as the contract (sync/archive deltas if you are working in `openspec/changes/**`)
+- The authoritative change-operation policy is `docs/change-operation.md`.
+- Classify every change independently along three axes:
+  - `Operation Lane`: `DIRECT`, `BEHAVIOR`, or `ARCHITECTURE`.
+  - `UX Mode`: `NONE`, `CONTINUITY`, or `SHAPE`.
+  - `Review Depth`: `STANDARD` or `DEEP`.
+- `DIRECT` is limited to work that changes neither observable behavior nor material architecture. It does not require an OpenSpec Change.
+- `BEHAVIOR` changes observable behavior and MUST use the `behavior-change` schema.
+- `ARCHITECTURE` changes material internal structure and MUST use the `architecture-change` schema.
+- UX shaping is optional and occurs only under `UX Mode: SHAPE`. `CONTINUITY` preserves an identified existing experience; `NONE` has no user-visible surface change.
+- Actual UI changes require production-designer involvement and review in a real browser on desktop and mobile. Generated UI mockups are optional non-contract evidence.
+- Use `STANDARD` review by default. Use `DEEP` review for high-impact security, data, external-contract, migration, cross-domain architecture, or active-change interaction risks, or when explicitly requested.
+
+## OpenSpec (Persistent Behavior Contract)
+
+- OpenSpec is the persistent contract for observable behavior, not the master implementation plan.
+- OpenSpec is pinned to `1.8.0`. Its `new change` command does not use `openspec/config.yaml#schema` as the creation default, so always pass `--schema behavior-change` for `BEHAVIOR` or `--schema architecture-change` for `ARCHITECTURE`. Never hand-create a directory under `openspec/changes/`.
+- OpenCode core definitions under `.opencode/commands/opsx-*.md` and `.opencode/skills/openspec-*/SKILL.md` are generated together from OpenSpec `1.8.0` by `pnpm gen:openspec` and must not be hand-edited. Repository-specific supplemental OpenSpec skills remain under `.opencode/skills/openspec/`.
+- Main behavior specs live at `openspec/specs/**/spec.md`; active deltas live under `openspec/changes/*/specs/**/spec.md`.
+- Every `#### Scenario:` heading MUST end with a stable Scenario ID such as `(AGENT-LIFECYCLE-S001)`.
+- Automated tests MUST reference Scenario IDs in titles such as `it('[AGENT-LIFECYCLE-S001] Initialize an Agent', async () => { ... })`.
+- Add `Tags: manual` near a Scenario only when automation is not possible.
+- `scripts/openspec/verify-scenario-coverage.mjs` applies all active deltas to main specs by default and checks duplicate IDs, missing references, orphan references, and active-change conflicts.
+- Use `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>` for one selected Change, then run the default all-active-change check before completion.
+- `tasks.md` is a coarse Work Package ledger. Plan file-level, helper-level, and test-level implementation progressively at runtime from the current package and evidence; do not persist a detailed master plan in OpenSpec.
+- OpenSpec guardrails run through `pnpm lint:openspec` and include schema validation, strict artifact validation, proposal scope, Scenario/Test traceability, and task/design scope.

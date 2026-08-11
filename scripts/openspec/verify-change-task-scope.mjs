@@ -4,147 +4,201 @@ import process from 'node:process';
 
 import { collectActiveChangeArtifacts } from '#openspec/change-artifacts';
 
-// OpenSpec の未アーカイブ Change だけを検査し、過去の履歴や恒久的な運用文書を対象外にします。
 const TASK_FILE_NAME = 'tasks.md';
 const DESIGN_FILE_NAME = 'design.md';
-const TASK_LINE_PATTERN = /^- \[[ Xx]] /;
-const RELEASE_PROCEDURE_HEADING_PATTERN = /^##\s+(?:Release Procedure|リリース手順)\s*$/imu;
-const COMPLETION_SECTION_PATTERN =
-  /^##\s+(?:Merge Verification|Acceptance Criteria|マージ検証|受入条件)\s*$/imu;
-const TOP_LEVEL_HEADING_PATTERN = /^##\s+/u;
-
-// 実行環境へ副作用を起こす作業だけを検出し、repository 内の設定・CI 定義を編集する作業は許可します。
+const CHECKBOX_PATTERN = /^- \[[ xX]\]\s+/u;
+const WORK_PACKAGE_PATTERN = /^- \[[ xX]\] WP\d+:\s+\S/u;
+const REQUIRED_WORK_PACKAGE_FIELDS = [
+  { name: 'Covers', pattern: /^\s+-\s+Covers:\s+\S/mu },
+  { name: 'Completion Evidence', pattern: /^\s+-\s+Completion Evidence:\s+\S/mu },
+];
+const ARCHITECTURE_DESIGN_HEADINGS = [
+  'Material Decisions',
+  'Boundaries',
+  'Data',
+  'Security',
+  'Migration',
+  'Rollback',
+  'Failure Modes',
+  'Risks',
+  'Verification',
+  'Revisit Triggers',
+];
+const FILE_PLAN_PATTERN =
+  /(?:^|[\s`(])(?:[\w@.-]+\/)+[\w.-]+|\b[\w.-]+\.(?:cjs|css|html|js|jsx|json|md|mjs|sql|ts|tsx|yaml|yml)\b/iu;
+const HELPER_PLAN_PATTERN =
+  /\b(?:class|component|function|helper|hook|method|utility)\b|(?:クラス|コンポーネント|関数|補助処理|ヘルパー|フック|メソッド)(?:を|の|へ|ごと)/iu;
+const TEST_LAYER_PLAN_PATTERN =
+  /\b(?:component|e2e|integration|unit) tests?\b|(?:単体|結合|統合|コンポーネント|E2E)試験(?:を|の|へ|ごと)/iu;
 const EXTERNAL_OPERATION_PATTERNS = [
   {
     label: 'リリースまたはデプロイの実行',
-    pattern:
-      /(?:\b(?:run|execute|perform)\s+(?:a\s+)?(?:release|deployment)\b|(?:リリース|デプロイ)(?:を|の)?(?:実行|実施)|\bwrangler\s+deploy\s+(?:を|して|する|実行))/iu,
+    pattern: /(?:リリース|デプロイ)(?:を|の)?(?:実行|実施)|\bwrangler\s+deploy\b/iu,
   },
   {
-    label: '外部環境のプロビジョニング',
+    label: '外部環境の操作または検証',
     pattern:
-      /(?:(?:本番|production|staging|ステージング).{0,32}(?:環境|resource|リソース).{0,24}(?:作成|準備|provision)|(?:環境|resource|リソース).{0,24}(?:provision|プロビジョニング|作成).{0,32}(?:本番|production|staging|ステージング))/iu,
+      /(?:本番|production|staging|ステージング).{0,32}(?:作成|接続|確認|検証|監視|操作|テスト)/iu,
   },
   {
-    label: '認証情報の取得・確認・検証',
+    label: '認証情報へのアクセス',
     pattern:
-      /(?:(?:credential|credentials|認証情報|アクセストークン|API token|secret).{0,32}(?:取得|入力|要求|確認|検証|probe)|(?:取得|入力|要求|確認|検証|probe).{0,32}(?:credential|credentials|認証情報|アクセストークン|API token|secret))/iu,
+      /(?:credential|credentials|認証情報|アクセストークン|API token|secret).{0,32}(?:取得|入力|要求|確認|検証)/iu,
   },
   {
-    label: '外部承認または運用担当者への依頼',
-    pattern:
-      /(?:(?:外部|運用担当|operator|第三者).{0,32}(?:承認|approval|許可|依頼|確認)|(?:承認|approval|許可|依頼|確認).{0,32}(?:外部|運用担当|operator|第三者))/iu,
-  },
-  {
-    label: 'staging または production の検証',
-    pattern:
-      /(?:(?:本番|production|staging|ステージング).{0,32}(?:確認|検証|テスト|接続|リハーサル|rehearsal|監視|観測|observation)|(?:確認|検証|テスト|接続|リハーサル|rehearsal|監視|観測|observation).{0,32}(?:本番|production|staging|ステージング))/iu,
-  },
-  {
-    label: 'production bookmark',
-    pattern:
-      /(?:production|本番).{0,32}(?:bookmark|ブックマーク)|(?:bookmark|ブックマーク).{0,32}(?:production|本番)/iu,
+    label: '外部承認',
+    pattern: /(?:外部|運用担当|operator|第三者).{0,24}(?:承認|approval|許可|依頼)/iu,
   },
 ];
 
 /**
- * tasks.md の各 checkbox task と、その下に続く補足行を一つの検査単位へまとめる。
+ * @typedef {{ line: number; summary: string; body: string }} WorkPackage
+ */
+
+/**
+ * tasks.md のチェック項目と、その項目に属する説明行を一つの作業パッケージ候補へまとめる。
  *
  * @param {string} source - tasks.md の完全な内容。
- * @returns {{ line: number; text: string }[]} 各 task の開始行と検査対象テキスト。
+ * @returns {WorkPackage[]} チェック項目の開始行、要約、本文。
  */
-function collectTaskBlocks(source) {
-  const taskBlocks = [];
+function collectWorkPackages(source) {
   const lines = source.split(/\r?\n/u);
-  let currentTask = null;
+  const packages = [];
+  let current = null;
 
   for (const [index, line] of lines.entries()) {
-    if (TASK_LINE_PATTERN.test(line)) {
-      if (currentTask) taskBlocks.push(currentTask);
-      currentTask = { line: index + 1, text: line };
+    if (CHECKBOX_PATTERN.test(line)) {
+      if (current) packages.push(current);
+      current = { line: index + 1, summary: line, body: line };
       continue;
     }
-
-    if (currentTask && TOP_LEVEL_HEADING_PATTERN.test(line)) {
-      taskBlocks.push(currentTask);
-      currentTask = null;
+    if (/^##\s+/u.test(line)) {
+      if (current) packages.push(current);
+      current = null;
       continue;
     }
-
-    if (currentTask) currentTask.text += `\n${line}`;
+    if (current) current.body += `\n${line}`;
   }
-
-  if (currentTask) taskBlocks.push(currentTask);
-  return taskBlocks;
+  if (current) packages.push(current);
+  return packages;
 }
 
 /**
- * 検査対象テキストが Change 外の実運用を要求していないかを識別する。
+ * 作業パッケージの要約と Covers だけを粒度検査用の計画文として取得する。
  *
- * @param {string} text - task または完了条件のテキスト。
- * @returns {string | null} 違反カテゴリ。違反がない場合は `null`。
+ * Completion Evidence に現れるコマンドや試験種別は実装分解ではなく証跡なので除外する。
+ *
+ * @param {WorkPackage} workPackage - 検査する作業パッケージ。
+ * @returns {string} 粒度を判断する計画部分。
  */
-function getExternalOperationLabel(text) {
-  return EXTERNAL_OPERATION_PATTERNS.find(({ pattern }) => pattern.test(text))?.label ?? null;
+function getPlanningText(workPackage) {
+  const lines = workPackage.body.split(/\r?\n/u);
+  return lines.filter((line) => !/^\s*-\s+Completion Evidence:/u.test(line)).join('\n');
 }
 
 /**
- * design.md から merge 完了の根拠になる section だけを抽出する。
+ * 禁止された外部操作の種別を文章から一件取得する。
+ *
+ * @param {string} source - 作業パッケージまたは設計の内容。
+ * @returns {string | null} 該当する禁止操作。該当しない場合は `null`。
+ */
+function getExternalOperation(source) {
+  return EXTERNAL_OPERATION_PATTERNS.find(({ pattern }) => pattern.test(source))?.label ?? null;
+}
+
+/**
+ * Markdown の第2階層見出しを文書順に収集する。
  *
  * @param {string} source - design.md の完全な内容。
- * @returns {{ line: number; text: string }[]} 検査対象 section の開始行とテキスト。
+ * @returns {{ name: string; line: number }[]} 見出し名と 1 始まり行番号。
  */
-function collectCompletionSections(source) {
-  const sections = [];
-  const lines = source.split(/\r?\n/u);
-  let currentSection = null;
-
-  for (const [index, line] of lines.entries()) {
-    if (COMPLETION_SECTION_PATTERN.test(line)) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { line: index + 1, text: line };
-      continue;
-    }
-
-    if (currentSection && TOP_LEVEL_HEADING_PATTERN.test(line)) {
-      sections.push(currentSection);
-      currentSection = null;
-      continue;
-    }
-
-    if (currentSection) currentSection.text += `\n${line}`;
+function collectLevelTwoHeadings(source) {
+  const headings = [];
+  for (const [index, line] of source.split(/\r?\n/u).entries()) {
+    const name = /^##\s+(.+?)\s*$/u.exec(line)?.[1];
+    if (name) headings.push({ name, line: index + 1 });
   }
-
-  if (currentSection) sections.push(currentSection);
-  return sections;
+  return headings;
 }
 
 /**
- * 検査失敗を artifact の相対パスと行番号付きで蓄積する。
+ * 診断へリポジトリ相対パスと行番号を付与する。
  *
- * @param {string[]} errors - 出力する失敗メッセージの配列。
- * @param {string} absolutePath - 違反がある artifact の絶対パス。
- * @param {number} line - 違反箇所の 1 始まり行番号。
- * @param {string} label - 違反した外部操作のカテゴリ。
+ * @param {string[]} errors - 診断を蓄積する配列。
+ * @param {string} absolutePath - 問題がある成果物の絶対パス。
+ * @param {number} line - 1 始まりの行番号。
+ * @param {string} message - 修正方法が判断できる説明。
+ * @returns {void}
  */
-function addExternalOperationError(errors, absolutePath, line, label) {
-  const relativePath = path.relative(process.cwd(), absolutePath);
-  errors.push(
-    `${relativePath}:${line}: ${label} は Change の task、受入条件、完了条件に含められません。repository-local または CI で検証できる作業へ置き換えてください。`
-  );
+function addError(errors, absolutePath, line, message) {
+  errors.push(`${path.relative(process.cwd(), absolutePath)}:${String(line)}: ${message}`);
 }
 
 const errors = [];
 
-// 未アーカイブ Change がないリポジトリでも lint を成功させ、将来の Change 作成時から同じ境界を強制します。
 for (const taskPath of collectActiveChangeArtifacts(
   process.cwd(),
   (_absolutePath, fileName) => fileName === TASK_FILE_NAME
 )) {
-  const taskSource = readFileSync(taskPath, 'utf8');
-  for (const task of collectTaskBlocks(taskSource)) {
-    const label = getExternalOperationLabel(task.text);
-    if (label) addExternalOperationError(errors, taskPath, task.line, label);
+  const source = readFileSync(taskPath, 'utf8');
+  const workPackages = collectWorkPackages(source);
+  if (workPackages.length === 0)
+    addError(errors, taskPath, 1, 'tasks.md には少なくとも一つの Work Package が必要です。');
+
+  for (const workPackage of workPackages) {
+    if (!WORK_PACKAGE_PATTERN.test(workPackage.summary)) {
+      addError(
+        errors,
+        taskPath,
+        workPackage.line,
+        'チェック項目は `- [ ] WP<number>: <成果>` 形式で記載してください。'
+      );
+    }
+    for (const field of REQUIRED_WORK_PACKAGE_FIELDS) {
+      if (!field.pattern.test(workPackage.body)) {
+        addError(
+          errors,
+          taskPath,
+          workPackage.line,
+          `Work Package には内容を持つ ${field.name}: が必要です。`
+        );
+      }
+    }
+
+    const planningText = getPlanningText(workPackage);
+    if (FILE_PLAN_PATTERN.test(planningText)) {
+      addError(
+        errors,
+        taskPath,
+        workPackage.line,
+        'Work Package をファイル単位の計画へ分解できません。成果のまとまりで記載してください。'
+      );
+    }
+    if (HELPER_PLAN_PATTERN.test(planningText)) {
+      addError(
+        errors,
+        taskPath,
+        workPackage.line,
+        'Work Package を補助処理またはコード要素単位の計画へ分解できません。'
+      );
+    }
+    if (TEST_LAYER_PLAN_PATTERN.test(planningText)) {
+      addError(
+        errors,
+        taskPath,
+        workPackage.line,
+        'Work Package を試験階層単位の計画へ分解できません。検証は Completion Evidence に集約してください。'
+      );
+    }
+    const externalOperation = getExternalOperation(workPackage.body);
+    if (externalOperation) {
+      addError(
+        errors,
+        taskPath,
+        workPackage.line,
+        `${externalOperation} は Work Package または完了条件に含められません。`
+      );
+    }
   }
 }
 
@@ -152,21 +206,22 @@ for (const designPath of collectActiveChangeArtifacts(
   process.cwd(),
   (_absolutePath, fileName) => fileName === DESIGN_FILE_NAME
 )) {
-  const designSource = readFileSync(designPath, 'utf8');
-  const releaseProcedureLine = designSource
-    .split(/\r?\n/u)
-    .findIndex((line) => RELEASE_PROCEDURE_HEADING_PATTERN.test(line));
-  if (releaseProcedureLine >= 0) {
-    const relativePath = path.relative(process.cwd(), designPath);
-    errors.push(
-      `${relativePath}:${releaseProcedureLine + 1}: Release Procedure は Change の artifact に含められません。merge 検証を記述し、リリース影響は pull request template に記録してください。`
+  const source = readFileSync(designPath, 'utf8');
+  const headings = collectLevelTwoHeadings(source);
+  const names = headings.map(({ name }) => name);
+
+  // architecture-change の設計を物質的判断だけに限定し、旧来のファイル一覧や詳細計画を再導入させない。
+  if (names.join('\u0000') !== ARCHITECTURE_DESIGN_HEADINGS.join('\u0000')) {
+    addError(
+      errors,
+      designPath,
+      1,
+      `design.md の見出しは指定順で ${ARCHITECTURE_DESIGN_HEADINGS.map((heading) => `## ${heading}`).join('、')} だけを使用してください。`
     );
   }
-
-  for (const section of collectCompletionSections(designSource)) {
-    const label = getExternalOperationLabel(section.text);
-    if (label) addExternalOperationError(errors, designPath, section.line, label);
-  }
+  const externalOperation = getExternalOperation(source);
+  if (externalOperation)
+    addError(errors, designPath, 1, `${externalOperation} は設計の完了条件に含められません。`);
 }
 
 if (errors.length > 0) {

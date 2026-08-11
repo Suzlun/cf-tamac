@@ -199,7 +199,7 @@ This agent does not do hands-on implementation. Delegate implementation edits, g
 ## Expected input from the caller
 
 - Target change identifier or path, such as `openspec/changes/<change-id>/` or `<change-id>`
-- Confirmed intent path, owner-approved outcome, and positive boundaries for what should be delivered
+- Resolved `proposal.md` path, owner-approved outcome, and positive boundaries for what should be delivered
 - Relevant failure logs or CI logs, if any
 
 After checking CLI state and context availability, if a required input is missing, stop and list it.
@@ -221,7 +221,7 @@ Before the first implementation delegation, publish one timeline covering every 
 
 0. For each target change, run `pnpm exec openspec instructions apply --change "<change-id>" --json`.
 1. If the CLI state is `blocked` or a required artifact is missing, return `BLOCKED` with the exact CLI evidence. Do not delegate artifact creation or repair to a planner or implementation agent.
-2. Read every returned `contextFiles` path, explicitly including confirmed `intent.md`, plus each `.wireframe.json` source under the target change when UI is in scope. Treat generated `.wireframe.html` files and screenshots as `openspec/designer` rendering evidence only. If any required path is unreadable, return `BLOCKED` with exact path evidence.
+2. Read every schema-returned `contextFiles` path. Use `proposal.md` as the authoritative request interpretation, read `design.md` only for `architecture-change`, and require no artifact outside the selected schema. If any required path is unreadable, return `BLOCKED` with exact path evidence.
 3. If the CLI state is `ready`, determine task ownership, split work into executable units, compute dependencies and file conflicts, identify the dependency-safe parallel ready set, and delegate every ready unit:
    - Management Client work -> `.opencode/agents/unit/client/engineer.md` (`@unit/client/engineer`)
    - Agent Service and Agent-owned contract/codegen work -> `.opencode/agents/unit/agent/engineer.md` (`@unit/agent/engineer`)
@@ -242,11 +242,11 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 
 - Use the `tasks` returned by `pnpm exec openspec instructions apply --change "<change-id>" --json` as the implementation unit.
 - At every iteration, identify the full set of ready tasks and delegate the entire dependency-safe ready set in parallel.
-- Provide `contextFiles` (intent, proposal, specs, design, tasks, and similar) as primary sources.
+- Provide every schema-returned `contextFiles` path as the primary sources.
 - Each work order to the builder must include:
   - `contextFiles` paths
-  - The exact owner-approved intent from `intent.md`; do not replace it with a solution-shaped paraphrase
-  - The target task text and its line in `tasks.md`
+  - The exact resolved outcome and constraints from `proposal.md`; do not replace them with a solution-shaped paraphrase
+  - The target Work Package text and its line in `tasks.md`
   - Required verification steps, at minimum `pnpm lint`, and if possible `pnpm test:run`, `pnpm build`, and codegen when needed
 - Executing subagents must not edit `tasks.md`; after accepting their implementation and verification evidence, update only the corresponding completion checkbox yourself.
 - Do not leave a ready task idle only because another independent task is already in flight.
@@ -256,9 +256,8 @@ Note: if a commit is needed, delegate it to `@unit/build/builder` after the requ
 
 - Do not change the Change contents except to mark an accepted task complete in `tasks.md`. If implementation exposes a material unresolved decision, follow the evidence-based Proposer return path above.
 - Never delegate or execute dependency or version additions, permission-boundary changes, destructive operations, release execution, deployment, environment provisioning, credential access or probes, external approval, staging or production validation, operational rehearsal, production observation, or another external side effect. Stop the affected work and report the exact operation and evidence.
-- Implement the approved visible surface from `.wireframe.json` without revising it. You may resolve self-evident implementation details that preserve the existing user actions, information structure, and visible copy, such as component choice, responsive mechanics, focus behavior, or accessible naming.
-- Never infer a new visible control, screen, setting, selector, explanatory copy, version, model name, or internal state. If artifacts conflict or a serious business-value, safety, accessibility, or legal failure cannot be resolved within the existing surface, block only the affected work and return the evidence to the caller. Continue dependency-safe work that is independent of the blocked UI task, but do not report the Change complete.
-- Never edit or recapture generated `.wireframe.html` previews or screenshots. Any upstream visual correction returns to `openspec/designer`, changes JSON, and regenerates both evidence artifacts before apply resumes.
+- For `UX-Mode: CONTINUITY`, preserve the proposal's identified current product precedent. For `UX-Mode: SHAPE`, preserve the approved `Primary User Task` and `UX Direction` from the proposal. For `UX-Mode: NONE`, introduce no visible work.
+- Never infer a new visible control, screen, setting, selector, explanatory copy, version, model name, or internal state. If the proposal, Specs, and implementation evidence conflict or a serious business-value, safety, accessibility, or legal failure cannot be resolved within the approved UX direction, block only the affected work and return the evidence to the caller. Continue dependency-safe work that is independent of the blocked UI work, but do not report the Change complete.
 - Do not perform a Change semantic review, invent a private approval gate, or load a semantic review workflow.
 - Do not hand-edit `generated/**`.
 - Do not add lint bypasses such as `eslint-disable`, and do not add exceptions to bypass gates.

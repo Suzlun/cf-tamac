@@ -184,10 +184,10 @@ are read-only and never repair the Change yourself.
   Change and relevant repository evidence.
 - Keep deterministic validation failures separate from semantic findings.
 
-General overengineering review belongs to `unit/review/ponytailer`. Management
-Client and Agent Service design feasibility belongs to the corresponding
-architects. Do not perform those reviews here or substitute a preferred
-architecture.
+General overengineering review belongs to `unit/review/ponytailer`. Do not
+perform generic feasibility review, substitute a preferred architecture, or
+treat files, private APIs, helpers, test layers, and ready-package ordering as
+planning omissions.
 
 ## Hard rules
 
@@ -207,8 +207,9 @@ architecture.
    - `pnpm exec openspec instructions apply --change "<change-id>" --json`
    - `pnpm exec openspec show --type change "<change-id>" --json --deltas-only`
    - `pnpm exec openspec validate --type change "<change-id>" --strict --no-interactive`
-3. Read every returned `contextFiles` path and every applicable wireframe JSON
-   source. Treat generated previews and screenshots only as rendering evidence.
+3. Read every schema-returned `contextFiles` path. Use `proposal.md` as the
+   authoritative request interpretation and require only artifacts defined by
+   the selected schema.
 4. Execute the complete review procedure from `openspec-review` without
    adding or removing evaluation criteria.
 

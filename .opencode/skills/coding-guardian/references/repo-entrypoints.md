@@ -5,6 +5,7 @@ Read these files before applying `coding-guardian` in this repository.
 ## Core flow
 
 - `AGENTS.md`: project workflow, required commands, language policy
+- `docs/change-operation.md`: authoritative operation lane, UX mode, review depth, and OpenSpec boundary policy
 - `CODING_STANDARDS.md`: mechanically enforced rules summary
 - `CONTRIBUTING.md`: contributor workflow and required checks
 - `package.json`: root command graph for dev, build, lint, check, codegen, and tests
@@ -41,7 +42,7 @@ Read these files before applying `coding-guardian` in this repository.
 
 ## Server-side SDK enforcement
 
-- Scope: `packages/sdk/**`; `@cf-tamac/sdk` is a server-side typed Agent RPC consumer, not a browser package or an Agent/Client runtime source dependency
+- Scope: `packages/sdk/**`; `tamac-sdk` is a server-side typed Agent RPC consumer, not a browser package or an Agent/Client runtime source dependency
 - `packages/sdk/package.json`: server-side package metadata and public entrypoint/export declarations
 - `packages/sdk/src/index.ts`: re-export-only SDK public entrypoint
 - `packages/sdk/src/client.ts`, `packages/sdk/src/transport.ts`, `packages/sdk/src/auth/**`, `packages/sdk/src/errors.ts`, `packages/sdk/src/invocation-context.ts`: Client Service aggregate, binary Connect transport, Ed25519 JWT metadata, error normalization, and invocation context
@@ -58,7 +59,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/client/open-next.config.ts`: Cloudflare/OpenNext adapter configuration
 - `packages/client/app/**`: management route shells for `/agents` and detail sections; no `hello` or `users` experience
 - `packages/client/src/server/actions/managed-agents.ts`: Server Actions for Client-owned management ledger interactions
-- `packages/client/src/server/agent-rpc/**`: server-only SDK adapter that owns Client D1 resolution, encrypted signing-key access, and acting-user policy before constructing `@cf-tamac/sdk`
+- `packages/client/src/server/agent-rpc/**`: server-only SDK adapter that owns Client D1 resolution, encrypted signing-key access, and acting-user policy before constructing `tamac-sdk`
 - `packages/client/src/server/agent-rpc/origin-policy.ts`: `AGENT_RPC_ALLOWED_ORIGINS` parser and exact canonical HTTPS destination approval
 - `packages/client/src/server/agent-rpc/agent-loader.ts`: managed Agent stored-origin revalidation before signing-key, acting-user, or SDK transport resolution
 - `packages/client/src/server/agent-rpc/safe-results.ts`: Browser-safe four-field result (`displayData`, `safeStatus`, `safeErrorCategory`, `correlationId`) without raw diagnostics or secrets
@@ -80,10 +81,18 @@ Read these files before applying `coding-guardian` in this repository.
 
 ## OpenSpec enforcement
 
-- `scripts/openspec/verify-scenario-coverage.mjs`: Scenario ID coverage checks used by `pnpm lint`
-- `scripts/openspec/verify-change-intent.mjs`: owner-confirmed Intent gate for downstream Change artifacts
-- `scripts/openspec/verify-change-task-scope.mjs`: repository-local completion boundary for Change tasks and acceptance
-- `scripts/openspec/verify-wireframe-previews.mjs`: generated wireframe preview drift check
+- `.opencode/commands/opsx-*.md` and `.opencode/skills/openspec-*/SKILL.md`: OpenSpec `1.8.0` core definitions generated together by `pnpm gen:openspec`
+- `.opencode/skills/openspec/**`: repository-specific supplements layered on the generated core skills
+- `openspec/schemas/behavior-change/schema.yaml`: observable behavior Change artifact order and scope
+- `openspec/schemas/architecture-change/schema.yaml`: material architecture Change artifact order and scope
+- `scripts/openspec/verify-change-proposal.mjs`: resolved proposal structure, request classification, and `UX-Mode` evidence
+- `scripts/openspec/verify-scenario-coverage.mjs`: main specs plus active delta application, Scenario/Test traceability, and `--change` selection
+- `scripts/openspec/verify-change-task-scope.mjs`: coarse Work Package and material design scope
+
+## Pull request enforcement
+
+- `.github/pull_request_template.md`: `Operation Lane`, `UX Mode`, `Review Depth`, OpenSpec Change, Scenario IDs, and UI evidence fields
+- `.github/workflows/validate-pr-template.yml`: lane vocabulary, OpenSpec requirements, Scenario ID format, checklist completion, product-designer evidence, real-browser confirmation, and desktop/mobile before/after images
 
 ## Workspace governance enforcement
 
@@ -104,7 +113,7 @@ Read these files before applying `coding-guardian` in this repository.
 - There is no `openapi.gen.go`
 - There is no `docs/brand/**` baseline today
 - Agent API must not use REST/OpenAPI/Orval as the public contract
-- `@cf-tamac/sdk` is server-side only; Browser-visible modules must not import SDK, Connect runtime, generated RPC descriptors, credentials, or JWT signing
+- `tamac-sdk` is server-side only; Browser-visible modules must not import SDK, Connect runtime, generated RPC descriptors, credentials, or JWT signing
 - Generated RPC output is command-owned even when checked into git, including `packages/sdk/src/generated/agent-rpc/**`
 - `TamacAgentClient` is the Client Service Ed25519 JWT aggregate; `TamacProviderIngressClient` is the separate Provider Ed25519 detached-signature aggregate. Do not mix Client D1, acting-user, JWT, or Provider signing-key ownership between them
 - `AGENT_RPC_ALLOWED_ORIGINS` is a non-empty JSON array of unique canonical HTTPS origins. Validate Browser input and stored Client D1 origin against it before a Client Service JWT can be signed or sent

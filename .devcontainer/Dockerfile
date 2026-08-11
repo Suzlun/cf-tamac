@@ -91,4 +91,4 @@ RUN npm install -g agent-browser@0.31.1 && \
 RUN uv tool install -p 3.13 serena-agent
 
 # OpenSpec CLI をグローバルインストール
-RUN npm install -g @fission-ai/openspec@1.7.0
+RUN npm install -g @fission-ai/openspec@1.8.0

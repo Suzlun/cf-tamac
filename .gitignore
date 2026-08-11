@@ -11,7 +11,6 @@ build/
 .open-next/
 .wrangler/
 .cache/
-.deploy/
 *.tsbuildinfo
 .vite/
 next-env.d.ts
@@ -51,6 +50,8 @@ coverage/
 
 # Misc
 .turbo/
+__pycache__/
+*.py[cod]
 
 # Serena MCP Server
 .serena/cache/

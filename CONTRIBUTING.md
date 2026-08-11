@@ -6,9 +6,11 @@
 
 - コーディング規則（一次資料）: `CODING_STANDARDS.md`
   - `eslint.config.js` は規約の自動検査（実装）として追従させます
-- 仕様（契約）: OpenSpec の `spec.md`
-  - `pnpm lint` で `pnpm exec openspec validate --all --strict`、Change Intent確認ゲート、Scenario IDカバレッジ検査が走ります
-- SDK: `packages/sdk/**` の `@cf-tamac/sdk` は server-side Agent RPC SDK です。Browser-visible module から SDK、Connect runtime、generated RPC descriptor、credential、JWT signing を import しません。
+- 変更運用（一次資料）: `docs/change-operation.md`
+- 永続的な振る舞い契約: `openspec/specs/**/spec.md`
+  - `pnpm lint` で変更スキーマ、提案、厳格な成果物形式、Scenario と試験の追跡、作業パッケージと設計の対象範囲を検査します
+  - `openspec/changes/*/specs/**/spec.md` の活動中差分は、主仕様へ重ねた実効仕様として同期前から検査されます
+- SDK: `packages/sdk/**` の `tamac-sdk` は server-side Agent RPC SDK です。Browser-visible module から SDK、Connect runtime、generated RPC descriptor、credential、JWT signing を import しません。
 - SDK surface: `TamacAgentClient` は Client Service Ed25519 JWT operations、`TamacProviderIngressClient` は Provider Ed25519 detached-signature `PublishEvent` / `PublishToolResult` / `PublishDeliveryResult` です。Client D1、acting user、JWT context を Provider surface に渡しません。
 
 ## コメントと TSDoc
@@ -74,8 +76,37 @@ Husky によりコミット時に検証されます。
 - 仕様が変わる変更は spec とテストをセットで更新する
   - `#### Scenario: ... (..-S001)` に対して、テストタイトルに `[...-S001]` を含める
   - 自動化できない Scenario は `Tags: manual` を明示する
-- OpenSpec Change は、依頼の意味をrepositoryの事実と照合して所有者が確認した`intent.md`から開始する
-  - `Intent-Status: CONFIRMED`と`Owner-Confirmation: CONFIRMED`になる前にproposal以降を作成しない
+- OpenSpec Change の `proposal.md` は、依頼を成果、成果の制約、必須手段、候補手段へ分類し、リポジトリの事実と照合した権威ある解釈とする
+  - 重要な曖昧さが残る間は `Intent-Resolution: DRAFT` とし、差分仕様、設計、作業パッケージを作成しない
+
+## 変更運用
+
+変更を始める前に、`docs/change-operation.md` に従って三軸を独立に決めます。
+
+| 軸               | 値                                     | 判断内容                           |
+| ---------------- | -------------------------------------- | ---------------------------------- |
+| `Operation Lane` | `DIRECT` / `BEHAVIOR` / `ARCHITECTURE` | 振る舞い・構造をどの運用で扱うか   |
+| `UX Mode`        | `NONE` / `CONTINUITY` / `SHAPE`        | 利用者に見える体験をどう扱うか     |
+| `Review Depth`   | `STANDARD` / `DEEP`                    | 独立レビューをどの深さで実施するか |
+
+- `DIRECT`: 観測可能な振る舞いも物質的な内部構造も変えない。OpenSpec Change は不要です。
+- `BEHAVIOR`: 観測可能な振る舞いを変更する。`behavior-change` の OpenSpec Change が必要です。
+- `ARCHITECTURE`: 物質的な内部構造を変更する。`architecture-change` の OpenSpec Change が必要です。
+- `SHAPE` は UX の方向付けが必要な場合だけ使用します。運用区分から UX モードを推測しません。
+- 実際の UI 変更にはプロダクトデザイナーの関与と、デスクトップ・モバイル双方の実ブラウザ確認が必要です。
+- 画像生成による UI モックアップは任意の非契約証跡であり、仕様や実ブラウザ確認を置き換えません。
+- `STANDARD` を既定とし、重要なセキュリティ、データ、外部契約、移行、領域横断の構造、活動中 Change との相互作用に危険がある場合は `DEEP` を選びます。
+
+OpenSpec Changeは、`BEHAVIOR`なら`pnpm exec openspec new change <change-id> --schema behavior-change`、`ARCHITECTURE`なら`pnpm exec openspec new change <change-id> --schema architecture-change`で作成し、`openspec/changes/**`を手作業で作りません。OpenSpec `1.8.0`の`new change`は`openspec/config.yaml#schema`をChange作成時の既定値として参照しないため、`--schema`を省略しません。OpenCodeの公式コアコマンドとスキルは`pnpm gen:openspec`でOpenSpec `1.8.0`から同時に再生成し、`.opencode/commands/opsx-*.md`と`.opencode/skills/openspec-*/SKILL.md`を手編集しません。
+
+OpenSpec の `tasks.md` は粗い作業パッケージ台帳です。ファイル、補助処理、試験階層の詳細は、現在の作業パッケージと検証結果に基づき実装時に段階的に決めます。
+
+一つの Change に対する Scenario と試験の追跡は次で確認し、完了前には引数なしの全体検査も実行します。
+
+```bash
+node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>
+node scripts/openspec/verify-scenario-coverage.mjs
+```
 
 ## 自動生成
 
@@ -98,7 +129,7 @@ Agent public API は Connect unary binary Protobuf だけを公開します。RE
 
 ### Server-side SDK と Client adapter
 
-`@cf-tamac/sdk` は Agent RPC の server-side typed consumer です。SDK runtime は SDK 自身の command-owned generated descriptor と Connect unary binary Protobuf transport を使い、Agent または Client runtime source を import しません。SDK generated descriptor は `packages/sdk/src/generated/agent-rpc/**` に `pnpm gen:agent:rpc` が出力するため、手編集しません。
+`tamac-sdk` は Agent RPC の server-side typed consumer です。SDK runtime は SDK 自身の command-owned generated descriptor と Connect unary binary Protobuf transport を使い、Agent または Client runtime source を import しません。SDK generated descriptor は `packages/sdk/src/generated/agent-rpc/**` に `pnpm gen:agent:rpc` が出力するため、手編集しません。
 
 Management Client は `packages/client/src/server/agent-rpc/**` の server-only adapter から SDK を使います。Client D1、encrypted Client Service signing key store、acting user policy、managed Agent resolution、Next.js `server-only` boundary は Client が所有し、解決済みの server-side context だけを SDK に渡します。browser-visible module は SDK、Connect runtime、generated descriptor、credential、JWT signing を import しません。
 
@@ -126,11 +157,11 @@ PR 前にローカルで以下を通してください。
 pnpm format:check
 pnpm lint
 pnpm check
-pnpm --filter @cf-tamac/sdk check
+pnpm --filter tamac-sdk check
 pnpm check:codegen
 pnpm lint:governance
 pnpm test:governance
-pnpm gen:deploy-artifacts && pnpm check:deploy-artifacts
+pnpm check:production-contracts && pnpm check:production-environment
 ```
 
 必要に応じて関連テストも実行してください。
@@ -141,27 +172,30 @@ pnpm test:agent    # @cf-tamac/agent
 pnpm test:client # @cf-tamac/client
 pnpm test:governance # governance scripts
 pnpm test:e2e      # Playwright（変更が e2e に影響する場合）
-pnpm --filter @cf-tamac/sdk test # @cf-tamac/sdk
+pnpm --filter tamac-sdk test # tamac-sdk
 ```
 
 Agent/SDK/Client package を触った場合は、必要に応じて次も確認してください。
 
 ```bash
 pnpm check:agent
-pnpm --filter @cf-tamac/sdk check
+pnpm --filter tamac-sdk check
 pnpm check:client
 pnpm build # Agent、SDK、Management Client
 ```
 
 ## プルリクエストの流れ
 
-1. `main` を最新化し、作業ブランチを作成
+1. `develop` を最新化し、作業ブランチを作成
 2. 変更・テスト・ドキュメントを追加/更新（必要な範囲で）
 3. `pnpm lint` と `pnpm check`、関連テストを通す
-4. PR に以下を記載
+4. `develop` 向けプルリクエストに以下を記載
    - 変更の目的/背景
    - 変更点の要約
+   - `Operation Lane`、`UX Mode`、`Review Depth`
+   - `OpenSpec Change` と `Scenario IDs`。`BEHAVIOR` と `ARCHITECTURE` では必須、`DIRECT` では理由付きの `なし` を使用可能
    - 動作確認内容（コマンド、確認手順）
    - 破壊的変更がある場合は影響範囲と移行方法
+   - 実際の UI / UX 変更がある場合は `Desktop Before`、`Desktop After`、`Mobile Before`、`Mobile After` の画像
 
 不明点があれば Issue/PR で相談してください。

@@ -104,7 +104,7 @@ OK例: binary Protobuf request だけを facade に通し、malformed request �
 Summary: Agent/Client は別 Worker として独立し、runtime source を相互参照しません。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`.
 NG例: `packages/agent/src/**` から `@cf-tamac/client` を import する、または `packages/client/src/**` から `@cf-tamac/agent` runtime source を import する。
-OK例: Client server-only SDK adapter は `@cf-tamac/sdk` を使い、Client D1 と signing-key store の ownership を保ち、Agent source は Client source を知らない。
+OK例: Client server-only SDK adapter は `tamac-sdk` を使い、Client D1 と signing-key store の ownership を保ち、Agent source は Client source を知らない。
 
 **Rule: Agent/Client source は ESLint boundary classifier の既知 layer に置く。**
 Summary: Agent runtime、Agent generated RPC、Client runtime、Client generated Agent RPC、Client App のいずれかに分類されない source/import は失敗します。
@@ -121,21 +121,21 @@ OK例: `packages/agent/wrangler.toml` は `AI_AGENT` Durable Object と `AGENT_B
 ## 3. Management Client server/browser boundary
 
 **Rule: SDK は server-side Agent RPC consumer に閉じる。**
-Summary: `@cf-tamac/sdk` は Agent/Client runtime source の代替ではなく、SDK 自身の generated descriptor と Connect unary binary Protobuf transport を使う server-side typed consumer です。Client D1、encrypted signing-key store、acting-user policy、Next.js `server-only` boundary は Management Client server adapter が所有します。
+Summary: `tamac-sdk` は Agent/Client runtime source の代替ではなく、SDK 自身の generated descriptor と Connect unary binary Protobuf transport を使う server-side typed consumer です。Client D1、encrypted signing-key store、acting-user policy、Next.js `server-only` boundary は Management Client server adapter が所有します。
 Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs` and `scripts/governance/verify-agent-surface.mjs`; codegen drift via `pnpm check:codegen`.
 NG例: SDK runtime から `packages/agent/src/**` または `packages/client/src/**` を import する、Browser-visible Client module から SDK を import する、Client storage/Next.js ownership を SDK に移す。
-OK例: Client server-only adapter が Client-owned context を解決して `@cf-tamac/sdk` に渡し、SDK が `packages/sdk/src/generated/agent-rpc/**` と Connect binary Protobuf transport で Agent RPC を呼ぶ。
+OK例: Client server-only adapter が Client-owned context を解決して `tamac-sdk` に渡し、SDK が `packages/sdk/src/generated/agent-rpc/**` と Connect binary Protobuf transport で Agent RPC を呼ぶ。
 
 **Rule: Client Service と Provider の authentication surface を混在させない。**
 Summary: `TamacAgentClient` は Client-owned signing context による Client Service Ed25519 JWT operation aggregate です。`TamacProviderIngressClient` は Provider-owned Ed25519 detached signature による `PublishEvent`、`PublishToolResult`、`PublishDeliveryResult` だけの aggregate です。Provider surface は Client D1、acting user、JWT context を受け取りません。
-Enforcement point: `pnpm test:agent` via Provider principal-boundary tests; `pnpm --filter @cf-tamac/sdk test` via SDK surface tests; `pnpm lint:governance` via package boundary validation.
+Enforcement point: `pnpm test:agent` via Provider principal-boundary tests; `pnpm --filter tamac-sdk test` via SDK surface tests; `pnpm lint:governance` via package boundary validation.
 NG例: Provider ingress へ Client Service bearer JWT を付与する、Client D1/signing-key store を SDK Provider client に移す、Provider に Client lifecycle/config operation を公開する。
 OK例: Provider が unsigned generated Protobuf body digest と canonical text を detached-sign し、Agent が fixed `300_000` ms window、active Installation/trust key、digest、Ed25519 signature、identity を検証してから `INTEGRATION_INSTALLATION` principal を構築し、nonce/idempotency reservation と Agent-local final authorization を実行する。
 
 **Rule: Browser-visible Client modules は server-only SDK、credentials、generated RPC construction、Connect runtime を import しない。**
 Summary: Browser bundle に SDK、Agent RPC credential seam、private JWK、encrypted private JWK、生 JWT、direct Agent RPC invocation logic を入れません。
 Enforcement point: `pnpm lint:eslint` via `eslint.config.js`; `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/browser-agent-rpc-secrecy.test.ts`.
-NG例: `packages/client/app/page.tsx` から `@cf-tamac/sdk`、`@connectrpc/connect`、`@cf-tamac/client-agent-rpc/**`、`packages/client/src/server/**` を import する。
+NG例: `packages/client/app/page.tsx` から `tamac-sdk`、`@connectrpc/connect`、`@cf-tamac/client-agent-rpc/**`、`packages/client/src/server/**` を import する。
 OK例: SDK client construction は `packages/client/src/server/agent-rpc/**` に閉じ、App Router は Server Components/Server Actions 経由で使う。
 
 **Rule: Browser-visible Client modules は direct network call をしない。**
@@ -157,10 +157,10 @@ NG例: `packages/client/src/server/agent-rpc/create-client.ts` から `import 's
 OK例: Client Agent RPC factory modules は先頭で `import 'server-only';` を宣言する。
 
 **Rule: Client server-side SDK adapter は Client-owned context と SDK を使う。**
-Summary: Client server-side adapter は Agent runtime source を import せず、Client D1、encrypted Client Service signing key store、acting-user policy、managed Agent resolution を Client 側に閉じたまま、解決済み context で `@cf-tamac/sdk` を構築します。
+Summary: Client server-side adapter は Agent runtime source を import せず、Client D1、encrypted Client Service signing key store、acting-user policy、managed Agent resolution を Client 側に閉じたまま、解決済み context で `tamac-sdk` を構築します。
 Enforcement point: `pnpm lint:governance` via `scripts/governance/verify-package-boundaries.mjs`; `pnpm test:client` via `packages/client/src/tests/client-import-graph.test.ts`.
 NG例: `packages/client/src/server/agent-rpc/**` から `packages/agent/src/**` や `@cf-tamac/agent` runtime source を import する、または SDK、Connect runtime、generated descriptor を browser-visible module へ渡す。
-OK例: `@cf-tamac/sdk` を server-only module から使い、Client-owned storage/context を SDK input に限定し、SDK が自身の generated descriptor と binary Connect transport を使う。
+OK例: `tamac-sdk` を server-only module から使い、Client-owned storage/context を SDK input に限定し、SDK が自身の generated descriptor と binary Connect transport を使う。
 
 **Rule: Client Service JWT destination は canonical HTTPS allowlist で fail closed にする。**
 Summary: `AGENT_RPC_ALLOWED_ORIGINS` は unique canonical HTTPS origins の non-empty JSON array です。Browser registration input は canonicalize 後に exact match で承認し、Client D1 の stored origin は signing key、acting user、SDK transport の解決前に current policy で再検証します。
@@ -358,17 +358,23 @@ OK例: `feat: add agent registry shell`、`fix: close proxy route gap`、`docs: 
 
 ## 8. OpenSpec
 
-**Rule: OpenSpec は strict validation を lint の一部として通す。**
-Summary: `pnpm lint:openspec` は OpenSpec strict validation、Intent確認、Scenario coverage、task scope、wireframe preview checkを実行します。
-Enforcement point: `pnpm lint:openspec` via `package.json`、`scripts/openspec/verify-change-intent.mjs`、`scripts/openspec/verify-scenario-coverage.mjs`、`scripts/openspec/verify-change-task-scope.mjs`、`scripts/openspec/verify-wireframe-previews.mjs`.
-NG例: strict validation に失敗する change/spec artifact を残す。
-OK例: `pnpm lint:openspec` が pass する intent/proposal/spec/design/tasks にする。
+**Rule: OpenSpec の二つの変更スキーマと全成果物は厳格検査を通す。**
+Summary: `pnpm lint:openspec` は `behavior-change` / `architecture-change` のスキーマ、OpenSpec の厳格検査、規則試験、提案、Scenario と試験の追跡、作業パッケージと設計の対象範囲を検査します。
+Enforcement point: `pnpm lint:openspec` via `package.json`、`scripts/openspec/verify-change-proposal.mjs`、`scripts/openspec/verify-scenario-coverage.mjs`、`scripts/openspec/verify-change-task-scope.mjs`.
+NG例: 選択したスキーマに違反する Change 成果物を残す。
+OK例: `pnpm lint:openspec` が成功する `proposal.md`、差分仕様、`design.md`、`tasks.md` にする。
 
-**Rule: downstream artifactは所有者確認済みIntentから作成する。**
-Summary: repositoryの事実、推論、仮定、反証確認を分けた`intent.md`を所有者が確認するまでproposal以降へ進みません。
-Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-intent.mjs`.
-NG例: `Intent-Status: DRAFT`または`Owner-Confirmation: PENDING`のままproposal、spec、design、tasks、wireframeを作成する。
-OK例: 明示確認後に両markerを`CONFIRMED`へ変更し、確認済み成果と制約からdownstream artifactを作成する。
+**Rule: 後続成果物は解決済みの `proposal.md` から作成する。**
+Summary: 提案は依頼を成果、成果の制約、必須手段、候補手段へ分類し、重要な曖昧さが残る間は後続成果物を許可しません。
+Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-proposal.mjs`.
+NG例: `Intent-Resolution: DRAFT` のまま差分仕様、`design.md`、`tasks.md` を作成する。
+OK例: 依頼が十分なら `REQUEST_SUFFICIENT`、所有者が再構成した意図を明示確認した場合は `OWNER_CONFIRMED` とし、必須見出しと根拠を記載する。
+
+**Rule: OpenSpec は観測可能な振る舞いの契約とし、詳細な実装計画にしない。**
+Summary: `tasks.md` は粗い作業パッケージ台帳、アーキテクチャ変更の `design.md` は物質的な判断だけを記録します。
+Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-task-scope.mjs`.
+NG例: `tasks.md` をファイル、補助処理、試験階層ごとの計画へ分解する、または `design.md` に詳細な実装手順を追加する。
+OK例: `- [ ] WP<number>: <成果>`、`Covers`、`Completion Evidence` を持つ作業パッケージを置き、詳細は実装時に段階的に決める。
 
 **Rule: Scenario heading は stable Scenario ID で終わる。**
 Summary: `#### Scenario:` heading は `(...-S001)` 形式の stable ID で終わる必要があります。
@@ -377,7 +383,7 @@ NG例: `#### Scenario: Create agent` のように ID なしで書く、または
 OK例: `#### Scenario: Create agent (AGENT-PLATFORM-S001)` のように `^[\dA-Z]+(?:-[\dA-Z]+)*-S\d{3,}$` に一致させる。
 
 **Rule: Manual でない Scenario は automated test title から bracketed ID で参照する。**
-Summary: non-manual Scenario ID は test title の `[SCENARIO-ID]` から参照される必要があります。
+Summary: 自動化対象の Scenario ID は試験名の `[SCENARIO-ID]` から参照される必要があります。
 Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-coverage.mjs`; scanned tests include `packages/**`, `tests/**`, and `scripts/**` test/spec files.
 NG例: Scenario ID を test title から外す、または spec にない orphan Scenario ID を test title に入れる。
 OK例: `it('[AGENT-PLATFORM-S001] Create agent', ...)` のように bracketed ID を含める。
@@ -389,10 +395,28 @@ NG例: 自動化しない Scenario を manual tag なしで main spec に置く�
 OK例: Scenario heading の下に `Tags: manual` を置く。
 
 **Rule: Scenario ID は duplicate/orphan/missing coverage を残さない。**
-Summary: duplicate Scenario ID、main/change specs にない orphan test reference、missing automated coverage は失敗します。
+Summary: 重複した Scenario ID、主仕様と活動中差分にない孤立した試験参照、自動試験参照の欠落、活動中 Change 間の競合は失敗します。
 Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-coverage.mjs`.
 NG例: 同じ Scenario ID を複数置く、spec にない ID を tests で参照する、manual でない Scenario の test reference を忘れる。
-OK例: OpenSpec `spec.md` の Scenario ID と `packages/**`、`tests/**`、`scripts/**` の test titles を一致させる。
+OK例: 主仕様へ活動中差分を重ねた実効仕様と `packages/**`、`tests/**`、`scripts/**` の試験名を一致させ、一つの Change の確認後に全活動中 Change の検査も行う。
+
+**Rule: プルリクエスト本文に三つの独立した変更運用軸を記載する。**
+Summary: `Operation Lane`、`UX Mode`、`Review Depth` を個別に選び、運用区分から UX 方針やレビュー深度を推測しません。
+Enforcement point: `.github/workflows/validate-pr-template.yml`.
+NG例: `Operation Lane: BEHAVIOR` だけを記載し、`UX Mode` と `Review Depth` を空欄にする。
+OK例: `Operation Lane: ARCHITECTURE`、`UX Mode: CONTINUITY`、`Review Depth: DEEP` を個別に記載する。
+
+**Rule: `BEHAVIOR` と `ARCHITECTURE` は OpenSpec Change と Scenario ID を記載する。**
+Summary: 観測可能な振る舞いまたは物質的な構造を変えるプルリクエストは、対応する Change と一件以上の Scenario ID を示します。
+Enforcement point: `.github/workflows/validate-pr-template.yml`.
+NG例: `Operation Lane: ARCHITECTURE` で `OpenSpec Change: なし` または `Scenario IDs: なし` とする。
+OK例: `OpenSpec Change: make-delivery-opt-in-and-automate-releases` と `Scenario IDs: PACKAGE-RELEASE-AUTOMATION-S001` を記載する。`DIRECT` は理由付きの `なし` を使用できる。
+
+**Rule: 実際の UI / UX 変更では設計関与、実ブラウザ確認、変更前後画像を記録する。**
+Summary: UI を変更する場合はプロダクトデザイナー、デスクトップ、モバイル、アクセシビリティの確認と、四つの画像欄が必要です。
+Enforcement point: `.github/workflows/validate-pr-template.yml`.
+NG例: `UI / UX変更: あり` で `Mobile Before` の画像またはプロダクトデザイナー確認を省く。
+OK例: `Desktop Before`、`Desktop After`、`Mobile Before`、`Mobile After` の各節へ画像を添付し、実施した確認を記載する。
 
 ## 9. 設定参照
 
@@ -412,5 +436,8 @@ OK例: OpenSpec `spec.md` の Scenario ID と `packages/**`、`tests/**`、`scri
 | Agent surface governance            | `scripts/governance/verify-agent-surface.mjs`                                                                                                             |
 | Package boundary governance         | `scripts/governance/verify-package-boundaries.mjs`                                                                                                        |
 | OpenSpec scenario coverage          | `scripts/openspec/verify-scenario-coverage.mjs`                                                                                                           |
-| OpenSpec Intent gate                | `scripts/openspec/verify-change-intent.mjs`                                                                                                               |
+| OpenSpec proposal guard             | `scripts/openspec/verify-change-proposal.mjs`                                                                                                             |
+| OpenSpec task and design scope      | `scripts/openspec/verify-change-task-scope.mjs`                                                                                                           |
+| Change operation policy             | `docs/change-operation.md`                                                                                                                                |
+| Pull request operation metadata     | `.github/pull_request_template.md`、`.github/workflows/validate-pr-template.yml`                                                                          |
 | Supply-chain policy                 | `scripts/security/verify-pnpm-supply-chain.mjs`、`pnpm-workspace.yaml`                                                                                    |

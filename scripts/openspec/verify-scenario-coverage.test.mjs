@@ -1,166 +1,213 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { fileURLToPath, URL } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { runGuardInFixture } from '#openspec/guard-test-fixture';
 
-import {
-  collectTestScenarioReferences,
-  computeCoverage,
-  getDuplicateScenarioErrors,
-  indexScenariosById,
-  loadScenarios,
-} from './verify-scenario-coverage.mjs';
+const guardScriptPath = fileURLToPath(new URL('./verify-scenario-coverage.mjs', import.meta.url));
 
-function writeFixture(root, relativePath, content) {
-  const filePath = join(root, relativePath);
-  mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, content);
-  return filePath;
-}
-
+/**
+ * 試験 fixture 内だけで Scenario ID 参照記法を組み立て、実リポジトリの参照検査と分離する。
+ *
+ * @param {string} id - fixture で参照する Scenario ID。
+ * @returns {string} 角括弧で囲んだ試験題名用参照。
+ */
 function scenarioReference(id) {
   return `[${id}]`;
 }
 
-describe('OpenSpec Scenario ID coverage governance', () => {
-  it('[WORKSPACE-GOVERNANCE-S005] Scenario ID coverage validates foundation specs', () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), 'openspec-coverage-fixtures-'));
-    const validId = 'FOUNDATION-COVERAGE-S001';
-    const missingId = 'FOUNDATION-COVERAGE-S002';
-    const duplicateId = 'FOUNDATION-COVERAGE-S003';
-    const orphanId = 'FOUNDATION-COVERAGE-S999';
+/**
+ * 主仕様の一要件を作成し、差分適用試験の共通基準として使用する。
+ *
+ * @param {string} scenarioId - 主仕様へ記載する Scenario ID。
+ * @returns {string} OpenSpec 主仕様の内容。
+ */
+function createMainSpec(scenarioId = 'ACCOUNT-S001') {
+  return `## Purpose
 
-    try {
-      const validSpec = writeFixture(
-        fixtureRoot,
-        'specs/valid/spec.md',
-        `# Valid
+利用者のアカウント操作を保証する。
 
 ## Requirements
 
-### Requirement: Valid coverage
+### Requirement: アカウント表示
 
-#### Scenario: Valid covered behavior (${validId})
-- **WHEN** tests reference the scenario
-- **THEN** coverage passes for that scenario
-`
-      );
-      const missingSpec = writeFixture(
-        fixtureRoot,
-        'specs/missing/spec.md',
-        `# Missing
+システムはアカウントを表示しなければならない。
 
-## Requirements
+#### Scenario: アカウントを表示する (${scenarioId})
 
-### Requirement: Missing coverage
+- **WHEN** 利用者がアカウントを開く
+- **THEN** アカウントが表示される
+`;
+}
 
-#### Scenario: Missing test reference (${missingId})
-- **WHEN** no automated test references the scenario
-- **THEN** coverage reports it as missing
-`
-      );
-      const duplicateSpecA = writeFixture(
-        fixtureRoot,
-        'specs/duplicate-a/spec.md',
-        `# Duplicate A
+/**
+ * 一要件を含む差分仕様を作成する。
+ *
+ * @param {{ kind?: string; requirement?: string; scenarioId?: string; manual?: boolean }} [options] - 差分操作と Scenario の内容。
+ * @returns {string} OpenSpec 差分仕様の内容。
+ */
+function createDeltaSpec({
+  kind = 'ADDED',
+  requirement = 'アカウント作成',
+  scenarioId = 'ACCOUNT-S002',
+  manual = false,
+} = {}) {
+  return `## Purpose
 
-## Requirements
+利用者のアカウント操作を保証する。
 
-### Requirement: Duplicate coverage
+## ${kind} Requirements
 
-#### Scenario: Duplicate scenario A (${duplicateId})
-- **WHEN** two specs reuse an ID
-- **THEN** coverage reports a duplicate
-`
-      );
-      const duplicateSpecB = writeFixture(
-        fixtureRoot,
-        'specs/duplicate-b/spec.md',
-        `# Duplicate B
+### Requirement: ${requirement}
 
-## Requirements
+システムは要求された結果を返さなければならない。
 
-### Requirement: Duplicate coverage
+#### Scenario: 要求された結果を返す (${scenarioId})
 
-#### Scenario: Duplicate scenario B (${duplicateId})
-- **WHEN** two specs reuse an ID
-- **THEN** coverage reports a duplicate
-`
-      );
-      const testFile = writeFixture(
-        fixtureRoot,
-        'tests/coverage.test.mjs',
-        `it('${scenarioReference(validId)} covers valid behavior', () => {});
-it('${scenarioReference(duplicateId)} covers duplicate behavior once', () => {});
-it('${scenarioReference(orphanId)} references an unknown behavior', () => {});
-`
-      );
+${manual ? 'Tags: manual\n\n' : ''}- **WHEN** 利用者が操作する
+- **THEN** 要求された結果が表示される
+`;
+}
 
-      const { scenarios, parseErrors } = loadScenarios([validSpec, missingSpec, duplicateSpecA, duplicateSpecB]);
-      const byId = indexScenariosById(scenarios);
-      const duplicateErrors = getDuplicateScenarioErrors(byId);
-      const referencedIn = collectTestScenarioReferences([testFile]);
-      const { missing, orphans } = computeCoverage(byId, scenarios, referencedIn);
-
-      expect(parseErrors).toEqual([]);
-      expect(duplicateErrors).toEqual([expect.stringContaining(duplicateId)]);
-      expect(missing).toEqual([missingId]);
-      expect(orphans).toEqual([orphanId]);
-      expect(missing).not.toContain(validId);
-      expect(orphans).not.toContain(validId);
-    } finally {
-      rmSync(fixtureRoot, { recursive: true, force: true });
-    }
+// 主仕様と全活動中差分を重ねたScenarioが試験題名から追跡できることを確認する。
+void test('[WORKSPACE-GOVERNANCE-S005] 全活動中差分とスクリプト試験を検査する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/specs/account/spec.md': createMainSpec(),
+    'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec(),
+    'scripts/account.test.mjs': `test('${scenarioReference('ACCOUNT-S001')} display', () => {});\ntest('${scenarioReference('ACCOUNT-S002')} create', () => {});\n`,
   });
 
-  it('[WORKSPACE-GOVERNANCE-S012] Scenario coverage validates production auth specs and manual tags', () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), 'openspec-auth-coverage-fixtures-'));
-    const agentAuthId = 'AGENT-SECURITY-S010';
-    const clientAuthId = 'CLIENT-REGISTRY-S011';
-    const manualSmokeId = 'WORKSPACE-GOVERNANCE-S013';
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /coverage: OK/u);
+});
 
-    try {
-      const authSpec = writeFixture(
-        fixtureRoot,
-        'specs/auth/spec.md',
-        `## ADDED Requirements
+// 一つのChangeを指定した検査では、他の活動中差分を混在させないことを確認する。
+void test('--change は選択した差分だけを主仕様へ重ねる', () => {
+  const result = runGuardInFixture(
+    guardScriptPath,
+    {
+      'openspec/specs/account/spec.md': createMainSpec(),
+      'openspec/changes/change-a/specs/account/spec.md': createDeltaSpec({
+        kind: 'MODIFIED',
+        requirement: 'アカウント表示',
+        scenarioId: 'ACCOUNT-S010',
+      }),
+      'openspec/changes/change-b/specs/account/spec.md': createDeltaSpec({
+        kind: 'MODIFIED',
+        requirement: 'アカウント表示',
+        scenarioId: 'ACCOUNT-S020',
+      }),
+      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S010')} selected overlay', () => {});\n`,
+    },
+    ['--change', 'change-a']
+  );
 
-### Requirement: Production auth coverage
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stderr, /ACTIVE_SPEC_CONFLICT/u);
+});
 
-#### Scenario: Trust config resolves Ed25519 keys (${agentAuthId})
-- **WHEN** auth tests reference this scenario
-- **THEN** coverage passes
-
-#### Scenario: Signing key store is the only Agent RPC source (${clientAuthId})
-- **WHEN** auth tests reference this scenario
-- **THEN** coverage passes
-
-#### Scenario: Operator smoke remains manual (${manualSmokeId})
-Tags: manual
-- **WHEN** staging-only operator flow is documented
-- **THEN** automated coverage is not required
-`
-      );
-      const testFile = writeFixture(
-        fixtureRoot,
-        'tests/auth-coverage.test.mjs',
-        `it('${scenarioReference(agentAuthId)} covers trust config auth', () => {});
-it('${scenarioReference(clientAuthId)} covers signing source auth', () => {});
-`
-      );
-
-      const { scenarios, parseErrors } = loadScenarios([authSpec]);
-      const byId = indexScenariosById(scenarios);
-      const referencedIn = collectTestScenarioReferences([testFile]);
-      const { missing, orphans } = computeCoverage(byId, scenarios, referencedIn);
-
-      expect(parseErrors).toEqual([]);
-      expect(scenarios.find((scenario) => scenario.id === manualSmokeId)?.manual).toBe(true);
-      expect(missing).toEqual([]);
-      expect(orphans).toEqual([]);
-    } finally {
-      rmSync(fixtureRoot, { recursive: true, force: true });
-    }
+// 同じ要件を競合する形で変更する複数の活動中Changeが拒否されることを確認する。
+void test('異なる活動中 Change の物質的に異なる操作を拒否する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/specs/account/spec.md': createMainSpec(),
+    'openspec/changes/change-a/specs/account/spec.md': createDeltaSpec({
+      kind: 'MODIFIED',
+      requirement: 'アカウント表示',
+      scenarioId: 'ACCOUNT-S010',
+    }),
+    'openspec/changes/change-b/specs/account/spec.md': createDeltaSpec({
+      kind: 'MODIFIED',
+      requirement: 'アカウント表示',
+      scenarioId: 'ACCOUNT-S020',
+    }),
+    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S020')} latest overlay', () => {});\n`,
   });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /ACTIVE_SPEC_CONFLICT/u);
+});
+
+// 実効仕様で同じScenario IDが異なる振る舞いへ割り当てられないことを確認する。
+void test('実効仕様内で重複する Scenario ID を拒否する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/changes/add-account/specs/account/spec.md': `${createDeltaSpec()}
+### Requirement: アカウント削除
+
+#### Scenario: アカウントを削除する (ACCOUNT-S002)
+
+- **WHEN** 利用者が削除する
+- **THEN** アカウントが削除される
+`,
+    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S002')} account operation', () => {});\n`,
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Duplicate Scenario ID 'ACCOUNT-S002'/u);
+});
+
+// 自動化できない理由を明示したScenarioだけが試験参照の対象外になることを確認する。
+void test('[WORKSPACE-GOVERNANCE-S012] Tags: manual は試験参照を要求しない', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec({ manual: true }),
+  });
+
+  assert.equal(result.status, 0);
+});
+
+// 自動化対象Scenarioに対応する試験題名がない状態を検出することを確認する。
+void test('自動化対象 Scenario の参照欠落を拒否する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/specs/account/spec.md': createMainSpec(),
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Missing test reference 'ACCOUNT-S001'/u);
+});
+
+// 仕様から削除されたScenarioを試験題名が参照し続ける状態を検出することを確認する。
+void test('実効仕様にない試験参照を拒否する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S999')} orphan', () => {});\n`,
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Orphan test reference 'ACCOUNT-S999'/u);
+});
+
+// MODIFIED操作が旧Scenarioを残さず新しいScenarioへ置き換えることを確認する。
+void test('MODIFIED は主仕様の旧 Scenario を実効仕様から置き換える', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/specs/account/spec.md': createMainSpec(),
+    'openspec/changes/change-account/specs/account/spec.md': createDeltaSpec({
+      kind: 'MODIFIED',
+      requirement: 'アカウント表示',
+      scenarioId: 'ACCOUNT-S010',
+    }),
+    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} obsolete', () => {});\ntest('${scenarioReference('ACCOUNT-S010')} current', () => {});\n`,
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Orphan test reference 'ACCOUNT-S001'/u);
+});
+
+// 仕様単位の目的を欠く差分が意味不明なまま受理されないことを確認する。
+void test('差分仕様に Purpose を要求する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec().replace(
+      '## Purpose',
+      '## Context'
+    ),
+    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S002')} create', () => {});\n`,
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /## Purpose が必要/u);
+});
+
+// 入力誤りで存在しないChangeを指定した場合に明示的に失敗することを確認する。
+void test('存在しない --change の指定を拒否する', () => {
+  const result = runGuardInFixture(guardScriptPath, {}, ['--change', 'missing-change']);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /存在しません/u);
 });

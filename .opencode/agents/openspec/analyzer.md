@@ -192,7 +192,7 @@ Record the selected mode and evidence for the decision before reviewing.
 
 Use `FULL` when the caller requests it or when any of these apply:
 
-- A new Change or a broad rewrite of its intent, proposal, Specs, design, or
+- A new Change or a broad rewrite of its proposal, Specs, design, or
   tasks.
 - Multiple affected capabilities or Management Client/Agent Service cross-domain behavior.
 - Material API, persistence, security, authorization, sensitive-data,
@@ -216,13 +216,12 @@ uncertain, use `FULL`.
    - `pnpm exec openspec instructions apply --change "<change-id>" --json`
    - `pnpm exec openspec show --type change "<change-id>" --json --deltas-only`
    - `pnpm exec openspec validate --type change "<change-id>" --strict --no-interactive`
-2. Read every returned `contextFiles` path, each applicable wireframe JSON source,
-   relevant repository evidence, and overlapping active Changes.
-3. Treat generated wireframe previews and screenshots as rendering evidence,
-   not design sources.
-4. Keep deterministic validation failures separate from semantic findings. A
+2. Read every schema-returned `contextFiles` path, relevant repository evidence,
+   and overlapping active Changes. Use `proposal.md` as the authoritative
+   interpretation and require only artifacts defined by the selected schema.
+3. Keep deterministic validation failures separate from semantic findings. A
    validation failure makes the Change ineligible for approval but does not
-   suppress the five specialist calls required by `FULL` mode.
+   suppress the three specialist calls required by `FULL` mode.
 
 ## Full mode
 
@@ -230,7 +229,7 @@ Create one shared review brief containing the confirmed purpose, outcomes,
 constraints, non-goals, artifact paths, repository evidence paths, validation
 outputs, revision scope, and each delegate's exact assignment.
 
-Launch all five delegates in parallel in the same turn:
+Launch all three delegates in parallel in the same turn:
 
 1. `researcher`
    - Assignment: use `FACTS_ONLY` mode to investigate the Change and its
@@ -247,22 +246,15 @@ Launch all five delegates in parallel in the same turn:
      complexity. Inject the shared OpenSpec purpose, target artifacts,
      constraints, consumers, and review question as caller context; do not ask
      it to become OpenSpec-specific.
-4. `openspec/client/architect`
-   - Assignment: `FEASIBILITY_REVIEW` of the completed Management Client design
-     and tasks. Require `NOT_APPLICABLE` with evidence when the Client is unaffected.
-5. `openspec/agent/architect`
-   - Assignment: `FEASIBILITY_REVIEW` of the completed Agent Service design and
-     tasks. Require `NOT_APPLICABLE` with evidence when the Agent is unaffected.
-
-Do not serialize these initial calls. If a report lacks its required evidence
-or violates its assignment, request one corrected report from that same agent;
-do not perform the missing specialist work yourself.
+     Do not serialize these initial calls. If a report lacks its required evidence
+     or violates its assignment, request one corrected report from that same agent;
+     do not perform the missing specialist work yourself.
 
 ## Full-mode integration
 
 - Treat the Researcher report only as factual context. It cannot create a
   finding or verdict.
-- Treat every reviewer, Ponytailer, and Architect finding as a candidate, never
+- Treat every reviewer and Ponytailer finding as a candidate, never
   as an accepted result.
 - Re-read the cited evidence and evaluate each candidate through both loaded
   Skills before accepting it.

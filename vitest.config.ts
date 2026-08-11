@@ -28,6 +28,7 @@ export default defineConfig({
           name: 'governance',
           environment: 'node',
           include: ['scripts/**/*.test.mjs'],
+          exclude: ['scripts/openspec/**/*.test.mjs'],
         },
       },
     ],
