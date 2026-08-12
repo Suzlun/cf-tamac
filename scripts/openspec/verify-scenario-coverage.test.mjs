@@ -81,6 +81,34 @@ void test('[WORKSPACE-GOVERNANCE-S005] 全活動中差分とスクリプト試�
   assert.match(result.stdout, /coverage: OK/u);
 });
 
+// 提案工程では活動中差分の構造を検査し、未実装の試験参照までは要求しないことを確認する。
+void test('計画時は活動中差分の試験参照を要求しない', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'openspec/specs/account/spec.md': createMainSpec(),
+    'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec(),
+    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} display', () => {});\n`,
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /coverage: OK/u);
+});
+
+// 実装完了工程では選択Changeの自動化対象Scenarioへ試験参照を必須化することを確認する。
+void test('実装完了時は選択した差分の試験参照を要求する', () => {
+  const result = runGuardInFixture(
+    guardScriptPath,
+    {
+      'openspec/specs/account/spec.md': createMainSpec(),
+      'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec(),
+      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} display', () => {});\n`,
+    },
+    ['--change', 'add-account', '--require-test-references']
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Missing test reference 'ACCOUNT-S002'/u);
+});
+
 // 一つのChangeを指定した検査では、他の活動中差分を混在させないことを確認する。
 void test('--change は選択した差分だけを主仕様へ重ねる', () => {
   const result = runGuardInFixture(
@@ -97,7 +125,7 @@ void test('--change は選択した差分だけを主仕様へ重ねる', () => 
         requirement: 'アカウント表示',
         scenarioId: 'ACCOUNT-S020',
       }),
-      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S010')} selected overlay', () => {});\n`,
+      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} main', () => {});\ntest('${scenarioReference('ACCOUNT-S010')} selected overlay', () => {});\n`,
     },
     ['--change', 'change-a']
   );
@@ -147,9 +175,13 @@ void test('実効仕様内で重複する Scenario ID を拒否する', () => {
 
 // 自動化できない理由を明示したScenarioだけが試験参照の対象外になることを確認する。
 void test('[WORKSPACE-GOVERNANCE-S012] Tags: manual は試験参照を要求しない', () => {
-  const result = runGuardInFixture(guardScriptPath, {
-    'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec({ manual: true }),
-  });
+  const result = runGuardInFixture(
+    guardScriptPath,
+    {
+      'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec({ manual: true }),
+    },
+    ['--change', 'add-account', '--require-test-references']
+  );
 
   assert.equal(result.status, 0);
 });
@@ -175,7 +207,27 @@ void test('実効仕様にない試験参照を拒否する', () => {
 });
 
 // MODIFIED操作が旧Scenarioを残さず新しいScenarioへ置き換えることを確認する。
-void test('MODIFIED は主仕様の旧 Scenario を実効仕様から置き換える', () => {
+void test('実装完了時の MODIFIED は旧 Scenario 参照を孤立として拒否する', () => {
+  const result = runGuardInFixture(
+    guardScriptPath,
+    {
+      'openspec/specs/account/spec.md': createMainSpec(),
+      'openspec/changes/change-account/specs/account/spec.md': createDeltaSpec({
+        kind: 'MODIFIED',
+        requirement: 'アカウント表示',
+        scenarioId: 'ACCOUNT-S010',
+      }),
+      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} obsolete', () => {});\ntest('${scenarioReference('ACCOUNT-S010')} current', () => {});\n`,
+    },
+    ['--change', 'change-account', '--require-test-references']
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Orphan test reference 'ACCOUNT-S001'/u);
+});
+
+// 全体相互作用検査が置換済みの旧Scenario参照を再要求しないことを確認する。
+void test('全体検査は MODIFIED 実装後に旧 Scenario 参照を要求しない', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/specs/account/spec.md': createMainSpec(),
     'openspec/changes/change-account/specs/account/spec.md': createDeltaSpec({
@@ -183,11 +235,11 @@ void test('MODIFIED は主仕様の旧 Scenario を実効仕様から置き換�
       requirement: 'アカウント表示',
       scenarioId: 'ACCOUNT-S010',
     }),
-    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} obsolete', () => {});\ntest('${scenarioReference('ACCOUNT-S010')} current', () => {});\n`,
+    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S010')} current', () => {});\n`,
   });
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Orphan test reference 'ACCOUNT-S001'/u);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /coverage: OK/u);
 });
 
 // 仕様単位の目的を欠く差分が意味不明なまま受理されないことを確認する。

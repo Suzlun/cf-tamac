@@ -134,7 +134,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - Every `#### Scenario:` heading MUST end with a stable Scenario ID such as `(AGENT-LIFECYCLE-S001)`.
 - Automated tests MUST reference Scenario IDs in titles such as `it('[AGENT-LIFECYCLE-S001] Initialize an Agent', async () => { ... })`.
 - Add `Tags: manual` near a Scenario only when automation is not possible.
-- `scripts/openspec/verify-scenario-coverage.mjs` applies all active deltas to main specs by default and checks duplicate IDs, missing references, orphan references, and active-change conflicts.
-- Use `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>` for one selected Change, then run the default all-active-change check before completion.
+- `scripts/openspec/verify-scenario-coverage.mjs` applies active deltas for structural, duplicate-ID, and conflict validation. Planning requires test references only for main specs and recognizes references declared by any active delta.
+- Use `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>` while planning, `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references` at apply completion, then the default all-active-change check for interactions.
 - `tasks.md` is a coarse Work Package ledger. Plan file-level, helper-level, and test-level implementation progressively at runtime from the current package and evidence; do not persist a detailed master plan in OpenSpec.
 - OpenSpec guardrails run through `pnpm lint:openspec` and include schema validation, strict artifact validation, proposal scope, Scenario/Test traceability, and task/design scope.

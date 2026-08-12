@@ -9,7 +9,7 @@
 - 変更運用（一次資料）: `docs/change-operation.md`
 - 永続的な振る舞い契約: `openspec/specs/**/spec.md`
   - `pnpm lint` で変更スキーマ、提案、厳格な成果物形式、Scenario と試験の追跡、作業パッケージと設計の対象範囲を検査します
-  - `openspec/changes/*/specs/**/spec.md` の活動中差分は、主仕様へ重ねた実効仕様として同期前から検査されます
+  - 活動中差分は同期前から構造、識別子、競合を検査し、計画時は主仕様の試験参照だけを必須とします
 - SDK: `packages/sdk/**` の `tamac-sdk` は server-side Agent RPC SDK です。Browser-visible module から SDK、Connect runtime、generated RPC descriptor、credential、JWT signing を import しません。
 - SDK surface: `TamacAgentClient` は Client Service Ed25519 JWT operations、`TamacProviderIngressClient` は Provider Ed25519 detached-signature `PublishEvent` / `PublishToolResult` / `PublishDeliveryResult` です。Client D1、acting user、JWT context を Provider surface に渡しません。
 
@@ -105,6 +105,7 @@ OpenSpec の `tasks.md` は粗い作業パッケージ台帳です。ファイ�
 
 ```bash
 node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>
+node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references
 node scripts/openspec/verify-scenario-coverage.mjs
 ```
 

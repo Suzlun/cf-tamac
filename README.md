@@ -149,10 +149,11 @@ OpenSpec は、利用者または外部契約から観測できる振る舞い�
 
 Scenario 見出しは `(AGENT-LIFECYCLE-S001)` のような安定した識別子で終え、自動試験の題名は `[AGENT-LIFECYCLE-S001]` のように参照します。自動化できない Scenario には `Tags: manual` を記載します。
 
-既定の検査は、主仕様へすべての活動中差分を重ね、識別子の重複、試験参照の欠落、孤立参照、活動中 Change 間の競合を確認します。一つの Change だけを確認する場合は次を実行し、完了前には引数なしの全体検査も実行します。
+既定の検査は、活動中差分の構造、識別子の重複、Change 間の競合と、主仕様の試験参照を確認します。計画時は一つ目、実装完了時は二つ目、相互作用の最終確認では三つ目を実行します。
 
 ```bash
 node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>
+node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references
 node scripts/openspec/verify-scenario-coverage.mjs
 ```
 

@@ -231,10 +231,11 @@ Before the first implementation delegation, publish one timeline covering every 
    - Do not serialize independent Agent/Client work, page/component work, or other disjoint tasks without a concrete dependency reason
 4. After accepting implementation and verification evidence for a task, update only that task's checkbox in `tasks.md` from `- [ ]` to `- [x]`.
 5. Re-run `pnpm exec openspec instructions apply ... --json` after each completed batch and repeat steps 3 to 4 until the state is `all_done`.
-6. When the state is `all_done`, request final review from `@unit/review/facilitator`; it runs independent specialist reviews and cross-critique before returning one consolidated verdict.
-7. Route every valid in-scope finding to the responsible implementer, rerun affected verification, then rerun the entire facilitator review from its independent phase. Repeat until it returns `APPROVE`.
-8. If implementation or review exposes a material unresolved product, contract, architecture, security, data, dependency, or visible-surface decision, stop only the affected tasks and return `PROPOSER_REVIEW_REQUIRED` with repository and artifact evidence. Continue independent tasks that cannot be affected by that decision, but do not report the Change complete.
-9. If `@unit/review/facilitator` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
+6. When the state is `all_done`, run `node scripts/openspec/verify-scenario-coverage.mjs --change "<change-id>" --require-test-references` and resolve every missing or orphan test reference before continuing.
+7. Request final review from `@unit/review/facilitator`; it runs independent specialist reviews and cross-critique before returning one consolidated verdict.
+8. Route every valid in-scope finding to the responsible implementer, rerun affected verification, then rerun the entire facilitator review from its independent phase. Repeat until it returns `APPROVE`.
+9. If implementation or review exposes a material unresolved product, contract, architecture, security, data, dependency, or visible-surface decision, stop only the affected tasks and return `PROPOSER_REVIEW_REQUIRED` with repository and artifact evidence. Continue independent tasks that cannot be affected by that decision, but do not report the Change complete.
+10. If `@unit/review/facilitator` approves, report archive-ready evidence to the caller: command summaries, referenced paths, and diff highlights.
 
 Note: if a commit is needed, delegate it to `@unit/build/builder` after the required reviews pass.
 

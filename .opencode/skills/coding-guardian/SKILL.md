@@ -83,7 +83,7 @@ Dependency directions:
 - OpenSpec persists observable behavior, not a file-level implementation plan.
 - Keep `tasks.md` as coarse Work Packages; decide files, helpers, test layers, and local order progressively during implementation.
 - Preserve Scenario IDs across main Specs, active deltas, and test titles.
-- Validate one Change with `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>`, then run the global active-Change check.
+- Validate one Change while planning with `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>`, require full test references at apply completion with the same command plus `--require-test-references`, then run the global active-Change check.
 - Actual UI changes require a product designer and real desktop/mobile browser review. Generated mockups are optional non-contract evidence.
 - PRs record Operation Lane, UX Mode, Review Depth, OpenSpec Change, and Scenario IDs. `BEHAVIOR` and `ARCHITECTURE` require a Change and Scenario IDs.
 - Ask before dependency, version, or permission-boundary changes. Never perform a release, publication, deployment, environment mutation, credential access, or external approval as repository completion evidence.
