@@ -15,6 +15,12 @@ const validDesign = `## Material Decisions
 
 - 仕様境界に沿って責務を分離する。
 
+## Reuse Assessment
+
+| Need | Existing Repository Assets | Installed Packages | Established External Packages | Selected Reuse | Independent Implementation Justification |
+| ---- | -------------------------- | ------------------ | ----------------------------- | -------------- | ----------------------------------------- |
+| 依頼を分類する能力 | 既存の分類処理 | なし（理由: 既存処理で満たせる） | なし（理由: 外部依存は不要） | 既存の分類処理 | なし（理由: 独自実装を採用しない） |
+
 ## Boundaries
 
 - 依存方向を内向きに保つ。

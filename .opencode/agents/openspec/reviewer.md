@@ -1,5 +1,5 @@
 ---
-description: Independently reviews an OpenSpec Change for purpose/means separation, rule compliance, contradictions, misinterpretation, and material omissions.
+description: Independently reviews an OpenSpec Change for customer value, purpose/means separation, reuse evidence, contradictions, and material omissions.
 mode: subagent
 hidden: true
 model: openai/gpt-5.6-luna

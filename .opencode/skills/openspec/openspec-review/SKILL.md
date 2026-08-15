@@ -23,7 +23,8 @@ own structural checks.
 ## Purpose and means
 
 - Desired outcomes and outcome constraints may become Requirements and
-  Scenarios.
+  Scenarios only when their customer value is evident from the request or
+  confirmed interpretation.
 - Technologies, components, dependencies, structures, algorithms, procedures,
   migrations, tools, files, commands, tests, and implementation sequences are
   means.
@@ -34,6 +35,15 @@ own structural checks.
 - `design.md` exists only for `architecture-change` and contains material
   decisions, not local implementation decomposition.
 - `tasks.md` is a coarse work-package ledger, not a file or test-layer plan.
+- Standards, RFC compliance, packages, and implementation techniques remain
+  means unless the customer explicitly requires their externally observable
+  effect. A visible UI composition or placement may be an Outcome Constraint
+  when it directly expresses the requested experience; an internal component
+  structure remains a means.
+- An `architecture-change` design inventories relevant repository assets,
+  installed packages, and established external packages, selects the earliest
+  viable reuse level, and justifies independent implementation only when none of
+  those candidates can satisfy the confirmed outcome within repository rules.
 
 ## Finding categories
 
@@ -42,7 +52,8 @@ own structural checks.
 - `OVERREQUIREMENT`: an artifact requires behavior, structure, work, or an
   operational condition beyond its justified boundary.
 - `MISINTERPRETATION`: the Change changes the meaning of the resolved proposal,
-  promotes means into behavior, or presents assumptions as facts.
+  promotes means into behavior, adds behavior without evident customer value, or
+  presents assumptions as facts.
 - `MATERIAL_OMISSION`: missing information would force implementation to decide
   behavior, an external contract, architecture, security, data, dependency,
   runtime, scope, or material UX direction.
@@ -67,9 +78,15 @@ contradiction, excess, misinterpretation, or omission.
 1. Read all schema-returned `contextFiles` and relevant repository evidence.
 2. Separate outcomes, constraints, required means, and candidate means from the
    proposal.
-3. Trace every Requirement and Scenario only to outcomes or constraints.
-4. For `architecture-change`, verify every material decision preserves Specs and
-   includes a boundary and revisit trigger.
+3. Trace every Requirement and Scenario only to outcomes or constraints with
+   evident customer value. Reject an RFC, standard, package, or implementation
+   technique represented as behavior, while preserving confirmed visible UX
+   composition that directly defines the requested experience.
+4. For `architecture-change`, verify every material decision preserves Specs,
+   includes a boundary and revisit trigger, and is supported by complete reuse
+   evidence. Report missing candidate evaluation or selection as
+   `MATERIAL_OMISSION`; report unjustified independent implementation as
+   `OVERREQUIREMENT`.
 5. Verify each work package has justified coverage and objective evidence while
    leaving local implementation choices open.
 6. Group one root cause into one finding and try to disprove it before reporting.

@@ -18,6 +18,13 @@ context: |
   - `UX-Mode: NONE` means no user-visible surface changes.
   - `UX-Mode: CONTINUITY` preserves an identified existing experience and records its continuity source.
   - `UX-Mode: SHAPE` defines the primary user task and the intended experience direction before specifications are written.
+  - A visible UI composition or placement may be an Outcome Constraint when it directly expresses the experience the customer wants. Internal component structure remains a means.
+
+  YAGNI and reuse boundary:
+  - Keep only Requirements and Scenarios whose customer value is evident from the request or confirmed interpretation.
+  - Standards, RFC compliance, packages, and implementation techniques remain means unless the customer explicitly requires their externally observable effect.
+  - Before creating an `architecture-change`, investigate existing repository assets, installed packages, and established external packages.
+  - Independent implementation is allowed only when none of the reusable candidates can satisfy the confirmed outcome within security, supply-chain, and architecture rules.
 
   Change completion boundary:
   - A Change is complete when its Work Packages are implemented and merge-ready with reproducible repository-local or CI evidence.
@@ -42,11 +49,13 @@ rules:
     - Do not resolve a proposal while a material decision remains open.
   specs:
     - Begin every delta spec with `## Purpose`.
-    - Requirements and Scenarios contain only observable behavior or externally owned constraints.
+    - Requirements and Scenarios contain only observable behavior or externally owned constraints with evident customer value.
+    - Do not specify standards, RFC compliance, packages, or implementation techniques unless their externally observable effect is itself a confirmed outcome constraint.
     - Every Scenario heading includes a stable Scenario ID suffix in parentheses.
     - 'If a Scenario cannot be automated, include `Tags: manual` close to its heading.'
   design:
-    - Keep only material decisions, boundaries, data, security, migration, rollback, failure modes, risks, verification, and revisit triggers.
+    - Keep only material decisions, reuse assessment, boundaries, data, security, migration, rollback, failure modes, risks, verification, and revisit triggers.
+    - Record relevant repository assets, installed packages, established external packages, selected reuse, and evidence required for any independent implementation.
   tasks:
     - Keep `tasks.md` as a coarse Work Package ledger with objective completion evidence.
     - Do not create file-by-file, helper-by-helper, or test-layer-by-test-layer plans.

@@ -45,6 +45,14 @@ Treat solution-shaped wording as Desired Outcome, Outcome Constraint, Required
 Means, or Candidate Means. A required means may require `ARCHITECTURE`, but it
 never becomes a Requirement or Scenario.
 
+Practice YAGNI throughout classification and artifact work. Do not create a Spec
+Unit, Requirement, or Scenario unless its customer value is evident from the
+request or confirmed interpretation. Standards, RFC compliance, packages, and
+implementation techniques are means unless the customer explicitly needs their
+externally observable effect. A visible UI composition or placement may be an
+Outcome Constraint when it directly expresses the experience the customer wants,
+rather than prescribing an internal component implementation.
+
 ## DIRECT
 
 Create no directory, metadata, proposal, or placeholder Change. Return:
@@ -88,6 +96,26 @@ Use `REQUEST_SUFFICIENT` only when the request resolves every material
 ambiguity. Use `OWNER_CONFIRMED` only after explicit confirmation of the
 reconstructed interpretation.
 
+## Reuse investigation
+
+Before creating an `ARCHITECTURE` Change, investigate the implementation surface
+in this order:
+
+1. Existing repository code, shared boundaries, and established patterns.
+2. Installed packages confirmed from manifests and the lockfile.
+3. Established external packages relevant to needs not satisfied by the first
+   two levels, including current primary documentation, maintenance evidence,
+   compatibility, security, and supply-chain constraints.
+
+Record relevant candidates or a reasoned `none` for every level. Select existing
+code before installed packages, installed packages before adding an external
+package, and an external package before independent implementation whenever the
+earlier choice can satisfy the confirmed outcome within repository rules.
+Independent implementation is permitted only when the evidence shows that none
+of the reusable candidates can satisfy the confirmed outcome. Do not create the
+Change until this investigation is sufficient to bound the material dependency
+and reuse decisions.
+
 ## UX routing
 
 - `NONE`: record why no visible surface changes and perform no UI delegation.
@@ -109,9 +137,13 @@ Continue only after `ux/shaper` returns `DIRECTION_READY`. For
    repository evidence.
 2. Resolve the request interpretation in `proposal.md` using the schema template
    and instructions.
-3. Author Specs from desired outcomes and outcome constraints only. Every
-   Scenario has a stable ID; means remain outside Specs.
-4. For `ARCHITECTURE` only, identify each material decision. Call
+3. Author Specs from desired outcomes and outcome constraints with evident
+   customer value only. Every Scenario has a stable ID; standards, packages,
+   implementation techniques, and other means remain outside Specs. Preserve a
+   confirmed visible UX composition when it is itself an Outcome Constraint.
+4. For `ARCHITECTURE` only, identify each material decision and transfer the
+   reuse investigation, selected reuse, and any justified independent
+   implementation into `design.md`. Call
    `openspec/agent/architect` for Agent, TypeSpec, RPC, SDK, or Agent-owned data
    decisions and `openspec/client/architect` for Management Client or
    Client-owned data decisions in `DECISION_SUPPORT` only when repository

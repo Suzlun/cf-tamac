@@ -25,10 +25,10 @@ artifacts:
     template: spec.md
     instruction: |
       proposal.md で列挙した各 Spec Unit に `specs/<capability>/spec.md` を作成する。
-      冒頭の `## Purpose` に、永続的な仕様領域の目的を記載する。
+      冒頭の `## Purpose` に、依頼または確認済み解釈から顧客価値が明らかな永続的仕様領域の目的を記載する。
       差分見出しは `## ADDED Requirements`、`## MODIFIED Requirements`、`## REMOVED Requirements`、`## RENAMED Requirements` だけを使用する。
       Requirement と Scenario には、利用者または外部契約から観測できる終端状態だけを記載する。
-      実装方式、ファイル、パッケージ、補助処理、移行作業、試験計画を Requirement または Scenario にしない。
+      規格準拠、RFC準拠、実装方式、ファイル、パッケージ、補助処理、移行作業、試験計画を Requirement または Scenario にしない。ただし、顧客が求める体験そのものを表す可視のUI構成または配置は Outcome Constraint として記載できる。
       Scenario 見出しは `#### Scenario: <名称> (<CAPABILITY>-S###)` とし、安定した識別子を付ける。
       自動化できない Scenario は見出しの近くに `Tags: manual` を記載する。
     requires:

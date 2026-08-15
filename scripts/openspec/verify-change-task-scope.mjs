@@ -14,6 +14,7 @@ const REQUIRED_WORK_PACKAGE_FIELDS = [
 ];
 const ARCHITECTURE_DESIGN_HEADINGS = [
   'Material Decisions',
+  'Reuse Assessment',
   'Boundaries',
   'Data',
   'Security',

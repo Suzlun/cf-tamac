@@ -370,11 +370,11 @@ Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-prop
 NG例: `Intent-Resolution: DRAFT` のまま差分仕様、`design.md`、`tasks.md` を作成する。
 OK例: 依頼が十分なら `REQUEST_SUFFICIENT`、所有者が再構成した意図を明示確認した場合は `OWNER_CONFIRMED` とし、必須見出しと根拠を記載する。
 
-**Rule: OpenSpec は観測可能な振る舞いの契約とし、詳細な実装計画にしない。**
-Summary: `tasks.md` は粗い作業パッケージ台帳、アーキテクチャ変更の `design.md` は物質的な判断だけを記録します。
+**Rule: OpenSpec は顧客価値に直結する観測可能な振る舞いの契約とし、詳細な実装計画にしない。**
+Summary: 規格、RFC、パッケージ、実装方式は手段として仕様から分離し、希望体験そのものを表す可視のUI構成だけを成果の制約として扱います。`tasks.md` は粗い作業パッケージ台帳、アーキテクチャ変更の `design.md` は物質的な判断と再利用評価だけを記録します。
 Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-task-scope.mjs`.
-NG例: `tasks.md` をファイル、補助処理、試験階層ごとの計画へ分解する、または `design.md` に詳細な実装手順を追加する。
-OK例: `- [ ] WP<number>: <成果>`、`Covers`、`Completion Evidence` を持つ作業パッケージを置き、詳細は実装時に段階的に決める。
+NG例: i18nのRFC準拠または使用パッケージをRequirementにする、`tasks.md`を詳細分解する、または`design.md`で再利用候補と採否を記載しない。
+OK例: 顧客が求める言語で利用できる終端状態をRequirementにし、`Reuse Assessment`で既存コード、導入済みパッケージ、実績のある外部パッケージと採用対象を示す。
 
 **Rule: Scenario heading は stable Scenario ID で終わる。**
 Summary: `#### Scenario:` heading は `(...-S001)` 形式の stable ID で終わる必要があります。

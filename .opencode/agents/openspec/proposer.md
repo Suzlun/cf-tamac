@@ -1,5 +1,5 @@
 ---
-description: Classifies planning requests, returns no OpenSpec work for DIRECT, and authors schema-specific Changes with optional UX shaping and architecture decision support.
+description: Classifies planning requests, preserves only evident customer value in Specs, and minimizes implementation through reuse-first schema-specific Changes.
 mode: subagent
 model: openai/gpt-5.6-sol
 reasoningEffort: 'high'
