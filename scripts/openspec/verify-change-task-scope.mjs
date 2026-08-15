@@ -25,6 +25,9 @@ const ARCHITECTURE_DESIGN_HEADINGS = [
   'Verification',
   'Revisit Triggers',
 ];
+const ARCHITECTURE_DESIGN_HEADINGS_WITHOUT_REUSE = ARCHITECTURE_DESIGN_HEADINGS.filter(
+  (heading) => heading !== 'Reuse Assessment'
+);
 const FILE_PLAN_PATTERN =
   /(?:^|[\s`(])(?:[\w@.-]+\/)+[\w.-]+|\b[\w.-]+\.(?:cjs|css|html|js|jsx|json|md|mjs|sql|ts|tsx|yaml|yml)\b/iu;
 const HELPER_PLAN_PATTERN =
@@ -212,7 +215,11 @@ for (const designPath of collectActiveChangeArtifacts(
   const names = headings.map(({ name }) => name);
 
   // architecture-change の設計を物質的判断だけに限定し、旧来のファイル一覧や詳細計画を再導入させない。
-  if (names.join('\u0000') !== ARCHITECTURE_DESIGN_HEADINGS.join('\u0000')) {
+  if (
+    ![ARCHITECTURE_DESIGN_HEADINGS, ARCHITECTURE_DESIGN_HEADINGS_WITHOUT_REUSE].some(
+      (allowedHeadings) => names.join('\u0000') === allowedHeadings.join('\u0000')
+    )
+  ) {
     addError(
       errors,
       designPath,
