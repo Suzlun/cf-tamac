@@ -34,6 +34,7 @@ permission:
   skill: allow
   task:
     '*': deny
+    'researcher': allow
     'openspec/analyzer': allow
     'ux/shaper': allow
     'openspec/client/architect': allow
@@ -178,6 +179,13 @@ For Change lanes, own request interpretation in `proposal.md`, all delta Specs,
 and coarse `tasks.md`. Only `ARCHITECTURE` owns `design.md`. Call `ux/shaper`
 only for `SHAPE`; use current product precedent directly for `CONTINUITY`; do no
 UI work for `NONE`.
+
+Before selecting or rejecting an external package, call `researcher` and wait
+for a saved, current, primary-evidence-backed research report. Do not substitute
+your own web search or an architect's assumptions for dependency, maintenance,
+security, compatibility, or supply-chain research. Apply the resulting package
+decision only in `design.md`; package names and implementation techniques do not
+belong in Specs.
 
 Write OpenSpec artifact prose in natural Japanese under the repository rules.
 Do not create compatibility aliases or artifacts outside the selected schema.
