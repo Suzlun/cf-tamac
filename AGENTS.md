@@ -42,6 +42,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 5. すべてのルールには意図がある。必ず意図を理解すること。意図を理解しないまま改定したり、逆に遵守しようとしてはならない。
 6. 常に完璧なプロダクトであること。妥協、横着、顧客にとって意味のないプロダクトを作ることは一切許されない。仮置きを残す、後回し、コメントにしておいて放置に決してしてはならない。後回しという言葉は発することするら厳禁である。最小実装などという言葉は何があっても使ってはならないし、問題の本質的な解決以外の解決は一切認めない。
 7. いかなる理由があろうと、クレドに違反しないこと、クレド違反を放置しないことを最優先とすること。どのクレドによって肯定しうるのか、その作業内容が一切クレドに違反しないことを必ず方針の前に声に出して報告しなければならない。
+8. YAGNIを徹底し、その精神を極めること。車輪の再発明と不必要に多い実装を欠陥として忌避すること。セキュリティ、サプライチェーン、アーキテクチャのすべての規則が許す限り、まず既存のコードを再利用し、既存のコードで満たせない場合は実績のある外部パッケージを利用すること。独自実装は、既存のコードと外部パッケージのいずれでも検証された顧客成果を満たせないことを確認した場合に限る。
 
 ## Code Comments
 
@@ -73,6 +74,9 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 ## Testing
 
+- Tests MUST be limited to the smallest set needed to verify business value and the applicable observable contract.
+- You MUST NOT create tests whose subject is development tooling or a development phase rather than business value.
+- Pursue the highest business value per test. Prefer a small number of strong tests that cover meaningful outcomes over many narrow tests that verify implementation details.
 - All unit tests: `pnpm test:run`
 - Agent tests: `pnpm test:agent`
 - Management Client tests: `pnpm test:client`
