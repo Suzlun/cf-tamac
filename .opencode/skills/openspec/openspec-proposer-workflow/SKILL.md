@@ -162,10 +162,10 @@ Architect output is accepted only when it includes `Recommendation`,
 
 ## Planning Ready
 
-A Change is Planning Ready when behavior, external contracts, architecture,
-security, data, dependencies, runtime, scope, and material UX direction are
-resolved. Concrete files, private APIs, helpers, test layers, fixtures, and
-within-package order remain implementation freedom.
+Apply the planning-completion boundary from `docs/change-operation.md` and
+`openspec-review`. Resolve only the selected schema's confirmed outcomes and
+material decisions; leave concrete representations and local implementation
+choices to apply when they preserve the resolved meaning.
 
 ## Convergence
 

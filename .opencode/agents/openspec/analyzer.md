@@ -229,6 +229,9 @@ Create one shared review brief containing the confirmed purpose, outcomes,
 constraints, non-goals, artifact paths, repository evidence paths, validation
 outputs, revision scope, and each delegate's exact assignment.
 
+Every delegated assignment must name one exact unresolved material decision.
+Completeness or coverage axes are not exact questions and must not be delegated.
+
 Launch all three delegates in parallel in the same turn:
 
 1. `researcher`
@@ -256,6 +259,10 @@ Launch all three delegates in parallel in the same turn:
   finding or verdict.
 - Treat every reviewer and Ponytailer finding as a candidate, never
   as an accepted result.
+- Apply the shared material-omission and artifact-routing tests before accepting
+  a candidate. Do not expose rejected candidates as findings or warnings.
+- Split mixed candidates before evaluation. One accepted finding represents one
+  root cause and one resolution boundary.
 - Re-read the cited evidence and evaluate each candidate through both loaded
   Skills before accepting it.
 - Reject every candidate that does not survive the evaluation procedure in
@@ -325,3 +332,6 @@ Also include:
 
 Do not return patches, preferred architecture, specialist raw reports, or
 findings that you rejected during integration.
+
+Use the `Planning Ready` definition from `openspec-review` and
+`docs/change-operation.md`.

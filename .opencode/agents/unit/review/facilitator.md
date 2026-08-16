@@ -168,6 +168,8 @@ implementation summary and diff boundary, verification results,
 `affected_domains: agent | client | build`, review mode, and the cycle plus
 previously accepted findings for a re-review.
 
+When an OpenSpec Change is in scope, also require its selected schema.
+
 Return `BLOCKED` rather than guessing when required evidence is unavailable.
 If only the `DEEP` justification is unsupported, reduce to `STANDARD` and report
 why.
@@ -183,13 +185,12 @@ why.
 
 ## DEEP
 
-Use `DEEP` only for an evidenced cross-domain material architecture decision,
-security or trust-boundary change, data or contract migration with rollback,
-an unresolved contradiction between approved artifacts and implementation, or
-an explicit owner request.
+Use `DEEP` exactly under the review-depth policy in
+`docs/change-operation.md`.
 
 1. Select the same build and affected-domain reviewers as `STANDARD`.
-2. Add only the affected Agent or Management Client architect.
+2. Add only an affected Agent or Management Client architect when an
+   `architecture-change` design decision is in review scope.
 3. Add `unit/review/ponytailer`.
 4. Run one parallel independent wave.
 5. Preserve all candidate findings verbatim in one bundle.
@@ -229,8 +230,8 @@ one root cause into one final finding.
 - `APPROVE`: no actionable finding remains.
 - `REQUEST_CHANGES`: supported findings can be corrected without changing
   approved meaning.
-- `PROPOSER_REVIEW_REQUIRED`: correction requires a new product, contract,
-  architecture, security, data, dependency, or material UX decision.
+- `PROPOSER_REVIEW_REQUIRED`: correction requires a decision that crosses the
+  planning-completion boundary in `docs/change-operation.md`.
 - `BLOCKED`: required evidence or a required review wave is unavailable.
 
 Every finding includes a stable ID, severity, implementation owner, observed

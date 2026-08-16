@@ -54,13 +54,31 @@ own structural checks.
 - `MISINTERPRETATION`: the Change changes the meaning of the resolved proposal,
   promotes means into behavior, adds behavior without evident customer value, or
   presents assumptions as facts.
-- `MATERIAL_OMISSION`: missing information would force implementation to decide
-  behavior, an external contract, architecture, security, data, dependency,
-  runtime, scope, or material UX direction.
+- `MATERIAL_OMISSION`: missing information leaves a pre-implementation decision
+  that can materially change a confirmed customer-valued outcome, externally
+  owned contract meaning, architecture, security, data, dependency, runtime,
+  scope, or material UX direction.
 
 Files, private APIs, helper decomposition, test layers, fixture layout, and
 within-ready-package order are not material omissions when resolved boundaries
-permit local choice.
+permit local choice. A choice is not a planning omission merely because the
+contract source of truth or implementation must make it when the choice
+preserves confirmed outcomes, externally owned contract meaning, and every
+material boundary.
+
+## Artifact routing
+
+- Accept a candidate omission only after identifying the exact confirmed
+  outcome, externally owned contract meaning, or material boundary it can change
+  and the OpenSpec artifact or owner decision that must resolve it before
+  implementation.
+- Specs own customer-valued terminal outcomes and confirmed externally
+  observable constraints. `design.md` owns only material architecture,
+  security, data, dependency, and runtime decisions.
+- The repository's contract source of truth, `tasks.md`, and progressive
+  implementation own concrete representations, local construction,
+  verification details, and choices within resolved boundaries. Reject
+  completeness requests that cannot pass the material-omission test.
 
 ## UX review
 
@@ -82,14 +100,18 @@ contradiction, excess, misinterpretation, or omission.
    evident customer value. Reject an RFC, standard, package, or implementation
    technique represented as behavior, while preserving confirmed visible UX
    composition that directly defines the requested experience.
-4. For `architecture-change`, verify every material decision preserves Specs,
+4. For every candidate omission, identify the exact confirmed outcome or
+   material boundary it can change and its required resolution owner. Reject
+   contract-completeness and implementation-choice findings that do not pass
+   this test.
+5. For `architecture-change`, verify every material decision preserves Specs,
    includes a boundary and revisit trigger, and is supported by complete reuse
    evidence. Report missing candidate evaluation or selection as
    `MATERIAL_OMISSION`; report unjustified independent implementation as
    `OVERREQUIREMENT`.
-5. Verify each work package has justified coverage and objective evidence while
+6. Verify each work package has justified coverage and objective evidence while
    leaving local implementation choices open.
-6. Group one root cause into one finding and try to disprove it before reporting.
+7. Group one root cause into one finding and try to disprove it before reporting.
 
 ## Results
 
@@ -99,8 +121,10 @@ contradiction, excess, misinterpretation, or omission.
 - `DECISION_REQUIRED`: a material decision in the omission boundary is needed.
 - `FAILED`: required evidence cannot be read or evaluated.
 
-`APPROVED` means Planning Ready: implementation may decide files, private APIs,
-helpers, test layers, fixtures, and ready-package order locally.
+`APPROVED` means Planning Ready under the lifecycle boundary in
+`docs/change-operation.md`. Implementation may decide concrete representations,
+files, private APIs, helpers, test layers, fixtures, and ready-package order when
+those choices preserve the resolved meaning.
 
 ## Finding format
 

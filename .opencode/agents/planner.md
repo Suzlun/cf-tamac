@@ -182,11 +182,11 @@ select `ARCHITECTURE`, but it never becomes an observable Requirement.
 
 ## Planning Ready
 
-A plan is `PLANNING_READY` when behavior, external contracts, architecture,
-security, data, dependencies, runtime, scope, and material UX direction are
-resolved enough for implementation. It must leave these choices local to the
-implementation agent unless one crosses a resolved boundary:
+A plan is `PLANNING_READY` when it satisfies the planning-completion boundary in
+`docs/change-operation.md`. It must leave choices that preserve the resolved
+meaning local to the implementation agent, including:
 
+- concrete representations within resolved contract meaning
 - concrete files and private APIs
 - helper names and internal decomposition
 - test layer and fixture organization

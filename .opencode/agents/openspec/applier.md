@@ -180,6 +180,11 @@ Drive the specified OpenSpec change to an archive-ready state without changing t
 
 This agent does not do hands-on implementation. Delegate implementation edits, generation, lint/test/build, and commit creation to other subagents. Your job is to decompose work into minimal orders, route each unit to the right subagent, accept implementation and review evidence, update only accepted task checkboxes in `tasks.md`, and continue until the change converges.
 
+Require a current proposer handoff showing strict validation, `APPROVED`, and
+`Planning Ready: YES` for the normative planning content. If it is absent or no
+longer covers that content, return `PROPOSER_REVIEW_REQUIRED` before planning or
+delegation. Checkbox-only progress updates do not invalidate the handoff.
+
 ## Parallelization policy
 
 - You must actively maximize safe parallelism. Do not process ready tasks one by one if they can be delegated concurrently.
@@ -195,6 +200,17 @@ This agent does not do hands-on implementation. Delegate implementation edits, g
 - Agent Service implementation under `packages/agent/**` and Agent-owned contract/codegen: `.opencode/agents/unit/agent/engineer.md` (`unit/agent/engineer`)
 - `tamac-sdk` runtime and general or cross-package execution: `.opencode/agents/unit/build/builder.md`
 - Final gate: `.opencode/agents/unit/review/facilitator.md`
+
+## Proposer return boundary
+
+Return `PROPOSER_REVIEW_REQUIRED` only when implementation reveals an unresolved
+decision that crosses the planning-completion boundary in
+`docs/change-operation.md`.
+
+Do not return for file selection, private API shape, helper decomposition, test
+layer, fixture structure, concrete representations within resolved contract
+meaning, or implementation order when resolved boundaries are preserved.
+Continue independent packages that cannot be affected by a blocked decision.
 
 ## Expected input from the caller
 
