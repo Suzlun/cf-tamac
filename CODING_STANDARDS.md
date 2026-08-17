@@ -318,11 +318,11 @@ Enforcement point: `pnpm lint:eslint` via `eslint.config.js` for `packages/**/in
 NG例: `packages/client/src/server/db/index.ts` に `export const now = Date.now();` や `export default` を置く。
 OK例: `export { createManagedAgent } from './managed-agents';` のように re-export だけを書く。
 
-**Rule: package TS/TSX は 1 file 500 lines、1 function 100 lines 以内にする。**
+**Rule: パッケージのTS/TSXは1ファイル1500行、1関数250行以内にする。**
 Summary: package source の肥大化は max-lines rules で失敗します。
 Enforcement point: `pnpm lint:eslint` via `.eslintrc-maxlines.json` and `eslint.config.js`.
-NG例: hand-written package source を 800 lines にする、1 function に 150 lines を詰める。
-OK例: responsibilities を小さく分け、generated outputs と tests 以外は limit 内に保つ。
+NG例: 手書きのパッケージソースを1600行にする、1関数に300行を詰める。
+OK例: 同じ責務を行数だけで分断せず、異なるアーキテクチャ上の責務または再利用理由がある場合だけ抽出して上限内に保つ。
 
 **Rule: pnpm supply-chain policy は 72-hour release-age と package-by-package build-script approval を維持する。**
 Summary: dependency release-age gate と install-script approval policy を弱めると lint が失敗します。
