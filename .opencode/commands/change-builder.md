@@ -21,4 +21,4 @@ Present each unit's outcome, scope, classification, dependencies, and safe
 parallel groups for explicit approval. After approval, delegate only units that
 require a Change to `openspec/proposer`. Independent proposals may run in
 parallel. Do not implement from this command. Report evidence that each proposal
-passes strict validation and Scenario coverage and returns `Planning Ready: YES`.
+passes strict validation and Scenario validation and returns `Planning Ready: YES`.

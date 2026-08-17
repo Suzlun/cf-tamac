@@ -2,6 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
+import ts from 'typescript';
+
 import { collectActiveChangeDirectories, isDirectory } from '#openspec/change-artifacts';
 
 const SCENARIO_ID_PATTERN = /^[\dA-Z]+(?:-[\dA-Z]+)*-S\d{3,}$/;
@@ -26,7 +28,7 @@ const IGNORED_DIRECTORIES = new Set([
  */
 
 /**
- * @typedef {{ id: string; manual: boolean; relPath: string; line: number }} Scenario
+ * @typedef {{ id: string; relPath: string; line: number }} Scenario
  */
 
 /**
@@ -121,27 +123,6 @@ function extractScenarioId(headingBody, relPath, line) {
 }
 
 /**
- * Scenario 本文の先頭部分から自動化除外タグを取得する。
- *
- * @param {string[]} lines - 仕様ファイルの行配列。
- * @param {number} headingIndex - Scenario 見出しの 0 始まり行位置。
- * @returns {boolean} 次の見出しまでに `manual` タグがある場合は `true`。
- */
-function isManualScenario(lines, headingIndex) {
-  for (
-    let index = headingIndex + 1;
-    index < Math.min(lines.length, headingIndex + 21);
-    index += 1
-  ) {
-    const line = lines.at(index) ?? '';
-    if (/^#{1,4}\s+/u.test(line)) break;
-    const tags = /^Tags:\s*(.+?)\s*$/iu.exec(line)?.[1];
-    if (tags?.split(',').some((tag) => tag.trim().toLowerCase() === 'manual')) return true;
-  }
-  return false;
-}
-
-/**
  * 要件本文に含まれる Scenario を抽出し、識別子形式を同時に検査する。
  *
  * @param {string[]} lines - 仕様ファイル全体の行配列。
@@ -166,7 +147,6 @@ function parseScenarios(lines, startIndex, endIndex, relPath) {
     }
     scenarios.push({
       id: extracted.id,
-      manual: isManualScenario(lines, index),
       relPath,
       line: index + 1,
     });
@@ -301,26 +281,16 @@ function parseSpecFile(absolutePath, context) {
  * コマンドラインから全活動中差分または単一 Change の選択を解釈する。
  *
  * @param {string[]} args - Node.js 実行引数のスクリプト名以降。
- * @returns {{ changeId: string | null; requireTestReferences: boolean; error: string | null }} 選択結果、試験参照の厳格化指定、または利用方法エラー。
+ * @returns {{ changeId: string | null; error: string | null }} 選択結果または利用方法エラー。
  */
 function parseArguments(args) {
-  if (args.length === 0) return { changeId: null, requireTestReferences: false, error: null };
+  if (args.length === 0) return { changeId: null, error: null };
   if (args.length === 2 && args[0] === '--change' && /^[a-z0-9][a-z0-9-]*$/u.test(args[1] ?? '')) {
-    return { changeId: args[1] ?? null, requireTestReferences: false, error: null };
-  }
-  if (
-    args.length === 3 &&
-    args[0] === '--change' &&
-    /^[a-z0-9][a-z0-9-]*$/u.test(args[1] ?? '') &&
-    args[2] === '--require-test-references'
-  ) {
-    return { changeId: args[1] ?? null, requireTestReferences: true, error: null };
+    return { changeId: args[1] ?? null, error: null };
   }
   return {
     changeId: null,
-    requireTestReferences: false,
-    error:
-      'Usage: node scripts/openspec/verify-scenario-coverage.mjs [--change <change-id> [--require-test-references]]',
+    error: 'Usage: node scripts/openspec/verify-scenario-coverage.mjs [--change <change-id>]',
   };
 }
 
@@ -474,57 +444,121 @@ function indexScenarios(requirements) {
 }
 
 /**
- * アプリケーション試験とスクリプト試験から Scenario ID 参照と参照元を収集する。
+ * Playwrightの`test`関数またはその実行用修飾子を持つ呼び出しか判定する。
+ *
+ * @param {ts.Expression} expression - 呼び出し対象の構文要素。
+ * @param {Set<string>} testNames - `test`として読み込まれた局所名。
+ * @param {Set<string>} namespaceNames - Playwright名前空間として読み込まれた局所名。
+ * @returns {boolean} Playwright試験を宣言する呼び出しの場合は`true`。
+ */
+function isPlaywrightTestCall(expression, testNames, namespaceNames) {
+  if (ts.isIdentifier(expression)) return testNames.has(expression.text);
+  if (!ts.isPropertyAccessExpression(expression)) return false;
+
+  if (['only', 'skip', 'fixme', 'fail'].includes(expression.name.text)) {
+    return isPlaywrightTestCall(expression.expression, testNames, namespaceNames);
+  }
+
+  return (
+    expression.name.text === 'test' &&
+    ts.isIdentifier(expression.expression) &&
+    namespaceNames.has(expression.expression.text)
+  );
+}
+
+/**
+ * TypeScript構文木からPlaywright E2E試験の静的な題名だけを取得する。
+ *
+ * @param {string} source - E2E試験ファイルの内容。
+ * @param {string} absolutePath - 構文解析対象の絶対パス。
+ * @returns {string[]} 文字列リテラルで宣言された試験題名。
+ */
+function collectPlaywrightTestTitles(source, absolutePath) {
+  const sourceFile = ts.createSourceFile(
+    absolutePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    absolutePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+  const testNames = new Set(['test']);
+  const namespaceNames = new Set();
+
+  // `@playwright/test`の名前付き別名と名前空間読み込みを収集し、局所名で呼び出しを判定する。
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    if (
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== '@playwright/test'
+    )
+      continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) {
+      namespaceNames.add(bindings.name.text);
+      continue;
+    }
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if ((element.propertyName ?? element.name).text === 'test') testNames.add(element.name.text);
+    }
+  }
+
+  const titles = [];
+  const visit = (node) => {
+    if (
+      ts.isCallExpression(node) &&
+      isPlaywrightTestCall(node.expression, testNames, namespaceNames)
+    ) {
+      const title = node.arguments[0];
+      if (title && (ts.isStringLiteral(title) || ts.isNoSubstitutionTemplateLiteral(title))) {
+        titles.push(title.text);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return titles;
+}
+
+/**
+ * Playwright E2E試験の静的な題名からScenario ID参照を収集する。
  *
  * @param {string} repositoryRoot - リポジトリルートの絶対パス。
- * @returns {Map<string, Set<string>>} Scenario ID ごとの参照元相対パス。
+ * @returns {Map<string, Set<string>>} Scenario IDごとの参照元E2E試験ファイル。
  */
 function collectTestReferences(repositoryRoot) {
-  const files = [
-    ...collectFiles(path.join(repositoryRoot, 'packages'), (absolutePath) =>
-      TEST_FILE_PATTERN.test(absolutePath)
-    ),
-    ...collectFiles(path.join(repositoryRoot, 'tests'), (absolutePath) =>
-      TEST_FILE_PATTERN.test(absolutePath)
-    ),
-    ...collectFiles(path.join(repositoryRoot, 'scripts'), (absolutePath) =>
-      TEST_FILE_PATTERN.test(absolutePath)
-    ),
-  ];
+  const files = collectFiles(path.join(repositoryRoot, 'tests', 'e2e'), (absolutePath) =>
+    TEST_FILE_PATTERN.test(absolutePath)
+  );
   const references = new Map();
   for (const absolutePath of files) {
     const relPath = path.relative(repositoryRoot, absolutePath);
-    for (const match of readFileSync(absolutePath, 'utf8').matchAll(SCENARIO_REF_PATTERN)) {
-      const id = match.groups?.id;
-      if (!id) continue;
-      const paths = references.get(id) ?? new Set();
-      paths.add(relPath);
-      references.set(id, paths);
+    const source = readFileSync(absolutePath, 'utf8');
+    for (const title of collectPlaywrightTestTitles(source, absolutePath)) {
+      for (const scenarioMatch of title.matchAll(SCENARIO_REF_PATTERN)) {
+        const id = scenarioMatch.groups?.id;
+        if (!id) continue;
+        const paths = references.get(id) ?? new Set();
+        paths.add(relPath);
+        references.set(id, paths);
+      }
     }
   }
   return references;
 }
 
 /**
- * 選択した工程で必須となる試験参照と、既知の全 Scenario に対する孤立参照を検査する。
+ * Playwright E2E試験から仕様に存在しないScenarioへの孤立参照を検出する。
  *
- * @param {Map<string, Scenario[]>} scenariosById - 実効仕様の Scenario 索引。
- * @param {Map<string, Set<string>>} references - 試験からの Scenario 参照。
+ * @param {Set<string>} knownScenarioIds - 有効な参照先Scenario ID。
+ * @param {Map<string, Set<string>>} references - Playwright E2E試験側のScenario ID参照。
  * @returns {string[]} 利用者が修正できる診断一覧。
  */
-function validateCoverage(requiredScenariosById, knownScenarioIds, references) {
+function validateReferences(knownScenarioIds, references) {
   const errors = [];
-  for (const [id, scenarios] of requiredScenariosById) {
-    if (scenarios.some((scenario) => !scenario.manual) && !references.has(id)) {
-      const scenario = scenarios.find((entry) => !entry.manual) ?? scenarios[0];
-      errors.push(
-        `Missing test reference '${id}': ${scenario?.relPath}:${String(scenario?.line ?? 1)}`
-      );
-    }
-  }
   for (const [id, paths] of references) {
     if (!knownScenarioIds.has(id))
-      errors.push(`Orphan test reference '${id}': ${[...paths].sort().join(', ')}`);
+      errors.push(`Orphan Playwright E2E reference '${id}': ${[...paths].sort().join(', ')}`);
   }
   return errors.sort();
 }
@@ -551,7 +585,7 @@ function validateScenarioDefinitions(scenariosById) {
 }
 
 /**
- * CLI 全体を実行し、計画時または実装完了時の仕様と試験参照の整合を報告する。
+ * CLI全体を実行し、仕様構造とPlaywright E2E試験からScenarioへの参照を検証する。
  *
  * @returns {void}
  */
@@ -592,7 +626,7 @@ function main() {
   const effectiveScenariosById = indexScenarios(effective.requirements);
   errors.push(...validateScenarioDefinitions(effectiveScenariosById));
 
-  // 選択検査でも別の活動中 Change の実装試験を孤立参照と誤判定しないよう、全差分の ID を収集する。
+  // 選択検査でも別の活動中Changeを参照するE2E試験を孤立と誤判定しないよう、全差分のIDを収集する。
   const allDeltaOperations = [];
   if (parsedArguments.changeId === null) {
     allDeltaOperations.push(...deltaOperations);
@@ -607,40 +641,16 @@ function main() {
       allDeltaOperations.push(...parsed.operations);
     }
   }
-  const knownOperations = parsedArguments.requireTestReferences
-    ? [
-        ...effective.requirements,
-        ...allDeltaOperations.filter(
-          (operation) => operation.changeId !== parsedArguments.changeId
-        ),
-      ]
-    : [...baseOperations, ...allDeltaOperations];
+  const knownOperations = [...baseOperations, ...allDeltaOperations];
   const knownScenarioIds = new Set(indexScenarios(knownOperations).keys());
-  const replacedMainTargets = new Set(
-    allDeltaOperations
-      .filter((operation) => operation.kind === 'MODIFIED' || operation.kind === 'REMOVED')
-      .map((operation) => `${operation.capability}\u0000${operation.target}`)
-  );
-  const stableBaseOperations = baseOperations.filter(
-    (operation) => !replacedMainTargets.has(`${operation.capability}\u0000${operation.target}`)
-  );
-  const requiredScenariosById = parsedArguments.requireTestReferences
-    ? effectiveScenariosById
-    : indexScenarios(parsedArguments.changeId === null ? stableBaseOperations : baseOperations);
-  errors.push(
-    ...validateCoverage(
-      requiredScenariosById,
-      knownScenarioIds,
-      collectTestReferences(repositoryRoot)
-    )
-  );
+  errors.push(...validateReferences(knownScenarioIds, collectTestReferences(repositoryRoot)));
 
   if (errors.length === 0) {
-    process.stdout.write('OpenSpec scenario coverage: OK\n');
+    process.stdout.write('OpenSpec scenario validation: OK\n');
     return;
   }
   process.stderr.write(
-    `OpenSpec scenario coverage: FAILED\n${[...new Set(errors)]
+    `OpenSpec scenario validation: FAILED\n${[...new Set(errors)]
       .sort()
       .map((error) => `- ${error}`)
       .join('\n')}\n`

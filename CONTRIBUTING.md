@@ -8,8 +8,8 @@
   - `eslint.config.js` は規約の自動検査（実装）として追従させます
 - 変更運用（一次資料）: `docs/change-operation.md`
 - 永続的な振る舞い契約: `openspec/specs/**/spec.md`
-  - `pnpm lint` で変更スキーマ、提案、厳格な成果物形式、Scenario と試験の追跡、作業パッケージと設計の対象範囲を検査します
-  - 活動中差分は同期前から構造、識別子、競合を検査し、計画時は主仕様の試験参照だけを必須とします
+  - `pnpm lint` で変更スキーマ、提案、厳格な成果物形式、Playwright E2E試験からScenarioへの一方向参照、作業パッケージと設計の対象範囲を検査します
+  - 活動中差分は同期前から構造、識別子、競合を検査し、Scenarioから自動試験への参照は要求しません
 - SDK: `packages/sdk/**` の `tamac-sdk` は server-side Agent RPC SDK です。Browser-visible module から SDK、Connect runtime、generated RPC descriptor、credential、JWT signing を import しません。
 - SDK surface: `TamacAgentClient` は Client Service Ed25519 JWT operations、`TamacProviderIngressClient` は Provider Ed25519 detached-signature `PublishEvent` / `PublishToolResult` / `PublishDeliveryResult` です。Client D1、acting user、JWT context を Provider surface に渡しません。
 
@@ -73,9 +73,10 @@ Husky によりコミット時に検証されます。
 - 自動生成ファイルは手で直さない
   - 例: `packages/agent/proto/**`、`packages/agent/src/generated/rpc/**`、`packages/client/src/generated/agent-rpc/**`、`packages/sdk/src/generated/agent-rpc/**`
 - `packages/sdk/src/generated/agent-rpc/**` を含む4つの generated roots は mandatory policy target です。contract は TypeSpec -> proto -> descriptors の順で更新し、互換コピーを追加しません。
-- 仕様が変わる変更は spec とテストをセットで更新する
-  - `#### Scenario: ... (..-S001)` に対して、テストタイトルに `[...-S001]` を含める
-  - 自動化できない Scenario は `Tags: manual` を明示する
+- 仕様が変わる変更は spec と必要な試験を一緒に更新する
+  - Playwright E2E試験だけが題名から既存Scenarioを`[...-S001]`の形式で参照する
+  - Scenarioごとの自動試験は要求せず、純粋な単体試験はScenario識別子を参照しない
+  - 試験分類はPlaywright E2E試験と純粋な単体試験だけとし、試験専用の製品側API、公開要素、生成処理、分岐、Binding、設定を作らない
 - OpenSpec Change の `proposal.md` は、依頼を成果、成果の制約、必須手段、候補手段へ分類し、リポジトリの事実と照合した権威ある解釈とする
   - 重要な曖昧さが残る間は `Intent-Resolution: DRAFT` とし、差分仕様、設計、作業パッケージを作成しない
 
@@ -105,7 +106,6 @@ OpenSpec の `tasks.md` は粗い作業パッケージ台帳です。ファイ�
 
 ```bash
 node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>
-node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references
 node scripts/openspec/verify-scenario-coverage.mjs
 ```
 

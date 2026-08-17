@@ -21,7 +21,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/agent/src/env.ts`: Agent binding types and no-Client-D1 boundary
 - `packages/agent/src/rpc/**`: Connect Worker adapter, router, fail-closed service modules, interceptors, and Durable Object dispatcher
 - `packages/agent/src/storage/schema/agent-storage.ts`: Agent-owned DO SQLite schema constants
-- `packages/agent/src/tests/*.test.ts`: `AGENT-PLATFORM-*` Scenario ID coverage
+- `packages/agent/src/tests/*.test.ts`: Agent package verification tests; these titles are not OpenSpec Scenario traceability sources
 
 ## Agent TypeSpec, proto, and RPC codegen
 
@@ -48,7 +48,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/sdk/src/client.ts`, `packages/sdk/src/transport.ts`, `packages/sdk/src/auth/**`, `packages/sdk/src/errors.ts`, `packages/sdk/src/invocation-context.ts`: Client Service aggregate, binary Connect transport, Ed25519 JWT metadata, error normalization, and invocation context
 - `packages/sdk/src/provider-ingress.ts`, `packages/sdk/src/provider-ingress-transport.ts`, `packages/sdk/src/provider-ingress-types.ts`: Provider-only detached-signature `PublishEvent` / `PublishToolResult` / `PublishDeliveryResult` surface, canonical unsigned-Protobuf digest, and restricted request/correlation metadata
 - `packages/sdk/src/generated/agent-rpc/**`: command-owned Agent RPC descriptor output from `pnpm gen:agent:rpc`; do not hand-edit
-- `packages/sdk/src/tests/*.test.ts`: `TAMAC-SDK-*` Scenario ID coverage
+- `packages/sdk/src/tests/*.test.ts`: SDK package verification tests; these titles are not OpenSpec Scenario traceability sources
 
 ## Management Client foundation enforcement
 
@@ -64,7 +64,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `packages/client/src/server/agent-rpc/agent-loader.ts`: managed Agent stored-origin revalidation before signing-key, acting-user, or SDK transport resolution
 - `packages/client/src/server/agent-rpc/safe-results.ts`: Browser-safe four-field result (`displayData`, `safeStatus`, `safeErrorCategory`, `correlationId`) without raw diagnostics or secrets
 - `packages/client/src/server/db/**`: Client D1 schema, migrations, managed Agent records, credential reference repositories, and encrypted Client Service signing-key store only
-- `packages/client/src/tests/*.test.ts*`: `client-*` Scenario ID coverage
+- `packages/client/src/tests/*.test.ts*`: Management Client package verification tests; these titles are not OpenSpec Scenario traceability sources
 
 ## Git hooks
 
@@ -86,7 +86,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `openspec/schemas/behavior-change/schema.yaml`: observable behavior Change artifact order and scope
 - `openspec/schemas/architecture-change/schema.yaml`: material architecture Change artifact order and scope
 - `scripts/openspec/verify-change-proposal.mjs`: resolved proposal structure, request classification, and `UX-Mode` evidence
-- `scripts/openspec/verify-scenario-coverage.mjs`: main specs plus active delta application, Scenario/Test traceability, and `--change` selection
+- `scripts/openspec/verify-scenario-coverage.mjs`: main specs plus active delta application, one-way Playwright E2E-to-Scenario traceability, and `--change` selection
 - `scripts/openspec/verify-change-task-scope.mjs`: coarse Work Package and material design scope
 
 ## Pull request enforcement

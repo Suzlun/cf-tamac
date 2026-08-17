@@ -74,9 +74,13 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 ## Testing
 
-- Tests MUST be limited to the smallest set needed to verify business value and the applicable observable contract.
-- You MUST NOT create tests whose subject is development tooling or a development phase rather than business value.
-- Pursue the highest business value per test. Prefer a small number of strong tests that cover meaningful outcomes over many narrow tests that verify implementation details.
+- Automated tests exist only to protect confirmed customer value by detecting unintended regressions before customers encounter them.
+- Only two automated test categories are allowed:
+  - Playwright E2E tests exercise high-value customer journeys through public product surfaces. They exclusively own Scenario ID references in titles such as `test('[USER-MGMT-S001] Create a user', async () => { ... })`.
+  - Pure unit tests protect deterministic, customer-impacting rules in isolation. They MUST NOT access a database, network, filesystem, server, Workerd, or another runtime, and MUST NOT reference Scenario IDs.
+- Integration, connection, contract, real-database, Workerd-specific, and runtime-specific test suites are prohibited. Preserve customer journeys with Playwright E2E tests and isolated rules with pure unit tests instead.
+- Never add or retain production APIs, exports, factories, branches, bindings, or configuration solely to support tests. Remove the test rather than changing production code for test access.
+- Use the fewest tests that preserve the highest-value outcomes. Do not duplicate the same customer assurance across layers or files.
 - All unit tests: `pnpm test:run`
 - Agent tests: `pnpm test:agent`
 - Management Client tests: `pnpm test:client`
@@ -136,9 +140,8 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - OpenCode core definitions under `.opencode/commands/opsx-*.md` and `.opencode/skills/openspec-*/SKILL.md` are generated together from OpenSpec `1.8.0` by `pnpm gen:openspec` and must not be hand-edited. Repository-specific supplemental OpenSpec skills remain under `.opencode/skills/openspec/`.
 - Main behavior specs live at `openspec/specs/**/spec.md`; active deltas live under `openspec/changes/*/specs/**/spec.md`.
 - Every `#### Scenario:` heading MUST end with a stable Scenario ID such as `(AGENT-LIFECYCLE-S001)`.
-- Automated tests MUST reference Scenario IDs in titles such as `it('[AGENT-LIFECYCLE-S001] Initialize an Agent', async () => { ... })`.
-- Add `Tags: manual` near a Scenario only when automation is not possible.
-- `scripts/openspec/verify-scenario-coverage.mjs` applies active deltas for structural, duplicate-ID, and conflict validation. Planning requires test references only for main specs and recognizes references declared by any active delta.
-- Use `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>` while planning, `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references` at apply completion, then the default all-active-change check for interactions.
+- Scenario traceability is one-way: Playwright E2E test titles may reference existing Scenario IDs, but Scenarios do not require automated test references.
+- `scripts/openspec/verify-scenario-coverage.mjs` applies active deltas for structural, duplicate-ID, and conflict validation and rejects only Playwright E2E title references to nonexistent Scenario IDs.
+- Use `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>` for one Change and the default all-active-change check for interactions.
 - `tasks.md` is a coarse Work Package ledger. Plan file-level, helper-level, and test-level implementation progressively at runtime from the current package and evidence; do not persist a detailed master plan in OpenSpec.
-- OpenSpec guardrails run through `pnpm lint:openspec` and include schema validation, strict artifact validation, proposal scope, Scenario/Test traceability, and task/design scope.
+- OpenSpec guardrails run through `pnpm lint:openspec` and include schema validation, strict artifact validation, proposal scope, one-way Playwright E2E-to-Scenario traceability, and task/design scope.

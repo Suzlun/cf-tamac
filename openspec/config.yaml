@@ -4,7 +4,7 @@ context: |
   Repository: cf-tamac
   Tech stack: TypeScript, React, Next.js, Cloudflare Workers, Durable Objects, Drizzle ORM, TypeSpec, Protobuf, Connect RPC
   Product boundaries: Agent Worker, server-side SDK, Management Client
-  Testing: Vitest (unit/integration), Node.js script tests, Playwright (e2e)
+  Testing: Vitest (pure unit), Playwright (E2E)
 
   Intent resolution boundary:
   - `proposal.md` is the authoritative interpretation of the request.
@@ -30,13 +30,14 @@ context: |
   - A Change is complete when its Work Packages are implemented and merge-ready with reproducible repository-local or CI evidence.
   - Do not include release execution, deployment, environment provisioning, credential access, external approval, staging or production validation, rehearsal, or production observation.
 
-  Spec -> Test contract:
+  Test -> Spec contract:
   - Main specs live at `openspec/specs/**/spec.md`.
   - Active delta specs participate in structural, duplicate-ID, and conflict validation before archive or sync.
-  - Planning validation requires test references for main specs and accepts references declared by any active delta; apply completion requires full references for the selected effective spec.
   - Every Scenario heading ends with a stable ID such as `(AGENT-LIFECYCLE-S001)`.
-  - Automated tests reference Scenario IDs in titles such as `[AGENT-LIFECYCLE-S001]`.
-  - A Scenario excluded from automation contains `Tags: manual` close to its heading.
+  - Playwright E2E test titles may reference existing Scenario IDs such as `[AGENT-LIFECYCLE-S001]`.
+  - Scenario definitions do not require automated test references, and pure unit tests never reference Scenario IDs.
+  - Only Playwright E2E tests and pure unit tests are allowed. Do not add integration, connection, contract, real-database, Workerd-specific, or runtime-specific test suites.
+  - Never change production APIs, exports, factories, branches, bindings, or configuration solely to support tests.
 
   Spec Units:
   - A Spec Unit is a kebab-case enduring product capability or externally owned contract area.
@@ -52,7 +53,6 @@ rules:
     - Requirements and Scenarios contain only observable behavior or externally owned constraints with evident customer value.
     - Do not specify standards, RFC compliance, packages, or implementation techniques unless their externally observable effect is itself a confirmed outcome constraint.
     - Every Scenario heading includes a stable Scenario ID suffix in parentheses.
-    - 'If a Scenario cannot be automated, include `Tags: manual` close to its heading.'
   design:
     - Keep only material decisions, reuse assessment, boundaries, data, security, migration, rollback, failure modes, risks, verification, and revisit triggers.
     - Record relevant repository assets, installed packages, established external packages, selected reuse, and evidence required for any independent implementation.

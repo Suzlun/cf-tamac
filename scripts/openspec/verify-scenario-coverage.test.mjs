@@ -43,14 +43,13 @@ function createMainSpec(scenarioId = 'ACCOUNT-S001') {
 /**
  * 一要件を含む差分仕様を作成する。
  *
- * @param {{ kind?: string; requirement?: string; scenarioId?: string; manual?: boolean }} [options] - 差分操作と Scenario の内容。
+ * @param {{ kind?: string; requirement?: string; scenarioId?: string }} [options] - 差分操作とScenarioの内容。
  * @returns {string} OpenSpec 差分仕様の内容。
  */
 function createDeltaSpec({
   kind = 'ADDED',
   requirement = 'アカウント作成',
   scenarioId = 'ACCOUNT-S002',
-  manual = false,
 } = {}) {
   return `## Purpose
 
@@ -64,49 +63,47 @@ function createDeltaSpec({
 
 #### Scenario: 要求された結果を返す (${scenarioId})
 
-${manual ? 'Tags: manual\n\n' : ''}- **WHEN** 利用者が操作する
+- **WHEN** 利用者が操作する
 - **THEN** 要求された結果が表示される
 `;
 }
 
-// 主仕様と全活動中差分を重ねたScenarioが試験題名から追跡できることを確認する。
-void test('[WORKSPACE-GOVERNANCE-S005] 全活動中差分とスクリプト試験を検査する', () => {
+// 主仕様と全活動中差分を重ねたScenarioをPlaywright E2E試験題名から検査できることを確認する。
+void test('[WORKSPACE-GOVERNANCE-S005] 全活動中差分とPlaywright E2E試験を検査する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/specs/account/spec.md': createMainSpec(),
     'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec(),
-    'scripts/account.test.mjs': `test('${scenarioReference('ACCOUNT-S001')} display', () => {});\ntest('${scenarioReference('ACCOUNT-S002')} create', () => {});\n`,
+    'tests/e2e/account.spec.ts': `test('${scenarioReference('ACCOUNT-S001')} display', () => {});\ntest('${scenarioReference('ACCOUNT-S002')} create', () => {});\n`,
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /coverage: OK/u);
+  assert.match(result.stdout, /validation: OK/u);
 });
 
-// 提案工程では活動中差分の構造を検査し、未実装の試験参照までは要求しないことを確認する。
-void test('計画時は活動中差分の試験参照を要求しない', () => {
+// ScenarioからPlaywright E2E試験への参照を要求しないことを確認する。
+void test('ScenarioにPlaywright E2E試験参照を要求しない', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/specs/account/spec.md': createMainSpec(),
     'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec(),
-    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} display', () => {});\n`,
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /coverage: OK/u);
+  assert.match(result.stdout, /validation: OK/u);
 });
 
-// 実装完了工程では選択Changeの自動化対象Scenarioへ試験参照を必須化することを確認する。
-void test('実装完了時は選択した差分の試験参照を要求する', () => {
+// 廃止した試験参照必須オプションを受け付けないことを確認する。
+void test('廃止した試験参照必須オプションを拒否する', () => {
   const result = runGuardInFixture(
     guardScriptPath,
     {
       'openspec/specs/account/spec.md': createMainSpec(),
       'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec(),
-      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} display', () => {});\n`,
     },
     ['--change', 'add-account', '--require-test-references']
   );
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Missing test reference 'ACCOUNT-S002'/u);
+  assert.match(result.stderr, /Usage:/u);
 });
 
 // 一つのChangeを指定した検査では、他の活動中差分を混在させないことを確認する。
@@ -125,7 +122,7 @@ void test('--change は選択した差分だけを主仕様へ重ねる', () => 
         requirement: 'アカウント表示',
         scenarioId: 'ACCOUNT-S020',
       }),
-      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} main', () => {});\ntest('${scenarioReference('ACCOUNT-S010')} selected overlay', () => {});\n`,
+      'tests/e2e/account.spec.ts': `test('${scenarioReference('ACCOUNT-S001')} main', () => {});\ntest('${scenarioReference('ACCOUNT-S010')} selected overlay', () => {});\n`,
     },
     ['--change', 'change-a']
   );
@@ -148,7 +145,6 @@ void test('異なる活動中 Change の物質的に異なる操作を拒否す�
       requirement: 'アカウント表示',
       scenarioId: 'ACCOUNT-S020',
     }),
-    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S020')} latest overlay', () => {});\n`,
   });
 
   assert.equal(result.status, 1);
@@ -166,68 +162,78 @@ void test('実効仕様内で重複する Scenario ID を拒否する', () => {
 - **WHEN** 利用者が削除する
 - **THEN** アカウントが削除される
 `,
-    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S002')} account operation', () => {});\n`,
   });
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Duplicate Scenario ID 'ACCOUNT-S002'/u);
 });
 
-// 自動化できない理由を明示したScenarioだけが試験参照の対象外になることを確認する。
-void test('[WORKSPACE-GOVERNANCE-S012] Tags: manual は試験参照を要求しない', () => {
-  const result = runGuardInFixture(
-    guardScriptPath,
-    {
-      'openspec/changes/add-account/specs/account/spec.md': createDeltaSpec({ manual: true }),
-    },
-    ['--change', 'add-account', '--require-test-references']
-  );
-
-  assert.equal(result.status, 0);
-});
-
-// 自動化対象Scenarioに対応する試験題名がない状態を検出することを確認する。
-void test('自動化対象 Scenario の参照欠落を拒否する', () => {
+// Scenario参照がなくても仕様構造の検査を通過することを確認する。
+void test('Scenario参照がなくても仕様検査を通過する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/specs/account/spec.md': createMainSpec(),
   });
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Missing test reference 'ACCOUNT-S001'/u);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /validation: OK/u);
 });
 
-// 仕様から削除されたScenarioを試験題名が参照し続ける状態を検出することを確認する。
-void test('実効仕様にない試験参照を拒否する', () => {
+// 実効仕様にないPlaywright E2E試験参照を検出することを確認する。
+void test('実効仕様にないPlaywright E2E試験参照を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
-    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S999')} orphan', () => {});\n`,
+    'tests/e2e/account.spec.ts': "test('[ACCOUNT-S999] orphan', () => {});\n",
   });
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Orphan test reference 'ACCOUNT-S999'/u);
+  assert.match(result.stderr, /Orphan Playwright E2E reference 'ACCOUNT-S999'/u);
 });
 
-// MODIFIED操作が旧Scenarioを残さず新しいScenarioへ置き換えることを確認する。
-void test('実装完了時の MODIFIED は旧 Scenario 参照を孤立として拒否する', () => {
-  const result = runGuardInFixture(
-    guardScriptPath,
-    {
-      'openspec/specs/account/spec.md': createMainSpec(),
-      'openspec/changes/change-account/specs/account/spec.md': createDeltaSpec({
-        kind: 'MODIFIED',
-        requirement: 'アカウント表示',
-        scenarioId: 'ACCOUNT-S010',
-      }),
-      'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S001')} obsolete', () => {});\ntest('${scenarioReference('ACCOUNT-S010')} current', () => {});\n`,
-    },
-    ['--change', 'change-account', '--require-test-references']
-  );
+// @playwright/testの名前付き別名を読み取って孤立参照を検出することを確認する。
+void test('別名で読み込んだPlaywright testのScenario IDを検査する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'tests/e2e/account.spec.ts':
+      "import { test as e2e } from '@playwright/test';\ne2e('[ACCOUNT-S999] orphan', () => {});\n",
+  });
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Orphan test reference 'ACCOUNT-S001'/u);
+  assert.match(result.stderr, /Orphan Playwright E2E reference 'ACCOUNT-S999'/u);
 });
 
-// 全体相互作用検査が置換済みの旧Scenario参照を再要求しないことを確認する。
-void test('全体検査は MODIFIED 実装後に旧 Scenario 参照を要求しない', () => {
+// @playwright/testの名前空間とonly修飾子を読み取ることを確認する。
+void test('Playwright名前空間の修飾testにあるScenario IDを検査する', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'tests/e2e/account.spec.ts':
+      "import * as playwright from '@playwright/test';\nplaywright.test.only('[ACCOUNT-S999] orphan', () => {});\n",
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Orphan Playwright E2E reference 'ACCOUNT-S999'/u);
+});
+
+// Playwright以外の別名・名前空間とdescribe、コメント、文字列例を追跡しないことを確認する。
+void test('Playwright以外から読み込んだtest別名と名前空間を追跡対象にしない', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'tests/e2e/account.spec.ts':
+      "import { test as helperTest } from './helper';\nimport * as helper from './helper';\nhelperTest('[ACCOUNT-S999] alias', () => {});\nhelper.test('[ACCOUNT-S998] namespace', () => {});\n",
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /validation: OK/u);
+});
+
+void test('単体試験とE2E試験題名以外のScenario IDを追跡対象にしない', () => {
+  const result = runGuardInFixture(guardScriptPath, {
+    'packages/account/account.test.ts': "test('[ACCOUNT-S998] unit', () => {});\n",
+    'tests/e2e/account.spec.ts':
+      "// test('[ACCOUNT-S999] note', () => {});\nconst example = \"test('[ACCOUNT-S997] string')\";\ntest.describe('[ACCOUNT-S996] group', () => {});\ntest('scenario reference is absent', () => {});\n",
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /validation: OK/u);
+});
+
+// 活動中差分のScenarioを全体検査の参照先として認識することを確認する。
+void test('全体検査は活動中差分のScenarioをE2E参照先として認識する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/specs/account/spec.md': createMainSpec(),
     'openspec/changes/change-account/specs/account/spec.md': createDeltaSpec({
@@ -235,11 +241,11 @@ void test('全体検査は MODIFIED 実装後に旧 Scenario 参照を要求し�
       requirement: 'アカウント表示',
       scenarioId: 'ACCOUNT-S010',
     }),
-    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S010')} current', () => {});\n`,
+    'tests/e2e/account.spec.ts': "test('[ACCOUNT-S010] current', () => {});\n",
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /coverage: OK/u);
+  assert.match(result.stdout, /validation: OK/u);
 });
 
 // 仕様単位の目的を欠く差分が意味不明なまま受理されないことを確認する。
@@ -249,7 +255,6 @@ void test('差分仕様に Purpose を要求する', () => {
       '## Purpose',
       '## Context'
     ),
-    'tests/account.test.ts': `test('${scenarioReference('ACCOUNT-S002')} create', () => {});\n`,
   });
 
   assert.equal(result.status, 1);

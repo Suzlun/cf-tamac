@@ -189,7 +189,7 @@ meaning local to the implementation agent, including:
 - concrete representations within resolved contract meaning
 - concrete files and private APIs
 - helper names and internal decomposition
-- test layer and fixture organization
+- policy-compliant Playwright E2E or pure-unit selection and fixture organization
 - implementation order within a ready work package
 
 For `DIRECT`, report a compact implementation outcome, affected ownership area,
@@ -208,7 +208,7 @@ Outcome: <observable result>
 Material boundaries:
 - <boundary or none>
 Local implementation freedom:
-- files, private APIs, helpers, test layer, and ready-package order
+- files, private APIs, helpers, policy-compliant test details, and ready-package order
 Required next route: <unit agent | openspec/proposer>
 Decision required: none | <one exact material decision>
 ```

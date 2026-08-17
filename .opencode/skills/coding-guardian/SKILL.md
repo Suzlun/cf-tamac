@@ -35,7 +35,7 @@ Important enforcement entrypoints:
 - Management Client: `packages/client/package.json`, Worker and Next.js configuration, `packages/client/app/**`, `packages/client/src/server/**`
 - Security boundaries: Client destination policy, encrypted signing-key storage, browser-safe results, Provider ingress authentication and admission
 - Governance: `scripts/governance/**`, `scripts/security/**`, `scripts/openspec/**`
-- OpenSpec: generated core commands and skills, both custom schemas, and the proposal, Scenario coverage, and task/design scope validators
+- OpenSpec: generated core commands and skills, both custom schemas, and the proposal, Scenario validation, and task/design scope validators
 - Pull requests: `.github/pull_request_template.md` and `.github/workflows/validate-pr-template.yml`
 
 ### 2. Classify Before Editing
@@ -81,9 +81,20 @@ Dependency directions:
 - Add the required detailed Japanese TSDoc to public package exports, except generated and test code.
 - Preserve `minimumReleaseAge: 4320`, package-specific `allowBuilds`, and the ban on `dangerouslyAllowAllBuilds` and `minimumReleaseAgeExclude`.
 - OpenSpec persists observable behavior, not a file-level implementation plan.
-- Keep `tasks.md` as coarse Work Packages; decide files, helpers, test layers, and local order progressively during implementation.
-- Preserve Scenario IDs across main Specs, active deltas, and test titles.
-- Validate one Change while planning with `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>`, require full test references at apply completion with the same command plus `--require-test-references`, then run the global active-Change check.
+- Keep `tasks.md` as coarse Work Packages; decide files, helpers,
+  policy-compliant test details, and local order progressively during implementation.
+- Allow only Playwright E2E tests for high-value customer journeys and pure unit
+  tests for isolated deterministic customer-impacting rules. Unit tests never
+  access databases, networks, filesystems, servers, Workerd, or other runtimes.
+- Do not create integration, connection, contract, real-database,
+  Workerd-specific, or runtime-specific test suites.
+- Never add production APIs, exports, factories, branches, bindings, or
+  configuration solely for test access. Remove the test instead.
+- Playwright E2E test titles exclusively own Scenario ID references. Scenarios
+  do not require automated test references, and unit tests never reference IDs.
+- Validate one Change with
+  `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>`, then
+  run the global active-Change check.
 - Actual UI changes require a product designer and real desktop/mobile browser review. Generated mockups are optional non-contract evidence.
 - PRs record Operation Lane, UX Mode, Review Depth, OpenSpec Change, and Scenario IDs. `BEHAVIOR` and `ARCHITECTURE` require a Change and Scenario IDs.
 - Ask before dependency, version, or permission-boundary changes. Never perform a release, publication, deployment, environment mutation, credential access, or external approval as repository completion evidence.
@@ -121,7 +132,7 @@ Report the touched areas, enforced rules applied, generation performed, commands
 - Resolving credentials before destination approval
 - Exposing server-only diagnostics or secrets to browser-visible code
 - Weakening supply-chain controls
-- Scenario/Test traceability drift
+- One-way Playwright E2E-to-Scenario traceability drift
 - Collapsing Operation Lane and UX Mode into one classification
 - Turning OpenSpec into a file-, helper-, or test-layer implementation plan
 - Treating release, publication, deployment, or external-system state as Change completion evidence

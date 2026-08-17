@@ -30,7 +30,6 @@ artifacts:
       Requirement と Scenario には、利用者または外部契約から観測できる終端状態だけを記載する。
       規格準拠、RFC準拠、実装方式、ファイル、パッケージ、補助処理、移行作業、試験計画を Requirement または Scenario にしない。ただし、顧客が求める体験そのものを表す可視のUI構成または配置は Outcome Constraint として記載できる。
       Scenario 見出しは `#### Scenario: <名称> (<CAPABILITY>-S###)` とし、安定した識別子を付ける。
-      自動化できない Scenario は見出しの近くに `Tags: manual` を記載する。
     requires:
       - proposal
 
@@ -53,5 +52,5 @@ apply:
   tracks: tasks.md
   instruction: |
     解決済み提案と差分仕様を守り、作業パッケージ単位で実装と検証を完了する。
-    全作業パッケージ完了時は `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references` を実行し、選択 Change の実効仕様と試験参照を一致させる。
+    全作業パッケージ完了時は `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>` を実行し、選択Changeの仕様構造とPlaywright E2E試験からScenarioへの参照を検証する。
     重要な矛盾または未解決判断を発見した場合は作業を止め、所有者へ確認する。

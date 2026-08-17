@@ -359,7 +359,7 @@ OK例: `feat: add agent registry shell`、`fix: close proxy route gap`、`docs: 
 ## 8. OpenSpec
 
 **Rule: OpenSpec の二つの変更スキーマと全成果物は厳格検査を通す。**
-Summary: `pnpm lint:openspec` は `behavior-change` / `architecture-change` のスキーマ、OpenSpec の厳格検査、規則試験、提案、Scenario と試験の追跡、作業パッケージと設計の対象範囲を検査します。
+Summary: `pnpm lint:openspec` は `behavior-change` / `architecture-change` のスキーマ、OpenSpec の厳格検査、規則試験、提案、Playwright E2E試験からScenarioへの一方向参照、作業パッケージと設計の対象範囲を検査します。
 Enforcement point: `pnpm lint:openspec` via `package.json`、`scripts/openspec/verify-change-proposal.mjs`、`scripts/openspec/verify-scenario-coverage.mjs`、`scripts/openspec/verify-change-task-scope.mjs`.
 NG例: 選択したスキーマに違反する Change 成果物を残す。
 OK例: `pnpm lint:openspec` が成功する `proposal.md`、差分仕様、`design.md`、`tasks.md` にする。
@@ -382,23 +382,17 @@ Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-co
 NG例: `#### Scenario: Create agent` のように ID なしで書く、または lowercase/不正形式の ID を使う。
 OK例: `#### Scenario: Create agent (AGENT-PLATFORM-S001)` のように `^[\dA-Z]+(?:-[\dA-Z]+)*-S\d{3,}$` に一致させる。
 
-**Rule: Manual でない Scenario は automated test title から bracketed ID で参照する。**
-Summary: 自動化対象の Scenario ID は試験名の `[SCENARIO-ID]` から参照される必要があります。
-Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-coverage.mjs`; scanned tests include `packages/**`, `tests/**`, and `scripts/**` test/spec files.
-NG例: Scenario ID を test title から外す、または spec にない orphan Scenario ID を test title に入れる。
-OK例: `it('[AGENT-PLATFORM-S001] Create agent', ...)` のように bracketed ID を含める。
+**Rule: Playwright E2E試験題名だけが Scenario ID を参照する。**
+Summary: `tests/e2e` 配下の Playwright E2E試験題名にある `[SCENARIO-ID]` 参照だけを、TypeScript構文木から検査します。Scenarioから自動試験への参照欠落は検査しません。
+Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-coverage.mjs`; `@playwright/test` の直接読み込み、名前付き別名、名前空間、`only` / `skip` / `fixme` / `fail` を認識します。
+NG例: `tests/e2e/account.spec.ts` で仕様にない `[ACCOUNT-S999]` を Playwright E2E試験題名へ入れる。
+OK例: `test('[AGENT-PLATFORM-S001] Create agent', ...)` のように既存 Scenario ID を題名へ含める。
 
-**Rule: Automated coverage 対象外にする Scenario は `Tags: manual` を明示する。**
-Summary: 自動化しない Scenario は heading 直下の tags で manual を宣言します。
+**Rule: Scenario ID は duplicate/unknown reference を残さない。**
+Summary: 重複した Scenario ID、主仕様または活動中差分にない Playwright E2E試験参照、活動中 Change 間の競合は失敗します。同期前の主仕様に残る Scenario ID は参照先として認識します。
 Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-coverage.mjs`.
-NG例: 自動化しない Scenario を manual tag なしで main spec に置く。
-OK例: Scenario heading の下に `Tags: manual` を置く。
-
-**Rule: Scenario ID は duplicate/orphan/missing coverage を残さない。**
-Summary: 重複した Scenario ID、主仕様と活動中差分にない孤立した試験参照、自動試験参照の欠落、活動中 Change 間の競合は失敗します。
-Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-scenario-coverage.mjs`.
-NG例: 同じ Scenario ID を複数置く、spec にない ID を tests で参照する、manual でない Scenario の test reference を忘れる。
-OK例: 主仕様へ活動中差分を重ねた実効仕様と `packages/**`、`tests/**`、`scripts/**` の試験名を一致させ、一つの Change の確認後に全活動中 Change の検査も行う。
+NG例: 同じ Scenario ID を複数置く、または spec にない ID を `tests/e2e` の Playwright E2E試験題名で参照する。
+OK例: 主仕様へ活動中差分を重ねた仕様と Playwright E2E試験題名の参照を一致させ、一つの Change の確認後に全活動中 Change の検査も行う。
 
 **Rule: プルリクエスト本文に三つの独立した変更運用軸を記載する。**
 Summary: `Operation Lane`、`UX Mode`、`Review Depth` を個別に選び、運用区分から UX 方針やレビュー深度を推測しません。

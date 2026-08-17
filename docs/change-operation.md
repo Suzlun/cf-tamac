@@ -109,9 +109,9 @@ Requirement と Scenario は、利用者または外部契約から観測でき�
 
 ### Scenario と試験の追跡
 
-すべての Scenario 見出しは、`#### Scenario: ... (CAPABILITY-S001)` の形式で安定した識別子を持ちます。自動試験は題名へ `[CAPABILITY-S001]` を含めます。自動化できない場合は Scenario の近くに `Tags: manual` を記載します。
+すべての Scenario 見出しは、`#### Scenario: ... (CAPABILITY-S001)` の形式で安定した識別子を持ちます。追跡方向はPlaywright E2E試験からScenarioへの一方向です。Playwright E2E試験は題名へ `[CAPABILITY-S001]` を含められますが、Scenarioに対応する自動試験の存在は要求しません。純粋な単体試験はScenario識別子を参照しません。
 
-`scripts/openspec/verify-scenario-coverage.mjs` は、主仕様へ活動中差分を重ね、差分構造、要件操作、識別子の重複、活動中 Change 間の競合を検査します。計画時は主仕様の試験参照を必須とし、主仕様または活動中差分に存在する識別子への参照を有効とみなします。これにより、提案者へ実装試験を要求せず、実装済みの活動中 Scenario 参照も孤立と誤判定しません。
+`scripts/openspec/verify-scenario-coverage.mjs` は、主仕様へ活動中差分を重ね、差分構造、要件操作、識別子の重複、活動中 Change 間の競合を検査します。さらに、`tests/e2e`配下のPlaywright試験題名にある参照が、主仕様またはいずれかの活動中差分に存在するScenario識別子を指すことを確認します。参照の欠落は検査しません。
 
 一つの Change に限った実効仕様を確認する場合は、次を実行します。
 
@@ -121,11 +121,16 @@ node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>
 
 `--change` は対象 Change と主仕様の組み合わせへ集中するための選択機能です。全活動中 Change 間の競合確認を置き換えないため、最終確認では引数なしの検査も実行します。
 
-実装完了時は、選択 Change の実効仕様に対して試験参照の欠落と旧参照を厳格に検査します。
+### 自動試験の境界
 
-```bash
-node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references
-```
+自動試験は、確認済みの顧客価値を守り、意図しない退行が顧客へ届く前に検出するためだけに作成します。許可する分類は次の二つだけです。
+
+- Playwright E2E試験は、公開された製品表面を通る価値の高い顧客作業を保全し、Scenario識別子を題名で参照します。
+- 純粋な単体試験は、顧客成果へ影響する決定的な規則を隔離して保全します。データベース、ネットワーク、ファイルシステム、サーバー、Workerdその他の実行環境へ接続せず、Scenario識別子を参照しません。
+
+統合試験、接続試験、契約試験、実データベース試験、Workerd固有試験、実行環境固有試験を独立した試験分類として作成しません。同じ顧客保証を複数の層やファイルで重複させず、価値の高い成果を保全できる最少数の試験を選びます。
+
+試験だけのために製品コードへAPI、公開要素、生成処理、分岐、Binding、設定を追加または維持しません。試験から製品内部へ到達する必要がある場合は製品コードを変更せず、その試験を削除します。
 
 ## 段階的な実行計画
 
