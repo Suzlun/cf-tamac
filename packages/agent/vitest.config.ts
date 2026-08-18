@@ -12,8 +12,6 @@ export default defineConfig({
     },
   },
   test: {
-    // Workers runtime専用の実SQLiteテストは別configで実行し、Node test runnerがcloudflare:* moduleを解決しないようにします。
-    exclude: ['src/tests/initialization-receipt-storage.test.ts'],
     environment: 'node',
     include: ['src/tests/**/*.test.ts'],
     name: 'agent',

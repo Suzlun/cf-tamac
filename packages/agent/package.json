@@ -13,7 +13,7 @@
     "deploy": "wrangler deploy --config wrangler.toml",
     "build": "tsc -p tsconfig.json --noEmit",
     "check": "pnpm build",
-    "test": "vitest run --passWithNoTests && vitest run --config vitest.storage.config.ts",
+    "test": "vitest run --passWithNoTests",
     "gen:proto": "tsp compile src/typespec",
     "lint:proto": "buf lint",
     "breaking:proto": "buf breaking --against proto",
