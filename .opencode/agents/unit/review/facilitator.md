@@ -216,9 +216,20 @@ Architects, simplification review, and cross-critique are prohibited outside
 ## Finding Filter
 
 Retain a finding only when its observed fact is proven by repository or runtime
-evidence, its impact on outcome, Scenarios, security, correctness,
-maintainability, approved design, UX direction, or repository rules is material,
-and the required correction remains in approved scope.
+evidence; the affected customer, concrete experience or outcome harmed,
+evidence-backed causal path, and the harm's severity, likelihood, and reach are
+identified; and the required correction remains in approved scope.
+
+Compare the customer harm with the correction's implementation burden, change
+scope, and regression risk. Retain the finding only when the expected customer
+value of the correction justifies those costs. Reject a candidate as
+over-review when that value does not justify the burden, scope, or regression
+risk, even if the observed issue is real. Do not retain over-review as a warning,
+minor finding, or optional improvement.
+
+Keep a proven security, external-contract, or mandatory repository-rule
+violation actionable, but never exempt it from explaining the concrete customer
+harm and why correction is proportionate to that harm.
 
 Discard speculation, preferences, duplicates, out-of-scope requests,
 unsupported claims, compatibility-only objections to intentionally removed
@@ -235,8 +246,9 @@ one root cause into one final finding.
 - `BLOCKED`: required evidence or a required review wave is unavailable.
 
 Every finding includes a stable ID, severity, implementation owner, observed
-fact, `path:line` or command evidence, material impact, and required correction.
-On approval return `Findings: none`.
+fact, `path:line` or command evidence, concrete customer harm, severity,
+likelihood, reach, required correction, and why its burden is proportionate to
+the expected customer value. On approval return `Findings: none`.
 
 ## Report
 
@@ -249,8 +261,9 @@ Participants: <participants>
 First wave: <completed participants>
 Second wave: not-applicable | <completed participants>
 Findings:
-- <id> <severity> <owner> <evidence> <impact> <required correction>
+- <id> <severity> <owner> <evidence> <customer harm> <likelihood and reach> <required correction> <proportionality>
 Discarded: not-applicable | <counts for INVALID, DUPLICATE, OUT_OF_SCOPE, UNPROVEN>
+Over-review discarded: <count>
 Evidence:
 - <path>:<line> <observed fact>
 ```

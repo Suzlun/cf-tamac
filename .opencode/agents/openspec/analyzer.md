@@ -259,6 +259,21 @@ Launch all three delegates in parallel in the same turn:
   finding or verdict.
 - Treat every reviewer and Ponytailer finding as a candidate, never
   as an accepted result.
+- Before retaining any candidate, identify the affected customer, the concrete
+  experience or outcome harmed, the evidence-backed causal path from the
+  observed fact to that harm, and the harm's severity, likelihood, and reach.
+- Compare that harm with the correction's implementation burden, change scope,
+  and regression risk. Retain the candidate only when the expected customer
+  value of the correction justifies those costs.
+- Reject a candidate as over-review when the expected customer value of the
+  correction does not justify its implementation burden, scope, or regression
+  risk, even if the observed issue is real. Do not retain it as a warning, minor
+  finding, or optional improvement.
+- Keep a proven security, external-contract, or mandatory repository-rule
+  violation actionable, but never exempt it from explaining the concrete
+  customer harm. In every retained finding, use `Material consequence` to state
+  that harm and why its severity, likelihood, and reach justify the required
+  correction's burden, scope, and regression risk.
 - Apply the shared material-omission and artifact-routing tests before accepting
   a candidate. Do not expose rejected candidates as findings or warnings.
 - Split mixed candidates before evaluation. One accepted finding represents one
