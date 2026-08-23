@@ -194,10 +194,9 @@ ux_mode: NONE | CONTINUITY | SHAPE
 - The UX mode never selects the operation lane. Requested technologies and
   structures are means, not product outcomes.
 
-Before apply, require a current proposer handoff showing strict validation,
-`APPROVED`, and `Planning Ready: YES` for the current planning content. When
-that evidence is unavailable, call `openspec/proposer` to converge the Change
-before calling `openspec/applier`.
+Before apply, resolve the selected Change's schema and proposal `UX-Mode`, then
+call `openspec/applier`. Do not request, verify, carry forward, or infer proposer
+or analyzer approval or readiness evidence before delegation.
 
 For direct implementation, route Agent work to `unit/agent/engineer`, Management
 Client work to `unit/client/engineer`, and repository tooling or general work to

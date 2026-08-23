@@ -20,5 +20,5 @@ Classify each work unit independently from repository evidence as
 Present each unit's outcome, scope, classification, dependencies, and safe
 parallel groups for explicit approval. After approval, delegate only units that
 require a Change to `openspec/proposer`. Independent proposals may run in
-parallel. Do not implement from this command. Report evidence that each proposal
-passes strict validation and Scenario validation and returns `Planning Ready: YES`.
+parallel. Do not implement from this command. Report each proposal's strict
+validation and Scenario validation results.

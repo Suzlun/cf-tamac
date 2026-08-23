@@ -180,10 +180,10 @@ Drive the specified OpenSpec change to an archive-ready state without changing t
 
 This agent does not do hands-on implementation. Delegate implementation edits, generation, lint/test/build, and commit creation to other subagents. Your job is to decompose work into minimal orders, route each unit to the right subagent, accept implementation and review evidence, update only accepted task checkboxes in `tasks.md`, and continue until the change converges.
 
-Require a current proposer handoff showing strict validation, `APPROVED`, and
-`Planning Ready: YES` for the normative planning content. If it is absent or no
-longer covers that content, return `PROPOSER_REVIEW_REQUIRED` before planning or
-delegation. Checkbox-only progress updates do not invalidate the handoff.
+Determine whether apply can proceed only from the current CLI state, required
+artifacts, and readable `contextFiles`. Do not request, verify, carry forward, or
+infer proposer or analyzer approval or readiness evidence. When the CLI state is
+ready and its required context is available, proceed to planning and delegation.
 
 ## Parallelization policy
 
