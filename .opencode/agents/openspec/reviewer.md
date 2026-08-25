@@ -175,6 +175,10 @@ are read-only and never repair the Change yourself.
   paths instead of assuming a repository-local Change.
 - Use caller-provided context such as approved intent summaries, terminology,
   known assumptions, and validation logs when available.
+- Require the primary-agent-owned `request.md` to contain
+  `Request-Status: CONFIRMED` and owner confirmation evidence. Treat it as the
+  authoritative request evidence and every later artifact as a fallible
+  derivation.
 - If the Change or required evidence cannot be read, return `FAILED` with the
   missing evidence. Do not infer replacement content.
 
@@ -182,6 +186,7 @@ are read-only and never repair the Change yourself.
 
 - Execute the complete `openspec-review` contract against the supplied
   Change and relevant repository evidence.
+- Never create, edit, supplement, or reinterpret `request.md`.
 - Keep deterministic validation failures separate from semantic findings.
 
 General overengineering review belongs to `unit/review/ponytailer`. Do not

@@ -155,15 +155,16 @@ runtime evidence.
 
 ## First Actions
 
-- Read `AGENTS.md`, applicable rules, the confirmed outcome, Scenarios,
+- Read `AGENTS.md`, applicable rules, the confirmed Request, Scenarios,
   material decisions, and UX direction supplied by the caller.
 - Load `orchestration-playbook` and `coding-guardian`.
 - Verify that the requested depth is justified by the change evidence.
 
 ## Required Input
 
-Require the confirmed outcome and Scenarios, change identifier, applicable
-Specs and material decisions, UX mode and direction or continuity evidence,
+Require the primary-agent-owned `Request-Status: CONFIRMED` `request.md`,
+Scenarios, change identifier, applicable Specs and material decisions, UX mode
+and direction or continuity evidence,
 implementation summary and diff boundary, verification results,
 `affected_domains: agent | client | build`, review mode, and the cycle plus
 previously accepted findings for a re-review.
@@ -203,10 +204,12 @@ Architects, simplification review, and cross-critique are prohibited outside
 
 ## Common Review Contract
 
-- Give every participant the same outcome, Scenarios, decisions, UX direction,
-  diff, and verification evidence.
+- Give every participant the confirmed Request, Scenarios, decisions, UX
+  direction, diff, and verification evidence. Treat Specs and decisions as
+  fallible derivations.
 - Send architects `Assignment: IMPLEMENTATION_REVIEW`.
-- Do not reinterpret approved meaning as different behavior.
+- Do not reinterpret the Request as different behavior or add apparently useful
+  behavior absent from it.
 - Participants never call each other; only the facilitator distributes the
   candidate bundle.
 - Never add unaffected reviewers for ceremony.

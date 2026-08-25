@@ -33,7 +33,7 @@ This document is lint-as-rules. Include only rules that are mechanically enforce
    - Agent API source of truth is `packages/agent/src/typespec/main.tsp`
    - Generated outputs are `packages/agent/proto/**`, `packages/agent/src/generated/rpc/**`, `packages/client/src/generated/agent-rpc/**`, and `packages/sdk/src/generated/agent-rpc/**`
    - Do not model Agent APIs with OpenAPI or Orval
-7. Mention OpenSpec exactly as implemented today through the `behavior-change` and `architecture-change` schemas, `pnpm lint:openspec`, `scripts/openspec/verify-change-proposal.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`, and `scripts/openspec/verify-change-task-scope.mjs`.
+7. Mention OpenSpec exactly as implemented today through the primary-agent-owned confirmed `request.md`, the `behavior-change` and `architecture-change` schemas, `pnpm lint:openspec`, `scripts/openspec/verify-change-proposal.mjs`, `scripts/openspec/verify-scenario-coverage.mjs`, and `scripts/openspec/verify-change-task-scope.mjs`.
 8. Use this repo's real file names and paths. Do not make old demo package categories the primary architecture or command model.
 9. Keep OpenSpec documented as the persistent observable behavior contract, not a master implementation plan. Document one-way Playwright E2E-to-Scenario traceability, `--change`, coarse Work Packages, and progressive runtime planning.
 10. Document the independent `Operation Lane`, `UX Mode`, and `Review Depth` vocabulary enforced by `.github/workflows/validate-pr-template.yml`.

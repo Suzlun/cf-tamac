@@ -11,7 +11,7 @@ solution named in the request.
 ## Required Input
 
 - Customer outcome
-- Scope and non-goals
+- Positive Change boundary
 - Required and candidate means
 - Relevant files, existing Specs, current surfaces, and external contracts
 - Unresolved material decisions

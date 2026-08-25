@@ -163,7 +163,7 @@ The caller must provide or identify sources for all of the following:
 
 1. Purpose and desired end state.
 2. Review target, such as paths, a diff, documents, or supplied content.
-3. Constraints, invariants, non-goals, and externally owned contracts.
+3. Constraints, invariants, positive Change boundary, and externally owned contracts.
 4. The requested review scope or question.
 5. Relevant consumers, execution paths, or integration boundaries when a
    finding depends on whether something is used.
