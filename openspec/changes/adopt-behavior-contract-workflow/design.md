@@ -8,6 +8,16 @@
 | 対象固有の責務境界         | 提案の Outcome Constraint                                | 補足エージェント、スキル、文書、検査を Agent、管理クライアント、SDK、TypeSpec、Protobuf、RPC、配布境界へ適合させる。                       | 移植元の一般的な運用判断を保持しながら、対象に存在しないフロントエンド・バックエンド境界の再導入を防ぐ。 |
 | 実効仕様の追跡             | 提案の Material Constraints                              | 主仕様へ全活動中差分を重ね、重複、欠落、孤立、競合を Scenario ID 単位で検査する。                                                          | 活動中 Change 同士の矛盾をアーカイブ時まで見逃さず、仕様と試験の対応を継続的に保証できる。               |
 
+## Reuse Assessment
+
+| Spec Unit            | Reusable Capability     | Source Classification | Decision | Selected Reuse / Version                                           | Research Evidence                                                | Limited Complement Justification |
+| -------------------- | ----------------------- | --------------------- | -------- | ------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------- |
+| workspace-governance | 変更運用の分類          | REPOSITORY_CODE       | REUSE    | `docs/change-operation.md` @ `fe387ffb`                            | `docs/report/research/26/08/25/053040-scoped-reuse-decisions.md` | N/A                              |
+| workspace-governance | OpenSpec中核定義生成    | DIRECT_DEPENDENCY     | REUSE    | `@fission-ai/openspec` @ `1.8.0`                                   | `docs/report/research/26/08/25/053040-scoped-reuse-decisions.md` | N/A                              |
+| workspace-governance | OpenSpec成果物検査      | REPOSITORY_CODE       | REUSE    | `scripts/openspec/**` @ `fe387ffb`                                 | `docs/report/research/26/08/25/053040-scoped-reuse-decisions.md` | N/A                              |
+| workspace-governance | 対象固有の責務委任      | REPOSITORY_CODE       | REUSE    | `.opencode/agents/**`と`.opencode/skills/openspec/**` @ `fe387ffb` | `docs/report/research/26/08/25/053040-scoped-reuse-decisions.md` | N/A                              |
+| workspace-governance | ScenarioとE2E試験の追跡 | REPOSITORY_CODE       | REUSE    | `scripts/openspec/verify-scenario-coverage.mjs` @ `6e38fbbe`       | `docs/report/research/26/08/25/053040-scoped-reuse-decisions.md` | N/A                              |
+
 ## Boundaries
 
 - 公式 OpenSpec コマンドとスキルは生成器が所有し、リポジトリ固有の補足判断は別のエージェント、スキル、方針文書が所有する。

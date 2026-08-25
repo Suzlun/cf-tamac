@@ -10,7 +10,7 @@
 
 ## 結論
 
-移植元の契約は、`cf-tamac`の製品コードやProtobuf RPC契約を変更せず、OpenSpecとOpenCodeの統制面へ適合できる。移植元の15ファイルに対する変更を基礎とし、対象側のAgent Service、Management Client、SDK、Scenario/Test追跡、既存統制スクリプトを保持する必要がある。対象側には活動中の`architecture-change`設計がないため、現在の活動中Changeを新しい`Reuse Assessment`表へ移行する作業は発生しない。
+移植元の契約は、`cf-tamac`の製品コードやProtobuf RPC契約を変更せず、OpenSpecとOpenCodeの統制面へ適合できる。移植元の15ファイルに対する変更を基礎とし、対象側のAgent Service、Management Client、SDK、Scenario/Test追跡、既存統制スクリプトを保持する必要がある。対象側には活動中の`architecture-change`設計が一件あり、新検査を導入する際に既存の物質的判断を能力単位の`Reuse Assessment`表へ移行する必要がある。
 
 確認済みの事実として、新しい検査処理は対象側の既存インポート別名`#openspec/change-artifacts`と`collectActiveChangeDirectories`をそのまま利用できる。判断として、移植元のフロントエンド・バックエンド向け委任先は採用せず、対象側の`unit/agent/engineer`、`unit/client/engineer`、`unit/build/builder`を維持する。
 
@@ -28,27 +28,27 @@
 
 ## 確認済みの事実
 
-| 事実                                                                                                             | 根拠                                                                                               | 確認日時   | 情報の消費期限・変化要因                               |
-| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------ |
-| 移植元コミットは、スキーマ、設計ひな形、提案・レビュー・適用手順、文書、検査入口、新しい再利用判断検査を変更する | `/home/suzlun/repos/cfreact-template`のコミット`1feb0e276ca868f3e0d5529629b7379ed7ce2d34`          | 2026-08-25 | 移植元の後続コミットまたはOpenSpec方針変更で変化する   |
-| `cf-tamac`の公開APIはTypeSpecから生成するProtobuf RPCであり、OpenAPI/Orvalを使用しない                           | `AGENTS.md:68-76`、`AGENTS.md:107-119`（基点`6e38fbbe`）                                           | 2026-08-25 | API契約または製品境界の変更で変化する                  |
-| 対象側は`#openspec/change-artifacts`を既存の補助処理へ割り当てている                                             | `package.json:7-10`（作業ブランチ）                                                                | 2026-08-25 | ルートのインポート別名変更で変化する                   |
-| 対象側の補助処理は活動中Changeを列挙し、`archive`を除外する                                                      | `scripts/openspec/change-artifacts.mjs:18-36`（基点`6e38fbbe`）                                    | 2026-08-25 | OpenSpecディレクトリ構造または補助処理の変更で変化する |
-| 活動中Changeは`adopt-behavior-contract-workflow`だけで、`design.md`を持たない                                    | `openspec/changes/`および`openspec/changes/adopt-behavior-contract-workflow/`（基点`6e38fbbe`）    | 2026-08-25 | 活動中Changeの追加・更新・アーカイブで直ちに変化する   |
-| 新検査は有効な能力単位表を受理し、delta Spec Unitの判断欠落を拒否する                                            | `/tmp`を利用する`runGuardInFixture`による`verify-change-reuse-decisions.mjs`の隔離実行             | 2026-08-25 | 検査処理または表契約の変更で変化する                   |
-| `pnpm gen:openspec`は成功し、生成済みOpenSpec中核定義に差分を生じさせなかった                                    | 作業ブランチでの`pnpm gen:openspec`実行結果と`git status`                                          | 2026-08-25 | OpenSpec版または生成設定の変更で変化する               |
-| `pnpm lint:openspec`は新検査まで成功した後、既存の活動中提案の見出し不整合で失敗する                             | `openspec/changes/adopt-behavior-contract-workflow/proposal.md:1-83`と`pnpm lint:openspec`実行結果 | 2026-08-25 | 当該Changeの提案更新または検査規則変更で変化する       |
-| `pnpm lint:eslint`は今回未変更のOpenCodeプラグインにある15件の既存型安全性違反で失敗する                         | `.opencode/plugins/applier-compaction.ts:27-50`と`pnpm lint:eslint`実行結果                        | 2026-08-25 | 当該プラグインまたはESLint設定の変更で変化する         |
-| `pnpm test:governance`は今回未変更のデプロイ成果物試験1件で失敗する                                              | `scripts/deploy/generate-deploy-artifacts.test.mjs:93-95`と`pnpm test:governance`実行結果          | 2026-08-25 | READMEまたはデプロイ成果物生成契約の変更で変化する     |
+| 事実                                                                                                                         | 根拠                                                                                                       | 確認日時   | 情報の消費期限・変化要因                               |
+| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------ |
+| 移植元コミットは、スキーマ、設計ひな形、提案・レビュー・適用手順、文書、検査入口、新しい再利用判断検査を変更する             | `/home/suzlun/repos/cfreact-template`のコミット`1feb0e276ca868f3e0d5529629b7379ed7ce2d34`                  | 2026-08-25 | 移植元の後続コミットまたはOpenSpec方針変更で変化する   |
+| `cf-tamac`の公開APIはTypeSpecから生成するProtobuf RPCであり、OpenAPI/Orvalを使用しない                                       | `AGENTS.md:68-76`、`AGENTS.md:107-119`（基点`6e38fbbe`）                                                   | 2026-08-25 | API契約または製品境界の変更で変化する                  |
+| 対象側は`#openspec/change-artifacts`を既存の補助処理へ割り当てている                                                         | `package.json:7-10`（作業ブランチ）                                                                        | 2026-08-25 | ルートのインポート別名変更で変化する                   |
+| 対象側の補助処理は活動中Changeを列挙し、`archive`を除外する                                                                  | `scripts/openspec/change-artifacts.mjs:18-36`（基点`6e38fbbe`）                                            | 2026-08-25 | OpenSpecディレクトリ構造または補助処理の変更で変化する |
+| 活動中Changeは`architecture-change`の`adopt-behavior-contract-workflow`だけで、旧形式の`design.md`を持つ                     | `openspec/changes/adopt-behavior-contract-workflow/.openspec.yaml:1-2`と`design.md:1-73`（基点`6e38fbbe`） | 2026-08-25 | 活動中Changeの追加・更新・アーカイブで直ちに変化する   |
+| 新検査は有効な能力単位表を受理し、delta Spec Unitの判断欠落を拒否する                                                        | `/tmp`を利用する`runGuardInFixture`による`verify-change-reuse-decisions.mjs`の隔離実行                     | 2026-08-25 | 検査処理または表契約の変更で変化する                   |
+| `pnpm gen:openspec`は成功し、生成済みOpenSpec中核定義に差分を生じさせなかった                                                | 作業ブランチでの`pnpm gen:openspec`実行結果と`git status`                                                  | 2026-08-25 | OpenSpec版または生成設定の変更で変化する               |
+| `pnpm lint:openspec`はスキーマ、厳格検査、規則試験に成功した後、新検査へ到達する前に既存の活動中提案の見出し不整合で失敗する | `openspec/changes/adopt-behavior-contract-workflow/proposal.md:1-83`と`pnpm lint:openspec`実行結果         | 2026-08-25 | 当該Changeの提案更新または検査規則変更で変化する       |
+| `pnpm lint:eslint`は今回未変更のOpenCodeプラグインにある15件の既存型安全性違反で失敗する                                     | `.opencode/plugins/applier-compaction.ts:27-50`と`pnpm lint:eslint`実行結果                                | 2026-08-25 | 当該プラグインまたはESLint設定の変更で変化する         |
+| `pnpm test:governance`は今回未変更のデプロイ成果物試験1件で失敗する                                                          | `scripts/deploy/generate-deploy-artifacts.test.mjs:93-95`と`pnpm test:governance`実行結果                  | 2026-08-25 | READMEまたはデプロイ成果物生成契約の変更で変化する     |
 
 ## 推論と判断
 
-| 推論・判断                                                   | 根拠となる事実                                                                    | 前提                                         | 確信度 |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------- | ------ |
-| 新しい再利用判断検査は対象側の補助処理を複製せずに導入できる | 既存インポート別名と活動中Change列挙処理が検査処理の要求と一致する                | OpenSpecディレクトリ構造を維持する           | 高     |
-| 移植元の委任先をそのまま採用すると対象側の責務境界を壊す     | 対象側はAgent Service、Management Client、SDK用の委任先を定義している             | 現行Agent権限を維持する                      | 高     |
-| 現在の活動中Changeに対する再利用判断表の移行は不要である     | 活動中Changeに`design.md`が存在せず、新検査は設計が存在するChangeだけを対象にする | 活動中Changeのスキーマをこの作業で変更しない | 高     |
-| 既存の検証失敗は今回の再利用判断契約とは因果関係がない       | 失敗箇所は`origin/develop`と同一であり、今回の変更対象外である                    | 基点の状態を比較対象とする                   | 高     |
+| 推論・判断                                                   | 根拠となる事実                                                                      | 前提                                   | 確信度 |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------- | ------ |
+| 新しい再利用判断検査は対象側の補助処理を複製せずに導入できる | 既存インポート別名と活動中Change列挙処理が検査処理の要求と一致する                  | OpenSpecディレクトリ構造を維持する     | 高     |
+| 移植元の委任先をそのまま採用すると対象側の責務境界を壊す     | 対象側はAgent Service、Management Client、SDK用の委任先を定義している               | 現行Agent権限を維持する                | 高     |
+| 現在の活動中Changeに対する再利用判断表の移行が必要である     | 活動中の`architecture-change`設計が新しい必須見出しを持たず、新検査が欠落を拒否した | 既存の物質的判断と製品要件を変更しない | 高     |
+| 既存の検証失敗は今回の再利用判断契約とは因果関係がない       | 失敗箇所は`origin/develop`と同一であり、今回の変更対象外である                      | 基点の状態を比較対象とする             | 高     |
 
 ## 矛盾・不確実性
 
@@ -58,7 +58,7 @@
 
 ## 推奨事項
 
-移植元コミットを基礎にしつつ、競合箇所では対象側のProtobuf RPC、Scenario/Test追跡、実行スクリプト、Agent Service、Management Client、SDKの委任先と権限を維持する。新検査を`pnpm lint:openspec`へ追加し、提案者、レビュー担当、分析担当、適用担当、スキーマ、ひな形、設定、統治文書を同じ分類値と判断値へ統一する。
+移植元コミットを基礎にしつつ、競合箇所では対象側のProtobuf RPC、Scenario/Test追跡、実行スクリプト、Agent Service、Management Client、SDKの委任先と権限を維持する。新検査を`pnpm lint:openspec`へ追加し、提案者、レビュー担当、分析担当、適用担当、スキーマ、ひな形、設定、統治文書を同じ分類値と判断値へ統一する。活動中の`architecture-change`設計には、既存判断を変えずに能力単位の再利用表を追加する。
 
 既存の活動中Change、OpenCodeプラグイン、デプロイ成果物試験の不整合は、所有者確認済みRequestと別の作業範囲を持つため、この移植作業へ混在させない。
 
@@ -87,7 +87,8 @@
 5. 4件の競合を、対象側の製品境界、Scenario/Test追跡、実行スクリプト、権限を維持して解消した。
 6. 移植元差分、対象側の補助処理、スキーマ、OpenCode定義、文書、実行スクリプトを照合した。
 7. `pnpm gen:openspec`を実行し、生成済み中核定義に差分がないことを確認した。
-8. OpenSpec、整形、型、統制、供給網、Agent/Skill定義、コード生成安定性と隔離fixtureを検証し、既存不整合を変更起因の失敗と分離した。
+8. 新検査の直接実行で活動中の`architecture-change`に再利用判断表がないことを確認し、既存の物質的判断を能力単位の表へ移行した。
+9. OpenSpec、整形、型、統制、供給網、Agent/Skill定義、コード生成安定性と隔離fixtureを検証し、既存不整合を変更起因の失敗と分離した。
 
 ## 残存課題
 
