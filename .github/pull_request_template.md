@@ -28,7 +28,7 @@
 - OpenSpec Change:
 - Scenario IDs:
 
-<!-- BEHAVIOR / ARCHITECTUREではOpenSpec Changeと1件以上のScenario IDが必須です。DIRECTでは理由付きの「なし」を使用できます。 -->
+<!-- BEHAVIOR / ARCHITECTUREではOpenSpec Changeが必須です。差分仕様を持つChangeでは1件以上のScenario IDが必須です。DIRECTとskip_specs: trueのARCHITECTUREではScenario IDsに理由付きの「なし」を使用できます。 -->
 
 ## セキュリティ確認
 

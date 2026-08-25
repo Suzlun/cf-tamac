@@ -95,6 +95,7 @@ Husky によりコミット時に検証されます。
 - `DIRECT`: 観測可能な振る舞いも物質的な内部構造も変えない。OpenSpec Change は不要です。
 - `BEHAVIOR`: 観測可能な振る舞いを変更する。`behavior-change` の OpenSpec Change が必要です。
 - `ARCHITECTURE`: 物質的な内部構造を変更する。`architecture-change` の OpenSpec Change が必要です。
+- `architecture-change`が観測可能な振る舞いを変更しない場合は`.openspec.yaml`に`skip_specs: true`を設定し、差分仕様、Requirement、Scenarioを作成しません。
 - `SHAPE` は UX の方向付けが必要な場合だけ使用します。運用区分から UX モードを推測しません。
 - 実際の UI 変更にはプロダクトデザイナーの関与と、デスクトップ・モバイル双方の実ブラウザ確認が必要です。
 - 画像生成による UI モックアップは任意の非契約証跡であり、仕様や実ブラウザ確認を置き換えません。
@@ -104,7 +105,7 @@ OpenSpec Changeは、`BEHAVIOR`なら`pnpm exec openspec new change <change-id> 
 
 OpenSpec の `tasks.md` は粗い作業パッケージ台帳です。ファイル、補助処理、試験階層の詳細は、現在の作業パッケージと検証結果に基づき実装時に段階的に決めます。
 
-`architecture-change`の`design.md`は、全delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、`Reuse Assessment`へ再利用元分類、採用判断、対象と版、対象能力を調査範囲に含む調査報告を記載します。Requirement対応表は外部候補調査の証拠にならず、推移依存は対象packageの直接依存として宣言するまで採用済みと扱いません。`pnpm lint:openspec`はSpec Unitの欠落、分類値、調査報告の実在を検査します。
+`architecture-change`の`design.md`は、存在する全delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、`Reuse Assessment`へ再利用元分類、採用判断、対象と版、対象能力を調査範囲に含む調査報告を記載します。`skip_specs: true`の場合はSpec Unitや調査行を捏造しません。Requirement対応表は外部候補調査の証拠にならず、推移依存は対象packageの直接依存として宣言するまで採用済みと扱いません。`pnpm lint:openspec`は存在するSpec Unitの欠落、分類値、調査報告の実在を検査します。
 
 一つの Change に対する Scenario と試験の追跡は次で確認し、完了前には引数なしの全体検査も実行します。
 
@@ -198,7 +199,7 @@ pnpm build # Agent、SDK、Management Client
    - 変更の目的/背景
    - 変更点の要約
    - `Operation Lane`、`UX Mode`、`Review Depth`
-   - `OpenSpec Change` と `Scenario IDs`。`BEHAVIOR` と `ARCHITECTURE` では必須、`DIRECT` では理由付きの `なし` を使用可能
+   - `OpenSpec Change`は`BEHAVIOR`と`ARCHITECTURE`で必須。`Scenario IDs`は`BEHAVIOR`と差分仕様を持つ`ARCHITECTURE`で必須。`DIRECT`と`skip_specs: true`の`ARCHITECTURE`では理由付きの`なし`を使用可能
    - 動作確認内容（コマンド、確認手順）
    - 破壊的変更がある場合は影響範囲と移行方法
    - 実際の UI / UX 変更がある場合は `Desktop Before`、`Desktop After`、`Mobile Before`、`Mobile After` の画像

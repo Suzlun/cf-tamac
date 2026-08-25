@@ -40,8 +40,9 @@ OpenSpecは要求を発見または生成する場所ではありません。指
 責務境界、依存方向、データ所有権、セキュリティ境界、移行、切り戻し、重大な障害形態など、物質的な内部構造を変更する作業です。
 
 - `architecture-change` スキーマの OpenSpec Change が必須です。
-- `request.md`、`proposal.md`、差分仕様、`design.md`、`tasks.md` を使用します。
-- 差分仕様には、構造変更後も成立すべき観測可能な振る舞いを記載します。
+- `request.md`、`proposal.md`、`design.md`、`tasks.md` を使用します。
+- 観測可能な振る舞いも変更する場合だけ差分仕様を使用し、構造変更後に成立すべき観測可能な結果を記載します。
+- 観測可能な振る舞いを変更しない場合は`.openspec.yaml`に`skip_specs: true`を設定し、差分仕様、Requirement、Scenarioを作成しません。
 - `design.md` には物質的な判断だけを記載し、詳細な実装手順へ分解しません。
 
 ## UX Mode
@@ -95,6 +96,8 @@ OpenSpec `1.8.0`の`new change`は`openspec/config.yaml#schema`をChange作成�
 
 主仕様は `openspec/specs/<capability>/spec.md` に置きます。活動中の Change は `openspec/changes/<change-id>/specs/<capability>/spec.md` に差分を持ちます。
 
+`architecture-change`が観測可能な振る舞いを変更しない場合、OpenSpec標準の`skip_specs: true`を使用します。検証を通すためのRequirement、Scenario、Spec Unitを作成してはいけません。観測可能な変更が判明した場合は`skip_specs`を除去し、確認済みRequestから直接導ける差分仕様を作成します。
+
 Requirement と Scenario は、確認済みRequestから直接導ける、利用者または外部契約から観測可能な肯定的終端状態だけを表します。特定の規格、RFC、ファイル、パッケージ、関数、補助処理、移行作業、試験階層を製品要件として記載しません。ただし、所有者がRequestで求めた体験そのものを表す可視のUI構成または配置は成果の制約として記載できます。内部コンポーネントの構造は手段です。
 
 非目標、対象外、却下案、旧実装や旧経路が存在しないこと、特定の技術や機能を追加しないことをRequirementまたはScenarioにしません。不要になったRequirementは`REMOVED Requirements`で除去し、反対向きのRequirementへ置き換えません。認可や秘密非開示など、拒否自体が確認済み成果に含まれる場合も、認可された主体または公開可能な情報を表す肯定的な保証として定義し、その保証を観測する拒否Scenarioを記載します。
@@ -108,6 +111,8 @@ Requirement と Scenario は、確認済みRequestから直接導ける、利用
 ### 再利用を優先する設計
 
 提案者は`architecture-change`を作成する前に、各delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、能力ごとに既存のリポジトリ資産、workspace package、対象packageの直接依存、他packageで採用済みの依存、推移依存、新規外部候補、更新候補を調査します。セキュリティ、サプライチェーン、アーキテクチャの規則を満たす範囲で、既存コード、導入済みパッケージ、外部パッケージ、限定補完の順に選択します。
+
+`skip_specs: true`のChangeにはdelta Spec Unitがないため、Spec Unitや対応する調査行を捏造しません。物質的な設計判断と、その判断に実際に必要な再利用根拠は`design.md`へ記載します。
 
 `design.md`の`Reuse Assessment`には、全delta Spec Unitについて、汎用能力、再利用元分類、採用判断、対象と版、対象能力を`調査範囲`へ明記した調査報告、限定補完時の代替不能根拠を記載します。一つのSpec Unitに複数の汎用能力がある場合は行を分けます。Requirement対応表はパッケージ候補調査の代わりになりません。Reviewerは、各Spec Unitの能力分解、調査範囲、依存の現在状態、採用判断が完全であることを確認します。
 
@@ -189,7 +194,7 @@ OpenSpec では実装全体を事前に詳細分解しません。実装時に�
 - `UX Mode`: `NONE`、`CONTINUITY`、`SHAPE` のいずれか。
 - `Review Depth`: `STANDARD`、`DEEP` のいずれか。
 - `OpenSpec Change`: `BEHAVIOR` と `ARCHITECTURE` では必須。`DIRECT` では理由付きの `なし` を使用可能。
-- `Scenario IDs`: `BEHAVIOR` と `ARCHITECTURE` では一件以上必須。`DIRECT` では理由付きの `なし` を使用可能。
+- `Scenario IDs`: `BEHAVIOR`と差分仕様を持つ`ARCHITECTURE`では一件以上必須。`DIRECT`と`skip_specs: true`の`ARCHITECTURE`では理由付きの`なし`を使用可能。
 
 ## 検証入口
 

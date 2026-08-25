@@ -146,6 +146,10 @@ for (const changeDirectory of collectActiveChangeDirectories(process.cwd())) {
   if (!existsSync(designPath)) continue;
 
   const specUnits = collectSpecUnits(changeDirectory);
+
+  // 差分仕様を省略した構造変更では、存在しないSpec Unitや対応する調査判断を要求しない。
+  if (specUnits.length === 0) continue;
+
   const designSource = readFileSync(designPath, 'utf8');
   const section = readLevelTwoSection(designSource, REUSE_HEADING);
   if (!section) {

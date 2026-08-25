@@ -139,7 +139,8 @@ OpenSpec は、利用者または外部契約から観測できる振る舞い�
 - 主仕様は `openspec/specs/**/spec.md` に置きます。
 - 活動中の差分仕様は `openspec/changes/*/specs/**/spec.md` に置きます。
 - `behavior-change` は提案、差分仕様、作業パッケージを管理します。
-- `architecture-change` はこれらに加え、物質的な設計判断を `design.md` で管理します。
+- `architecture-change` は提案、物質的な設計判断、作業パッケージを管理し、観測可能な振る舞いも変更する場合だけ差分仕様を持ちます。
+- 観測可能な振る舞いを変更しない`architecture-change`は`.openspec.yaml`に`skip_specs: true`を設定し、差分仕様、Requirement、Scenarioを作成しません。
 - Requirement と Scenario には観測可能な終端状態だけを記載します。
 - `tasks.md` は粗い作業パッケージ台帳とし、ファイル、補助処理、試験階層ごとの詳細計画を置きません。
 

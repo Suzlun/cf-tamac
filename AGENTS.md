@@ -98,7 +98,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - Do not delete sections or checklist items that do not apply. Instead, write `なし（理由: ...）` or a concrete reason explaining why the item does not apply.
 - Check every checklist item after writing the applicable confirmation or non-applicable reason. Do not leave unchecked items in the pull request body.
 - Record `Operation Lane` as `DIRECT`, `BEHAVIOR`, or `ARCHITECTURE`; record `UX Mode` independently as `NONE`, `CONTINUITY`, or `SHAPE`; and record `Review Depth` as `STANDARD` or `DEEP`.
-- `BEHAVIOR` and `ARCHITECTURE` pull requests MUST identify an OpenSpec Change and at least one Scenario ID. `DIRECT` pull requests may use a reasoned `なし` for both fields.
+- `BEHAVIOR` and `ARCHITECTURE` pull requests MUST identify an OpenSpec Change. `BEHAVIOR` and `ARCHITECTURE` Changes with delta specs MUST identify at least one Scenario ID; `DIRECT` and `ARCHITECTURE` Changes with `skip_specs: true` may use a reasoned `なし` for Scenario IDs.
 - For pull requests with UI / UX changes, attach screenshots in all of these sections: `Desktop Before`, `Desktop After`, `Mobile Before`, and `Mobile After`.
 - The pull request body is validated by `.github/workflows/validate-pr-template.yml`; when using any pull request creation tool, read the template first and prepare a body that passes this validation.
 
@@ -142,6 +142,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - OpenSpec is pinned to `1.8.0`. Its `new change` command does not use `openspec/config.yaml#schema` as the creation default, so always pass `--schema behavior-change` for `BEHAVIOR` or `--schema architecture-change` for `ARCHITECTURE`. Never hand-create a directory under `openspec/changes/`.
 - OpenCode core definitions under `.opencode/commands/opsx-*.md` and `.opencode/skills/openspec-*/SKILL.md` are generated together from OpenSpec `1.8.0` by `pnpm gen:openspec` and must not be hand-edited. Repository-specific supplemental OpenSpec skills remain under `.opencode/skills/openspec/`.
 - Both Change schemas begin with a primary-agent-owned `Request-Status: CONFIRMED` `request.md`. The proposer rejects a Change without it and cannot edit it.
+- An `architecture-change` that changes no observable behavior MUST set `skip_specs: true` in `.openspec.yaml` and MUST NOT invent delta Specs, Requirements, Scenarios, Spec Units, or corresponding reuse-research rows. Remove `skip_specs` and author delta Specs only when the confirmed Request changes observable behavior.
 - Request candidates remain in conversation until owner confirmation. Contract artifacts contain only owner-confirmed positive outcomes and constraints; they omit non-goals, rejected alternatives, absent legacy behavior, absent implementation, and technologies or features that will not be added.
 - Remove obsolete behavior with `REMOVED Requirements`; never replace unrequested or removed behavior with an inverse Requirement that requires its absence.
 - Main behavior specs live at `openspec/specs/**/spec.md`; active deltas live under `openspec/changes/*/specs/**/spec.md`.

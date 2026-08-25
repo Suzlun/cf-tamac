@@ -6,6 +6,8 @@
 
 ## Reuse Assessment
 
+<!-- delta Spec Unitがない場合は表を削除し、理由付きで「なし」と記載する。Spec Unitや調査行を捏造しない。 -->
+
 | Spec Unit                   | Reusable Capability                       | Source Classification                                                                                                                                                     | Decision                                                             | Selected Reuse / Version                    | Research Evidence                            | Limited Complement Justification                             |
 | --------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------ |
 | <!-- TODO: specs/<name> --> | <!-- TODO: パッケージで代替可能な能力 --> | <!-- TODO: REPOSITORY_CODE / WORKSPACE_PACKAGE / DIRECT_DEPENDENCY / REPOSITORY_DEPENDENCY / TRANSITIVE_ONLY / NEW_EXTERNAL / EXISTING_UPDATE / NO_REUSABLE_CANDIDATE --> | <!-- TODO: REUSE / ADOPT / UPDATE / REPLACE / LIMITED_COMPLEMENT --> | <!-- TODO: 採用対象と固定版または既存版 --> | <!-- TODO: docs/report/research/...md:行 --> | <!-- TODO: LIMITED_COMPLEMENTだけ代替不能根拠。ほかはN/A --> |

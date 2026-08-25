@@ -96,7 +96,7 @@ Dependency directions:
   `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id>`, then
   run the global active-Change check.
 - Actual UI changes require a product designer and real desktop/mobile browser review. Generated mockups are optional non-contract evidence.
-- PRs record Operation Lane, UX Mode, Review Depth, OpenSpec Change, and Scenario IDs. `BEHAVIOR` and `ARCHITECTURE` require a Change and Scenario IDs.
+- PRs record Operation Lane, UX Mode, Review Depth, OpenSpec Change, and Scenario IDs. `BEHAVIOR` and `ARCHITECTURE` require a Change. Changes with delta specs require Scenario IDs; an `ARCHITECTURE` Change with `skip_specs: true` uses a reasoned `なし`.
 - Ask before dependency, version, or permission-boundary changes. Never perform a release, publication, deployment, environment mutation, credential access, or external approval as repository completion evidence.
 - Do not use the removed demonstration package graph as an architecture or implementation source.
 

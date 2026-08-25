@@ -76,7 +76,8 @@ material visible direction and must be represented as observable behavior.
 - `BEHAVIOR` uses `behavior-change`: `request.md`, `proposal.md`,
   `specs/*/spec.md`, `tasks.md`.
 - `ARCHITECTURE` uses `architecture-change`: `request.md`, `proposal.md`,
-  `specs/*/spec.md`, `design.md`, `tasks.md`.
+  `design.md`, `tasks.md`, plus `specs/*/spec.md` only when observable behavior
+  changes.
 
 The primary agent has already created the Change and confirmed Request. Verify
 the selected schema from `.openspec.yaml`; never create a Change or silently
@@ -135,6 +136,12 @@ reusable candidates can satisfy that capability, and record the exact limited
 complement. Do not finalize the proposal or design until every delta Spec Unit
 is covered.
 
+When the confirmed Request changes no observable behavior, set
+`skip_specs: true` in `.openspec.yaml`, list no Spec Units, and create no delta
+Specs, Requirements, Scenarios, Reuse Assessment rows, or corresponding
+research reports. Remove `skip_specs` only when the confirmed Request entails
+observable behavior changes.
+
 If a `BEHAVIOR` Change reveals a material package adoption, dependency update or
 replacement, cross-package reuse boundary, or limited-complement decision,
 return a route mismatch for `ARCHITECTURE`; do not hide the decision in tasks or
@@ -161,8 +168,9 @@ with the missing product evidence.
    repository evidence.
 2. Verify the primary-agent-owned confirmed Request, then derive `proposal.md`
    from it without adding outcomes, constraints, or required means.
-3. Author Specs only from desired outcomes and outcome constraints in
-   `request.md`. Every Scenario has a stable ID; standards, packages,
+3. Author Specs only when desired outcomes or outcome constraints in
+   `request.md` change observable behavior. Otherwise set `skip_specs: true`
+   and skip the artifact. Every created Scenario has a stable ID; standards, packages,
    implementation techniques, non-goals, rejected alternatives, absent legacy
    behavior, and other means remain outside Specs. Preserve a visible UX
    composition only when the confirmed Request makes it an Outcome Constraint.

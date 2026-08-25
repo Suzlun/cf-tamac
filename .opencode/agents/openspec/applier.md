@@ -185,6 +185,9 @@ derivation. Return `PROPOSER_REVIEW_REQUIRED` without delegation when an
 artifact expands, reverses, or misinterprets the Request, or when a task cannot
 be causally connected to its requested outcome.
 
+For an `architecture-change` with `skip_specs: true`, require no delta Spec,
+Scenario, Spec Unit, Reuse Assessment row, or corresponding research report.
+
 For an `architecture-change`, verify that every delta Spec Unit is represented
 in `Reuse Assessment` and that each dispatched capability carries its source
 classification, adoption decision, selected target and version, and scoped

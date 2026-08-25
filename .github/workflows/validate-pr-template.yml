@@ -168,8 +168,9 @@ jobs:
           ) {
             errors.push('`OpenSpec Change` は小文字のChange識別子、または `DIRECT` の場合は理由付きの `なし` を記入してください。');
           }
-          if (requiresOpenSpec && scenarioIdsValue !== null && isNoneValue(scenarioIdsValue)) {
-            errors.push('`BEHAVIOR` と `ARCHITECTURE` では1件以上の `Scenario IDs` が必要です。');
+          // BEHAVIORは必ず差分仕様を持つ。ARCHITECTUREはskip_specsの場合に限り、理由付きの「なし」を記載できる。
+          if (operationLaneValue === 'BEHAVIOR' && scenarioIdsValue !== null && isNoneValue(scenarioIdsValue)) {
+            errors.push('`BEHAVIOR` では1件以上の `Scenario IDs` が必要です。');
           }
 
           // Scenario IDはコンマまたは空白区切りで受け付け、仕様検査と同じ安定識別子形式へ限定する。

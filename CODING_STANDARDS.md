@@ -412,11 +412,11 @@ Enforcement point: `.github/workflows/validate-pr-template.yml`.
 NG例: `Operation Lane: BEHAVIOR` だけを記載し、`UX Mode` と `Review Depth` を空欄にする。
 OK例: `Operation Lane: ARCHITECTURE`、`UX Mode: CONTINUITY`、`Review Depth: DEEP` を個別に記載する。
 
-**Rule: `BEHAVIOR` と `ARCHITECTURE` は OpenSpec Change と Scenario ID を記載する。**
-Summary: 観測可能な振る舞いまたは物質的な構造を変えるプルリクエストは、対応する Change と一件以上の Scenario ID を示します。
+**Rule: `BEHAVIOR`と`ARCHITECTURE`はOpenSpec Changeを記載し、差分仕様を持つChangeはScenario IDも記載する。**
+Summary: 観測可能な振る舞いまたは物質的な構造を変えるプルリクエストは対応するChangeを示し、差分仕様を持つ場合は一件以上のScenario IDも示します。
 Enforcement point: `.github/workflows/validate-pr-template.yml`.
-NG例: `Operation Lane: ARCHITECTURE` で `OpenSpec Change: なし` または `Scenario IDs: なし` とする。
-OK例: `OpenSpec Change: make-delivery-opt-in-and-automate-releases` と `Scenario IDs: PACKAGE-RELEASE-AUTOMATION-S001` を記載する。`DIRECT` は理由付きの `なし` を使用できる。
+NG例: `Operation Lane: ARCHITECTURE`で`OpenSpec Change: なし`とする、または差分仕様があるのに`Scenario IDs: なし`とする。
+OK例: `OpenSpec Change: make-delivery-opt-in-and-automate-releases`と`Scenario IDs: PACKAGE-RELEASE-AUTOMATION-S001`を記載する。`DIRECT`と`skip_specs: true`の`ARCHITECTURE`はScenario IDsに理由付きの`なし`を使用できる。
 
 **Rule: 実際の UI / UX 変更では設計関与、実ブラウザ確認、変更前後画像を記録する。**
 Summary: UI を変更する場合はプロダクトデザイナー、デスクトップ、モバイル、アクセシビリティの確認と、四つの画像欄が必要です。

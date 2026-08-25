@@ -1,6 +1,6 @@
 name: architecture-change
-version: 3
-description: 所有者確認済みの要求から、物質的な構造変更を提案、仕様、設計、作業パッケージの順で管理する
+version: 4
+description: 所有者確認済みの要求から、物質的な構造変更を提案、必要な仕様、設計、作業パッケージの順で管理する
 
 artifacts:
   - id: request
@@ -25,7 +25,9 @@ artifacts:
       `Request-Status: CONFIRMED`のrequest.mdを読み、behavior-changeと同じ提案契約で記載された要求の範囲だけを提案する。
       request.mdが存在しない、確認済みでない、または意味が不明な場合は成果物を作成せずプライマリエージェントへ返す。
       構造変更という手段を顧客成果へ置き換えず、Required Means または Candidate Means として分類する。
-      proposal.mdとdesign.mdを確定する前に、各delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、利用できる既存コード、workspace package、対象packageの直接依存、他packageで採用済みの依存、推移依存、新規外部候補、更新候補を調査する。
+      Requestが観測可能な振る舞いを変更しない場合は`.openspec.yaml`へ`skip_specs: true`を設定し、Spec Unitsへ理由付きの「なし」を記載して差分仕様を作成しない。
+      Requestが観測可能な振る舞いも変更する場合は`skip_specs`を設定せず、確認済みRequestから直接導けるdelta Spec Unitだけを記載する。
+      proposal.mdとdesign.mdを確定する前に、存在する各delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、利用できる既存コード、workspace package、対象packageの直接依存、他packageで採用済みの依存、推移依存、新規外部候補、更新候補を調査する。
       再利用判断に使う調査報告は、対象の汎用能力を`調査範囲`へ明記した現在の一次資料付き報告に限る。Requirement対応表または別能力の候補調査を、外部候補調査の証拠へ流用しない。
       リポジトリの事実、一般的な慣行、セキュリティ上の推奨、実装上の必要性から新しい成果または成果制約を追加しない。
       `UX-Mode` は `NONE`、`CONTINUITY`、`SHAPE` のいずれかとし、条件に応じた UI / UX Impact を記載する。
@@ -36,10 +38,11 @@ artifacts:
 
   - id: specs
     generates: 'specs/*/spec.md'
-    description: 構造変更後も成立すべき観測可能な差分仕様
+    description: 観測可能な振る舞いも変える場合に、構造変更後の結果を定める差分仕様
     template: spec.md
     instruction: |
-      request.mdとproposal.mdを読み、所有者確認済みRequestから直接導ける各 Spec Unit に `specs/<capability>/spec.md` を作成する。
+      `.openspec.yaml`に`skip_specs: true`がある場合は成果物を作成しない。
+      それ以外の場合はrequest.mdとproposal.mdを読み、所有者確認済みRequestから直接導ける各 Spec Unit に `specs/<capability>/spec.md` を作成する。
       冒頭の `## Purpose` に、所有者確認済みRequestが求める永続的仕様領域の目的を肯定形で記載する。
       Requirement と Scenario には所有者が確認した利用者または外部契約から観測できる肯定的な終端状態だけを記載し、内部構造を仕様化しない。
       規格準拠、RFC準拠、パッケージ、実装方式を Requirement または Scenario にしない。ただし、顧客が求める体験そのものを表す可視のUI構成または配置は Outcome Constraint として記載できる。
@@ -53,12 +56,12 @@ artifacts:
 
   - id: design
     generates: design.md
-    description: 仕様を満たすために必要な物質的な設計判断
+    description: 確認済みRequestと存在する差分仕様を満たすために必要な物質的な設計判断
     template: design.md
     instruction: |
-      承認済み仕様を実現するために必要な物質的判断だけを記載する。
+      確認済みRequest、proposal.md、存在する差分仕様を実現するために必要な物質的判断だけを記載する。
       Material Decisions、Reuse Assessment、Boundaries、Data、Security、Migration、Rollback、Failure Modes、Risks、Verification、Revisit Triggers 以外の節を追加しない。
-      Reuse Assessmentには全delta Spec Unitを少なくとも一行ずつ記載し、各Spec Unitをパッケージで代替可能な汎用能力へ分解する。同じSpec Unitに複数能力がある場合は行を分ける。
+      Reuse Assessmentには存在する全delta Spec Unitを少なくとも一行ずつ記載し、各Spec Unitをパッケージで代替可能な汎用能力へ分解する。同じSpec Unitに複数能力がある場合は行を分ける。`skip_specs: true`の場合はSpec Unitや調査行を作らず、該当しない理由を記載する。
       各行はSpec Unit、Reusable Capability、Source Classification、Decision、Selected Reuse / Version、Research Evidence、Limited Complement Justificationを持つ。
       Source Classificationは`REPOSITORY_CODE`、`WORKSPACE_PACKAGE`、`DIRECT_DEPENDENCY`、`REPOSITORY_DEPENDENCY`、`TRANSITIVE_ONLY`、`NEW_EXTERNAL`、`EXISTING_UPDATE`、`NO_REUSABLE_CANDIDATE`のいずれかとする。
       Decisionは`REUSE`、`ADOPT`、`UPDATE`、`REPLACE`、`LIMITED_COMPLEMENT`のいずれかとする。推移依存は直接採用済みと扱わず、利用するpackageが正規の直接依存として宣言する判断を記載する。
@@ -78,7 +81,7 @@ artifacts:
     template: tasks.md
     instruction: |
       tasks.md は `- [ ] WP<number>: <成果>` 形式の作業パッケージ台帳とする。
-      各作業パッケージに対象の設計判断または Scenario と、客観的な Completion Evidence を記載する。
+      各作業パッケージに対象の設計判断または存在するScenarioと、客観的な Completion Evidence を記載する。
       ファイル単位、補助処理単位、試験階層単位へ分解しない。
       リリース、デプロイ、外部環境操作、認証情報、外部承認を完了条件に含めない。
     requires:
@@ -93,6 +96,6 @@ apply:
     - tasks
   tracks: tasks.md
   instruction: |
-    所有者確認済みRequest、提案、差分仕様、設計判断を読み、Requestが求める成果へ因果的につながる作業パッケージだけを実装、検証する。
+    所有者確認済みRequest、提案、存在する差分仕様、設計判断を読み、Requestが求める成果へ因果的につながる作業パッケージだけを実装、検証する。
     全作業パッケージ完了時は `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references` を実行し、選択 Change の実効仕様と試験参照を一致させる。
     成果物がRequestを拡張、反転、または誤解している場合、重要な矛盾または未解決判断を発見した場合は作業を止め、プライマリエージェントへ返す。

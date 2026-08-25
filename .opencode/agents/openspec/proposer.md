@@ -184,6 +184,11 @@ Specs, and coarse `tasks.md`. Only `ARCHITECTURE` owns `design.md`. Call `ux/sha
 only for `SHAPE`; use current product precedent directly for `CONTINUITY`; do no
 UI work for `NONE`.
 
+For an `ARCHITECTURE` Request with no observable behavior change, set
+`skip_specs: true` in `.openspec.yaml` and create no delta Specs, Requirements,
+Scenarios, Spec Units, Reuse Assessment rows, or corresponding research reports.
+Remove `skip_specs` only when the confirmed Request changes observable behavior.
+
 Accept a Change only when the primary agent has already created a readable
 `request.md` containing `Request-Status: CONFIRMED` and owner confirmation
 evidence. Otherwise return `REQUEST_REQUIRED` without editing any artifact. The

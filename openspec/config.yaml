@@ -26,6 +26,7 @@ context: |
   - Before creating an `architecture-change`, investigate existing repository assets, installed packages, and established external packages.
   - Independent implementation is allowed only when none of the reusable candidates can satisfy the confirmed outcome within security, supply-chain, and architecture rules.
   - Every architecture-change delta Spec Unit has at least one Reuse Assessment decision. Split each Spec Unit into package-replaceable generic capabilities before deciding reuse.
+  - An architecture-change with no observable behavior change sets `skip_specs: true` and does not invent delta Specs, Requirements, Scenarios, Spec Units, or corresponding reuse-research rows.
   - Reuse evidence is valid only when the cited research report explicitly includes the generic capability in its investigation scope. Requirement traceability is not package-candidate coverage.
   - Distinguish repository code, workspace packages, direct dependencies, repository-adopted dependencies, transitive-only dependencies, new external packages, and dependency updates.
 
