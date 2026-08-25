@@ -7,18 +7,16 @@ import { runGuardInFixture } from '#openspec/guard-test-fixture';
 const guardScriptPath = fileURLToPath(new URL('./verify-change-proposal.mjs', import.meta.url));
 
 /**
- * 条件分岐の検査に使う、解決済み提案の完全な基準内容を生成する。
+ * 条件分岐の検査に使う、完全な提案の基準内容を生成する。
  *
- * @param {{ resolution?: string; uxMode?: string; uxDetails?: string }} [options] - 差し替える意図解決値と UX 証跡。
+ * @param {{ uxMode?: string; uxDetails?: string }} [options] - 差し替える UX モードと証跡。
  * @returns {string} proposal.md として有効な内容。
  */
 function createResolvedProposal({
-  resolution = 'REQUEST_SUFFICIENT',
   uxMode = 'NONE',
   uxDetails = '利用者に見える画面または操作は変化しない。',
 } = {}) {
-  return `Intent-Resolution: ${resolution}
-UX-Mode: ${uxMode}
+  return `UX-Mode: ${uxMode}
 
 ## Outcome
 
@@ -28,22 +26,9 @@ UX-Mode: ${uxMode}
 
 活動中の仕様差分を含めなければ、実装前の不整合を検出できないため。
 
-## Scope
-
-### In Scope
+## Confirmed Change Boundary
 
 - 活動中の仕様差分を検査対象に含める。
-
-### Out of Scope
-
-- 外部環境での運用は対象外とする。
-
-## Request Classification
-
-| Request Statement | Classification | Resolution |
-| --- | --- | --- |
-| 仕様差分を検査する | Desired Outcome | 活動中の差分を含む実効仕様を検査する。 |
-| 標準ライブラリを使う | Required Means | 実装上の制約として扱う。 |
 
 ## Spec Units
 
@@ -69,23 +54,15 @@ ${uxDetails}
 | --- | --- | --- |
 | \`scripts/openspec\` | 検査処理が存在する。 | 共通処理を再利用できる。 |
 
-## Assumptions and Decisions
-
-- Assumptions: なし。対象範囲は依頼で明示されている。
-- Decisions: 依頼で指定された成果を採用する。
-
 ## Observable Success
 
 - 活動中の差分にあるシナリオが検査される。
 
-## Confirmation Evidence
-
-- 依頼文が成果、範囲、制約を明示している。
 `;
 }
 
-// 依頼だけで意図が確定した提案は、確認待ちに戻さず後続成果物へ進めることを確認する。
-void test('REQUEST_SUFFICIENT の完全な提案を許可する', () => {
+// 必須の提案構造が揃っていれば受理されることを確認する。
+void test('完全な提案を許可する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/proposal.md': createResolvedProposal(),
   });
@@ -94,11 +71,11 @@ void test('REQUEST_SUFFICIENT の完全な提案を許可する', () => {
   assert.equal(result.stderr, '');
 });
 
-// 意図確認中の提案は、後続成果物がなければ安全に保存できることを確認する。
-void test('後続成果物のない DRAFT 提案を許可する', () => {
+// プライマリエージェントが確認済みRequestだけを先に保存できることを確認する。
+void test('proposal.md 作成前の request.md だけを許可する', () => {
   const result = runGuardInFixture(guardScriptPath, {
-    'openspec/changes/example/proposal.md':
-      'Intent-Resolution: DRAFT\nUX-Mode: NONE\n\n<!-- TODO: 意図を確認する。 -->\n',
+    'openspec/changes/example/request.md':
+      'Request-Status: CONFIRMED\n\n## Request\n\n確認済み要求。\n',
   });
 
   assert.equal(result.status, 0);
@@ -107,6 +84,7 @@ void test('後続成果物のない DRAFT 提案を許可する', () => {
 // 提案を経ずに仕様差分だけを作成する経路が拒否されることを確認する。
 void test('proposal.md がない後続成果物を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
+    'openspec/changes/example/request.md': 'Request-Status: CONFIRMED\n',
     'openspec/changes/example/specs/account/spec.md': '## Purpose\n\nアカウントを扱う。\n',
   });
 
@@ -114,15 +92,17 @@ void test('proposal.md がない後続成果物を拒否する', () => {
   assert.match(result.stderr, /proposal\.md が必要/u);
 });
 
-// 未確定の意図を設計や作業台帳へ固定する経路が拒否されることを確認する。
-void test('[WORKSPACE-GOVERNANCE-S025] DRAFT 提案の後続成果物を拒否する', () => {
+// 規定外の提案構造が拒否されることを確認する。
+void test('[WORKSPACE-GOVERNANCE-S025] 指定外の提案見出しを拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
-    'openspec/changes/example/proposal.md': 'Intent-Resolution: DRAFT\nUX-Mode: NONE\n',
-    'openspec/changes/example/tasks.md': '## Work Packages\n',
+    'openspec/changes/example/proposal.md': createResolvedProposal().replace(
+      '## Confirmed Change Boundary',
+      '## Scope'
+    ),
   });
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /DRAFT の間/u);
+  assert.match(result.stderr, /Confirmed Change Boundary/u);
 });
 
 // 解決済み提案に未確定の仮記述を残せないことを確認する。
@@ -135,30 +115,17 @@ void test('解決済み提案に残る placeholder を拒否する', () => {
   assert.match(result.stderr, /TODO または TBD/u);
 });
 
-// 意図解決の根拠が空の提案を、形式だけで受理しないことを確認する。
-void test('解決済み提案の空の確認証跡を拒否する', () => {
+// 成功条件が空の提案を形式だけで受理しないことを確認する。
+void test('提案の空の成功条件を拒否する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/proposal.md': createResolvedProposal().replace(
-      '- 依頼文が成果、範囲、制約を明示している。',
+      '- 活動中の差分にあるシナリオが検査される。',
       '-'
     ),
   });
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Confirmation Evidence に内容がありません/u);
-});
-
-// 成果と手段を分離する分類語彙以外が提案へ混入しないことを確認する。
-void test('指定外の分類を拒否する', () => {
-  const result = runGuardInFixture(guardScriptPath, {
-    'openspec/changes/example/proposal.md': createResolvedProposal().replace(
-      'Desired Outcome',
-      'Implementation'
-    ),
-  });
-
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Implementation.*許可されていません/u);
+  assert.match(result.stderr, /Observable Success に内容がありません/u);
 });
 
 // 既存体験を維持する判断には、維持対象を特定する根拠が必要なことを確認する。
@@ -175,7 +142,6 @@ void test('CONTINUITY に既存体験の根拠を要求する', () => {
 void test('SHAPE に中心作業と体験方向を要求する', () => {
   const result = runGuardInFixture(guardScriptPath, {
     'openspec/changes/example/proposal.md': createResolvedProposal({
-      resolution: 'OWNER_CONFIRMED',
       uxMode: 'SHAPE',
       uxDetails: '### Primary User Task\n\n利用者が仕様を確認する。',
     }),

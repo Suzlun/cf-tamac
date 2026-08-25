@@ -9,14 +9,15 @@ compatibility: Requires openspec CLI.
 This is the repository-specific contract layered on the generated
 `openspec-propose` skill for `openspec/proposer`. Use the generated skill for
 store selection, status, instructions, dependency traversal, and artifact path
-resolution. This contract controls lane selection, explicit schema selection,
-UX routing, intent resolution, and review convergence whenever the generic
-workflow is broader or assumes the built-in schema.
+resolution. When the generic workflow is broader or assumes the built-in
+schema, this contract controls lane selection, explicit schema selection, UX
+routing, Request acceptance, and review convergence.
 
 ## Inputs
 
-- A request or confirmed proposal handoff.
-- Optional `change-id`, planning store, and repository evidence.
+- A `change-id` whose Change already contains a primary-agent-owned
+  `Request-Status: CONFIRMED` `request.md`.
+- Optional planning store and repository evidence.
 - Optional explicit `lane` and `ux_mode`; verify rather than trust unsupported
   classifications.
 
@@ -41,21 +42,22 @@ ux_mode: NONE | CONTINUITY | SHAPE
 - `SHAPE` requires an intended experience direction not established by current
   precedent.
 
-Treat solution-shaped wording as Desired Outcome, Outcome Constraint, Required
-Means, or Candidate Means. A required means may require `ARCHITECTURE`, but it
-never becomes a Requirement or Scenario.
+Treat solution-shaped wording in the confirmed Request as Desired Outcome,
+Outcome Constraint, Required Means, or Candidate Means. A required means may
+require `ARCHITECTURE`, but it never becomes a Requirement or Scenario.
 
-Practice YAGNI throughout classification and artifact work. Do not create a Spec
-Unit, Requirement, or Scenario unless its customer value is evident from the
-request or confirmed interpretation. Standards, RFC compliance, packages, and
-implementation techniques are means unless the customer explicitly needs their
-externally observable effect. A visible UI composition or placement may be an
-Outcome Constraint when it directly expresses the experience the customer wants,
-rather than prescribing an internal component implementation.
+Practice YAGNI throughout classification and artifact work. Create a Spec Unit,
+Requirement, or Scenario only when it follows directly from `request.md`.
+Repository evidence, common practice, security recommendations, implementation
+necessity, downstream artifacts, and tests cannot create product behavior.
+Standards, RFC compliance, packages, and implementation techniques are means
+unless the confirmed Request explicitly requires their externally observable
+effect. A visible UI composition or placement may be an Outcome Constraint only
+when it is present in the confirmed Request.
 
 ## DIRECT
 
-Create no directory, metadata, proposal, or placeholder Change. Return:
+Edit no artifact and return the route mismatch to the primary agent:
 
 ```text
 NO_OPENSPEC_REQUIRED
@@ -71,35 +73,33 @@ material visible direction and must be represented as observable behavior.
 
 ## Change schemas
 
-- `BEHAVIOR` uses `behavior-change`: `proposal.md`, `specs/*/spec.md`,
-  `tasks.md`.
-- `ARCHITECTURE` uses `architecture-change`: `proposal.md`,
+- `BEHAVIOR` uses `behavior-change`: `request.md`, `proposal.md`,
+  `specs/*/spec.md`, `tasks.md`.
+- `ARCHITECTURE` uses `architecture-change`: `request.md`, `proposal.md`,
   `specs/*/spec.md`, `design.md`, `tasks.md`.
 
-Create a new Change with:
+The primary agent has already created the Change and confirmed Request. Verify
+the selected schema from `.openspec.yaml`; never create a Change or silently
+switch its schema. Never create `design.md` for `BEHAVIOR`. Never create
+artifacts that the selected schema does not define.
 
-```bash
-pnpm exec openspec new change "<change-id>" --schema <schema> --json
-```
+## Request acceptance
 
-Never create `design.md` for `BEHAVIOR`. Never create artifacts that the
-selected schema does not define.
+Before any artifact work, read `request.md`. Accept the Change only when it has
+`Request-Status: CONFIRMED`, a concrete Request, and owner confirmation evidence.
+If it is missing, unconfirmed, unclear, or internally inconsistent, return
+`REQUEST_REQUIRED` to the primary agent without editing any artifact.
 
-## Proposal ownership
-
-`proposal.md` is the authoritative interpretation of the request. Inspect
-repository evidence before writing it and keep `Intent-Resolution: DRAFT` while
-any ambiguity could materially change behavior, external contracts,
-architecture, security, data, dependencies, runtime, scope, or UX direction.
-
-Use `REQUEST_SUFFICIENT` only when the request resolves every material
-ambiguity. Use `OWNER_CONFIRMED` only after explicit confirmation of the
-reconstructed interpretation.
+Never create, edit, supplement, reinterpret, or replace `request.md`. Keep
+inferred improvements, candidate means, non-goals, rejected interpretations,
+and design decisions out of the Request. If planning discovers that the Request
+must change, stop and return the exact owner decision needed to the primary
+agent.
 
 ## Reuse investigation
 
-Before creating an `ARCHITECTURE` Change, investigate the implementation surface
-in this order:
+Before finalizing an `ARCHITECTURE` proposal or design, investigate the
+implementation surface in this order:
 
 1. Existing repository code, shared boundaries, and established patterns.
 2. Installed packages confirmed from manifests and the lockfile.
@@ -110,11 +110,11 @@ in this order:
 Record relevant candidates or a reasoned `none` for every level. Select existing
 code before installed packages, installed packages before adding an external
 package, and an external package before independent implementation whenever the
-earlier choice can satisfy the confirmed outcome within repository rules.
+earlier choice can satisfy the confirmed Request within repository rules.
 Independent implementation is permitted only when the evidence shows that none
-of the reusable candidates can satisfy the confirmed outcome. Do not create the
-Change until this investigation is sufficient to bound the material dependency
-and reuse decisions.
+of the reusable candidates can satisfy the confirmed Request. Do not finalize
+the proposal or design until this investigation is sufficient to bound the
+material dependency and reuse decisions.
 
 ## UX routing
 
@@ -122,25 +122,26 @@ and reuse decisions.
 - `CONTINUITY`: inspect the current product and record exact continuity source
   paths in the proposal. Do not call `ux/shaper`.
 - `SHAPE`: call `ux/shaper` before finalizing the proposal and before Specs.
-  Provide the desired outcome, primary user task, current surface evidence,
-  constraints, and open UX question. Integrate only its approved primary user
-  task and UX direction into the proposal; do not create additional OpenSpec
-  side artifacts.
+  Provide the confirmed Request, current surface evidence, constraints, and open
+  UX question. Integrate only a primary user task and UX direction directly
+  supported by the Request; do not create additional OpenSpec side artifacts.
 
 Continue only after `ux/shaper` returns `DIRECTION_READY`. For
-`OWNER_DECISION_REQUIRED`, obtain the owner's decision and rerun shaping. For
-`BLOCKED`, stop with the missing product evidence.
+`OWNER_DECISION_REQUIRED`, return to the primary agent so it can obtain owner
+confirmation and update `request.md`, then rerun shaping. For `BLOCKED`, stop
+with the missing product evidence.
 
 ## Artifact workflow
 
 1. Read `AGENTS.md`, `openspec/config.yaml`, the selected schema, and relevant
    repository evidence.
-2. Resolve the request interpretation in `proposal.md` using the schema template
-   and instructions.
-3. Author Specs from desired outcomes and outcome constraints with evident
-   customer value only. Every Scenario has a stable ID; standards, packages,
-   implementation techniques, and other means remain outside Specs. Preserve a
-   confirmed visible UX composition when it is itself an Outcome Constraint.
+2. Verify the primary-agent-owned confirmed Request, then derive `proposal.md`
+   from it without adding outcomes, constraints, or required means.
+3. Author Specs only from desired outcomes and outcome constraints in
+   `request.md`. Every Scenario has a stable ID; standards, packages,
+   implementation techniques, non-goals, rejected alternatives, absent legacy
+   behavior, and other means remain outside Specs. Preserve a visible UX
+   composition only when the confirmed Request makes it an Outcome Constraint.
 4. For `ARCHITECTURE` only, identify each material decision and transfer the
    reuse investigation, selected reuse, and any justified independent
    implementation into `design.md`. Call
@@ -163,9 +164,9 @@ Architect output is accepted only when it includes `Recommendation`,
 ## Planning Ready
 
 Apply the planning-completion boundary from `docs/change-operation.md` and
-`openspec-review`. Resolve only the selected schema's confirmed outcomes and
-material decisions; leave concrete representations and local implementation
-choices to apply when they preserve the resolved meaning.
+`openspec-review`. Resolve only outcomes in the confirmed Request and material
+decisions needed to realize them. Leave concrete representations and local
+implementation choices to apply when they preserve the Request.
 
 ## Convergence
 
@@ -184,8 +185,10 @@ analyzer returns `APPROVED` and `Planning Ready: YES`.
 
 ## Boundaries
 
-- Proposer owns request interpretation, proposal, Specs, coarse tasks, and only
-  architecture design.
+- Proposer owns proposal, Specs, coarse tasks, and architecture design only. It
+  never owns or reinterprets `request.md`.
+- Return `REQUEST_REQUIRED` without edits when the primary-agent-owned confirmed
+  Request is absent or insufficient.
 - Architects do not author artifacts or behavior.
 - Do not implement, edit generated outputs, add dependencies, deploy, access
   credentials, or perform external writes.

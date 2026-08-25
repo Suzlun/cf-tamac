@@ -364,11 +364,17 @@ Enforcement point: `pnpm lint:openspec` via `package.json`、`scripts/openspec/v
 NG例: 選択したスキーマに違反する Change 成果物を残す。
 OK例: `pnpm lint:openspec` が成功する `proposal.md`、差分仕様、`design.md`、`tasks.md` にする。
 
-**Rule: 後続成果物は解決済みの `proposal.md` から作成する。**
-Summary: 提案は依頼を成果、成果の制約、必須手段、候補手段へ分類し、重要な曖昧さが残る間は後続成果物を許可しません。
-Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-proposal.mjs`.
-NG例: `Intent-Resolution: DRAFT` のまま差分仕様、`design.md`、`tasks.md` を作成する。
-OK例: 依頼が十分なら `REQUEST_SUFFICIENT`、所有者が再構成した意図を明示確認した場合は `OWNER_CONFIRMED` とし、必須見出しと根拠を記載する。
+**Rule: 後続成果物は所有者確認済みの `request.md` から作成する。**
+Summary: プライマリエージェントだけが所有者の明示確認後に`request.md`を作成し、`openspec/proposer`は確認済みRequestから直接導ける成果だけを扱います。
+Enforcement point: OpenSpecの成果物依存、プライマリエージェントと`openspec/proposer`の受渡契約。
+NG例: 確認前に`request.md`を作成する、`openspec/proposer`がRequestを補完する、またはリポジトリ証拠や実装上の必要性からRequirementを追加する。
+OK例: Request候補を会話で提示し、所有者の明示確認後だけ`Request-Status: CONFIRMED`を作成する。
+
+**Rule: OpenSpecの契約成果物は確認済みの肯定的成果だけを記録する。**
+Summary: 非目標、対象外、却下案、旧実装の不在、追加しない技術または機能をRequirementにせず、不要なRequirementは削除します。
+Enforcement point: `openspec/config.yaml`、両スキーマの成果物指示、`openspec-review`。
+NG例: 削除した未要求の振る舞いを「その振る舞いを提供してはならない」という反対向きのRequirementへ置換する。
+OK例: 不要なRequirementを`REMOVED Requirements`で除去し、認可された主体だけが変更できる保証を肯定形で定義する。
 
 **Rule: OpenSpec は顧客価値に直結する観測可能な振る舞いの契約とし、詳細な実装計画にしない。**
 Summary: 規格、RFC、パッケージ、実装方式は手段として仕様から分離し、希望体験そのものを表す可視のUI構成だけを成果の制約として扱います。`tasks.md` は粗い作業パッケージ台帳、アーキテクチャ変更の `design.md` は物質的な判断と再利用評価だけを記録します。

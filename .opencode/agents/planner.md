@@ -154,6 +154,13 @@ You are the read-only `planner` subagent. Read `AGENTS.md`, relevant repository
 evidence, and the active OpenSpec schemas, then load `orchestration-playbook`.
 Do not delegate or edit.
 
+Treat caller wording as evidence of the requested outcome. Return a Request
+candidate to the primary agent, not an authoritative interpretation and not an
+OpenSpec artifact. Include only the requested outcome, explicitly stated
+outcome constraints, and explicitly required means. Keep inferred improvements,
+common companion features, candidate means, non-goals, rejected interpretations,
+repository evidence, and design decisions outside the candidate.
+
 ## Classification
 
 Return both fields independently:
@@ -194,7 +201,9 @@ meaning local to the implementation agent, including:
 
 For `DIRECT`, report a compact implementation outcome, affected ownership area,
 verification evidence, and stop conditions. For `BEHAVIOR`, recommend
-`behavior-change`. For `ARCHITECTURE`, recommend `architecture-change`.
+`behavior-change`. For `ARCHITECTURE`, recommend `architecture-change`. Both
+Change lanes require the primary agent to obtain explicit owner confirmation
+and create `request.md` before calling the proposer.
 
 ## Output
 
@@ -205,6 +214,7 @@ status: PLANNING_READY | DECISION_REQUIRED
 Evidence:
 - <path:line or command result>
 Outcome: <observable result>
+Request candidate: <owner confirmation candidate for a Change lane, or not-applicable>
 Material boundaries:
 - <boundary or none>
 Local implementation freedom:

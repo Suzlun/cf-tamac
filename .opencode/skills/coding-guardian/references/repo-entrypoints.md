@@ -85,7 +85,7 @@ Read these files before applying `coding-guardian` in this repository.
 - `.opencode/skills/openspec/**`: repository-specific supplements layered on the generated core skills
 - `openspec/schemas/behavior-change/schema.yaml`: observable behavior Change artifact order and scope
 - `openspec/schemas/architecture-change/schema.yaml`: material architecture Change artifact order and scope
-- `scripts/openspec/verify-change-proposal.mjs`: resolved proposal structure, request classification, and `UX-Mode` evidence
+- `scripts/openspec/verify-change-proposal.mjs`: proposal structure and `UX-Mode` evidence
 - `scripts/openspec/verify-scenario-coverage.mjs`: main specs plus active delta application, Scenario/Test traceability, and `--change` selection
 - `scripts/openspec/verify-change-task-scope.mjs`: coarse Work Package and material design scope
 

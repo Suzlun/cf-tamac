@@ -5,29 +5,19 @@ import process from 'node:process';
 import { collectActiveChangeDirectories } from '#openspec/change-artifacts';
 
 const PROPOSAL_FILE_NAME = 'proposal.md';
-const RESOLUTIONS = new Set(['DRAFT', 'REQUEST_SUFFICIENT', 'OWNER_CONFIRMED']);
-const RESOLVED = new Set(['REQUEST_SUFFICIENT', 'OWNER_CONFIRMED']);
+const REQUEST_FILE_NAME = 'request.md';
 const UX_MODES = new Set(['NONE', 'CONTINUITY', 'SHAPE']);
-const CLASSIFICATIONS = new Set([
-  'Desired Outcome',
-  'Outcome Constraint',
-  'Required Means',
-  'Candidate Means',
-]);
 const REQUIRED_HEADINGS = [
   'Outcome',
   'Why',
-  'Scope',
-  'Request Classification',
+  'Confirmed Change Boundary',
   'Spec Units',
   'UI / UX Impact',
   'Material Constraints',
   'Repository Evidence',
-  'Assumptions and Decisions',
   'Observable Success',
-  'Confirmation Evidence',
 ];
-const REQUIRED_SUBHEADINGS = ['In Scope', 'Out of Scope', 'New Spec Units', 'Modified Spec Units'];
+const REQUIRED_SUBHEADINGS = ['New Spec Units', 'Modified Spec Units'];
 const PLACEHOLDER_PATTERN = /<!--\s*TODO:|\bTBD\b/iu;
 
 /**
@@ -43,17 +33,14 @@ function removeHtmlComments(source) {
 }
 
 /**
- * `Key: VALUE` 形式の提案マーカーを一件だけ取得する。
+ * `UX-Mode: VALUE` 形式の提案マーカーを一件だけ取得する。
  *
  * @param {string} source - コメントを除いた proposal.md の内容。
- * @param {string} key - 取得するマーカー名。
  * @returns {string | null} マーカー値。欠落または重複時は `null`。
  */
-function getUniqueMarker(source, key) {
-  const matches = [...source.matchAll(/^(Intent-Resolution|UX-Mode):\s*([A-Z_]+)\s*$/gmu)].filter(
-    (match) => match[1] === key
-  );
-  return matches.length === 1 ? (matches[0]?.[2] ?? null) : null;
+function getUniqueUxMode(source) {
+  const matches = [...source.matchAll(/^UX-Mode:\s*([A-Z_]+)\s*$/gmu)];
+  return matches.length === 1 ? (matches[0]?.[1] ?? null) : null;
 }
 
 /**
@@ -128,6 +115,7 @@ function collectDownstreamArtifacts(changeDirectory) {
       } else if (
         entry.isFile() &&
         entry.name !== PROPOSAL_FILE_NAME &&
+        entry.name !== REQUEST_FILE_NAME &&
         entry.name !== '.openspec.yaml'
       ) {
         artifacts.push(entryPath);
@@ -136,27 +124,6 @@ function collectDownstreamArtifacts(changeDirectory) {
   }
 
   return artifacts.sort();
-}
-
-/**
- * Request Classification 表のデータ行から分類値を抽出する。
- *
- * @param {string} source - コメントを除いた proposal.md の内容。
- * @returns {string[]} 表へ記載された分類値。
- */
-function collectClassifications(source) {
-  const sectionMatch = /^## Request Classification\s*$([\s\S]*?)(?=^##\s+|(?![\s\S]))/mu.exec(
-    source
-  );
-  if (!sectionMatch?.[1]) return [];
-
-  const classifications = [];
-  for (const line of sectionMatch[1].split(/\r?\n/u)) {
-    const cells = line.split('|').map((cell) => cell.trim());
-    if (cells.length < 5 || cells[2] === 'Classification' || /^-+$/u.test(cells[2] ?? '')) continue;
-    if (cells[2]) classifications.push(cells[2]);
-  }
-  return classifications;
 }
 
 /**
@@ -188,17 +155,8 @@ for (const changeDirectory of collectActiveChangeDirectories(process.cwd())) {
 
   const originalSource = readFileSync(proposalPath, 'utf8');
   const source = removeHtmlComments(originalSource);
-  const resolution = getUniqueMarker(source, 'Intent-Resolution');
-  const uxMode = getUniqueMarker(source, 'UX-Mode');
+  const uxMode = getUniqueUxMode(source);
 
-  if (resolution === null || !RESOLUTIONS.has(resolution)) {
-    addError(
-      errors,
-      proposalPath,
-      1,
-      'Intent-Resolution は DRAFT、REQUEST_SUFFICIENT、OWNER_CONFIRMED のいずれか一つでなければなりません。'
-    );
-  }
   if (uxMode === null || !UX_MODES.has(uxMode)) {
     addError(
       errors,
@@ -207,20 +165,6 @@ for (const changeDirectory of collectActiveChangeDirectories(process.cwd())) {
       'UX-Mode は NONE、CONTINUITY、SHAPE のいずれか一つでなければなりません。'
     );
   }
-
-  // DRAFT は提案内容の作業途中を許可する一方、仕様以降へ進むことは許可しない。
-  if (resolution === 'DRAFT') {
-    if (downstreamArtifacts.length > 0) {
-      addError(
-        errors,
-        proposalPath,
-        1,
-        'Intent-Resolution が DRAFT の間は後続成果物を作成できません。'
-      );
-    }
-    continue;
-  }
-  if (!RESOLVED.has(resolution ?? '')) continue;
 
   const h2Headings = collectHeadings(source, 2);
   const h2Names = h2Headings.map(({ name }) => name).filter((name) => name !== 'Thesaurus');
@@ -254,21 +198,6 @@ for (const changeDirectory of collectActiveChangeDirectories(process.cwd())) {
   if (placeholderMatch?.index !== undefined) {
     const line = originalSource.slice(0, placeholderMatch.index).split(/\r?\n/u).length;
     addError(errors, proposalPath, line, '解決済み提案に TODO または TBD を残せません。');
-  }
-
-  const classifications = collectClassifications(source);
-  if (classifications.length === 0) {
-    addError(errors, proposalPath, 1, 'Request Classification に少なくとも一つの分類が必要です。');
-  }
-  for (const classification of classifications) {
-    if (!CLASSIFICATIONS.has(classification)) {
-      addError(
-        errors,
-        proposalPath,
-        1,
-        `Request Classification の分類 '${classification}' は許可されていません。`
-      );
-    }
   }
 
   // UX モード固有の証跡が揃っていることを確認し、UI の意図が暗黙に決まる状態を防ぐ。

@@ -1,12 +1,16 @@
 ---
-description: Classifies planning requests, preserves only evident customer value in Specs, and minimizes implementation through reuse-first schema-specific Changes.
+description: Derives schema-specific Changes only from a primary-agent-owned confirmed Request and minimizes implementation through reuse-first planning.
 mode: subagent
 model: openai/gpt-5.6-sol
 reasoningEffort: 'high'
 temperature: 0.1
 permission:
   edit:
-    '*': allow
+    '*': deny
+    'openspec/changes/**': allow
+    '*/openspec/changes/**': allow
+    'openspec/changes/**/request.md': deny
+    '*/openspec/changes/**/request.md': deny
   'github_*': deny
   'github_get_*': allow
   'github_list_*': allow
@@ -175,10 +179,17 @@ Classify every request as `lane: DIRECT | BEHAVIOR | ARCHITECTURE` and
 `DIRECT`, create no Change and return `NO_OPENSPEC_REQUIRED` with the evidence
 and responsible implementation route.
 
-For Change lanes, own request interpretation in `proposal.md`, all delta Specs,
-and coarse `tasks.md`. Only `ARCHITECTURE` owns `design.md`. Call `ux/shaper`
+For Change lanes, own the fallible change proposal in `proposal.md`, all delta
+Specs, and coarse `tasks.md`. Only `ARCHITECTURE` owns `design.md`. Call `ux/shaper`
 only for `SHAPE`; use current product precedent directly for `CONTINUITY`; do no
 UI work for `NONE`.
+
+Accept a Change only when the primary agent has already created a readable
+`request.md` containing `Request-Status: CONFIRMED` and owner confirmation
+evidence. Otherwise return `REQUEST_REQUIRED` without editing any artifact. The
+Request is owner-controlled evidence: never create, edit, supplement,
+reinterpret, or replace it. `proposal.md` is your fallible change proposal, not
+the authority for what the owner requested.
 
 Before selecting or rejecting an external package, call `researcher` and wait
 for a saved, current, primary-evidence-backed research report. Do not substitute
@@ -189,3 +200,6 @@ belong in Specs.
 
 Write OpenSpec artifact prose in natural Japanese under the repository rules.
 Do not create compatibility aliases or artifacts outside the selected schema.
+Do not add product behavior because it appears useful, customary, safer, or
+necessary for implementation. Return to the primary agent whenever the
+confirmed Request itself must change.

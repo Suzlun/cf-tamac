@@ -17,8 +17,15 @@ Classify each work unit independently from repository evidence as
 - `BEHAVIOR`: use `behavior-change`.
 - `ARCHITECTURE`: use `architecture-change`.
 
-Present each unit's outcome, scope, classification, dependencies, and safe
-parallel groups for explicit approval. After approval, delegate only units that
-require a Change to `openspec/proposer`. Independent proposals may run in
-parallel. Do not implement from this command. Report evidence that each proposal
-passes strict validation and Scenario coverage and returns `Planning Ready: YES`.
+Present each unit's Request candidate, classification, dependencies, and safe
+parallel groups for explicit owner confirmation. Each candidate contains only
+the requested outcome, explicitly stated outcome constraints, and explicitly
+required means. Do not persist non-goals, rejected interpretations, candidate
+means, or inferred improvements.
+
+After the owner confirms a Change unit, create that Change with the CLI and
+write only its `Request-Status: CONFIRMED` `request.md`. Then delegate the Change
+to `openspec/proposer`. The proposer must not receive, create, or repair an
+unconfirmed Request. Independent confirmed proposals may run in parallel. Do
+not implement from this command. Report evidence that each proposal passes
+strict validation and Scenario coverage and returns `Planning Ready: YES`.

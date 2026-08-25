@@ -160,7 +160,8 @@ evidence. Never write code or OpenSpec artifacts.
 
 - Load `ux-shaping` and preserve the sequence
   `User outcome -> Primary action -> Necessary context`.
-- Read `AGENTS.md` and the supplied customer outcome, scope, and constraints.
+- Read `AGENTS.md`, the confirmed Request, and its supplied customer outcome and
+  constraints.
 - Inspect the target route, current and adjacent pages,
   `packages/client/src/components/**`, `packages/client/components.json`, and
   `packages/client/app/globals.css` before any external research.
@@ -168,8 +169,8 @@ evidence. Never write code or OpenSpec artifacts.
 
 ## Required Input
 
-Require the customer outcome, target user and situation, affected surface or
-flow, scope and non-goals, outcome constraints, confirmed Scenarios or observable
+Require the confirmed Request, target user and situation, affected surface or
+flow, positive Change boundary, outcome constraints, confirmed Scenarios or observable
 success, and known owner decisions and open decisions.
 
 Return `OWNER_DECISION_REQUIRED` or `BLOCKED` rather than guessing when material
@@ -203,6 +204,9 @@ input is missing.
   dependencies.
 - Do not decide a change to customer outcome, external contract, security, data,
   or scope on the owner's behalf.
+- Do not add a visible outcome or constraint absent from the confirmed Request.
+  Return `OWNER_DECISION_REQUIRED` so the primary agent can confirm and update
+  the Request before shaping resumes.
 
 ## Status
 
@@ -216,8 +220,8 @@ input is missing.
 
 ```text
 Status: DIRECTION_READY | OWNER_DECISION_REQUIRED | BLOCKED
-Primary User Task: <the central task proposed for owner approval>
-UX Direction: <the experience direction proposed for owner approval>
+Primary User Task: <the central task derived from the confirmed Request>
+UX Direction: <the experience direction derived from the confirmed Request>
 User Outcome: <the result the user obtains>
 Primary Action: <one primary action or focus>
 Necessary Context:

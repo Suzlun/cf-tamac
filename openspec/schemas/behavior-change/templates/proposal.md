@@ -1,29 +1,16 @@
-Intent-Resolution: DRAFT
 UX-Mode: NONE
 
 ## Outcome
 
-<!-- TODO: 利用者、状況、解決したい問題、得たい成果を実装方式に依存せず記載する。 -->
+<!-- TODO: 確認済みRequestが求める成果を、意味を追加せず記載する。 -->
 
 ## Why
 
 <!-- TODO: なぜ今この成果が必要なのかを、確認できた痛みまたは機会に基づいて記載する。 -->
 
-## Scope
-
-### In Scope
+## Confirmed Change Boundary
 
 - <!-- TODO: この変更で実現する成果と外部契約の境界を記載する。 -->
-
-### Out of Scope
-
-- <!-- TODO: 対象外とする成果または契約を、理由とともに記載する。 -->
-
-## Request Classification
-
-| Request Statement                                 | Classification                                                                         | Resolution                        |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------- |
-| <!-- TODO: 依頼中の成果、制約、技術または方式 --> | <!-- TODO: Desired Outcome / Outcome Constraint / Required Means / Candidate Means --> | <!-- TODO: 採用した意味と根拠 --> |
 
 ## Spec Units
 
@@ -51,18 +38,9 @@ UX-Mode: NONE
 | --------------------------------------------- | ----------------------------- | ------------------------------------- |
 | <!-- TODO: `path:line` またはコマンド結果 --> | <!-- TODO: 確認できた事実 --> | <!-- TODO: 意図または制約との関係 --> |
 
-## Assumptions and Decisions
-
-- Assumptions: <!-- TODO: 未確認の前提。解決済み時に重要な未確認事項を残さない。 -->
-- Decisions: <!-- TODO: 採用した解釈と、実質的に異なる解釈を採用しなかった根拠。 -->
-
 ## Observable Success
 
 - <!-- TODO: 利用者または外部契約から確認できる成功条件を記載する。 -->
-
-## Confirmation Evidence
-
-- <!-- TODO: REQUEST_SUFFICIENT の場合は十分な依頼文、OWNER_CONFIRMED の場合は所有者の明示確認を特定できる形で記載する。 -->
 
 <!-- 業務用語の統一が必要な場合だけ、以下の Thesaurus をコメント外へ出して記載する。 -->
 <!--
