@@ -359,8 +359,8 @@ OK例: `feat: add agent registry shell`、`fix: close proxy route gap`、`docs: 
 ## 8. OpenSpec
 
 **Rule: OpenSpec の二つの変更スキーマと全成果物は厳格検査を通す。**
-Summary: `pnpm lint:openspec` は `behavior-change` / `architecture-change` のスキーマ、OpenSpec の厳格検査、規則試験、提案、Playwright E2E試験からScenarioへの一方向参照、作業パッケージと設計の対象範囲を検査します。
-Enforcement point: `pnpm lint:openspec` via `package.json`、`scripts/openspec/verify-change-proposal.mjs`、`scripts/openspec/verify-scenario-coverage.mjs`、`scripts/openspec/verify-change-task-scope.mjs`.
+Summary: `pnpm lint:openspec` は `behavior-change` / `architecture-change` のスキーマ、OpenSpec の厳格検査、規則試験、提案、能力単位の再利用判断、Playwright E2E試験からScenarioへの一方向参照、作業パッケージと設計の対象範囲を検査します。
+Enforcement point: `pnpm lint:openspec` via `package.json`、`scripts/openspec/verify-change-proposal.mjs`、`scripts/openspec/verify-change-reuse-decisions.mjs`、`scripts/openspec/verify-scenario-coverage.mjs`、`scripts/openspec/verify-change-task-scope.mjs`.
 NG例: 選択したスキーマに違反する Change 成果物を残す。
 OK例: `pnpm lint:openspec` が成功する `proposal.md`、差分仕様、`design.md`、`tasks.md` にする。
 
@@ -381,6 +381,12 @@ Summary: 規格、RFC、パッケージ、実装方式は手段として仕様�
 Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-task-scope.mjs`.
 NG例: i18nのRFC準拠または使用パッケージをRequirementにする、`tasks.md`を詳細分解する、または`design.md`で再利用候補と採否を記載しない。
 OK例: 顧客が求める言語で利用できる終端状態をRequirementにし、`Reuse Assessment`で既存コード、導入済みパッケージ、実績のある外部パッケージと採用対象を示す。
+
+**Rule: Architecture Change は全delta Spec Unitの再利用判断を能力単位で記録する。**
+Summary: 各Spec Unitをパッケージで代替可能な汎用能力へ分解し、再利用元分類、採用判断、対象と版、その能力を調査範囲に含む現行調査報告を`Reuse Assessment`へ記録します。
+Enforcement point: `pnpm lint:openspec` via `scripts/openspec/verify-change-reuse-decisions.mjs`.
+NG例: Requirement対応表を外部パッケージ候補の調査証拠にする、別能力だけを調査した報告を流用する、他パッケージの直接依存またはロックファイルの推移依存を対象パッケージで採用済みと扱う、一つのパッケージがSpec Unit全体を満たさないことを理由に下位能力まで独自実装する。
+OK例: 各Spec Unitを翻訳、言語照合、入力検証、永続状態などの汎用能力へ分け、`REPOSITORY_CODE`などの再利用元分類、`REUSE`などの採用判断、対象と版、対象能力を調査範囲に含む報告を記録する。同じ報告が複数能力を明示的に扱う場合は複数行から参照でき、`LIMITED_COMPLEMENT`には既存資産と外部候補で代替できない根拠を記載します。
 
 **Rule: Scenario heading は stable Scenario ID で終わる。**
 Summary: `#### Scenario:` heading は `(...-S001)` 形式の stable ID で終わる必要があります。
@@ -437,6 +443,7 @@ OK例: `Desktop Before`、`Desktop After`、`Mobile Before`、`Mobile After` の
 | Package boundary governance         | `scripts/governance/verify-package-boundaries.mjs`                                                                                                        |
 | OpenSpec scenario coverage          | `scripts/openspec/verify-scenario-coverage.mjs`                                                                                                           |
 | OpenSpec proposal guard             | `scripts/openspec/verify-change-proposal.mjs`                                                                                                             |
+| OpenSpec reuse decision guard       | `scripts/openspec/verify-change-reuse-decisions.mjs`                                                                                                      |
 | OpenSpec task and design scope      | `scripts/openspec/verify-change-task-scope.mjs`                                                                                                           |
 | Change operation policy             | `docs/change-operation.md`                                                                                                                                |
 | Pull request operation metadata     | `.github/pull_request_template.md`、`.github/workflows/validate-pr-template.yml`                                                                          |

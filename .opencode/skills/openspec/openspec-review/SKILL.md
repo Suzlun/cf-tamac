@@ -49,6 +49,16 @@ inconsistent. Never create, edit, supplement, or reinterpret it during review.
   installed packages, and established external packages, selects the earliest
   viable reuse level, and justifies independent implementation only when none of
   those candidates can satisfy the confirmed outcome within repository rules.
+- Every delta Spec Unit in an `architecture-change` has one or more reuse
+  decisions, split by generic capability that repository code or a package can
+  provide. Requirement traceability does not prove package-candidate coverage.
+- Each reuse decision distinguishes repository code, workspace packages, direct
+  dependencies, packages adopted elsewhere in the repository, transitive-only
+  dependencies, new external packages, and updates. Transitive resolution alone
+  is not direct adoption.
+- Research evidence supports a reuse decision only when the report's stated
+  investigation scope explicitly covers that generic capability. A narrow
+  report cannot be generalized to an uninvestigated capability.
 - Repository evidence, common practice, security recommendations,
   implementation necessity, downstream artifacts, and tests may constrain
   design but never create product behavior.
@@ -125,10 +135,14 @@ contradiction, excess, misinterpretation, or omission.
    material boundary it can change and its required resolution owner. Reject
    contract-completeness and implementation-choice findings that do not pass
    this test.
-5. For `architecture-change`, verify every material decision preserves Specs,
-   includes a boundary and revisit trigger, and is supported by complete reuse
-   evidence. Report missing candidate evaluation or selection as
-   `MATERIAL_OMISSION`; report unjustified independent implementation as
+5. For `architecture-change`, derive the delta Spec Unit set from the actual
+   `specs/**/spec.md` paths. Verify every Spec Unit is represented in `Reuse
+Assessment`, its generic capabilities are not collapsed into one
+   customer-specific Requirement, and each decision has a valid source
+   classification, selected target and version, and current scoped research
+   evidence. Report a missing capability, out-of-scope research citation,
+   unexamined package state, or missing candidate selection as
+   `MATERIAL_OMISSION`; report unjustified `LIMITED_COMPLEMENT` as
    `OVERREQUIREMENT`.
 6. Verify each work package has justified coverage and objective evidence while
    leaving local implementation choices open.

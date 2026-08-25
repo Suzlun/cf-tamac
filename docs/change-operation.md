@@ -107,9 +107,11 @@ Requirement と Scenario は、確認済みRequestから直接導ける、利用
 
 ### 再利用を優先する設計
 
-提案者は`architecture-change`を作成する前に、必要な能力ごとに既存のリポジトリ資産、導入済みパッケージ、実績のある外部パッケージを調査します。セキュリティ、サプライチェーン、アーキテクチャの規則を満たす範囲で、既存コード、導入済みパッケージ、外部パッケージ、独自実装の順に選択します。
+提案者は`architecture-change`を作成する前に、各delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、能力ごとに既存のリポジトリ資産、workspace package、対象packageの直接依存、他packageで採用済みの依存、推移依存、新規外部候補、更新候補を調査します。セキュリティ、サプライチェーン、アーキテクチャの規則を満たす範囲で、既存コード、導入済みパッケージ、外部パッケージ、限定補完の順に選択します。
 
-`design.md`の`Reuse Assessment`には各段階の候補または理由付きの「なし」、採用する再利用対象、独自実装を選ぶ場合はすべての候補で確認済み成果を満たせない根拠を記載します。Reviewerは、仕様が顧客価値と手段を混同していないこと、および設計が再利用可能な内容を十分に特定していることを確認します。
+`design.md`の`Reuse Assessment`には、全delta Spec Unitについて、汎用能力、再利用元分類、採用判断、対象と版、対象能力を`調査範囲`へ明記した調査報告、限定補完時の代替不能根拠を記載します。一つのSpec Unitに複数の汎用能力がある場合は行を分けます。Requirement対応表はパッケージ候補調査の代わりになりません。Reviewerは、各Spec Unitの能力分解、調査範囲、依存の現在状態、採用判断が完全であることを確認します。
+
+再利用元は`REPOSITORY_CODE`、`WORKSPACE_PACKAGE`、`DIRECT_DEPENDENCY`、`REPOSITORY_DEPENDENCY`、`TRANSITIVE_ONLY`、`NEW_EXTERNAL`、`EXISTING_UPDATE`、`NO_REUSABLE_CANDIDATE`に分類します。判断は`REUSE`、`ADOPT`、`UPDATE`、`REPLACE`、`LIMITED_COMPLEMENT`に分類します。推移依存は直接採用済みと扱いません。`LIMITED_COMPLEMENT`は、既存資産と実績ある外部候補のいずれでも確認済み成果を満たせない証拠がある場合だけ使用します。
 
 ### Scenario と試験の追跡
 

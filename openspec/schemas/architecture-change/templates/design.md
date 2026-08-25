@@ -6,9 +6,9 @@
 
 ## Reuse Assessment
 
-| Need                                    | Existing Repository Assets                        | Installed Packages                                                      | Established External Packages                                         | Selected Reuse                                    | Independent Implementation Justification                                                        |
-| --------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| <!-- TODO: 確認済み成果に必要な能力 --> | <!-- TODO: 再利用候補または理由付きの「なし」 --> | <!-- TODO: manifestとlockfileで確認した候補または理由付きの「なし」 --> | <!-- TODO: 一次資料と供給網を確認した候補または理由付きの「なし」 --> | <!-- TODO: 採用する既存コードまたはパッケージ --> | <!-- TODO: 独自実装時は全候補で成果を満たせない根拠。独自実装しない場合は理由付きの「なし」 --> |
+| Spec Unit                   | Reusable Capability                       | Source Classification                                                                                                                                                     | Decision                                                             | Selected Reuse / Version                    | Research Evidence                            | Limited Complement Justification                             |
+| --------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------ |
+| <!-- TODO: specs/<name> --> | <!-- TODO: パッケージで代替可能な能力 --> | <!-- TODO: REPOSITORY_CODE / WORKSPACE_PACKAGE / DIRECT_DEPENDENCY / REPOSITORY_DEPENDENCY / TRANSITIVE_ONLY / NEW_EXTERNAL / EXISTING_UPDATE / NO_REUSABLE_CANDIDATE --> | <!-- TODO: REUSE / ADOPT / UPDATE / REPLACE / LIMITED_COMPLEMENT --> | <!-- TODO: 採用対象と固定版または既存版 --> | <!-- TODO: docs/report/research/...md:行 --> | <!-- TODO: LIMITED_COMPLEMENTだけ代替不能根拠。ほかはN/A --> |
 
 ## Boundaries
 

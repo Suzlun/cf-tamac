@@ -98,8 +98,9 @@ agent.
 
 ## Reuse investigation
 
-Before finalizing an `ARCHITECTURE` proposal or design, investigate the
-implementation surface in this order:
+Before finalizing an `ARCHITECTURE` proposal or design, enumerate every delta
+Spec Unit, decompose it into generic capabilities that repository code or a
+package could provide, and investigate each capability in this order:
 
 1. Existing repository code, shared boundaries, and established patterns.
 2. Installed packages confirmed from manifests and the lockfile.
@@ -107,14 +108,37 @@ implementation surface in this order:
    two levels, including current primary documentation, maintenance evidence,
    compatibility, security, and supply-chain constraints.
 
-Record relevant candidates or a reasoned `none` for every level. Select existing
-code before installed packages, installed packages before adding an external
-package, and an external package before independent implementation whenever the
-earlier choice can satisfy the confirmed Request within repository rules.
-Independent implementation is permitted only when the evidence shows that none
-of the reusable candidates can satisfy the confirmed Request. Do not finalize
-the proposal or design until this investigation is sufficient to bound the
-material dependency and reuse decisions.
+Record at least one `Reuse Assessment` row for every delta Spec Unit and a
+separate row for every generic capability within it. A Requirement-level
+traceability table is not package-candidate coverage. Do not require one package
+to satisfy an entire customer-specific Requirement before adopting it for the
+generic capability it does satisfy.
+
+Classify the selected reuse source as `REPOSITORY_CODE`, `WORKSPACE_PACKAGE`,
+`DIRECT_DEPENDENCY`, `REPOSITORY_DEPENDENCY`, `TRANSITIVE_ONLY`, `NEW_EXTERNAL`,
+`EXISTING_UPDATE`, or `NO_REUSABLE_CANDIDATE`. Record the decision as `REUSE`,
+`ADOPT`, `UPDATE`, `REPLACE`, or `LIMITED_COMPLEMENT`, plus the selected target
+and fixed or existing version. A transitive-only package is not adopted for
+direct use; adoption requires a declared direct dependency in the consumer.
+
+Every row cites a saved current report under `docs/report/research/**` whose
+investigation scope explicitly names the generic capability. A narrow report
+cannot support decisions outside that scope, even when it contains a
+Requirement traceability table. One report may support multiple rows when its
+scope covers each capability.
+
+Select existing code before installed packages, installed packages before adding
+an external package, and an external package before independent implementation
+whenever the earlier choice can satisfy the confirmed Request within repository
+rules. Use `LIMITED_COMPLEMENT` only when evidence shows that none of the
+reusable candidates can satisfy that capability, and record the exact limited
+complement. Do not finalize the proposal or design until every delta Spec Unit
+is covered.
+
+If a `BEHAVIOR` Change reveals a material package adoption, dependency update or
+replacement, cross-package reuse boundary, or limited-complement decision,
+return a route mismatch for `ARCHITECTURE`; do not hide the decision in tasks or
+apply-time implementation freedom.
 
 ## UX routing
 
@@ -143,8 +167,9 @@ with the missing product evidence.
    behavior, and other means remain outside Specs. Preserve a visible UX
    composition only when the confirmed Request makes it an Outcome Constraint.
 4. For `ARCHITECTURE` only, identify each material decision and transfer the
-   reuse investigation, selected reuse, and any justified independent
-   implementation into `design.md`. Call
+   Spec Unit-complete reuse investigation, source classification, adoption
+   decision, selected target and version, scoped research evidence, and any
+   justified limited complement into `design.md`. Call
    `openspec/agent/architect` for Agent, TypeSpec, RPC, SDK, or Agent-owned data
    decisions and `openspec/client/architect` for Management Client or
    Client-owned data decisions in `DECISION_SUPPORT` only when repository

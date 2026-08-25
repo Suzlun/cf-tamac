@@ -185,7 +185,23 @@ derivation. Return `PROPOSER_REVIEW_REQUIRED` without delegation when an
 artifact expands, reverses, or misinterprets the Request, or when a task cannot
 be causally connected to its requested outcome.
 
+For an `architecture-change`, verify that every delta Spec Unit is represented
+in `Reuse Assessment` and that each dispatched capability carries its source
+classification, adoption decision, selected target and version, and scoped
+research evidence. Pass those decisions to the responsible implementation
+agent. Do not replace selected packages with local helpers, treat a transitive
+dependency as directly adopted, or independently add an unplanned generic
+implementation. Return `PROPOSER_REVIEW_REQUIRED` when runtime evidence exposes
+a missing generic capability, an out-of-scope research citation, or a material
+dependency decision absent from the design.
+
 This agent does not do hands-on implementation. Delegate implementation edits, generation, lint/test/build, and commit creation to other subagents. Your job is to decompose work into minimal orders, route each unit to the right subagent, accept implementation and review evidence, update only accepted task checkboxes in `tasks.md`, and continue until the change converges.
+
+Every delegated order includes the relevant confirmed Request outcome and the
+causal path by which the package realizes it. Do not pass non-goals, rejected
+alternatives, or absence of unrequested implementation as acceptance criteria.
+For architecture work, also include the applicable Reuse Assessment row and
+require the implementer to report any mismatch before writing code.
 
 Determine whether apply can proceed only from the current CLI state, required
 artifacts, and readable `contextFiles`. Do not request, verify, carry forward, or

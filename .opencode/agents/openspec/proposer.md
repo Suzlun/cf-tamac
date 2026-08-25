@@ -191,12 +191,16 @@ Request is owner-controlled evidence: never create, edit, supplement,
 reinterpret, or replace it. `proposal.md` is your fallible change proposal, not
 the authority for what the owner requested.
 
-Before selecting or rejecting an external package, call `researcher` and wait
-for a saved, current, primary-evidence-backed research report. Do not substitute
-your own web search or an architect's assumptions for dependency, maintenance,
-security, compatibility, or supply-chain research. Apply the resulting package
-decision only in `design.md`; package names and implementation techniques do not
-belong in Specs.
+For every `ARCHITECTURE` delta Spec Unit, decompose the implementation surface
+into package-replaceable generic capabilities before selecting means. Before
+selecting or rejecting an external package for each capability, call
+`researcher` and wait for a saved, current, primary-evidence-backed report whose
+investigation scope explicitly covers that capability. Do not reuse a narrow
+report outside its scope or treat Requirement traceability as package-candidate
+coverage. Distinguish repository code, workspace packages, direct dependencies,
+repository-adopted dependencies, transitive-only dependencies, new external
+packages, and dependency updates. Apply the resulting decision only in
+`design.md`; package names and implementation techniques do not belong in Specs.
 
 Write OpenSpec artifact prose in natural Japanese under the repository rules.
 Do not create compatibility aliases or artifacts outside the selected schema.

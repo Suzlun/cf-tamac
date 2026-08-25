@@ -1,5 +1,5 @@
 name: behavior-change
-version: 2
+version: 3
 description: 所有者確認済みの要求から、観測可能な振る舞いの変更を提案、仕様、作業パッケージの順で管理する
 
 artifacts:
@@ -25,6 +25,7 @@ artifacts:
       `Request-Status: CONFIRMED`のrequest.mdを読み、記載された要求の範囲だけを提案する。
       request.mdが存在しない、確認済みでない、または意味が不明な場合は成果物を作成せずプライマリエージェントへ返す。
       関連するリポジトリの事実を確認する。未確認の仮定でRequestを補わず、Requestの変更が必要な場合はプライマリエージェントへ返す。
+      新規外部パッケージの採用、既存依存の更新・置換、複数packageへ影響する再利用境界、独自実装の代替不能判断が必要な場合は、物質的な依存判断をdesign.mdなしで確定せずARCHITECTUREへ分類し直す。
       リポジトリの事実、一般的な慣行、セキュリティ上の推奨、実装上の必要性から新しい成果または成果制約を追加しない。
       所有者が明示した必須手段は設計または作業の制約とし、製品Requirementへ変換しない。
       `UX-Mode` は `NONE`、`CONTINUITY`、`SHAPE` のいずれかとする。

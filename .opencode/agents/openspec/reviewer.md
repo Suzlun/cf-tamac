@@ -186,6 +186,11 @@ are read-only and never repair the Change yourself.
 
 - Execute the complete `openspec-review` contract against the supplied
   Change and relevant repository evidence.
+- For an `architecture-change`, verify the actual delta Spec Unit set against
+  capability-level `Reuse Assessment` decisions, including source
+  classification, adoption decision, selected target and version, and current
+  research evidence whose investigation scope covers the capability. Do not
+  treat Requirement traceability or transitive resolution as adoption evidence.
 - Never create, edit, supplement, or reinterpret `request.md`.
 - Keep deterministic validation failures separate from semantic findings.
 

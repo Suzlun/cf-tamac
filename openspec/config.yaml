@@ -25,6 +25,9 @@ context: |
   - Standards, RFC compliance, packages, and implementation techniques remain means unless the customer explicitly requires their externally observable effect.
   - Before creating an `architecture-change`, investigate existing repository assets, installed packages, and established external packages.
   - Independent implementation is allowed only when none of the reusable candidates can satisfy the confirmed outcome within security, supply-chain, and architecture rules.
+  - Every architecture-change delta Spec Unit has at least one Reuse Assessment decision. Split each Spec Unit into package-replaceable generic capabilities before deciding reuse.
+  - Reuse evidence is valid only when the cited research report explicitly includes the generic capability in its investigation scope. Requirement traceability is not package-candidate coverage.
+  - Distinguish repository code, workspace packages, direct dependencies, repository-adopted dependencies, transitive-only dependencies, new external packages, and dependency updates.
 
   Change completion boundary:
   - A Change is complete when its Work Packages are implemented and merge-ready with reproducible repository-local or CI evidence.
@@ -60,7 +63,10 @@ rules:
     - Every Scenario heading includes a stable Scenario ID suffix in parentheses.
   design:
     - Keep only material decisions, reuse assessment, boundaries, data, security, migration, rollback, failure modes, risks, verification, and revisit triggers.
-    - Record relevant repository assets, installed packages, established external packages, selected reuse, and evidence required for any independent implementation.
+    - Record one or more Reuse Assessment rows for every delta Spec Unit, split by package-replaceable generic capability.
+    - Record the reuse source classification, adoption decision, selected target and version, and a current research report whose investigation scope explicitly covers that capability.
+    - Treat transitive-only dependencies as unadopted until the consuming package declares and reviews a direct dependency.
+    - Permit LIMITED_COMPLEMENT only with evidence that repository assets and established external packages cannot satisfy the confirmed outcome.
   tasks:
     - Keep `tasks.md` as a coarse Work Package ledger with objective completion evidence.
     - Do not create file-by-file, helper-by-helper, or test-layer-by-test-layer plans.

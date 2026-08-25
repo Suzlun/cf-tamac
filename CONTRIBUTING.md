@@ -104,6 +104,8 @@ OpenSpec Changeは、`BEHAVIOR`なら`pnpm exec openspec new change <change-id> 
 
 OpenSpec の `tasks.md` は粗い作業パッケージ台帳です。ファイル、補助処理、試験階層の詳細は、現在の作業パッケージと検証結果に基づき実装時に段階的に決めます。
 
+`architecture-change`の`design.md`は、全delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、`Reuse Assessment`へ再利用元分類、採用判断、対象と版、対象能力を調査範囲に含む調査報告を記載します。Requirement対応表は外部候補調査の証拠にならず、推移依存は対象packageの直接依存として宣言するまで採用済みと扱いません。`pnpm lint:openspec`はSpec Unitの欠落、分類値、調査報告の実在を検査します。
+
 一つの Change に対する Scenario と試験の追跡は次で確認し、完了前には引数なしの全体検査も実行します。
 
 ```bash

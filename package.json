@@ -45,7 +45,7 @@
     "test:e2e:debug": "playwright test --debug",
     "lint": "pnpm lint:eslint && pnpm lint:openspec && pnpm lint:governance && pnpm lint:supply-chain",
     "lint:eslint": "eslint .",
-    "lint:openspec": "pnpm exec openspec schema validate behavior-change && pnpm exec openspec schema validate architecture-change && pnpm exec openspec validate --all --strict && pnpm test:openspec-rules && node scripts/openspec/verify-change-proposal.mjs && node scripts/openspec/verify-scenario-coverage.mjs && node scripts/openspec/verify-change-task-scope.mjs",
+    "lint:openspec": "pnpm exec openspec schema validate behavior-change && pnpm exec openspec schema validate architecture-change && pnpm exec openspec validate --all --strict && pnpm test:openspec-rules && node scripts/openspec/verify-change-proposal.mjs && node scripts/openspec/verify-change-reuse-decisions.mjs && node scripts/openspec/verify-scenario-coverage.mjs && node scripts/openspec/verify-change-task-scope.mjs",
     "lint:governance": "node scripts/governance/verify-agent-surface.mjs && node scripts/governance/verify-package-boundaries.mjs",
     "lint:supply-chain": "node scripts/security/verify-pnpm-supply-chain.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",

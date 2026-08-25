@@ -226,6 +226,12 @@ uncertain, use `FULL`.
 3. Keep deterministic validation failures separate from semantic findings. A
    validation failure makes the Change ineligible for approval but does not
    suppress the three specialist calls required by `FULL` mode.
+4. For an `architecture-change`, derive every delta Spec Unit and reusable
+   capability from the current artifacts. Confirm that each capability has a
+   valid source classification, adoption decision, selected target and version,
+   and a current research report whose stated scope covers that capability.
+   Requirement traceability is not candidate research, and a transitive-only
+   dependency is not directly adopted.
 
 ## Full mode
 
