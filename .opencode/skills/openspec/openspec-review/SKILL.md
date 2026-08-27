@@ -13,7 +13,7 @@ This is the shared semantic contract for proposer self-review,
 
 1. `AGENTS.md` and enforced repository rules.
 2. `openspec/config.yaml` and the selected schema.
-3. Primary-agent-owned `Request-Status: CONFIRMED` in `request.md`.
+3. `openspec/proposer`-owned `Request-Status: CONFIRMED` in `request.md`.
 4. Repository evidence relevant to the confirmed Request.
 5. Proposal, Specs, architecture design when defined by the schema, and coarse
    tasks.
@@ -21,14 +21,17 @@ This is the shared semantic contract for proposer self-review,
 Require only artifacts defined by the selected schema. Deterministic validators
 own structural checks.
 
-`request.md` is owner-controlled evidence, not a proposer artifact. Return
-`FAILED` when it is missing, unconfirmed, unreadable, or internally
+`request.md` is owner-controlled evidence, not a downstream planning artifact.
+Return `FAILED` when its confirmed Background, Motivation, Request, or
+confirmation evidence is missing, unconfirmed, unreadable, or internally
 inconsistent. Never create, edit, supplement, or reinterpret it during review.
 
 ## Purpose and means
 
 - Desired outcomes and outcome constraints may become Requirements and
   Scenarios only when they follow directly from the confirmed Request.
+- Confirmed Background and Motivation explain why the Request exists but never
+  create a Requirement, Scenario, or outcome constraint by themselves.
 - Technologies, components, dependencies, structures, algorithms, procedures,
   migrations, tools, files, commands, tests, and implementation sequences are
   means.

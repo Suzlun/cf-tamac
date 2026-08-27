@@ -124,6 +124,8 @@ pnpm check:production-contracts && pnpm check:production-environment
 
 ## OpenSpec と変更運用
 
+計画では`openspec/proposer`、実装では`openspec/applier`をOpenCodeのプライマリエージェントとして選択します。Proposerは背景、変更動機、Request、全計画成果物を所有し、Applierは実装委任、進捗、検証を統括します。
+
 変更運用の一次資料は [`docs/change-operation.md`](docs/change-operation.md) です。すべての変更で、次の三軸を独立に選びます。
 
 - `Operation Lane`: `DIRECT`、`BEHAVIOR`、`ARCHITECTURE`

@@ -1,20 +1,23 @@
 name: behavior-change
-version: 3
+version: 4
 description: 所有者確認済みの要求から、観測可能な振る舞いの変更を提案、仕様、作業パッケージの順で管理する
 
 artifacts:
   - id: request
     generates: request.md
-    description: プライマリエージェントが所有者確認後に保存する要求
+    description: '`openspec/proposer`が所有者確認後に保存する要求'
     template: request.md
     instruction: |
-      この成果物は、指示を受けたプライマリエージェントだけが所有者の明示確認後に作成する。
+      この成果物は、利用者が選択した`openspec/proposer`だけが所有者の明示確認後に作成する。
       Request候補、推論、仮定、候補手段、非目標、却下した解釈をファイルへ保存しない。
-      所有者が確認した要求、明示した成果制約、明示的に必須とした手段だけを記載する。
+      具体的な解決手段より先に、誰がどの状況にいるか、現在何が起きているか、なぜ変化に価値があるか、どの価値や成果を望むかを一つずつ確認する。
+      変更動機には否定的な要因だけでなく、期待、機会、好奇心、未探索の可能性などの肯定的な要因も含める。
+      所有者が確認した背景、変更動機と期待価値、要求、成果制約、必須手段だけを記載する。
+      背景と変更動機は要求理由であり、それ自体をRequirementへ変換しない。
       成果制約または必須手段がない場合は、対応する任意の節を作成しない。
       `Request-Status`は`CONFIRMED`だけを使用し、確認前のファイルを作成しない。
       `Owner Confirmation`には、確認済みRequestの要約と現在の会話における所有者の明示回答を記録する。
-      proposerはこの成果物を作成、変更、補完してはならない。
+      初回作成前はRequest候補全体の明示確認を得る。明確な追加回答は確認証拠として即時反映し、不明な場合は`openspec/proposer`が再確認する。
     requires: []
 
   - id: proposal
@@ -23,8 +26,8 @@ artifacts:
     template: proposal.md
     instruction: |
       `Request-Status: CONFIRMED`のrequest.mdを読み、記載された要求の範囲だけを提案する。
-      request.mdが存在しない、確認済みでない、または意味が不明な場合は成果物を作成せずプライマリエージェントへ返す。
-      関連するリポジトリの事実を確認する。未確認の仮定でRequestを補わず、Requestの変更が必要な場合はプライマリエージェントへ返す。
+      request.mdが存在しない、確認済みでない、または意味が不明な場合は`openspec/proposer`が所有者へ確認する。
+      自明でない意味判断を補完や推測せず、`openspec/proposer`が所有者へ確認する。
       新規外部パッケージの採用、既存依存の更新・置換、複数packageへ影響する再利用境界、独自実装の代替不能判断が必要な場合は、物質的な依存判断をdesign.mdなしで確定せずARCHITECTUREへ分類し直す。
       リポジトリの事実、一般的な慣行、セキュリティ上の推奨、実装上の必要性から新しい成果または成果制約を追加しない。
       所有者が明示した必須手段は設計または作業の制約とし、製品Requirementへ変換しない。
@@ -77,4 +80,4 @@ apply:
   instruction: |
     所有者確認済みRequest、提案、差分仕様を読み、Requestが求める成果へ因果的につながる作業パッケージだけを実装、検証する。
     全作業パッケージ完了時は `node scripts/openspec/verify-scenario-coverage.mjs --change <change-id> --require-test-references` を実行し、選択 Change の実効仕様と試験参照を一致させる。
-    成果物がRequestを拡張、反転、または誤解している場合、重要な矛盾または未解決判断を発見した場合は作業を止め、プライマリエージェントへ返す。
+    成果物がRequestを拡張、反転、または誤解している場合は作業を止め、利用者に`openspec/proposer`への切替を求める。

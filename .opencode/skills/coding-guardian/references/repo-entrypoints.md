@@ -82,6 +82,7 @@ Read these files before applying `coding-guardian` in this repository.
 ## OpenSpec enforcement
 
 - `.opencode/commands/opsx-*.md` and `.opencode/skills/openspec-*/SKILL.md`: OpenSpec `1.8.0` core definitions generated together by `pnpm gen:openspec`
+- `.opencode/agents/openspec/proposer.md` and `.opencode/agents/openspec/applier.md`: user-selected primary-agent ownership and permission boundaries
 - `.opencode/skills/openspec/**`: repository-specific supplements layered on the generated core skills
 - `openspec/schemas/behavior-change/schema.yaml`: observable behavior Change artifact order and scope
 - `openspec/schemas/architecture-change/schema.yaml`: material architecture Change artifact order and scope

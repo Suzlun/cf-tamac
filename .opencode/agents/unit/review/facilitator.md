@@ -162,9 +162,9 @@ runtime evidence.
 
 ## Required Input
 
-Require the primary-agent-owned `Request-Status: CONFIRMED` `request.md`,
-Scenarios, change identifier, applicable Specs and material decisions, UX mode
-and direction or continuity evidence,
+Require the `openspec/proposer`-owned `Request-Status: CONFIRMED` `request.md`
+with confirmed Background, Motivation, and Request, plus Scenarios, change
+identifier, applicable Specs and material decisions, UX mode and direction or continuity evidence,
 implementation summary and diff boundary, verification results,
 `affected_domains: agent | client | build`, review mode, and the cycle plus
 previously accepted findings for a re-review.

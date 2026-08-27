@@ -24,14 +24,14 @@
 ## Intent Before Implementation
 
 - Treat the user's wording as evidence of intent, not automatically as an implementation-ready specification.
-- Before selecting a solution, identify the customer outcome and verify the relevant repository facts and constraints.
+- Before selecting a solution, `openspec/proposer` interviews the owner about who is affected, the current situation, the motivation for change, the expected value, and the desired outcome, then verifies relevant repository facts and constraints.
 - Classify solution-shaped terms as a desired outcome, an outcome constraint, a required means, or a candidate means.
 - Confirmation can make a candidate means binding for design, but it never turns a means into an outcome. Only desired outcomes and outcome constraints may become product requirements or OpenSpec Specs; required means remain design constraints.
 - Separate observations from inferences and assumptions. Familiarity, common practice, and readily available example code are not evidence that a solution fits this repository.
-- Ask the user only when unresolved ambiguity could materially change user-visible behavior, external contracts, architecture, security, data, dependencies, or scope.
-- For `BEHAVIOR` and `ARCHITECTURE`, the instructed primary agent reconstructs a Request candidate in conversation and creates `request.md` only after explicit owner confirmation. Never persist an unconfirmed Request candidate.
-- `request.md` is owner-controlled request evidence. Proposers, reviewers, architects, appliers, and implementation agents must never create, edit, supplement, or reinterpret it.
-- Repository evidence, common practice, security recommendations, implementation necessity, downstream artifacts, and tests cannot create product Requirements. Return to the primary agent when the confirmed Request must change.
+- During proposal work, Proposer asks one focused owner question for every non-self-evident semantic choice. Local implementation choices remain with Applier.
+- For `BEHAVIOR` and `ARCHITECTURE`, `openspec/proposer` reconstructs a Request candidate and creates `request.md` only after explicit owner confirmation.
+- Only `openspec/proposer` may create or update owner-controlled `request.md`; reviewers, architects, appliers, and implementation agents must never edit it.
+- Repository evidence and implementation necessity cannot create product Requirements. Return to `openspec/proposer` when the confirmed Request must change.
 - When a workflow provides a confirmed Request or an approved specification, preserve that boundary and choose implementation details within it unless contradictory evidence requires escalation.
 
 ## Credo
@@ -141,7 +141,10 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - OpenSpec is the persistent contract for observable behavior, not the master implementation plan.
 - OpenSpec is pinned to `1.8.0`. Its `new change` command does not use `openspec/config.yaml#schema` as the creation default, so always pass `--schema behavior-change` for `BEHAVIOR` or `--schema architecture-change` for `ARCHITECTURE`. Never hand-create a directory under `openspec/changes/`.
 - OpenCode core definitions under `.opencode/commands/opsx-*.md` and `.opencode/skills/openspec-*/SKILL.md` are generated together from OpenSpec `1.8.0` by `pnpm gen:openspec` and must not be hand-edited. Repository-specific supplemental OpenSpec skills remain under `.opencode/skills/openspec/`.
-- Both Change schemas begin with a primary-agent-owned `Request-Status: CONFIRMED` `request.md`. The proposer rejects a Change without it and cannot edit it.
+- The user selects `openspec/proposer` for owner dialogue and planning and `openspec/applier` for implementation. Both are primary agents and must never be invoked through subagent delegation.
+- Generated proposal and apply skills supply generic traversal; the corresponding primary agent adds repository-specific permissions and semantics.
+- Both Change schemas begin with an `openspec/proposer`-owned confirmed Request containing Background, Motivation, and Request. Motivation includes pain points and limitations as well as opportunities, aspirations, curiosity, and unexplored possibilities.
+- Proposer owns all planning artifacts and asks the owner about every non-self-evident semantic choice. Clear answers are recorded immediately as confirmation evidence.
 - An `architecture-change` that changes no observable behavior MUST set `skip_specs: true` in `.openspec.yaml` and MUST NOT invent delta Specs, Requirements, Scenarios, Spec Units, or corresponding reuse-research rows. Remove `skip_specs` and author delta Specs only when the confirmed Request changes observable behavior.
 - Request candidates remain in conversation until owner confirmation. Contract artifacts contain only owner-confirmed positive outcomes and constraints; they omit non-goals, rejected alternatives, absent legacy behavior, absent implementation, and technologies or features that will not be added.
 - Remove obsolete behavior with `REMOVED Requirements`; never replace unrequested or removed behavior with an inverse Requirement that requires its absence.

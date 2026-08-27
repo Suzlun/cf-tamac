@@ -77,10 +77,14 @@ Husky によりコミット時に検証されます。
   - Playwright E2E試験だけが題名から既存Scenarioを`[...-S001]`の形式で参照する
   - Scenarioごとの自動試験は要求せず、純粋な単体試験はScenario識別子を参照しない
   - 試験分類はPlaywright E2E試験と純粋な単体試験だけとし、試験専用の製品側API、公開要素、生成処理、分岐、Binding、設定を作らない
-- `BEHAVIOR`と`ARCHITECTURE`では、指示を受けたプライマリエージェントがRequest候補を会話で提示し、所有者の明示確認後だけChangeと`Request-Status: CONFIRMED`の`request.md`を作成する
-  - `openspec/proposer`は確認済み`request.md`がないChangeを受理せず、`request.md`を作成、変更、補完、再解釈しない
+- `BEHAVIOR`と`ARCHITECTURE`では、利用者が選択した`openspec/proposer`がRequest候補を提示し、所有者の明示確認後だけChangeと`request.md`を作成する
+  - 解決手段より先に、利用者、現状、変更動機、期待価値、望む成果を確認する
+  - 変更動機には困りごとだけでなく、期待、機会、好奇心、可能性も含める
+  - ProposerがRequestと全計画成果物を所有し、自明でない内容を逐次確認する
   - `proposal.md`、Specsは確認済みRequestから直接導ける肯定的成果だけを記録し、非目標、対象外、却下案、旧実装の不在、追加しない技術または機能を契約化しない
   - 不要なRequirementは`REMOVED Requirements`で除去し、反対向きのRequirementへ置き換えない
+
+計画には`openspec/proposer`、実装には`openspec/applier`を利用者が選択します。Proposerは全計画成果物、Applierは実装統括と`tasks.md`進捗だけを所有します。
 
 ## 変更運用
 

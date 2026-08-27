@@ -70,6 +70,7 @@ Dependency directions:
 - Change Agent TypeSpec first, then run `pnpm gen:agent:proto`, `pnpm gen:agent:rpc`, and `pnpm check:codegen`.
 - Never edit Agent proto or generated Agent/Client/SDK RPC output manually.
 - Never edit `.opencode/commands/opsx-*.md` or `.opencode/skills/openspec-*/SKILL.md` manually; regenerate both with `pnpm gen:openspec` from OpenSpec `1.8.0`.
+- Treat generated proposal and apply skills as generic traversal. Apply the user-selected `openspec/proposer` or `openspec/applier` primary-agent contract, and never invoke either through subagent delegation.
 - Keep Agent public APIs Protobuf RPC-only. Do not add Agent REST, OpenAPI, Orval, ad-hoc JSON DTO, public Durable Object fetch, or browser-direct Agent RPC surfaces.
 - Keep the Agent Connect Worker on unary binary Protobuf. Production paths reject JSON encoding and HTTP GET.
 - Preserve `agent_id` on public Agent RPC request bodies, `idempotency_key` on commands, and the normalized bounded `thread_key` contract on Event publication.

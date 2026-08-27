@@ -6,7 +6,7 @@
 
 OpenSpec は、現在および変更後に利用者や外部契約から観測できる振る舞いを永続的に管理する契約です。実装全体を先に分解した基本計画、ファイル一覧、補助処理一覧、試験階層別の作業表にはしません。
 
-OpenSpecは要求を発見または生成する場所ではありません。指示を受けたプライマリエージェントが、所有者の発話を要求の証拠として会話内で再構成し、所有者が全体を明示確認した後だけ`request.md`へ保存します。リポジトリの事実、一般的な慣行、セキュリティ上の推奨、実装上の必要性、下流成果物、試験から製品要求を追加しません。
+OpenSpecは要求を発見または生成する場所ではありません。利用者が選択した`openspec/proposer`が、所有者の発話を要求の証拠として会話内で再構成し、所有者が全体を明示確認した後だけ`request.md`へ保存します。リポジトリの事実、一般的な慣行、セキュリティ上の推奨、実装上の必要性、下流成果物、試験から製品要求を追加しません。
 
 変更では、次の三つを独立に決めます。
 
@@ -82,15 +82,17 @@ pnpm exec openspec new change <change-id> --schema architecture-change
 
 OpenSpec `1.8.0`の`new change`は`openspec/config.yaml#schema`をChange作成時の既定値として参照しないため、運用区分に対応する`--schema`を必ず指定します。`openspec/changes/<change-id>`を手作業で作成してはいけません。OpenSpecの更新後は`pnpm gen:openspec`でOpenCodeの公式コアコマンドとスキルを同時に再生成し、`.opencode/commands/opsx-*.md`と`.opencode/skills/openspec-*/SKILL.md`を手編集しません。リポジトリ固有の補足スキルは`.opencode/skills/openspec/`に分離します。
 
+提案時は利用者が`openspec/proposer`、実装時は`openspec/applier`をプライマリエージェントとして選択します。両エージェントをサブエージェントとして呼び出しません。
+
 ### Requestと提案
 
-`request.md`は所有者が実際に求めた内容を保存する一次資料です。指示を受けたプライマリエージェントだけが、会話上でRequest候補全体の明示確認を得た後に作成します。確認前のRequest候補、推論、仮定、候補手段、非目標、却下した解釈をリポジトリへ保存しません。
+`request.md`は所有者が実際に求めた内容、背景、変更動機を保存する一次資料です。`openspec/proposer`は具体的な解決手段より先に、利用者、現在の状況、変更動機、期待価値、望む成果を確認します。変更動機には困りごとだけでなく、期待、機会、好奇心、未探索の可能性も含めます。
 
-`request.md`は`Request-Status: CONFIRMED`、所有者が確認したRequest、明示した成果制約、明示的に必須とした手段、確認証跡だけを持ちます。成果制約または必須手段がない場合は、対応する節を作成しません。
+`request.md`は`Request-Status: CONFIRMED`、確認済み`Background`、`Motivation`、Request、成果制約、必須手段、確認証跡だけを持ちます。背景と変更動機はそれ自体からRequirementを作りません。
 
-`proposal.md`は確認済みRequestを実現するための反証可能な変更提案です。依頼の権威ある解釈ではありません。`openspec/proposer`は確認済み`request.md`がなければ`REQUEST_REQUIRED`を返し、成果物を編集しません。Requestを作成、変更、補完、再解釈することもできません。
+自明でない意味判断はProposerが逐次確認し、明確な回答を確認証拠とともにRequestへ即時反映します。`proposal.md`は確認済みRequestを実現するための反証可能な変更提案であり、依頼の権威ある解釈ではありません。
 
-提案者はYAGNIを徹底し、確認済みRequestから直接導ける成果だけを仕様候補にします。規格準拠、RFC準拠、パッケージ、実装方式は、所有者がその外部から観測できる効果自体をRequestで求めている場合を除いて手段として扱います。計画中にRequestの変更が必要だと判明した場合は、プライマリエージェントへ返して所有者確認をやり直します。
+`openspec/proposer`はYAGNIを徹底し、Requestを提案、Specs、設計、粗いWork Packageの意味境界に従って分配します。ファイル、補助処理、試験構成、具体表現はApplier側の実装時判断です。
 
 ### 永続的な振る舞い契約
 
@@ -110,7 +112,7 @@ Requirement と Scenario は、確認済みRequestから直接導ける、利用
 
 ### 再利用を優先する設計
 
-提案者は`architecture-change`を作成する前に、各delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、能力ごとに既存のリポジトリ資産、workspace package、対象packageの直接依存、他packageで採用済みの依存、推移依存、新規外部候補、更新候補を調査します。セキュリティ、サプライチェーン、アーキテクチャの規則を満たす範囲で、既存コード、導入済みパッケージ、外部パッケージ、限定補完の順に選択します。
+`openspec/proposer`は`architecture-change`を作成する前に、各delta Spec Unitをパッケージで代替可能な汎用能力へ分解し、既存コード、導入済みパッケージ、外部候補、限定補完の順に調査します。
 
 `skip_specs: true`のChangeにはdelta Spec Unitがないため、Spec Unitや対応する調査行を捏造しません。物質的な設計判断と、その判断に実際に必要な再利用根拠は`design.md`へ記載します。
 

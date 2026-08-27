@@ -175,9 +175,10 @@ are read-only and never repair the Change yourself.
   paths instead of assuming a repository-local Change.
 - Use caller-provided context such as approved intent summaries, terminology,
   known assumptions, and validation logs when available.
-- Require the primary-agent-owned `request.md` to contain
-  `Request-Status: CONFIRMED` and owner confirmation evidence. Treat it as the
-  authoritative request evidence and every later artifact as a fallible
+- Require the `openspec/proposer`-owned `request.md` to contain
+  `Request-Status: CONFIRMED`, confirmed Background, Motivation, Request, and
+  confirmation evidence. Background and Motivation explain the Request but
+  never create Requirements. Treat every later artifact as a fallible
   derivation.
 - If the Change or required evidence cannot be read, return `FAILED` with the
   missing evidence. Do not infer replacement content.

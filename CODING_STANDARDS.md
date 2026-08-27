@@ -365,10 +365,10 @@ NG例: 選択したスキーマに違反する Change 成果物を残す。
 OK例: `pnpm lint:openspec` が成功する `proposal.md`、差分仕様、`design.md`、`tasks.md` にする。
 
 **Rule: 後続成果物は所有者確認済みの `request.md` から作成する。**
-Summary: プライマリエージェントだけが所有者の明示確認後に`request.md`を作成し、`openspec/proposer`は確認済みRequestから直接導ける成果だけを扱います。
+Summary: 利用者が選択した`openspec/proposer`だけが背景、変更動機、Requestを確認して`request.md`と全計画成果物を作成します。
 Enforcement point: OpenSpecの成果物依存、プライマリエージェントと`openspec/proposer`の受渡契約。
-NG例: 確認前に`request.md`を作成する、`openspec/proposer`がRequestを補完する、またはリポジトリ証拠や実装上の必要性からRequirementを追加する。
-OK例: Request候補を会話で提示し、所有者の明示確認後だけ`Request-Status: CONFIRMED`を作成する。
+NG例: 背景や変更動機を確認せず、提示された解決手段からRequirementを推測する。
+OK例: ProposerがBackground、Motivation、Requestを確認し、自明でない意味判断を逐次質問する。
 
 **Rule: OpenSpecの契約成果物は確認済みの肯定的成果だけを記録する。**
 Summary: 非目標、対象外、却下案、旧実装の不在、追加しない技術または機能をRequirementにせず、不要なRequirementは削除します。

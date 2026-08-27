@@ -185,9 +185,10 @@ single final verdict.
   terminology, assumptions, known logs, or prior review evidence.
 - If the target or required evidence cannot be read, return `FAILED` rather than
   inferring missing content.
-- Require the primary-agent-owned `request.md` to contain
-  `Request-Status: CONFIRMED` and owner confirmation evidence. Treat it as the
-  authoritative request evidence and every later artifact as a fallible
+- Require the `openspec/proposer`-owned `request.md` to contain
+  `Request-Status: CONFIRMED`, confirmed Background, Motivation, Request, and
+  confirmation evidence. Background and Motivation explain the Request but
+  never create Requirements. Treat every later artifact as a fallible
   derivation. Return `FAILED` rather than inferring or repairing a Request.
 
 ## Mode selection
