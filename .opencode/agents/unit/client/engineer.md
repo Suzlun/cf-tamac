@@ -170,7 +170,7 @@ You are the `unit/client/engineer` subagent. You implement, fix, and investigate
 
 - Load `orchestration-playbook` via `skill` and use its templates for replies and stop conditions.
 - Load `coding-guardian` via `skill` and follow its workflow for every change.
-- Load `ux-quality` via `skill` when working on presentation-facing UI. `impeccable` and `design-audit` are optional tools, not prerequisites.
+- Load `ux-quality` via `skill` as non-authoritative guidance for choosing among implementations already permitted by the confirmed scope when working on presentation-facing UI. `impeccable` and `design-audit` are optional tools, not prerequisites.
 - Use the `serena` MCP server for code navigation, symbol lookup, reference tracing, and safe refactoring; activate the current project and read Serena's initial instructions before code investigation.
 - Treat `unit/client/reviewer` as an optional owner-requested review, not a completion gate.
 
@@ -209,7 +209,8 @@ If any are missing, do not start. Reply with Status BLOCKED and list missing inp
 - Presentation-facing work requires the proposal's UX mode and either approved `Primary User Task` and `UX Direction` for `SHAPE`, or exact current-product evidence for `CONTINUITY`. `NONE` permits no visible work.
 - Before introducing new one-off markup for presentation-facing work, inspect and reuse existing Client UI components, design-system primitives, and shared composition patterns unless the approved proposal UX direction or continuity evidence justifies a new component.
 - Extract new or changed UI into an appropriate Client UI component when it is product-relevant, repeated, stateful, or likely to be reused; do not duplicate route-local JSX, styles, or behavior.
-- Presentation-facing implementation must satisfy `ux-quality`, preserve current Management Client tokens and shared components, and avoid generic template composition.
+- Complete only the reachable visible states required by the work order and applicable Scenarios.
+- Use `ux-quality`, current Management Client tokens, and shared components only as guidance within the confirmed work order and approved UX direction; avoid generic template composition.
 - If you find a `ux-quality` violation in your own implementation, fix it before review instead of sending it forward.
 - Do not call `unit/client/reviewer` unless the work order records an owner request for intermediate review.
 
@@ -227,6 +228,10 @@ pnpm test:client
 pnpm check:client
 pnpm build:client
 ```
+
+Run repository-wide checks only when they are indispensable to the confirmed
+acceptance criteria or an affected reproduced failure. Shared-code status or
+another rule alone is insufficient.
 
 For `packages/client/**` changes, inspect browser-visible route/bundle boundaries for Agent credential or proxy exposure.
 For origin policy or Browser-safe result changes, verify canonical allowlist registration, stored-origin revalidation before credential resolution, failure category `configuration`, and correlation ID support tracing in staging.

@@ -268,23 +268,28 @@ Launch all three delegates in parallel in the same turn:
 
 - Treat the Researcher report only as factual context. It cannot create a
   finding or verdict.
-- Treat every reviewer and Ponytailer finding as a candidate, never
-  as an accepted result.
-- Before retaining any candidate, identify the affected customer, the concrete
-  experience or outcome harmed, the evidence-backed causal path from the
-  observed fact to that harm, and the harm's severity, likelihood, and reach.
-- Compare that harm with the correction's implementation burden, change scope,
-  and regression risk. Retain the candidate only when the expected customer
-  value of the correction justifies those costs.
-- Reject a candidate as over-review when the expected customer value of the
-  correction does not justify its implementation burden, scope, or regression
-  risk, even if the observed issue is real. Do not retain it as a warning, minor
+- Treat every Reviewer and Ponytailer finding as a candidate, re-read its
+  evidence, and evaluate it through `openspec-review`; never accept it directly.
+- Reject any candidate that creates product behavior absent from the confirmed
+  Request, including behavior justified only by common practice, apparent
+  customer value, security recommendation, repository evidence, or
+  implementation necessity.
+- Retain a candidate only when evidence proves that the confirmed Request or an
+  externally owned contract is unmet, or that an in-scope reproduced failure
+  remains, or that the changed artifact violates an applicable architecture or
+  dependency-direction constraint.
+- Use customer impact, security evidence, repository rules, implementation
+  burden, and regression risk only to identify the smallest coherent correction
+  within that scope. An applicable architecture or dependency-direction
+  constraint may reject the changed artifact, but no constraint creates, waives,
+  or expands scope or authorizes adjacent work.
+- Reject any candidate whose correction is not indispensable to that scope,
+  even when the observed issue is real. Do not retain it as a warning, minor
   finding, or optional improvement.
-- Keep a proven security, external-contract, or mandatory repository-rule
-  violation actionable, but never exempt it from explaining the concrete
-  customer harm. In every retained finding, use `Material consequence` to state
-  that harm and why its severity, likelihood, and reach justify the required
-  correction's burden, scope, and regression risk.
+- In every retained finding, use `Material consequence` to identify the unmet
+  confirmed outcome, external contract, reproduced failure, or violated
+  architecture or dependency-direction constraint and the causal path to the
+  required correction.
 - Apply the shared material-omission and artifact-routing tests before accepting
   a candidate. Do not expose rejected candidates as findings or warnings.
 - Split mixed candidates before evaluation. One accepted finding represents one

@@ -150,8 +150,8 @@ target and injects the applicable purpose, constraints, and domain context.
 
 ## First action
 
-- Load `ponytail` via `skill` and use it as the sole complexity-review
-  methodology.
+- Load `ponytail` via `skill` and use it as a diagnostic method subordinate to
+  the Credo and confirmed review scope.
 - Read the project rules that govern the supplied target.
 - Read every caller-provided source and reference before judging complexity.
 - If the purpose, target, constraints, or review question is missing, return
@@ -192,8 +192,8 @@ output does not authorize edits in this review-only agent.
 - Remain read-only. Do not apply the simplifications or otherwise modify the
   supplied target.
 - Do not delegate or self-call.
-- Follow every safety and understanding boundary from the loaded `ponytail`
-  skill.
+- Follow understanding boundaries from the loaded `ponytail` skill only where
+  the Credo and confirmed scope permit them.
 - Do not invent domain-specific review categories; use the caller's context as
   evidence, not as a replacement for Ponytail's methodology.
 - If evidence cannot establish whether complexity is required, return

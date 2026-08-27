@@ -1,11 +1,12 @@
 ## Primary Rules
 
 - **MUST think in English** and **MUST communicate in natural Japanese**.
-- Every instruction in this file is absolute and binding within its scope. You MUST follow it exactly; if compliance is impossible or instructions conflict, stop and ask the owner instead of proceeding.
-- You MUST doubt your assumptions, verify factual claims against available evidence, and MUST NOT present unsupported statements as facts.
-- You MUST NOT override a specific rule or prohibition with an inferred benefit, an abstract principle, convenience, consistency, traceability, maintainability, or an unverified safety claim. Only an applicable explicit rule may authorize an exception; if explicit rules conflict or compliance would create a concrete security risk, stop and ask the owner.
-- Rules remain binding even when no automated check enforces them. A passing validation proves only the conditions it actually checks and MUST NOT justify an unchecked violation.
-- Write `AGENTS.md` in English. Pull request bodies and pull request template content MUST be written in Japanese, except for code identifiers, commands, logs, file paths, and issue or PR references.
+- The Credo is the highest project-level decision standard. It governs every agent and every activity, including planning, research, implementation, review, and facilitation.
+- Requirements, external contracts, and other repository rules provide facts and constraints subordinate to the Credo. An applicable constraint may reject an in-scope implementation that violates it, but it cannot expand scope or authorize adjacent work. Every action and judgment MUST be permitted by the Credo. If another repository instruction conflicts with the Credo, the Credo prevails.
+- You MUST doubt your assumptions and MUST NOT present unsupported statements as facts. Investigate only what is required to make or verify an in-scope judgment.
+- A validation proves only the conditions it actually checks. It neither expands the acceptance criteria nor independently authorizes more work.
+- Write `AGENTS.md` in English except for the Credo's numbered principles, whose Japanese wording is authoritative. Pull request bodies and pull request template content MUST be written in Japanese, except for code identifiers, commands, logs, file paths, and issue or PR references.
+- Write all OpenCode agent definitions, skill definitions in `SKILL.md`, and command definitions under `.opencode/` in English. Do not translate their prose into Japanese.
 
 ## Natural Japanese Prose
 
@@ -24,38 +25,36 @@
 ## Intent Before Implementation
 
 - Treat the user's wording as evidence of intent, not automatically as an implementation-ready specification.
-- Before selecting a solution, `openspec/proposer` interviews the owner about who is affected, the current situation, the motivation for change, the expected value, and the desired outcome, then verifies relevant repository facts and constraints.
+- Before selecting a solution, confirm only information whose absence materially changes the customer outcome or scope. Do not repeat questions already answered by the owner or authoritative evidence.
 - Classify solution-shaped terms as a desired outcome, an outcome constraint, a required means, or a candidate means.
 - Confirmation can make a candidate means binding for design, but it never turns a means into an outcome. Only desired outcomes and outcome constraints may become product requirements or OpenSpec Specs; required means remain design constraints.
 - Separate observations from inferences and assumptions. Familiarity, common practice, and readily available example code are not evidence that a solution fits this repository.
-- During proposal work, Proposer asks one focused owner question for every non-self-evident semantic choice. Local implementation choices remain with Applier.
-- For `BEHAVIOR` and `ARCHITECTURE`, `openspec/proposer` reconstructs a Request candidate and creates `request.md` only after explicit owner confirmation.
-- Only `openspec/proposer` may create or update owner-controlled `request.md`; reviewers, architects, appliers, and implementation agents must never edit it.
-- Repository evidence and implementation necessity cannot create product Requirements. Return to `openspec/proposer` when the confirmed Request must change.
+- During proposal work, `openspec/proposer` asks one focused owner question for every material artifact-level semantic choice that is not directly entailed by confirmed Request content or authoritative evidence. Do not ask about local implementation choices intentionally left to `openspec/applier`.
+- For `BEHAVIOR` and `ARCHITECTURE`, `openspec/proposer` reconstructs a Request candidate in conversation and creates `request.md` only after explicit owner confirmation. Never persist an unconfirmed Request candidate.
+- `request.md` is owner-controlled request evidence. Only `openspec/proposer` may create or update it from explicit owner confirmation; reviewers, architects, appliers, and implementation agents must never create, edit, supplement, or reinterpret it.
+- Repository evidence, common practice, security recommendations, implementation necessity, downstream artifacts, and tests cannot create product Requirements. Return to `openspec/proposer` when the confirmed Request must change.
 - When a workflow provides a confirmed Request or an approved specification, preserve that boundary and choose implementation details within it unless contradictory evidence requires escalation.
 
 ## Credo
 
-Before beginning any work, you MUST summarize your understanding of the Credo below in Japanese and explicitly declare that you will strictly comply with it. Do not translate or repeat the Credo verbatim; explain how you will apply it to the current task, then begin the work.
+Apply the Credo as a decision standard without reciting it or making ceremonial compliance declarations.
 
-1. あらゆる意思決定は顧客ファーストで考えること。誰がどのように利用し、どうすれば喜ばれるかを常に考えること。
-2. セキュリティはなによりも優先されること。セキュリティ最優先が、なにより顧客のためになる。
-3. 後方互換性は完全悪だ。後方互換性のためのコードや計画がある時点で、そのシステムは一切認められない。常に完璧なプロダクトであるために、不要な機能は即座に削除。
-4. 全てのアーキテクチャは保守性のためにある。同じレイヤーの中で同じコードは二度と書くな。コピペはするな。抽象化して考えろ。アーキテクチャで説明できない再実装や再記入は存在してはならない。
-5. すべてのルールには意図がある。必ず意図を理解すること。意図を理解しないまま改定したり、逆に遵守しようとしてはならない。
-6. 常に完璧なプロダクトであること。妥協、横着、顧客にとって意味のないプロダクトを作ることは一切許されない。仮置きを残す、後回し、コメントにしておいて放置に決してしてはならない。後回しという言葉は発することするら厳禁である。最小実装などという言葉は何があっても使ってはならないし、問題の本質的な解決以外の解決は一切認めない。
-7. いかなる理由があろうと、クレドに違反しないこと、クレド違反を放置しないことを最優先とすること。どのクレドによって肯定しうるのか、その作業内容が一切クレドに違反しないことを必ず方針の前に声に出して報告しなければならない。
-8. YAGNIを徹底し、その精神を極めること。車輪の再発明と不必要に多い実装を欠陥として忌避すること。セキュリティ、サプライチェーン、アーキテクチャのすべての規則が許す限り、まず既存のコードを再利用し、既存のコードで満たせない場合は実績のある外部パッケージを利用すること。独自実装は、既存のコードと外部パッケージのいずれでも検証された顧客成果を満たせないことを確認した場合に限る。
+1. 確認済みの顧客成果と外部契約だけを作業範囲の根拠とする。品質、保守性、安全性を理由に、依頼されていない機能や契約を作らない。
+2. 顧客成果を完全に満たす、最も小さく一貫した変更を選ぶ。変更ファイル、新しい名前、ブランチ、公開要素を増やさずに済む方法を優先し、隣接箇所をついでに変更しない。
+3. 抽象化、モジュール、インターフェース、設定、依存、フォールバック、再試行、防御処理、互換経路、追加試験、追加文書は、確認済み要求を満たすため、または依頼範囲内で再現した障害を直すために不可欠な場合だけ追加する。現在の複数利用箇所は、それだけでは追加理由にしない。
+4. 既存コード、標準ライブラリ、実行基盤の標準機能、実績ある外部パッケージを再利用する。未導入であることだけを理由に、実績ある外部パッケージを避けない。独自実装は、これらのいずれでも、妥協すればプロダクトが崩壊しかねないほど中核的な顧客価値を満たせない場合に限る最終手段とする。
+5. アーキテクチャは保守性を守り、総複雑性を減らすためにある。定められた責務境界と依存方向は、作業範囲内のすべての実装が必ず守る拘束条件である。違反する実装は受け入れないが、その是正を理由に作業範囲や隣接箇所を広げない。将来の再利用を想定した抽象化や、実装が一つしかないインターフェースを作らない。現在の安定した共通規則を一か所へ置くことで実際に総複雑性が下がる場合だけ抽象化する。
+6. 不具合は、観測された原因を最も狭い共有境界で直す。根本原因の追究は、周辺の再設計や未依頼の整理を許可しない。確定範囲内に仮置き、試験専用分岐、黙示的フォールバック、既知の失敗を残さない。
+7. 廃止された挙動を可能性だけで維持しない。永続データ、提供済みの外部契約、明示された要求は現在の制約として扱う。完了判定を満たしたら作業を終了する。
 
 ## Code Comments
 
-- Leave detailed Japanese comments for every single process in the code.
-- Clarify the intent, input/output, and side effects of each step so that future readers (including yourself) can understand immediately.
+- Add Japanese comments only when they convey non-obvious intent, constraints, inputs or outputs, or side effects. Do not comment every process or restate the code.
 
 ## Documentation Comments (TS Docs)
 
-- TSDoc (TypeScript) comments must be written in Japanese, providing detailed, multi-line explanations of their roles and parameter meanings.
-- Every public API (functions, methods, types, interfaces, and structs) must have a documentation comment in Japanese that describes what it does, the meaning of each argument and return value, error cases, and usage examples.
+- Handwritten exported TypeScript declarations must have Japanese TSDoc where lint requires it.
+- Keep TSDoc limited to contract information that names and types do not already express. Do not invent error cases or examples, and do not repeat the signature in prose.
 
 ## Commands
 
@@ -110,7 +109,8 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 
 ## Architecture Notes
 
-- Product shape: Cloudflare Workers 上で動作する自律駆動 AI Agent microservice と Management Client。
+- The architecture and dependency-direction rules below are binding constraints on every in-scope implementation. They may reject a nonconforming implementation, but they never expand scope or authorize adjacent work.
+- Product shape: an autonomous AI Agent microservice and Management Client running on Cloudflare Workers.
 - Aggregate boundary: `1 Agent ID = 1 AIAgent Durable Object instance = 1 AI Agent aggregate root`.
 - Agent dependency direction: Worker entrypoint -> RPC adapter/router/interceptors -> service modules -> Agent domain/runtime modules -> Agent-owned storage/observability/types.
 - Management Client direction: App Router/browser-visible modules -> Server Components/Server Actions -> server-only modules -> Client D1 repositories / generated Agent RPC client.
@@ -134,7 +134,7 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - `ARCHITECTURE` changes material internal structure and MUST use the `architecture-change` schema.
 - UX shaping is optional and occurs only under `UX Mode: SHAPE`. `CONTINUITY` preserves an identified existing experience; `NONE` has no user-visible surface change.
 - Actual UI changes require production-designer involvement and review in a real browser on desktop and mobile. Generated UI mockups are optional non-contract evidence.
-- Use `STANDARD` review by default. Use `DEEP` review for high-impact security, data, external-contract, migration, cross-domain architecture, or active-change interaction risks, or when explicitly requested.
+- Use `STANDARD` review by default. Use `DEEP` only when explicitly requested or when one exact unresolved question indispensable to a confirmed customer outcome or external contract cannot be resolved by `STANDARD`. A risk category alone does not justify extra review work.
 
 ## OpenSpec (Persistent Behavior Contract)
 
@@ -143,8 +143,8 @@ Before beginning any work, you MUST summarize your understanding of the Credo be
 - OpenCode core definitions under `.opencode/commands/opsx-*.md` and `.opencode/skills/openspec-*/SKILL.md` are generated together from OpenSpec `1.8.0` by `pnpm gen:openspec` and must not be hand-edited. Repository-specific supplemental OpenSpec skills remain under `.opencode/skills/openspec/`.
 - The user selects `openspec/proposer` for owner dialogue and planning and `openspec/applier` for implementation. Both are primary agents and must never be invoked through subagent delegation.
 - Generated proposal and apply skills supply generic traversal; the corresponding primary agent adds repository-specific permissions and semantics.
-- Both Change schemas begin with an `openspec/proposer`-owned confirmed Request containing Background, Motivation, and Request. Motivation includes pain points and limitations as well as opportunities, aspirations, curiosity, and unexplored possibilities.
-- Proposer owns all planning artifacts and asks the owner about every non-self-evident semantic choice. Clear answers are recorded immediately as confirmation evidence.
+- Both Change schemas begin with an `openspec/proposer`-owned `Request-Status: CONFIRMED` `request.md` containing confirmed Background, Motivation, and Request. Before asking for a concrete solution, `openspec/proposer` MUST ensure that who is affected, the current situation, the motivation for change, the expected value, and the desired outcome are confirmed. Ask only for missing material information and do not repeat confirmed questions. Confirmed Background and Motivation explain the Request but never create product Requirements by themselves. Motivation includes pain points and limitations as well as opportunities, aspirations, curiosity, and unexplored possibilities.
+- `openspec/proposer` owns all planning artifacts and asks one focused owner question for every material artifact-level semantic choice that is not directly entailed by confirmed Request content or authoritative evidence. Clear answers are recorded immediately as confirmation evidence. Local implementation choices remain with `openspec/applier`.
 - An `architecture-change` that changes no observable behavior MUST set `skip_specs: true` in `.openspec.yaml` and MUST NOT invent delta Specs, Requirements, Scenarios, Spec Units, or corresponding reuse-research rows. Remove `skip_specs` and author delta Specs only when the confirmed Request changes observable behavior.
 - Request candidates remain in conversation until owner confirmation. Contract artifacts contain only owner-confirmed positive outcomes and constraints; they omit non-goals, rejected alternatives, absent legacy behavior, absent implementation, and technologies or features that will not be added.
 - Remove obsolete behavior with `REMOVED Requirements`; never replace unrequested or removed behavior with an inverse Requirement that requires its absence.

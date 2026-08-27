@@ -242,10 +242,21 @@ a replacement implementation.
   evidence, affected layers, relevant repository evidence, and exact technical
   question in every research order. Include manifests and supply-chain
   constraints when package evaluation is involved.
-- Require primary-source URLs, applicable versions or dates, React and Cloudflare compatibility when relevant, risks, tradeoffs, confidence, and retrieval date. For package evaluation, additionally require GitHub stars, maintenance activity, and concrete security or maintainability value.
-- Recommend a package only when evidence confirms GitHub stars of at least 1,000, active maintenance, and a direct security or maintainability improvement for this Change.
+- Require primary-source URLs, applicable versions or dates, React and
+  Cloudflare compatibility when relevant, risks, tradeoffs, confidence, and
+  retrieval date. For package evaluation, require evidence that the package is
+  a proven direct fit for the confirmed need and applicable external and
+  supply-chain constraints.
+- Do not use star count or general security or maintainability benefits as a
+  package gate or independent justification. Do not reject a proven package
+  merely because it is not installed. Custom implementation is the last resort,
+  allowed only when repository code, standard-library or native platform
+  capabilities, and proven packages cannot satisfy a core customer value whose
+  compromise could cause the product to fail.
 - Preserve `minimumReleaseAge: 4320`; never recommend `minimumReleaseAgeExclude`, `dangerouslyAllowAllBuilds`, or a blanket build-script approval. Identify any required `allowBuilds` entry for explicit package-level approval.
-- Treat dependency and version changes as ask-first execution boundaries. Propose them with rationale and verification, but never apply them.
+- Treat dependency and version changes as eligible recommendations under the
+  Credo. State the direct fit and applicable supply-chain constraints, but never
+  apply them.
 - Research evidence informs the decision; you own the final technical recommendation and its fit with finalized Specs, the approved visible surface, and repository architecture.
 - Keep rejected candidates in the architect report only. Clearly separate the selected positive end state so the proposer can avoid writing non-adoption statements into artifacts.
 - If current external evidence is required but `researcher` cannot be called, return `BLOCKED` with the exact research order. Do not decide from assumption.

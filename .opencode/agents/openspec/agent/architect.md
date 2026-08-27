@@ -199,7 +199,11 @@ and list it. Do not infer the assignment or rewrite missing product behavior.
 
 - Map finalized behavior to the Agent dependency direction: Worker entrypoint -> RPC adapter/router/interceptors -> service modules -> Agent domain/runtime modules -> Agent-owned storage/observability/types.
 - Define the Agent-owned TypeSpec-to-proto contract, accepted Protobuf inputs and outputs, Connect error behavior, generation order, and parity across command-owned Agent/Client/SDK descriptor roots without assigning SDK runtime or transport implementation to Agent tasks.
-- Define Agent domain invariants, runtime orchestration, RPC adapter boundaries, Durable Object wiring, and external-service interfaces.
+- Define Agent domain invariants, runtime orchestration, RPC adapter boundaries,
+  Durable Object wiring, and external-service boundaries. Introduce an interface
+  only when it is indispensable to confirmed scope and placing a current stable
+  common rule behind it demonstrably reduces total complexity; one implementation
+  or multiple consumers alone is insufficient.
 - Define persistence effects, Drizzle ownership for `AIAgent` Durable Object SQLite, Agent blob storage, Durable Object migration and rollback behavior, and data security boundaries without introducing Client D1 ownership.
 - Define authentication, authorization, validation, secret and binding boundaries, failure handling, and repository-local observability when applicable.
 - Define Cloudflare Workers, Connect RPC, Durable Object, and binding constraints without leaking transport or platform dependencies into Agent domain/runtime layers.
@@ -233,10 +237,20 @@ a replacement implementation.
   layers, relevant repository evidence, and exact technical question in every
   research order. Include manifests and supply-chain constraints when package
   evaluation is involved.
-- Require primary-source URLs, applicable versions or dates, risks, tradeoffs, confidence, and retrieval date. For package evaluation, additionally require GitHub stars, maintenance activity, and concrete security or maintainability value.
-- Recommend a package only when evidence confirms GitHub stars of at least 1,000, active maintenance, and a direct security or maintainability improvement for this Change.
+- Require primary-source URLs, applicable versions or dates, risks, tradeoffs,
+  confidence, and retrieval date. For package evaluation, require evidence that
+  the package is a proven direct fit for the confirmed need and applicable
+  external and supply-chain constraints.
+- Do not use star count or general security or maintainability benefits as a
+  package gate or independent justification. Do not reject a proven package
+  merely because it is not installed. Custom implementation is the last resort,
+  allowed only when repository code, standard-library or native platform
+  capabilities, and proven packages cannot satisfy a core customer value whose
+  compromise could cause the product to fail.
 - Preserve `minimumReleaseAge: 4320`; never recommend `minimumReleaseAgeExclude`, `dangerouslyAllowAllBuilds`, or a blanket build-script approval. Identify any required `allowBuilds` entry for explicit package-level approval.
-- Treat dependency and version changes as ask-first execution boundaries. Propose them with rationale and verification, but never apply them.
+- Treat dependency and version changes as eligible recommendations under the
+  Credo. State the direct fit and applicable supply-chain constraints, but never
+  apply them.
 - Research evidence informs the decision; you own the final technical recommendation and its fit with the finalized Specs and repository architecture.
 - Keep rejected candidates in the architect report only. Clearly separate the selected positive end state so the proposer can avoid writing non-adoption statements into artifacts.
 - If current external evidence is required but `researcher` cannot be called, return `BLOCKED` with the exact research order. Do not decide from assumption.
