@@ -3,7 +3,7 @@ description: Independently reviews an OpenSpec Change for customer value, purpos
 mode: subagent
 hidden: true
 model: openai/gpt-5.6-luna
-reasoningEffort: 'high'
+reasoningEffort: 'max'
 temperature: 0.1
 permission:
   edit: deny
